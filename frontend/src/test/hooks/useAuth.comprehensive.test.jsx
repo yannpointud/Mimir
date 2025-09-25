@@ -1,0 +1,711 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook, waitFor, act } from '@testing-library/react';
+import { AuthProvider, useAuth, useAuthStatus } from '../../hooks/useAuth';
+import { authAPI } from '../../services/api';
+import * as authUtils from '../../utils/auth';
+
+// Mock de l'API d'authentification
+vi.mock('../../services/api', () => ({
+  authAPI: {
+    login: vi.fn(),
+    logout: vi.fn(),
+    getCurrentUser: vi.fn(),
+    refreshToken: vi.fn(),
+  },
+}));
+
+// Mock des utilitaires d'authentification
+vi.mock('../../utils/auth', () => ({
+  getAuthToken: vi.fn(),
+  setAuthToken: vi.fn(),
+  getUser: vi.fn(),
+  setUser: vi.fn(),
+  logout: vi.fn(),
+  checkAndCleanExpiredAuth: vi.fn(),
+  isAuthenticated: vi.fn(),
+}));
+
+// Mock de localStorage
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
+  writable: true,
+});
+
+// Mock de console.error pour éviter les logs en test
+let consoleSpy;
+
+// Wrapper pour les tests qui nécessitent le AuthProvider
+const AuthProviderWrapper = ({ children }) => (
+  <AuthProvider>{children}</AuthProvider>
+);
+
+describe('useAuth - Tests Complets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    authUtils.getUser.mockReturnValue(null);
+    authUtils.isAuthenticated.mockReturnValue(false);
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('Initialisation du contexte', () => {
+    it('devrait lancer une erreur si utilisé en dehors du AuthProvider', () => {
+      expect(() => {
+        renderHook(() => useAuth());
+      }).toThrow('useAuth must be used within an AuthProvider');
+    });
+
+    it('devrait initialiser avec les valeurs par défaut', async () => {
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      // Attendre que le loading soit terminé
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.user).toBeNull();
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(typeof result.current.login).toBe('function');
+      expect(typeof result.current.logout).toBe('function');
+      expect(typeof result.current.refreshToken).toBe('function');
+    });
+  });
+
+  describe('Vérification initiale de l\'authentification', () => {
+    it('devrait vérifier l\'authentification au montage avec token valide', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+      authAPI.getCurrentUser.mockResolvedValue(mockUser);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(authAPI.getCurrentUser).toHaveBeenCalled();
+      expect(authUtils.setUser).toHaveBeenCalledWith(mockUser);
+      expect(result.current.user).toEqual(mockUser);
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    it('devrait gérer l\'absence de token valide', async () => {
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(authAPI.getCurrentUser).not.toHaveBeenCalled();
+      expect(result.current.user).toBeNull();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+
+    it('devrait gérer les erreurs de vérification d\'authentification', async () => {
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+      authAPI.getCurrentUser.mockRejectedValue(new Error('Token expiré'));
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Erreur lors de la vérification de l\'authentification:',
+        expect.any(String)
+      );
+      expect(authUtils.logout).toHaveBeenCalled();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+  });
+
+  describe('Fonction de connexion', () => {
+    it('devrait connecter l\'utilisateur avec succès', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      const mockToken = 'mock-jwt-token';
+      const mockResponse = { access_token: mockToken, user: mockUser };
+
+      authAPI.login.mockResolvedValue(mockResponse);
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let loginResult;
+      await act(async () => {
+        loginResult = await result.current.login('testuser', 'password123');
+      });
+
+      expect(authAPI.login).toHaveBeenCalledWith('testuser', 'password123');
+      expect(authUtils.setAuthToken).toHaveBeenCalledWith(mockToken);
+      expect(authUtils.setUser).toHaveBeenCalledWith(mockUser);
+      expect(loginResult).toEqual({ success: true });
+      expect(result.current.user).toEqual(mockUser);
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    it('devrait gérer les erreurs de connexion', async () => {
+      const errorMessage = 'Identifiants incorrects';
+      authAPI.login.mockRejectedValue({
+        response: { data: { detail: errorMessage } }
+      });
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let loginResult;
+      await act(async () => {
+        loginResult = await result.current.login('wronguser', 'wrongpassword');
+      });
+
+      expect(loginResult).toEqual({
+        success: false,
+        error: errorMessage
+      });
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Erreur lors de la connexion:',
+        expect.any(String)
+      );
+    });
+
+    it('devrait gérer les erreurs réseau sans détail', async () => {
+      authAPI.login.mockRejectedValue(new Error('Network error'));
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let loginResult;
+      await act(async () => {
+        loginResult = await result.current.login('testuser', 'password123');
+      });
+
+      expect(loginResult).toEqual({
+        success: false,
+        error: 'Erreur de connexion'
+      });
+    });
+  });
+
+  describe('Fonction de déconnexion', () => {
+    it('devrait déconnecter l\'utilisateur connecté', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+      authAPI.getCurrentUser.mockResolvedValue(mockUser);
+      authAPI.logout.mockResolvedValue({});
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.isAuthenticated).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.logout();
+      });
+
+      expect(authAPI.logout).toHaveBeenCalled();
+      expect(authUtils.logout).toHaveBeenCalled();
+      expect(result.current.user).toBeNull();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+
+    it('devrait déconnecter même si l\'utilisateur n\'est pas connecté', async () => {
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.logout();
+      });
+
+      expect(authAPI.logout).not.toHaveBeenCalled();
+      expect(authUtils.logout).toHaveBeenCalled();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+
+    it('devrait gérer les erreurs de déconnexion API', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+      authAPI.getCurrentUser.mockResolvedValue(mockUser);
+      authAPI.logout.mockRejectedValue(new Error('Server error'));
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.isAuthenticated).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.logout();
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Erreur lors de la déconnexion:',
+        expect.any(String)
+      );
+      expect(authUtils.logout).toHaveBeenCalled();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+  });
+
+  describe('Fonction de rafraîchissement de token', () => {
+    it('devrait rafraîchir le token avec succès', async () => {
+      const newToken = 'new-jwt-token';
+      authAPI.refreshToken.mockResolvedValue({ access_token: newToken });
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let refreshResult;
+      await act(async () => {
+        refreshResult = await result.current.refreshToken();
+      });
+
+      expect(authAPI.refreshToken).toHaveBeenCalled();
+      expect(authUtils.setAuthToken).toHaveBeenCalledWith(newToken);
+      expect(refreshResult).toBe(true);
+    });
+
+    it('devrait gérer l\'échec du rafraîchissement', async () => {
+      authAPI.refreshToken.mockRejectedValue(new Error('Token expired'));
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let refreshResult;
+      await act(async () => {
+        refreshResult = await result.current.refreshToken();
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Erreur lors du rafraîchissement du token:',
+        expect.any(String)
+      );
+      expect(authUtils.logout).toHaveBeenCalled();
+      expect(refreshResult).toBe(false);
+    });
+  });
+
+  describe('États de chargement', () => {
+    it('devrait gérer l\'état de chargement pendant la connexion', async () => {
+      let resolveLogin;
+      const loginPromise = new Promise((resolve) => {
+        resolveLogin = resolve;
+      });
+      authAPI.login.mockReturnValue(loginPromise);
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      const loginCall = result.current.login('testuser', 'password');
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(true);
+      });
+
+      resolveLogin({ access_token: 'token', user: { id: 1, username: 'test', user_type: 'user' } });
+      await act(async () => {
+        await loginCall;
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('devrait gérer l\'état de chargement pendant la déconnexion', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+      authAPI.getCurrentUser.mockResolvedValue(mockUser);
+
+      let resolveLogout;
+      const logoutPromise = new Promise((resolve) => {
+        resolveLogout = resolve;
+      });
+      authAPI.logout.mockReturnValue(logoutPromise);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.isAuthenticated).toBe(true);
+      });
+
+      const logoutCall = result.current.logout();
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(true);
+      });
+
+      resolveLogout();
+      await act(async () => {
+        await logoutCall;
+      });
+
+      expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe('Flux d\'authentification complexes', () => {
+    it('devrait gérer une connexion suivie d\'une déconnexion', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      const mockToken = 'mock-jwt-token';
+      const mockResponse = { access_token: mockToken, user: mockUser };
+
+      authAPI.login.mockResolvedValue(mockResponse);
+      authAPI.logout.mockResolvedValue({});
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Connexion
+      await act(async () => {
+        await result.current.login('testuser', 'password123');
+      });
+
+      expect(result.current.isAuthenticated).toBe(true);
+      expect(result.current.user).toEqual(mockUser);
+
+      // Déconnexion
+      await act(async () => {
+        await result.current.logout();
+      });
+
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(result.current.user).toBeNull();
+    });
+
+    it('devrait gérer des tentatives de connexion multiples avec échecs', async () => {
+      const errorMessage = 'Identifiants incorrects';
+      authAPI.login.mockRejectedValue({
+        response: { data: { detail: errorMessage } }
+      });
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Première tentative
+      let result1;
+      await act(async () => {
+        result1 = await result.current.login('wrong1', 'wrong1');
+      });
+
+      expect(result1.success).toBe(false);
+      expect(result.current.isAuthenticated).toBe(false);
+
+      // Deuxième tentative
+      let result2;
+      await act(async () => {
+        result2 = await result.current.login('wrong2', 'wrong2');
+      });
+
+      expect(result2.success).toBe(false);
+      expect(result.current.isAuthenticated).toBe(false);
+      expect(authAPI.login).toHaveBeenCalledTimes(2);
+    });
+
+    it('devrait gérer le rafraîchissement de token pendant une session active', async () => {
+      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      const mockToken = 'mock-jwt-token';
+      const newToken = 'new-jwt-token';
+
+      authAPI.login.mockResolvedValue({ access_token: mockToken, user: mockUser });
+      authAPI.refreshToken.mockResolvedValue({ access_token: newToken });
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProviderWrapper,
+      });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Connexion initiale
+      await act(async () => {
+        await result.current.login('testuser', 'password123');
+      });
+
+      expect(result.current.isAuthenticated).toBe(true);
+
+      // Rafraîchissement du token
+      let refreshResult;
+      await act(async () => {
+        refreshResult = await result.current.refreshToken();
+      });
+
+      expect(refreshResult).toBe(true);
+      expect(authUtils.setAuthToken).toHaveBeenCalledWith(newToken);
+      expect(result.current.isAuthenticated).toBe(true);
+    });
+  });
+});
+
+describe('useAuthStatus - Tests Complets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    authUtils.isAuthenticated.mockReturnValue(false);
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('devrait initialiser avec le statut d\'authentification actuel', () => {
+    authUtils.isAuthenticated.mockReturnValue(true);
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+
+    const { result } = renderHook(() => useAuthStatus());
+
+    expect(result.current).toBe(true);
+  });
+
+  it('devrait vérifier périodiquement l\'authentification', () => {
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+    const { result } = renderHook(() => useAuthStatus());
+
+    expect(result.current).toBe(false);
+
+    // Simuler un changement d'état
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+
+    // Avancer le timer de 60 secondes
+    act(() => {
+      vi.advanceTimersByTime(60000);
+    });
+
+    expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(2);
+  });
+
+  it('devrait écouter les changements de localStorage', () => {
+    const { result } = renderHook(() => useAuthStatus());
+
+    expect(result.current).toBe(false);
+
+    // Simuler un événement storage
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+
+    act(() => {
+      const storageEvent = new StorageEvent('storage', {
+        key: 'authToken',
+        newValue: 'new-token',
+      });
+      window.dispatchEvent(storageEvent);
+    });
+
+    expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalled();
+  });
+
+  it('devrait ignorer les changements de localStorage non pertinents', () => {
+    const initialCallCount = authUtils.checkAndCleanExpiredAuth.mock.calls.length;
+
+    renderHook(() => useAuthStatus());
+
+    act(() => {
+      const storageEvent = new StorageEvent('storage', {
+        key: 'otherKey',
+        newValue: 'some-value',
+      });
+      window.dispatchEvent(storageEvent);
+    });
+
+    // Ne devrait pas avoir appelé checkAndCleanExpiredAuth en plus
+    expect(authUtils.checkAndCleanExpiredAuth.mock.calls.length).toBe(initialCallCount + 1);
+  });
+
+  it('devrait nettoyer les listeners au démontage', () => {
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+    const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+
+    const { unmount } = renderHook(() => useAuthStatus());
+
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('storage', expect.any(Function));
+    expect(clearIntervalSpy).toHaveBeenCalled();
+  });
+
+  it('devrait réagir aux changements de la clé user dans localStorage', () => {
+    renderHook(() => useAuthStatus());
+
+    authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+
+    act(() => {
+      const storageEvent = new StorageEvent('storage', {
+        key: 'user',
+        newValue: JSON.stringify({ id: 1, username: 'test', user_type: 'user' }),
+      });
+      window.dispatchEvent(storageEvent);
+    });
+
+    expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalled();
+  });
+
+  describe('Scénarios de synchronisation multi-onglets', () => {
+    it('devrait se synchroniser quand un autre onglet se connecte', () => {
+      const { result } = renderHook(() => useAuthStatus());
+
+      expect(result.current).toBe(false);
+
+      // Simuler qu'un autre onglet se connecte
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+
+      act(() => {
+        const storageEvent = new StorageEvent('storage', {
+          key: 'authToken',
+          newValue: 'new-auth-token',
+        });
+        window.dispatchEvent(storageEvent);
+      });
+
+      expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalled();
+    });
+
+    it('devrait se synchroniser quand un autre onglet se déconnecte', () => {
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+      const { result } = renderHook(() => useAuthStatus());
+
+      expect(result.current).toBe(true);
+
+      // Simuler qu'un autre onglet se déconnecte
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+      act(() => {
+        const storageEvent = new StorageEvent('storage', {
+          key: 'authToken',
+          newValue: null,
+        });
+        window.dispatchEvent(storageEvent);
+      });
+
+      expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalled();
+    });
+  });
+
+  describe('Gestion des timers et performances', () => {
+    it('devrait vérifier l\'authentification toutes les minutes', () => {
+      renderHook(() => useAuthStatus());
+
+      // Vérification initiale
+      expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(1);
+
+      // Après 30 secondes, pas de nouvelle vérification
+      act(() => {
+        vi.advanceTimersByTime(30000);
+      });
+      expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(1);
+
+      // Après 60 secondes, une nouvelle vérification
+      act(() => {
+        vi.advanceTimersByTime(30000);
+      });
+      expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(2);
+
+      // Après 2 minutes, une troisième vérification
+      act(() => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(3);
+    });
+
+    it('ne devrait pas créer de fuites mémoire avec plusieurs instances', () => {
+      const setIntervalSpy = vi.spyOn(global, 'setInterval');
+      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+
+      // Créer plusieurs instances
+      const hook1 = renderHook(() => useAuthStatus());
+      const hook2 = renderHook(() => useAuthStatus());
+      const hook3 = renderHook(() => useAuthStatus());
+
+      expect(setIntervalSpy).toHaveBeenCalledTimes(3);
+
+      // Démonter les instances
+      hook1.unmount();
+      hook2.unmount();
+      hook3.unmount();
+
+      expect(clearIntervalSpy).toHaveBeenCalledTimes(3);
+    });
+  });
+});

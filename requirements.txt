@@ -1,0 +1,50 @@
+# Mimir - Dependencies
+# Python 3.11 required
+
+# Core
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.8
+pydantic-settings==2.10.1
+python-dotenv==1.1.1
+
+# Database
+sqlalchemy==2.0.43
+alembic==1.16.5
+
+# LLM & RAG
+mistralai==0.4.2
+faiss-cpu==1.12.0
+numpy==2.3.3
+rapidfuzz==3.14.1
+
+# Document Processing
+pypdf==3.17.0
+python-docx==1.1.0
+markdown==3.5.1
+
+# Cache
+cachetools==5.3.2
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Monitoring
+watchdog==3.0.0
+
+# Email
+aiosmtplib==3.0.1
+
+# Rate Limiting
+slowapi==0.1.9
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2
+locust==2.19.1
+aiosqlite==0.21.0
+freezegun==1.5.5
