@@ -2,30 +2,15 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-teal.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-teal.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
-![License](https://img.shields.io/badge/license-Proprietary-red.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-Mimir est une solution de chatbot intelligent RAG (Retrieval Augmented Generation) destinée aux entreprises, permettant aux employés d'obtenir des réponses instantanées et fiables basées exclusivement sur la documentation interne. La solution garantit la confidentialité totale des données en fonctionnant entièrement sur l'infrastructure du client.
+Mimir est une solution de chatbot intelligent RAG (Retrieval Augmented Generation) destinée aux entreprises, permettant aux employés d'obtenir des réponses instantanées et fiables basées exclusivement sur la documentation interne. 
 
 ## 🎬 Démonstration
 
 ![Démonstration Mimir](DemoMimir.mp4)
-
-## 🎯 Vision et Objectifs
-
-### Objectifs Métiers
-- **Productivité** : Réduire de 70% le temps de recherche d'information
-- **Fiabilité** : 100% des réponses basées sur documentation officielle
-- **Intégration** : Accélération de l'onboarding des nouveaux employés
-- **Confidentialité** : Aucune donnée ne quitte l'infrastructure client
-- **Simplicité** : Déploiement en moins de 30 minutes
-
-### Indicateurs de Succès
-- Temps moyen de réponse < 3 secondes
-- Taux de satisfaction utilisateur > 85%
-- Réduction des tickets support documentation de 50%
-- 0 fuite de données
 
 ## ✨ Fonctionnalités
 
@@ -40,9 +25,8 @@ Mimir est une solution de chatbot intelligent RAG (Retrieval Augmented Generatio
 ### Module Administration
 - Authentification sécurisée (JWT)
 - Upload manuel de documents (PDF, DOCX, TXT, MD)
-- Surveillance automatique de dossier partagé
 - Liste et gestion des documents indexés
-- **Nettoyage automatique des chunks orphelins** (rebuild index)
+- Nettoyage automatique des chunks orphelins (rebuild index)
 - Configuration email d'escalade
 - Indicateurs de santé système en temps réel
 - Tableau de bord avec métriques d'utilisation
@@ -55,11 +39,11 @@ Mimir est une solution de chatbot intelligent RAG (Retrieval Augmented Generatio
 - Queue séquentielle anti-saturation
 - Protection documents critiques
 - Traitement asynchrone avec retry logic
-- **Nettoyage automatique des chunks orphelins**
+- Nettoyage automatique des chunks orphelins
 
 ### Module RAG
 - Recherche sémantique par similarité
-- Scoring multi-critères (pertinence + fraîcheur + boost nom de fichier)
+- Scoring multi-critères (pertinence + boost nom de fichier)
 - Contexte limité à la documentation
 - Pas d'hallucination (réponse "je ne sais pas" si incertitude)
 - Filtrage dynamique des sources
@@ -124,8 +108,7 @@ backend/
 │   └── utils/                 # Utilitaires (logs reader, parser)
 └── tests/
     ├── unit/                  # Tests unitaires
-    ├── integration/           # Tests d'intégration
-    └── e2e/                   # Tests end-to-end
+    └── integration/           # Tests d'intégration
 
 frontend/
 ├── src/
@@ -146,7 +129,7 @@ frontend/
 - Python 3.11+
 - Node.js 18+
 - Clé API Mistral
-- Minimum 16GB RAM
+- Minimum 4GB RAM
 
 ### Installation locale
 
@@ -160,15 +143,12 @@ python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # ou venv\Scripts\activate  # Windows
 
-# Installer les dépendances
-pip install -r requirements.txt
+# Installer les dépendances (requirements.txt est à la racine du projet)
+pip install -r ../requirements.txt
 
 # Créer le fichier .env
 cp .env.example .env
 # Éditer .env et configurer MISTRAL_API_KEY
-
-# Initialiser la base de données
-python scripts/init_db.py
 
 # Lancer le serveur
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -187,7 +167,7 @@ npm run dev
 ```
 
 L'application sera accessible sur :
-- Frontend : http://localhost:5173
+- Frontend : http://localhost:3000
 - Backend API : http://localhost:8000
 - Documentation API : http://localhost:8000/docs
 
@@ -206,40 +186,48 @@ DATABASE_URL=sqlite:///./data/sqlite/mimir.db
 SQLITE_WAL_MODE=true
 
 # LLM Configuration
-MISTRAL_API_KEY=votre_clé_api_mistral
+LLM_PROVIDER=mistral
+MISTRAL_API_KEY=your_mistral_api_key_here
 MISTRAL_MODEL=mistral-small-latest
 MISTRAL_EMBEDDING_MODEL=mistral-embed
-EMBEDDING_DIMENSION=1024
 
 # Vector Store
+VECTOR_STORE_TYPE=faiss
 FAISS_INDEX_PATH=./data/faiss/index.bin
 FAISS_METADATA_PATH=./data/faiss/metadata.pkl
+EMBEDDING_DIMENSION=1024
 SIMILARITY_THRESHOLD=0.5
-MAX_SOURCES=5
+MAX_SOURCES=8
+
+# Ingestion
+MAX_CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+MAX_FILE_SIZE_MB=100
 
 # Cache
 CACHE_ENABLED=true
-CACHE_MAX_SIZE=1000
+CACHE_MAX_SIZE=100
 CACHE_TTL=3600
 
 # Email (pour escalades)
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
-SMTP_USERNAME=notification@example.com
-SMTP_PASSWORD=votre_password
+SMTP_USER=your_email@example.com
+SMTP_PASSWORD=your_smtp_password
 ESCALATION_EMAIL=support@example.com
 
 # Security
-JWT_SECRET_KEY=votre_secret_très_long_et_sécurisé
+JWT_SECRET_KEY=change_me_to_a_long_random_secret
 JWT_ALGORITHM=HS256
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
-ADMIN_PASSWORD_HASH=bcrypt_hash_du_password
+JWT_EXPIRATION_HOURS=2
+ADMIN_PASSWORD_HASH=your_bcrypt_hash_here
 
 # Rate Limiting
 RATE_LIMIT_ENABLED=true
-RATE_LIMIT_PER_MINUTE=60
+RATE_LIMIT_PER_MINUTE=20
 
-# Logging
+# Environment & Logging
+ENVIRONMENT=development
 LOG_LEVEL=INFO
 ```
 
@@ -254,7 +242,7 @@ python -c "from src.auth.jwt_handler import JWTHandler; print(JWTHandler().hash_
 
 ### 1. Connexion Admin
 
-Accédez à l'interface admin et connectez-vous avec :
+Accédez à l'interface admin via http://localhost:3000/admin et connectez-vous avec :
 - Username : `admin`
 - Password par défaut : `Abc1234`
 
@@ -262,16 +250,11 @@ Le mot de passe peut être modifié depuis l'interface Admin > Configuration.
 
 ### 2. Upload de Documents
 
-Deux méthodes :
-
 **Upload manuel :**
 - Naviguez vers "Documents" dans l'admin
 - Cliquez sur "Upload Document"
 - Sélectionnez vos fichiers (PDF, DOCX, TXT, MD)
 
-**Surveillance automatique :**
-- Placez vos documents dans `./backend/data/uploads/`
-- Le système détectera et indexera automatiquement
 
 ### 3. Chat avec le Bot
 
@@ -284,32 +267,28 @@ Deux méthodes :
 
 - Tableau de bord admin pour métriques en temps réel
 - Health check : `/api/v1/health`
-- Logs système : `/backend/logs/`
+- Logs système : `logs/`
 
 ## 🧪 Tests
 
-### Tests Unitaires
-
 ```bash
-cd backend
+# Lancer tous les tests (unit + integration + performance)
+python -m pytest
 
-# Lancer tous les tests unitaires
+# Tests unitaires uniquement
 python -m pytest tests/unit/ -v
 
-# Avec couverture
-python -m pytest tests/unit/ --cov=backend/src --cov-report=html
-```
-
-### Tests d'Intégration
-
-```bash
-# Tests d'intégration complète
+# Tests d'intégration
 python -m pytest tests/integration/ -v
+
+# Tests de performance
+python -m pytest tests/performance/ -v
+
+# Avec rapport de couverture
+python -m pytest --cov=backend/src --cov-report=html
 ```
 
-### Couverture de Tests
-
-La suite de tests couvre les modules principaux : auth, cache, database, API endpoints, ingestion et RAG core.
+La suite de tests (~800 tests, ~75% coverage) couvre : auth, cache, database, API endpoints, ingestion, RAG core et performance.
 
 ## 🛠️ API Documentation
 
@@ -350,13 +329,6 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 
 ## 📊 Performance
 
-### Métriques Cibles
-- **Temps de réponse chat** : < 3 secondes
-- **Capacité documents** : 1 000 à 20 000 documents
-- **Utilisateurs simultanés** : 50
-- **Taille max document** : 100 MB
-- **Chunks max par document** : 2 000
-
 ### Optimisations Implémentées
 - Cache LRU avec TTL pour réponses chat
 - Mode WAL SQLite pour concurrence
@@ -372,16 +344,15 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 ### Mesures Implémentées
 - **Authentification** : JWT avec tokens signés
 - **Passwords** : Hash bcrypt avec salt
-- **Rate Limiting** : Adaptatif par type utilisateur
+- **Rate Limiting** : Par type d'endpoint (chat, admin, upload, auth)
 - **CORS** : Configuré selon environnement
 - **Validation** : Pydantic sur tous les inputs
-- **Injection Prevention** : Prompts sanitizés
-- **Logs RGPD** : Pas de log des questions utilisateurs
+- **Validation fichiers** : Sanitization des noms de fichiers uploadés
 - **Isolation** : Déploiement sur infrastructure dédiée
 
 ### Conformité
 - RGPD : Données en local uniquement
-- Confidentialité : Aucune donnée externe
+- Confidentialité : Données stockées en local (les requêtes LLM transitent par l'API Mistral)
 - Audit trail : Logs d'actions admin complets
 
 ## 🐛 Troubleshooting
@@ -391,28 +362,28 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 #### 1. Erreur de connexion à Mistral API
 
 ```bash
-# Vérifier la clé API
-echo $MISTRAL_API_KEY
+# Vérifier la clé API dans le fichier .env
+grep MISTRAL_API_KEY backend/.env
 
 # Tester manuellement
-curl -H "Authorization: Bearer $MISTRAL_API_KEY" https://api.mistral.ai/v1/models
+curl -H "Authorization: Bearer VOTRE_CLE" https://api.mistral.ai/v1/models
 ```
 
 #### 2. Base de données verrouillée
 
 ```bash
 # Vérifier le mode WAL
-sqlite3 data/sqlite/mimir.db "PRAGMA journal_mode;"
+sqlite3 backend/data/sqlite/mimir.db "PRAGMA journal_mode;"
 
 # Activer WAL si nécessaire
-sqlite3 data/sqlite/mimir.db "PRAGMA journal_mode=WAL;"
+sqlite3 backend/data/sqlite/mimir.db "PRAGMA journal_mode=WAL;"
 ```
 
 #### 3. Index FAISS corrompu
 
 ```bash
 # Supprimer et reconstruire
-rm data/faiss/index.bin data/faiss/metadata.pkl
+rm backend/data/faiss/index.bin backend/data/faiss/metadata.pkl
 
 # Retraiter tous les documents via l'admin
 # Endpoint: POST /api/v1/documents/{id}/reprocess
@@ -452,44 +423,36 @@ Le rebuild effectue automatiquement :
 
 ```bash
 # Backend logs
-tail -f backend/logs/app.log
+tail -f logs/app.log
 
 # Frontend logs (envoyés au backend)
-tail -f backend/logs/frontend.log
+tail -f logs/frontend.log
 
 # Filtrer par niveau
-grep "ERROR" backend/logs/app.log
+grep "ERROR" logs/app.log
 ```
 
-## 📖 Documentation Complémentaire
-
-- [mimir-codeguide.md](./mimir-codeguide.md) : Guide détaillé du code et de l'architecture
-- [mimir-cahier-charges.md](./mimir-cahier-charges.md) : Cahier des charges complet
-- [mimir-hld.md](./mimir-hld.md) : High-Level Design
-- [mimir-lld.md](./mimir-lld.md) : Low-Level Design
-- [mimir-implementation-plan.md](./mimir-implementation-plan.md) : Plan d'implémentation
 
 ## 🤝 Contribution
 
-Ce projet est propriétaire et destiné à un usage interne entreprise.
+Ce projet est libre.
 
 ### Standards de Code
 - **Python** : PEP 8, type hints, docstrings
-- **JavaScript** : ESLint, Prettier
+- **JavaScript** : ESLint
 - **Commits** : Conventional Commits
-- **Tests** : Couverture > 80%
+- **Tests** : Couverture ~75%
 
-## 📝 License
+## 📝 License MIT
 
-Proprietary - Usage interne entreprise uniquement
+## 👥 Contact
 
-## 👥 Support
+Si cette approche de l'ingénierie, où la technique sert une vision business claire, vous intéresse, je serais ravi d'en discuter.
 
-Pour toute question ou problème :
-- Email : support@votre-entreprise.com
-- Documentation : `/docs`
-- Issues : Gestionnaire de tickets interne
+Contact : 
+
+📧 yann@pointud.fr 
+
+📞 06 87 85 59 07
 
 ---
-
-**Développé avec ❤️ pour optimiser la productivité de votre entreprise**
