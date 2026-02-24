@@ -10,8 +10,7 @@ Mimir est une solution de chatbot intelligent RAG (Retrieval Augmented Generatio
 
 ## 🎬 Démonstration
 
-<video src="DemoMimir.mp4" controls muted style="max-height:640px; width:100%;">
-</video>
+https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 
 ## ✨ Fonctionnalités
 
