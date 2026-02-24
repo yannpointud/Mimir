@@ -1,6 +1,6 @@
 """
-Pattern Repository pour l'abstraction de la persistance
-Implémente les opérations CRUD avec gestion d'erreurs robuste
+Repository pattern for persistence abstraction
+Implements CRUD operations with robust error handling
 """
 
 from typing import List, Optional, Dict, Any
@@ -18,39 +18,39 @@ logger = logging.getLogger(__name__)
 
 
 class BaseRepository:
-    """Repository de base avec opérations communes"""
+    """Base repository with common operations"""
     
     def __init__(self, session: Session):
         self.session = session
     
     def _handle_db_error(self, e: Exception, operation: str):
-        """Gestion centralisée des erreurs de base de données"""
+        """Centralized database error handling"""
         logger.error(f"Database error during {operation}: {e}")
         self.session.rollback()
 
 
 class DocumentRepository(BaseRepository):
     """
-    Repository pour les documents
-    Gère le CRUD des documents avec logique métier intégrée
+    Repository for documents
+    Handles document CRUD with integrated business logic
     """
     
     def create(self, filename: str, file_hash: str, path: str = None, 
                preserve: bool = False) -> Document:
         """
-        Crée un nouveau document
-        
+        Create a new document
+
         Args:
-            filename: Nom du fichier
-            file_hash: Hash SHA-256 du fichier
-            path: Chemin optionnel
-            preserve: Protection contre suppression automatique
-            
+            filename: File name
+            file_hash: SHA-256 hash of the file
+            path: Optional path
+            preserve: Protection against automatic deletion
+
         Returns:
-            Document créé
-            
+            Created document
+
         Raises:
-            IntegrityError: Si le hash existe déjà
+            IntegrityError: If the hash already exists
         """
         try:
             document = Document(
@@ -76,7 +76,7 @@ class DocumentRepository(BaseRepository):
             raise
     
     def get_by_id(self, doc_id: int) -> Optional[Document]:
-        """Récupère un document par son ID"""
+        """Retrieve a document by its ID"""
         try:
             return self.session.query(Document).filter_by(id=doc_id).first()
         except SQLAlchemyError as e:
@@ -84,7 +84,7 @@ class DocumentRepository(BaseRepository):
             raise
     
     def get_by_hash(self, file_hash: str) -> Optional[Document]:
-        """Récupère un document par son hash (pour détecter doublons)"""
+        """Retrieve a document by its hash (to detect duplicates)"""
         try:
             return self.session.query(Document).filter_by(file_hash=file_hash).first()
         except SQLAlchemyError as e:
@@ -92,7 +92,7 @@ class DocumentRepository(BaseRepository):
             raise
     
     def get_by_status(self, status: str) -> List[Document]:
-        """Récupère tous les documents d'un statut donné"""
+        """Retrieve all documents with a given status"""
         try:
             return self.session.query(Document).filter_by(status=status).all()
         except SQLAlchemyError as e:
@@ -102,18 +102,18 @@ class DocumentRepository(BaseRepository):
     def get_all(self, limit: int = None, offset: int = 0, 
                 order_by: str = 'created_at', desc_order: bool = True) -> List[Document]:
         """
-        Récupère tous les documents avec pagination et tri
-        
+        Retrieve all documents with pagination and sorting
+
         Args:
-            limit: Nombre maximum de résultats
-            offset: Décalage pour pagination
-            order_by: Champ de tri ('created_at', 'filename', 'status')
-            desc_order: Tri descendant si True
+            limit: Maximum number of results
+            offset: Offset for pagination
+            order_by: Sort field ('created_at', 'filename', 'status')
+            desc_order: Descending order if True
         """
         try:
             query = self.session.query(Document)
             
-            # Tri
+            # Sorting
             order_field = getattr(Document, order_by, Document.created_at)
             if desc_order:
                 query = query.order_by(desc(order_field))
@@ -125,9 +125,9 @@ class DocumentRepository(BaseRepository):
                 query = query.offset(offset)
             if limit:
                 query = query.limit(limit)
-            
+
             return query.all()
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, "get all documents")
             raise
@@ -135,13 +135,13 @@ class DocumentRepository(BaseRepository):
     def get_all_paginated(self, offset: int = 0, limit: int = 50,
                          filters: dict = None, search: str = None) -> tuple[List['Document'], int]:
         """
-        Récupère tous les documents avec pagination et compte total
+        Retrieve all documents with pagination and total count
 
         Args:
-            offset: Décalage pour pagination
-            limit: Nombre maximum de résultats
-            filters: Filtres à appliquer (ex: {"status": "indexed"})
-            search: Terme de recherche dans le nom de fichier
+            offset: Offset for pagination
+            limit: Maximum number of results
+            filters: Filters to apply (e.g., {"status": "indexed"})
+            search: Search term in the filename
 
         Returns:
             Tuple (documents, total_count)
@@ -149,19 +149,19 @@ class DocumentRepository(BaseRepository):
         try:
             query = self.session.query(Document)
 
-            # Appliquer les filtres
+            # Apply filters
             if filters:
                 if "status" in filters:
                     query = query.filter(Document.status == filters["status"])
 
-            # Appliquer la recherche
+            # Apply search
             if search:
                 query = query.filter(Document.filename.ilike(f"%{search}%"))
 
-            # Compter le total avant pagination
+            # Count total before pagination
             total_count = query.count()
 
-            # Appliquer la pagination et le tri
+            # Apply pagination and sorting
             query = query.order_by(desc(Document.created_at))
             if offset > 0:
                 query = query.offset(offset)
@@ -179,13 +179,13 @@ class DocumentRepository(BaseRepository):
     def update_status(self, doc_id: int, status: str,
                      error_message: str = None, chunk_count: int = None):
         """
-        Met à jour le statut d'un document
-        
+        Update a document's status
+
         Args:
-            doc_id: ID du document
-            status: Nouveau statut
-            error_message: Message d'erreur optionnel
-            chunk_count: Nombre de chunks si indexé
+            doc_id: Document ID
+            status: New status
+            error_message: Optional error message
+            chunk_count: Number of chunks if indexed
         """
         try:
             document = self.get_by_id(doc_id)
@@ -212,14 +212,14 @@ class DocumentRepository(BaseRepository):
     
     def delete(self, doc_id: int, force: bool = False) -> bool:
         """
-        Supprime un document
-        
+        Delete a document
+
         Args:
-            doc_id: ID du document
-            force: Force la suppression même si protégé
-            
+            doc_id: Document ID
+            force: Force deletion even if protected
+
         Returns:
-            True si supprimé, False sinon
+            True if deleted, False otherwise
         """
         try:
             document = self.get_by_id(doc_id)
@@ -240,25 +240,25 @@ class DocumentRepository(BaseRepository):
             raise
     
     def get_statistics(self) -> Dict[str, Any]:
-        """Retourne des statistiques sur les documents"""
+        """Return statistics about documents"""
         try:
             stats = {}
             
-            # Comptes par statut
+            # Counts by status
             for status in ['pending', 'indexing', 'indexed', 'error']:
                 count = self.session.query(Document).filter_by(status=status).count()
                 stats[f'count_{status}'] = count
             
-            # Total
+            # Total count
             stats['total_documents'] = self.session.query(Document).count()
             
-            # Total des chunks
+            # Total chunks
             total_chunks = self.session.query(Document.chunk_count).filter(
                 Document.status == 'indexed'
             ).all()
             stats['total_chunks'] = sum(count[0] for count in total_chunks if count[0])
             
-            # Documents protégés
+            # Protected documents
             stats['protected_documents'] = self.session.query(Document).filter_by(
                 preserve=True
             ).count()
@@ -271,10 +271,10 @@ class DocumentRepository(BaseRepository):
 
 
 class ConfigurationRepository(BaseRepository):
-    """Repository pour la configuration système"""
+    """Repository for system configuration"""
     
     def get(self, key: str) -> Optional[Configuration]:
-        """Récupère une configuration par clé"""
+        """Retrieve a configuration by key"""
         try:
             return self.session.query(Configuration).filter_by(key=key).first()
         except SQLAlchemyError as e:
@@ -282,12 +282,12 @@ class ConfigurationRepository(BaseRepository):
             raise
     
     def get_value(self, key: str, default: str = None) -> Optional[str]:
-        """Récupère la valeur d'une configuration"""
+        """Retrieve the value of a configuration"""
         config = self.get(key)
         return config.value if config else default
     
     def set(self, key: str, value: str) -> Configuration:
-        """Définit ou met à jour une configuration"""
+        """Set or update a configuration"""
         try:
             config = self.get(key)
             if config:
@@ -308,7 +308,7 @@ class ConfigurationRepository(BaseRepository):
             raise
     
     def delete(self, key: str) -> bool:
-        """Supprime une configuration"""
+        """Delete a configuration"""
         try:
             config = self.get(key)
             if config:
@@ -323,7 +323,7 @@ class ConfigurationRepository(BaseRepository):
             raise
     
     def get_all(self) -> List[Configuration]:
-        """Récupère toutes les configurations"""
+        """Retrieve all configurations"""
         try:
             return self.session.query(Configuration).order_by(Configuration.key).all()
         except SQLAlchemyError as e:
@@ -332,15 +332,15 @@ class ConfigurationRepository(BaseRepository):
 
 
 class AuditLogRepository(BaseRepository):
-    """Repository pour les logs d'audit"""
+    """Repository for audit logs"""
     
     def create_log(self, user_type: str, action: str, details: str = None,
                    ip_address: str = None, user_agent: str = None,
                    success: bool = True, additional_data: dict = None) -> AuditLog:
-        """Crée un nouveau log d'audit"""
+        """Create a new audit log"""
         try:
-            # Note: additional_data est accepté pour compatibilité mais non persisté
-            # Dans une future version, on pourrait ajouter ce champ au modèle
+            # Note: additional_data is accepted for compatibility but not persisted
+            # In a future version, this field could be added to the model
             log_entry = AuditLog(
                 user_type=user_type,
                 action=action,
@@ -363,13 +363,13 @@ class AuditLogRepository(BaseRepository):
     def get_logs(self, user_type: str = None, action: str = None,
                  limit: int = 100, offset: int = 0) -> List[AuditLog]:
         """
-        Récupère les logs d'audit avec filtres
-        
+        Retrieve audit logs with filters
+
         Args:
-            user_type: Filtrer par type d'utilisateur
-            action: Filtrer par action
-            limit: Nombre maximum de résultats
-            offset: Décalage pour pagination
+            user_type: Filter by user type
+            action: Filter by action
+            limit: Maximum number of results
+            offset: Offset for pagination
         """
         try:
             query = self.session.query(AuditLog)
@@ -393,13 +393,13 @@ class AuditLogRepository(BaseRepository):
     
     def cleanup_old_logs(self, days_to_keep: int = 90) -> int:
         """
-        Nettoie les anciens logs d'audit
-        
+        Clean up old audit logs
+
         Args:
-            days_to_keep: Nombre de jours à conserver
-            
+            days_to_keep: Number of days to retain
+
         Returns:
-            Nombre de logs supprimés
+            Number of deleted logs
         """
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
@@ -420,14 +420,14 @@ class AuditLogRepository(BaseRepository):
             raise
 
 
-# Factory function pour créer les repositories avec session
+# Factory function to create repositories with a session
 
 def create_repositories(session: Session) -> Dict[str, Any]:
     """
-    Factory pour créer tous les repositories avec une session donnée
-    
+    Factory to create all repositories with a given session
+
     Returns:
-        Dictionnaire contenant tous les repositories
+        Dictionary containing all repositories
     """
     return {
         'document': DocumentRepository(session),

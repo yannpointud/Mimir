@@ -1,6 +1,6 @@
 """
-Tests unitaires simplifiés pour le système de logging
-Focus sur la couverture de code pour atteindre 80%
+Simplified unit tests for the logging system
+Focus on code coverage to reach 80%
 """
 
 import pytest
@@ -16,16 +16,16 @@ from src.monitoring.logger import (
 
 
 class TestJSONFormatterSimple:
-    """Tests simplifiés pour JSONFormatter"""
+    """Simplified tests for JSONFormatter."""
 
     def test_json_formatter_basic_format(self):
-        """Test de base du formatage JSON"""
+        """Test basic JSON formatting."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
             name="test", level=logging.INFO, pathname="test.py", lineno=10,
             msg="Test message", args=(), exc_info=None
         )
-        # Ajouter les attributs requis
+        # Add required attributes
         record.module = "test_module"
         record.funcName = "test_function"
         record.process = 1234
@@ -35,13 +35,13 @@ class TestJSONFormatterSimple:
         result = formatter.format(record)
 
         assert isinstance(result, str)
-        # Vérifier que c'est du JSON valide
+        # Verify it is valid JSON
         data = json.loads(result)
         assert data['level'] == 'INFO'
         assert data['message'] == 'Test message'
 
     def test_json_formatter_with_extra(self):
-        """Test avec champs extra"""
+        """Test with extra fields."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
             name="test", level=logging.ERROR, pathname="test.py", lineno=10,
@@ -62,15 +62,15 @@ class TestJSONFormatterSimple:
 
 
 class TestConsoleFormatterSimple:
-    """Tests simplifiés pour ConsoleFormatter"""
+    """Simplified tests for ConsoleFormatter."""
 
     def test_console_formatter_creates(self):
-        """Test de création du formateur console"""
+        """Test console formatter creation."""
         formatter = ConsoleFormatter()
         assert formatter is not None
 
     def test_console_formatter_formats(self):
-        """Test de formatage console"""
+        """Test console formatting."""
         formatter = ConsoleFormatter()
         record = logging.LogRecord(
             name="test", level=logging.INFO, pathname="test.py", lineno=10,
@@ -83,89 +83,89 @@ class TestConsoleFormatterSimple:
 
 
 class TestSetupLoggerSimple:
-    """Tests simplifiés pour setup_logger"""
+    """Simplified tests for setup_logger."""
 
     def test_setup_logger_creates_logger(self):
-        """Test de création de logger"""
+        """Test logger creation."""
         logger = setup_logger("test_simple")
 
         assert isinstance(logger, logging.Logger)
         assert logger.name == "test_simple"
 
     def test_setup_logger_default_level(self):
-        """Test du niveau par défaut"""
+        """Test default level."""
         logger = setup_logger("test_level")
 
-        # Le niveau par défaut devrait être INFO
+        # Default level should be INFO
         assert logger.level <= logging.INFO
 
     def test_setup_logger_has_handlers(self):
-        """Test que le logger a des handlers"""
+        """Test that the logger has handlers."""
         logger = setup_logger("test_handlers")
 
         assert len(logger.handlers) > 0
 
     def test_setup_logger_string_level(self):
-        """Test avec niveau string"""
+        """Test with string level."""
         logger = setup_logger("test_str", level="DEBUG")
 
         assert logger.level == logging.DEBUG
 
     def test_setup_logger_int_level(self):
-        """Test avec niveau int en string"""
+        """Test with int level as string."""
         logger = setup_logger("test_int", level="WARNING")
 
         assert logger.level == logging.WARNING
 
 
 class TestLoggerIntegrationSimple:
-    """Tests d'intégration simplifiés"""
+    """Simplified integration tests."""
 
     def test_logger_can_log_all_levels(self):
-        """Test que le logger peut logger tous les niveaux"""
+        """Test that the logger can log all levels."""
         logger = setup_logger("test_all_levels", level="DEBUG")
 
-        # Ces appels ne doivent pas lever d'exception
+        # These calls must not raise an exception
         logger.debug("Debug message")
         logger.info("Info message")
         logger.warning("Warning message")
         logger.error("Error message")
         logger.critical("Critical message")
 
-        assert True  # Si on arrive ici, pas d'exception
+        assert True  # If we get here, no exception
 
     def test_multiple_logger_creation(self):
-        """Test de création de plusieurs loggers"""
+        """Test creating multiple loggers."""
         logger1 = setup_logger("multi1")
         logger2 = setup_logger("multi2")
-        logger3 = setup_logger("multi1")  # Même nom que le premier
+        logger3 = setup_logger("multi1")  # Same name as first
 
         assert logger1.name == "multi1"
         assert logger2.name == "multi2"
-        assert logger1 is logger3  # Doit être le même instance
+        assert logger1 is logger3  # Must be the same instance
 
     def test_logger_with_file_creation(self):
-        """Test de création de logger avec fichier temporaire"""
+        """Test logger creation with temporary file."""
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
             logger = setup_logger("file_test")
 
-            # Tester que le logger fonctionne
+            # Test that the logger works
             logger.info("Test file logging")
 
             assert isinstance(logger, logging.Logger)
         finally:
-            # Nettoyer le fichier temporaire
+            # Clean up the temporary file
             Path(tmp_path).unlink(missing_ok=True)
 
 
 class TestLoggerFunctionalitySimple:
-    """Tests de fonctionnalité simple"""
+    """Simple functionality tests."""
 
     def test_json_formatter_no_exception_info(self):
-        """Test du formateur sans info d'exception"""
+        """Test formatter without exception info."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
             name="test", level=logging.INFO, pathname="test.py", lineno=1,
@@ -184,7 +184,7 @@ class TestLoggerFunctionalitySimple:
         assert data['message'] == 'No exception'
 
     def test_json_formatter_ensure_ascii_false(self):
-        """Test que ensure_ascii=False fonctionne"""
+        """Test that ensure_ascii=False works."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
             name="test", level=logging.INFO, pathname="test.py", lineno=1,
@@ -198,8 +198,8 @@ class TestLoggerFunctionalitySimple:
 
         result = formatter.format(record)
 
-        # Doit contenir les caractères unicode directement
+        # Must contain unicode characters directly
         assert "café" in result
-        # Et être du JSON valide
+        # And be valid JSON
         data = json.loads(result)
         assert data['message'] == "Message avec accents: café"

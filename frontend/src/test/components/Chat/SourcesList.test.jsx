@@ -2,13 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import SourcesList from '../../../components/Chat/SourcesList';
 
-// Mock des icônes Lucide
+// Mock Lucide icons
 vi.mock('lucide-react', () => ({
   FileText: ({ className }) => <div className={className} data-testid="file-icon" />,
   ExternalLink: ({ className }) => <div className={className} data-testid="external-icon" />,
 }));
 
-// Mock des utilitaires
+// Mock utilities
 vi.mock('../../../utils/helpers', () => ({
   cn: (...classes) => classes.filter(Boolean).join(' '),
   truncateText: (text, limit) => text.length > limit ? text.substring(0, limit) + '...' : text,
@@ -82,7 +82,7 @@ describe('SourcesList', () => {
     const progressBars = container.querySelectorAll('.bg-primary-600');
     expect(progressBars).toHaveLength(3);
 
-    // Vérifier les styles de largeur
+    // Verify the width styles
     expect(progressBars[0]).toHaveStyle('width: 85%');
     expect(progressBars[1]).toHaveStyle('width: 72%');
     expect(progressBars[2]).toHaveStyle('width: 91%');
@@ -100,7 +100,7 @@ describe('SourcesList', () => {
 
     render(<SourcesList sources={mockSources} />);
 
-    // Cliquer sur la première source
+    // Click on the first source
     const firstSourceItem = screen.getByText('Guide utilisateur.pdf').closest('div[role="button"], div');
     fireEvent.click(firstSourceItem.parentElement.parentElement);
 
@@ -135,7 +135,7 @@ describe('SourcesList', () => {
 
     expect(screen.getByText('Sans score.pdf')).toBeInTheDocument();
     expect(screen.getByText('Contenu sans score')).toBeInTheDocument();
-    // Ne devrait pas afficher de section de pertinence
+    // Should not display a relevance section
     expect(screen.queryByText(/Pertinence:/)).not.toBeInTheDocument();
   });
 
@@ -151,7 +151,7 @@ describe('SourcesList', () => {
 
     expect(screen.getByText('Sans texte.pdf')).toBeInTheDocument();
     expect(screen.getByText('Pertinence: 50%')).toBeInTheDocument();
-    // Le texte ne devrait pas être affiché
+    // The text should not be displayed
     expect(screen.queryByText(/class="text-xs text-gray-600"/)).not.toBeInTheDocument();
   });
 
@@ -166,13 +166,13 @@ describe('SourcesList', () => {
   it('respecte la limite de caractères pour la troncature', () => {
     const longTextSource = [{
       document_name: 'Long text.pdf',
-      text: 'A'.repeat(200), // Texte de 200 caractères
+      text: 'A'.repeat(200), // 200 characters text
       similarity_score: 0.8
     }];
 
     render(<SourcesList sources={longTextSource} />);
 
-    // Le texte devrait être tronqué à 120 caractères + "..."
+    // The text should be truncated to 120 characters + "..."
     const textElement = screen.getByText(new RegExp('A{120}\\.\\.\\.$'));
     expect(textElement).toBeInTheDocument();
   });

@@ -1,5 +1,5 @@
 """
-Utilitaires de validation pour détecter les incohérences entre SQLite et FAISS
+Validation utilities for detecting inconsistencies between SQLite and FAISS
 """
 
 from typing import Dict, List, Set, Any, Tuple
@@ -12,16 +12,16 @@ logger = logging.getLogger(__name__)
 
 class VectorStoreValidator:
     """
-    Validateur pour détecter les incohérences entre la base de données SQLite et FAISS
+    Validator for detecting inconsistencies between the SQLite database and FAISS.
     """
     
     def __init__(self, vector_store, document_repository):
         """
-        Initialise le validateur
-        
+        Initialize the validator.
+
         Args:
-            vector_store: Instance de FaissVectorStore
-            document_repository: Instance de DocumentRepository
+            vector_store: FaissVectorStore instance
+            document_repository: DocumentRepository instance
         """
         self.vector_store = vector_store
         self.doc_repo = document_repository
@@ -29,32 +29,32 @@ class VectorStoreValidator:
     
     def validate_consistency(self, fix_issues: bool = False) -> Dict[str, Any]:
         """
-        Valide la cohérence entre SQLite et FAISS
-        
+        Validate consistency between SQLite and FAISS.
+
         Args:
-            fix_issues: Si True, tente de corriger automatiquement les incohérences
-            
+            fix_issues: If True, attempt to automatically fix inconsistencies
+
         Returns:
-            Dict avec le rapport de validation détaillé
+            Dict with detailed validation report
         """
         start_time = datetime.utcnow()
         
         self.logger.info("Starting comprehensive validation between SQLite and FAISS")
         
         try:
-            # 1. Récupérer les données depuis les deux sources
+            # 1. Retrieve data from both sources
             db_documents = self._get_database_documents()
             vector_documents = self._get_vector_store_documents()
             
-            # 2. Analyser les incohérences
+            # 2. Analyze inconsistencies
             issues = self._analyze_inconsistencies(db_documents, vector_documents)
             
-            # 3. Corriger les incohérences si demandé
+            # 3. Fix inconsistencies if requested
             fixes_applied = []
             if fix_issues and issues['total_issues'] > 0:
                 fixes_applied = self._apply_fixes(issues)
             
-            # 4. Statistiques finales
+            # 4. Final statistics
             end_time = datetime.utcnow()
             duration = (end_time - start_time).total_seconds()
             
@@ -95,7 +95,7 @@ class VectorStoreValidator:
             raise Exception(error_msg)
     
     def _get_database_documents(self) -> Dict[str, Dict[str, Any]]:
-        """Récupère les documents depuis SQLite"""
+        """Retrieve documents from SQLite."""
         try:
             documents = self.doc_repo.get_all()
             return {
@@ -116,12 +116,12 @@ class VectorStoreValidator:
             raise
     
     def _get_vector_store_documents(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Récupère les documents depuis FAISS"""
+        """Retrieve documents from FAISS."""
         try:
             with self.vector_store._lock:
                 vector_docs = {}
                 
-                # Parcourir toutes les métadonnées FAISS
+                # Iterate through all FAISS metadata
                 for i, meta in enumerate(self.vector_store.metadata):
                     doc_id = meta.get('document_id')
                     if doc_id:
@@ -145,17 +145,17 @@ class VectorStoreValidator:
             raise
     
     def _analyze_inconsistencies(self, db_docs: Dict, vector_docs: Dict) -> Dict[str, Any]:
-        """Analyse les incohérences entre les deux sources"""
+        """Analyze inconsistencies between the two sources."""
         issues = {
-            'orphaned_chunks': [],      # Chunks dans FAISS sans document en DB
-            'missing_chunks': [],       # Documents en DB sans chunks dans FAISS
-            'chunk_count_mismatch': [], # Nombre de chunks incohérent
-            'status_inconsistency': [], # Statut DB vs présence dans FAISS
-            'ghost_chunks': [],         # Chunks marqués supprimés mais toujours référencés
-            'metadata_issues': []       # Métadonnées manquantes ou incohérentes
+            'orphaned_chunks': [],      # Chunks in FAISS without a document in DB
+            'missing_chunks': [],       # Documents in DB without chunks in FAISS
+            'chunk_count_mismatch': [], # Inconsistent chunk count
+            'status_inconsistency': [], # DB status vs presence in FAISS
+            'ghost_chunks': [],         # Chunks marked as deleted but still referenced
+            'metadata_issues': []       # Missing or inconsistent metadata
         }
         
-        # 1. Chercher les chunks orphelins (dans FAISS mais pas en DB)
+        # 1. Find orphaned chunks (in FAISS but not in DB)
         for doc_id, chunks in vector_docs.items():
             if doc_id not in db_docs:
                 active_chunks = [c for c in chunks if not c.get('deleted', False)]
@@ -167,7 +167,7 @@ class VectorStoreValidator:
                         'details': 'Document exists in FAISS but not in database'
                     })
         
-        # 2. Chercher les documents sans chunks (en DB mais pas dans FAISS)
+        # 2. Find documents without chunks (in DB but not in FAISS)
         for doc_id, doc_info in db_docs.items():
             if doc_info['status'] == 'indexed' and doc_id not in vector_docs:
                 issues['missing_chunks'].append({
@@ -177,7 +177,7 @@ class VectorStoreValidator:
                     'details': 'Document marked as indexed but no chunks in FAISS'
                 })
         
-        # 3. Vérifier la cohérence du nombre de chunks
+        # 3. Verify chunk count consistency
         for doc_id in set(db_docs.keys()) & set(vector_docs.keys()):
             db_chunk_count = db_docs[doc_id]['chunk_count']
             vector_active_chunks = len([c for c in vector_docs[doc_id] if not c.get('deleted', False)])
@@ -191,11 +191,11 @@ class VectorStoreValidator:
                     'difference': abs(db_chunk_count - vector_active_chunks)
                 })
         
-        # 4. Vérifier la cohérence des statuts
+        # 4. Verify status consistency
         for doc_id, doc_info in db_docs.items():
             if doc_info['status'] == 'indexed':
                 if doc_id not in vector_docs:
-                    # Déjà capturé dans missing_chunks
+                    # Already captured in missing_chunks
                     continue
                 
                 active_chunks = [c for c in vector_docs[doc_id] if not c.get('deleted', False)]
@@ -208,11 +208,11 @@ class VectorStoreValidator:
                         'details': 'Document marked as indexed but no active chunks in FAISS'
                     })
         
-        # 5. Chercher les chunks fantômes (mappés mais supprimés)
+        # 5. Find ghost chunks (mapped but deleted)
         for doc_id, chunk_ids in self.vector_store.document_to_chunks.items():
             if doc_id in vector_docs:
                 for chunk_id in chunk_ids:
-                    # Chercher le chunk dans les métadonnées
+                    # Find the chunk in metadata
                     chunk_meta = None
                     for meta in self.vector_store.metadata:
                         if meta.get('chunk_id') == chunk_id:
@@ -226,7 +226,7 @@ class VectorStoreValidator:
                             'details': 'Chunk referenced in mapping but marked as deleted'
                         })
         
-        # 6. Vérifier les métadonnées essentielles
+        # 6. Verify essential metadata
         for doc_id, chunks in vector_docs.items():
             for chunk in chunks:
                 missing_fields = []
@@ -242,17 +242,17 @@ class VectorStoreValidator:
                         'missing_fields': missing_fields
                     })
         
-        # Calculer le total
+        # Calculate total
         issues['total_issues'] = sum(len(issues[key]) for key in issues if key != 'total_issues')
         
         return issues
     
     def _apply_fixes(self, issues: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Applique les corrections automatiques possibles"""
+        """Apply possible automatic fixes."""
         fixes = []
         
         try:
-            # 1. Nettoyer les chunks orphelins
+            # 1. Clean orphaned chunks
             if issues['orphaned_chunks']:
                 orphaned_doc_ids = [item['document_id'] for item in issues['orphaned_chunks']]
                 cleanup_result = self.vector_store.clean_orphans(
@@ -267,7 +267,7 @@ class VectorStoreValidator:
                     'result': cleanup_result
                 })
             
-            # 2. Corriger les chunks fantômes (supprimer les références)
+            # 2. Fix ghost chunks (remove references)
             if issues['ghost_chunks']:
                 ghost_count = 0
                 for ghost in issues['ghost_chunks']:
@@ -286,16 +286,16 @@ class VectorStoreValidator:
                         'affected_chunks': ghost_count
                     })
             
-            # 3. Déclencher une optimisation si nécessaire
+            # 3. Trigger optimization if needed
             if fixes:
                 deleted_ratio = self.vector_store.get_stats().get('deleted_vectors', 0) / max(
                     self.vector_store.get_stats().get('total_vectors', 1), 1
                 )
                 
-                if deleted_ratio > 0.15:  # Plus de 15% de chunks supprimés
+                if deleted_ratio > 0.15:  # More than 15% of chunks deleted
                     rebuild_result = self.vector_store.rebuild_vector_store(
                         force_rebuild=False,
-                        cleanup_orphans=False  # Déjà fait
+                        cleanup_orphans=False  # Already done
                     )
                     
                     fixes.append({
@@ -304,7 +304,7 @@ class VectorStoreValidator:
                         'result': rebuild_result
                     })
             
-            # Sauvegarder les changements
+            # Save changes
             if fixes:
                 self.vector_store.persist()
                 
@@ -319,30 +319,30 @@ class VectorStoreValidator:
         return fixes
     
     def _calculate_consistency_score(self, issues: Dict[str, Any]) -> float:
-        """Calcule un score de cohérence (0.0 = incohérent, 1.0 = parfait)"""
+        """Calculate a consistency score (0.0 = inconsistent, 1.0 = perfect)."""
         total_issues = issues.get('total_issues', 0)
         
-        # Pondération des types d'erreurs (certaines sont plus graves)
+        # Weighting of error types (some are more severe)
         weighted_issues = (
-            len(issues.get('orphaned_chunks', [])) * 3 +      # Très grave
-            len(issues.get('missing_chunks', [])) * 3 +       # Très grave
-            len(issues.get('status_inconsistency', [])) * 2 + # Grave
-            len(issues.get('chunk_count_mismatch', [])) * 2 + # Grave
-            len(issues.get('ghost_chunks', [])) * 1 +         # Modéré
-            len(issues.get('metadata_issues', [])) * 1        # Modéré
+            len(issues.get('orphaned_chunks', [])) * 3 +      # Critical
+            len(issues.get('missing_chunks', [])) * 3 +       # Critical
+            len(issues.get('status_inconsistency', [])) * 2 + # Severe
+            len(issues.get('chunk_count_mismatch', [])) * 2 + # Severe
+            len(issues.get('ghost_chunks', [])) * 1 +         # Moderate
+            len(issues.get('metadata_issues', [])) * 1        # Moderate
         )
         
         if weighted_issues == 0:
             return 1.0
         
-        # Score basé sur le nombre d'erreurs pondérées
-        # Score dégradé rapidement avec les erreurs graves
+        # Score based on weighted error count
+        # Score degrades quickly with severe errors
         base_score = max(0.0, 1.0 - (weighted_issues / 100))
         
         return base_score
     
     def _generate_recommendations(self, issues: Dict[str, Any]) -> List[str]:
-        """Génère des recommandations basées sur les problèmes trouvés"""
+        """Generate recommendations based on found issues."""
         recommendations = []
         
         if issues.get('orphaned_chunks'):
@@ -386,18 +386,18 @@ class VectorStoreValidator:
         return recommendations
 
 
-def create_validation_report(vector_store, document_repository, 
+def create_validation_report(vector_store, document_repository,
                            output_path: str = None) -> Dict[str, Any]:
     """
-    Crée un rapport de validation complet et l'sauvegarde optionnellement
-    
+    Create a comprehensive validation report and optionally save it.
+
     Args:
-        vector_store: Instance de FaissVectorStore
-        document_repository: Instance de DocumentRepository  
-        output_path: Chemin optionnel pour sauvegarder le rapport
-        
+        vector_store: FaissVectorStore instance
+        document_repository: DocumentRepository instance
+        output_path: Optional path to save the report
+
     Returns:
-        Dict: Rapport de validation complet
+        Dict: Complete validation report
     """
     validator = VectorStoreValidator(vector_store, document_repository)
     report = validator.validate_consistency(fix_issues=False)

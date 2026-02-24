@@ -8,7 +8,7 @@ const EscalationDialog = ({ isOpen, onClose, onEscalate, chatHistory }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState('');
 
-  // Réinitialiser le formulaire quand le dialog s'ouvre
+  // Reset the form when dialog opens
   const handleOpen = useCallback(() => {
     if (isOpen) {
       setUserEmail('');
@@ -56,7 +56,7 @@ const EscalationDialog = ({ isOpen, onClose, onEscalate, chatHistory }) => {
     }
   };
 
-  // Créer un lien mailto de secours
+  // Create a fallback mailto link
   const createFallbackMailto = () => {
     const subject = 'Demande d\'assistance - Mimir';
     const body = `Bonjour,
@@ -87,7 +87,7 @@ ${userEmail}`;
 
         {/* Dialog */}
         <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          {/* En-tête */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
               <Mail className="h-6 w-6 text-primary-600 mr-2" />
@@ -109,7 +109,7 @@ ${userEmail}`;
             Votre conversation sera automatiquement incluse dans la demande.
           </p>
 
-          {/* Formulaire */}
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
@@ -150,14 +150,14 @@ ${userEmail}`;
               </p>
             </div>
 
-            {/* Info sur l'historique */}
+            {/* History info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
                 💡 L&apos;historique de votre conversation avec Mimir sera automatiquement inclus dans votre demande.
               </p>
             </div>
 
-            {/* Boutons */}
+            {/* Buttons */}
             <div className="flex space-x-3 pt-4">
               <button
                 type="button"
@@ -186,7 +186,7 @@ ${userEmail}`;
               </button>
             </div>
 
-            {/* Lien de secours */}
+            {/* Fallback link */}
             <div className="text-center pt-4 border-t border-gray-200">
               <p className="text-xs text-gray-500 mb-2">
                 Problème avec le formulaire ?

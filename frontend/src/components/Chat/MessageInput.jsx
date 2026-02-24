@@ -6,7 +6,7 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
   const [isComposing, setIsComposing] = useState(false);
   const textareaRef = useRef(null);
 
-  // Auto-resize du textarea
+  // Auto-resize the textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -15,7 +15,7 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
     }
   }, [message]);
 
-  // Focus automatique
+  // Auto-focus
   useEffect(() => {
     if (!disabled && textareaRef.current) {
       textareaRef.current.focus();
@@ -31,12 +31,12 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
   };
 
   const handleKeyDown = (e) => {
-    // Envoyer avec Ctrl+Enter ou Cmd+Enter
+    // Send with Ctrl+Enter or Cmd+Enter
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSubmit(e);
     }
-    // Empêcher l'envoi avec Enter seul pendant la composition (IME)
+    // Prevent sending with Enter alone during composition (IME)
     else if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();
       handleSubmit(e);
@@ -57,9 +57,9 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
     <div className="bg-white border-t border-gray-200 px-4 py-4">
       <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
         <div className="relative">
-          {/* Zone de saisie */}
+          {/* Input area */}
           <div className="flex items-end space-x-3">
-            {/* Bouton d'attachement (placeholder pour futures fonctionnalités) */}
+            {/* Attachment button (placeholder for future features) */}
             <button
               type="button"
               className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -85,13 +85,13 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
                 maxLength={2000}
               />
 
-              {/* Compteur de caractères */}
+              {/* Character counter */}
               <div className="absolute bottom-1 right-1 text-xs text-gray-400">
                 {message.length}/2000
               </div>
             </div>
 
-            {/* Bouton d'envoi */}
+            {/* Send button */}
             <button
               type="submit"
               disabled={!canSend}
@@ -106,7 +106,7 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
             </button>
           </div>
 
-          {/* Indicateurs d'état */}
+          {/* Status indicators */}
           <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
             <div className="flex items-center space-x-4">
               <span>

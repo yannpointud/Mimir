@@ -11,10 +11,10 @@ import {
 } from '../utils/auth';
 import { getErrorMessage } from '../utils/helpers';
 
-// Contexte d'authentification
+// Authentication context
 const AuthContext = createContext(null);
 
-// Hook pour utiliser le contexte d'authentification
+// Hook to use the authentication context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -23,24 +23,24 @@ export const useAuth = () => {
   return context;
 };
 
-// Provider d'authentification
+// Authentication provider
 export const AuthProvider = ({ children }) => {
   const [user, setUserState] = useState(getUser());
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(utilIsAuthenticated());
 
-  // Fonction de déconnexion - définie avant useEffect
+  // Logout function - defined before useEffect
   const logout = useCallback(async () => {
     try {
       setLoading(true);
-      // Appeler l'API de déconnexion si l'utilisateur est connecté
+      // Call logout API if user is logged in
       if (isAuthenticated) {
         await authAPI.logout();
       }
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', getErrorMessage(error));
     } finally {
-      // Nettoyer les données locales dans tous les cas
+      // Clean up local data in all cases
       utilLogout();
       setUserState(null);
       setIsAuthenticated(false);
@@ -48,20 +48,20 @@ export const AuthProvider = ({ children }) => {
     }
   }, [isAuthenticated]);
 
-  // Vérification initiale de l'authentification
+  // Initial authentication check
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Vérifier si le token existe et n'est pas expiré
+        // Check if token exists and is not expired
         if (checkAndCleanExpiredAuth()) {
-          // Vérifier avec le serveur que le token est toujours valide
+          // Verify with server that the token is still valid
           const userData = await authAPI.getCurrentUser();
           if (userData && userData.user_type) {
             setUserState(userData);
             setUser(userData);
             setIsAuthenticated(true);
           } else {
-            // Réponse invalide, déconnecter
+            // Invalid response, log out
             logout();
           }
         } else {
@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Erreur lors de la vérification de l\'authentification:', getErrorMessage(error));
-        // En cas d'erreur, déconnecter l'utilisateur
+        // On error, log out the user
         logout();
       } finally {
         setLoading(false);
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [logout]);
 
-  // Fonction de connexion
+  // Login function
   const login = async (username, password) => {
     try {
       setLoading(true);
@@ -88,18 +88,18 @@ export const AuthProvider = ({ children }) => {
 
       const { access_token, user_type } = response;
 
-      // Créer l'objet utilisateur avec les données du backend
+      // Create user object with backend data
       const userData = {
-        username: username, // On utilise le username de la connexion
+        username: username, // Use the username from login
         user_type: user_type
       };
 
-      // Validation des données reçues
+      // Validate received data
       if (!access_token || !user_type) {
         throw new Error('Réponse d\'authentification invalide');
       }
 
-      // Stocker le token et les données utilisateur
+      // Store token and user data
       setAuthToken(access_token);
       setUser(userData);
       setUserState(userData);
@@ -118,7 +118,7 @@ export const AuthProvider = ({ children }) => {
   };
 
 
-  // Fonction de rafraîchissement du token
+  // Token refresh function
   const refreshToken = async () => {
     try {
       const response = await authAPI.refreshToken();
@@ -153,7 +153,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Hook simple pour vérifier l'authentification sans contexte
+// Simple hook to check authentication without context
 export const useAuthStatus = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(utilIsAuthenticated());
 
@@ -162,13 +162,13 @@ export const useAuthStatus = () => {
       setIsAuthenticated(checkAndCleanExpiredAuth());
     };
 
-    // Vérifier lors du montage
+    // Check on mount
     checkAuth();
 
-    // Vérifier périodiquement (toutes les minutes)
+    // Check periodically (every minute)
     const interval = setInterval(checkAuth, 60000);
 
-    // Écouter les changements de localStorage (pour la synchronisation entre onglets)
+    // Listen for localStorage changes (for cross-tab synchronization)
     const handleStorageChange = (e) => {
       if (e.key === 'authToken' || e.key === 'user') {
         checkAuth();

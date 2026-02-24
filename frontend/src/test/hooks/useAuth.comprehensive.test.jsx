@@ -4,7 +4,7 @@ import { AuthProvider, useAuth, useAuthStatus } from '../../hooks/useAuth';
 import { authAPI } from '../../services/api';
 import * as authUtils from '../../utils/auth';
 
-// Mock de l'API d'authentification
+// Mock the authentication API
 vi.mock('../../services/api', () => ({
   authAPI: {
     login: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../../services/api', () => ({
   },
 }));
 
-// Mock des utilitaires d'authentification
+// Mock the authentication utilities
 vi.mock('../../utils/auth', () => ({
   getAuthToken: vi.fn(),
   setAuthToken: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('../../utils/auth', () => ({
   isAuthenticated: vi.fn(),
 }));
 
-// Mock de localStorage
+// Mock localStorage
 Object.defineProperty(window, 'localStorage', {
   value: {
     getItem: vi.fn(),
@@ -36,10 +36,10 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-// Mock de console.error pour éviter les logs en test
+// Mock console.error to suppress logs in tests
 let consoleSpy;
 
-// Wrapper pour les tests qui nécessitent le AuthProvider
+// Wrapper for tests that require the AuthProvider
 const AuthProviderWrapper = ({ children }) => (
   <AuthProvider>{children}</AuthProvider>
 );
@@ -69,7 +69,7 @@ describe('useAuth - Tests Complets', () => {
         wrapper: AuthProviderWrapper,
       });
 
-      // Attendre que le loading soit terminé
+      // Wait for loading to finish
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -429,7 +429,7 @@ describe('useAuth - Tests Complets', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Connexion
+      // Login
       await act(async () => {
         await result.current.login('testuser', 'password123');
       });
@@ -437,7 +437,7 @@ describe('useAuth - Tests Complets', () => {
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user).toEqual(mockUser);
 
-      // Déconnexion
+      // Logout
       await act(async () => {
         await result.current.logout();
       });
@@ -461,7 +461,7 @@ describe('useAuth - Tests Complets', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Première tentative
+      // First attempt
       let result1;
       await act(async () => {
         result1 = await result.current.login('wrong1', 'wrong1');
@@ -470,7 +470,7 @@ describe('useAuth - Tests Complets', () => {
       expect(result1.success).toBe(false);
       expect(result.current.isAuthenticated).toBe(false);
 
-      // Deuxième tentative
+      // Second attempt
       let result2;
       await act(async () => {
         result2 = await result.current.login('wrong2', 'wrong2');
@@ -498,14 +498,14 @@ describe('useAuth - Tests Complets', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Connexion initiale
+      // Initial login
       await act(async () => {
         await result.current.login('testuser', 'password123');
       });
 
       expect(result.current.isAuthenticated).toBe(true);
 
-      // Rafraîchissement du token
+      // Token refresh
       let refreshResult;
       await act(async () => {
         refreshResult = await result.current.refreshToken();
@@ -547,10 +547,10 @@ describe('useAuthStatus - Tests Complets', () => {
 
     expect(result.current).toBe(false);
 
-    // Simuler un changement d'état
+    // Simulate a state change
     authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
 
-    // Avancer le timer de 60 secondes
+    // Advance the timer by 60 seconds
     act(() => {
       vi.advanceTimersByTime(60000);
     });
@@ -563,7 +563,7 @@ describe('useAuthStatus - Tests Complets', () => {
 
     expect(result.current).toBe(false);
 
-    // Simuler un événement storage
+    // Simulate a storage event
     authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
 
     act(() => {
@@ -590,7 +590,7 @@ describe('useAuthStatus - Tests Complets', () => {
       window.dispatchEvent(storageEvent);
     });
 
-    // Ne devrait pas avoir appelé checkAndCleanExpiredAuth en plus
+    // Should not have called checkAndCleanExpiredAuth additionally
     expect(authUtils.checkAndCleanExpiredAuth.mock.calls.length).toBe(initialCallCount + 1);
   });
 
@@ -628,7 +628,7 @@ describe('useAuthStatus - Tests Complets', () => {
 
       expect(result.current).toBe(false);
 
-      // Simuler qu'un autre onglet se connecte
+      // Simulate another tab logging in
       authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
 
       act(() => {
@@ -648,7 +648,7 @@ describe('useAuthStatus - Tests Complets', () => {
 
       expect(result.current).toBe(true);
 
-      // Simuler qu'un autre onglet se déconnecte
+      // Simulate another tab logging out
       authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
 
       act(() => {
@@ -667,22 +667,22 @@ describe('useAuthStatus - Tests Complets', () => {
     it('devrait vérifier l\'authentification toutes les minutes', () => {
       renderHook(() => useAuthStatus());
 
-      // Vérification initiale
+      // Initial check
       expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(1);
 
-      // Après 30 secondes, pas de nouvelle vérification
+      // After 30 seconds, no new check
       act(() => {
         vi.advanceTimersByTime(30000);
       });
       expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(1);
 
-      // Après 60 secondes, une nouvelle vérification
+      // After 60 seconds, a new check
       act(() => {
         vi.advanceTimersByTime(30000);
       });
       expect(authUtils.checkAndCleanExpiredAuth).toHaveBeenCalledTimes(2);
 
-      // Après 2 minutes, une troisième vérification
+      // After 2 minutes, a third check
       act(() => {
         vi.advanceTimersByTime(60000);
       });
@@ -693,14 +693,14 @@ describe('useAuthStatus - Tests Complets', () => {
       const setIntervalSpy = vi.spyOn(global, 'setInterval');
       const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
 
-      // Créer plusieurs instances
+      // Create multiple instances
       const hook1 = renderHook(() => useAuthStatus());
       const hook2 = renderHook(() => useAuthStatus());
       const hook3 = renderHook(() => useAuthStatus());
 
       expect(setIntervalSpy).toHaveBeenCalledTimes(3);
 
-      // Démonter les instances
+      // Unmount the instances
       hook1.unmount();
       hook2.unmount();
       hook3.unmount();

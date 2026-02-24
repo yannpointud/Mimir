@@ -5,7 +5,7 @@ import ChatPage from '../../../components/Chat/ChatPage';
 import { AuthProvider } from '../../../hooks/useAuth';
 import * as chatAPI from '../../../services/api';
 
-// Mock de l'API
+// Mock the API
 vi.mock('../../../services/api', () => ({
   chatAPI: {
     sendMessage: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../../../services/api', () => ({
   },
 }));
 
-// Wrapper pour les tests
+// Wrapper for tests
 const TestWrapper = ({ children }) => (
   <BrowserRouter>
     <AuthProvider>

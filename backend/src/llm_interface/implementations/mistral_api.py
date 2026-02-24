@@ -165,7 +165,7 @@ class MistralAPIService(AbstractLLMService):
                     raise last_exception
 
             except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
-                # Re-lever les exceptions LLM spécifiques sans transformation
+                # Re-raise LLM-specific exceptions without transformation
                 raise
 
             except Exception as e:
@@ -435,12 +435,12 @@ class MistralAPIService(AbstractLLMService):
         all_embeddings = []
         total_usage_tokens = 0
 
-        # Si le nombre de textes est inférieur ou égal à la taille du batch, pas besoin de batching
+        # If the number of texts is less than or equal to batch size, no batching needed
         if len(texts) <= batch_size:
             logger.info(f"Generating embeddings for {len(texts)} texts (single batch)")
             return await self._embed_batch(texts, start_time, session_id=session_id, rag_debug=rag_debug)
 
-        # Traitement par batches
+        # Batch processing
         total_batches = (len(texts) + batch_size - 1) // batch_size
         logger.info(f"Generating embeddings for {len(texts)} texts in {total_batches} batches (size: {batch_size})")
 
@@ -448,8 +448,8 @@ class MistralAPIService(AbstractLLMService):
             batch_texts = texts[i:i + batch_size]
             batch_num = (i // batch_size) + 1
 
-            # Rate limiting: Mistral embeddings ont une limite de 1 req/s
-            if batch_num > 1:  # Pas de délai pour le premier batch
+            # Rate limiting: Mistral embeddings have a 1 req/s limit
+            if batch_num > 1:  # No delay for the first batch
                 logger.debug(f"Rate limiting: waiting 1s before batch {batch_num}")
                 await asyncio.sleep(1.0)
 
@@ -521,7 +521,7 @@ class MistralAPIService(AbstractLLMService):
 
             duration_ms = (time.time() - start_time) * 1000
 
-            # Log pour batch unique
+            # Log for single batch
             if len(embeddings) == len(texts):
                 logger.info(
                     f"Embedding generation successful: {len(embeddings)} embeddings, "

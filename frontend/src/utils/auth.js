@@ -1,9 +1,9 @@
-// Utilitaires pour la gestion de l'authentification
+// Authentication management utilities
 
 export const AUTH_TOKEN_KEY = 'authToken';
 export const USER_KEY = 'user';
 
-// Fonction utilitaire pour gérer localStorage de manière sécurisée
+// Utility function for safe localStorage handling
 const safeLocalStorage = {
   getItem: (key) => {
     try {
@@ -34,7 +34,7 @@ const safeLocalStorage = {
   }
 };
 
-// Stockage et récupération du token
+// Token storage and retrieval
 export const getAuthToken = () => {
   return safeLocalStorage.getItem(AUTH_TOKEN_KEY);
 };
@@ -48,21 +48,21 @@ export const removeAuthToken = () => {
   return safeLocalStorage.removeItem(AUTH_TOKEN_KEY);
 };
 
-// Stockage et récupération des informations utilisateur
+// User information storage and retrieval
 export const getUser = () => {
   try {
     const userStr = safeLocalStorage.getItem(USER_KEY);
     if (!userStr) return null;
 
     const user = JSON.parse(userStr);
-    // Validation basique de la structure utilisateur
+    // Basic validation of user structure
     if (user && typeof user === 'object' && user.user_type) {
       return user;
     }
     return null;
   } catch (error) {
     console.error('Erreur lors du parsing des données utilisateur:', error);
-    // Nettoyer les données corrompues
+    // Clean up corrupted data
     removeUser();
     return null;
   }
@@ -82,26 +82,26 @@ export const removeUser = () => {
   return safeLocalStorage.removeItem(USER_KEY);
 };
 
-// Vérification si l'utilisateur est authentifié
+// Check if the user is authenticated
 export const isAuthenticated = () => {
   const token = getAuthToken();
   const user = getUser();
   return !!(token && user);
 };
 
-// Vérification si l'utilisateur est admin
+// Check if the user is admin
 export const isAdmin = () => {
   const user = getUser();
   return user?.user_type === 'admin';
 };
 
-// Déconnexion complète
+// Full logout
 export const logout = () => {
   removeAuthToken();
   removeUser();
 };
 
-// Parsing du JWT pour récupérer les informations (sans vérification de signature)
+// Parse JWT to retrieve information (without signature verification)
 export const parseJWT = (token) => {
   try {
     const base64Url = token.split('.')[1];
@@ -119,7 +119,7 @@ export const parseJWT = (token) => {
   }
 };
 
-// Vérification si le token est expiré
+// Check if the token is expired
 export const isTokenExpired = (token) => {
   if (!token) return true;
 
@@ -130,7 +130,7 @@ export const isTokenExpired = (token) => {
   return payload.exp < now;
 };
 
-// Vérification et nettoyage automatique des tokens expirés
+// Automatic check and cleanup of expired tokens
 export const checkAndCleanExpiredAuth = () => {
   const token = getAuthToken();
   if (token && isTokenExpired(token)) {

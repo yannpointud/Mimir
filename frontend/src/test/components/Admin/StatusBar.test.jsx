@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 describe('StatusBar', () => {
-  // Tests simplifiés pour la couverture
+  // Simplified tests for coverage
   it('devrait avoir des tests pour StatusBar', () => {
     expect(true).toBe(true);
   });

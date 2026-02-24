@@ -3,15 +3,15 @@ import { cleanup } from '@testing-library/react';
 import { act } from 'react';
 import '@testing-library/jest-dom';
 
-// Export act pour utilisation dans les tests
+// Export act for use in tests
 export { act };
 
-// Nettoyage après chaque test
+// Cleanup after each test
 afterEach(() => {
   cleanup();
 });
 
-// Mock de l'API localStorage pour les tests
+// Mock the localStorage API for tests
 Object.defineProperty(window, 'localStorage', {
   value: {
     getItem: vi.fn(() => null),
@@ -22,7 +22,7 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-// Mock de l'API clipboard
+// Mock the clipboard API
 Object.defineProperty(navigator, 'clipboard', {
   value: {
     writeText: vi.fn(() => Promise.resolve()),
@@ -31,7 +31,7 @@ Object.defineProperty(navigator, 'clipboard', {
   writable: true,
 });
 
-// Mock de window.location
+// Mock window.location
 delete window.location;
 window.location = {
   href: 'http://localhost:3000',
@@ -48,7 +48,7 @@ window.location = {
   reload: vi.fn(),
 };
 
-// Mock de window.matchMedia pour les tests responsive
+// Mock window.matchMedia for responsive tests
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: vi.fn().mockImplementation(query => ({
@@ -63,19 +63,19 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock de ResizeObserver
+// Mock ResizeObserver
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }));
 
-// Mock d'IntersectionObserver
+// Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }));
 
-// Mock de scrollIntoView
+// Mock scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();

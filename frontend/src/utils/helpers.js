@@ -1,12 +1,12 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-// Utilitaire pour combiner les classes CSS avec Tailwind
+// Utility to merge CSS classes with Tailwind
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-// Formatage des dates
+// Date formatting
 export const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
 
@@ -22,7 +22,7 @@ export const formatDate = (dateString) => {
   }).format(date);
 };
 
-// Formatage des dates relatives
+// Relative date formatting
 export const formatRelativeDate = (dateString) => {
   if (!dateString) return 'N/A';
 
@@ -43,7 +43,7 @@ export const formatRelativeDate = (dateString) => {
   return formatDate(dateString);
 };
 
-// Formatage de la taille des fichiers
+// File size formatting
 export const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 B';
 
@@ -54,51 +54,51 @@ export const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Formatage des nombres avec espaces
+// Number formatting with spaces
 export const formatNumber = (num) => {
   return new Intl.NumberFormat('fr-FR').format(num);
 };
 
-// Génération d'un ID unique
+// Unique ID generation
 export const generateId = () => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
-// Génération d'un ID de session
+// Session ID generation
 export const generateSessionId = () => {
   return 'session-' + generateId();
 };
 
-// Validation d'email
+// Email validation
 export const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-// Truncation de texte
+// Text truncation
 export const truncateText = (text, maxLength = 100) => {
   if (!text || text.length <= maxLength) return text;
   return text.substring(0, maxLength).trim() + '...';
 };
 
-// Extraction du nom de fichier sans extension
+// Extract filename without extension
 export const getFileNameWithoutExtension = (fileName) => {
   return fileName.replace(/\.[^/.]+$/, '');
 };
 
-// Récupération de l'extension de fichier
+// Get file extension
 export const getFileExtension = (fileName) => {
   return fileName.split('.').pop().toLowerCase();
 };
 
-// Vérification si un fichier est supporté
+// Check if file type is supported
 export const isSupportedFileType = (fileName) => {
   const supportedExtensions = ['pdf', 'docx', 'txt', 'md'];
   const extension = getFileExtension(fileName);
   return supportedExtensions.includes(extension);
 };
 
-// Débounce d'une fonction
+// Function debounce
 export const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -111,7 +111,7 @@ export const debounce = (func, wait) => {
   };
 };
 
-// Throttle d'une fonction
+// Function throttle
 export const throttle = (func, limit) => {
   let inThrottle;
   return function(...args) {
@@ -123,14 +123,14 @@ export const throttle = (func, limit) => {
   };
 };
 
-// Copie de texte dans le presse-papiers
+// Copy text to clipboard
 export const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch (error) {
     console.error('Erreur lors de la copie:', error);
-    // Fallback pour les navigateurs plus anciens
+    // Fallback for older browsers
     try {
       const textArea = document.createElement('textarea');
       textArea.value = text;
@@ -146,7 +146,7 @@ export const copyToClipboard = async (text) => {
   }
 };
 
-// Création d'un lien mailto avec contenu
+// Create mailto link with content
 export const createMailtoLink = (to, subject, body) => {
   const params = new URLSearchParams();
   if (subject) params.append('subject', subject);
@@ -155,7 +155,7 @@ export const createMailtoLink = (to, subject, body) => {
   return `mailto:${to}?${params.toString()}`;
 };
 
-// Gestion des erreurs API
+// API error handling
 export const getErrorMessage = (error) => {
   if (error.response?.data?.detail) {
     return error.response.data.detail;
@@ -169,7 +169,7 @@ export const getErrorMessage = (error) => {
   return 'Une erreur inattendue s\'est produite';
 };
 
-// Traduction des statuts de documents
+// Document status translation
 export const translateDocumentStatus = (status) => {
   const translations = {
     'pending': 'En attente',
@@ -180,7 +180,7 @@ export const translateDocumentStatus = (status) => {
   return translations[status] || status;
 };
 
-// Couleurs pour les statuts
+// Status colors
 export const getStatusColor = (status) => {
   const colors = {
     'pending': 'bg-yellow-100 text-yellow-800',
@@ -191,7 +191,7 @@ export const getStatusColor = (status) => {
   return colors[status] || 'bg-gray-100 text-gray-800';
 };
 
-// Gestion robuste des valeurs nulles/undefined pour l'affichage
+// Robust handling of null/undefined values for display
 export const safeDisplayValue = (value, fallback = 'N/A') => {
   if (value === null || value === undefined) return fallback;
   if (typeof value === 'string' && value.trim() === '') return fallback;
@@ -199,13 +199,13 @@ export const safeDisplayValue = (value, fallback = 'N/A') => {
   return value;
 };
 
-// Formatage robuste des statistiques
+// Robust statistics formatting
 export const safeFormatNumber = (value, fallback = 0) => {
   const safeValue = safeDisplayValue(value, fallback);
   return typeof safeValue === 'number' ? formatNumber(safeValue) : safeValue;
 };
 
-// Gestion robuste des données d'objet
+// Robust object data handling
 export const safeGetProperty = (obj, path, fallback = null) => {
   try {
     return path.split('.').reduce((current, key) => {
@@ -217,7 +217,7 @@ export const safeGetProperty = (obj, path, fallback = null) => {
   }
 };
 
-// Validation robuste de données de document
+// Robust document data validation
 export const validateDocumentData = (document) => {
   return {
     ...document,

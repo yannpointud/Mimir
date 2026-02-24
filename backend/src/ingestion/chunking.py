@@ -16,7 +16,7 @@ class ChunkingConfig:
     chunk_size: int = 1000  # Target chunk size in characters
     overlap: int = 120      # Overlap between chunks in characters (optimized: 12%)
     min_chunk_size: int = 100  # Minimum viable chunk size
-    max_chunk_size: int = 3000  # Maximum chunk size before force split (augmenté pour CV)
+    max_chunk_size: int = 3000  # Maximum chunk size before force split (increased for resumes)
     preserve_sentences: bool = True  # Try to keep sentences intact
     preserve_paragraphs: bool = True  # Try to keep paragraphs intact
 

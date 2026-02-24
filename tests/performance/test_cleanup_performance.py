@@ -1,5 +1,5 @@
 """
-Tests de performance pour le système de nettoyage des chunks orphelins
+Performance tests for the orphan chunk cleanup system
 """
 
 import pytest
@@ -13,25 +13,25 @@ import numpy as np
 from datetime import datetime
 from unittest.mock import Mock
 
-# Imports du système
+# System imports
 from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.rag_core.interfaces import Chunk
 from src.rag_core.implementations.validation_utils import VectorStoreValidator
 
 
 class TestCleanupPerformance:
-    """Tests de performance pour le nettoyage des orphelins"""
+    """Performance tests for orphan cleanup"""
     
     @pytest.fixture
     def temp_dir(self):
-        """Répertoire temporaire pour les tests"""
+        """Temporary directory for tests"""
         temp_dir = tempfile.mkdtemp()
         yield temp_dir
         shutil.rmtree(temp_dir)
     
     @pytest.fixture
     def vector_store(self, temp_dir):
-        """Instance de FaissVectorStore pour les tests"""
+        """FaissVectorStore instance for tests"""
         index_path = os.path.join(temp_dir, "perf_index.bin")
         metadata_path = os.path.join(temp_dir, "perf_metadata.pkl")
         
@@ -44,7 +44,7 @@ class TestCleanupPerformance:
         return store
     
     def create_test_chunks(self, num_docs: int, chunks_per_doc: int) -> list:
-        """Crée des chunks de test en masse"""
+        """Create test chunks in bulk"""
         chunks = []
         for doc_id in range(num_docs):
             for chunk_idx in range(chunks_per_doc):
@@ -64,38 +64,38 @@ class TestCleanupPerformance:
     def benchmark_cleanup(self, vector_store, num_docs: int, chunks_per_doc: int, 
                          orphan_ratio: float = 0.8) -> dict:
         """
-        Benchmark du nettoyage avec différentes tailles de datasets
-        
+        Benchmark cleanup with different dataset sizes
+
         Args:
-            vector_store: Instance du store
-            num_docs: Nombre de documents
-            chunks_per_doc: Chunks par document
-            orphan_ratio: Ratio de documents orphelins (0.0 à 1.0)
+            vector_store: Store instance
+            num_docs: Number of documents
+            chunks_per_doc: Chunks per document
+            orphan_ratio: Orphan document ratio (0.0 to 1.0)
         """
-        # Créer et insérer les chunks
+        # Create and insert chunks
         chunks = self.create_test_chunks(num_docs, chunks_per_doc)
         total_chunks = len(chunks)
         
         print(f"\\nBenchmarking cleanup with {num_docs} docs, {chunks_per_doc} chunks/doc, {orphan_ratio:.1%} orphan ratio")
         
-        # Mesurer le temps d'insertion
+        # Measure insertion time
         start_time = time.time()
         vector_store.upsert(chunks)
         upsert_time = time.time() - start_time
         
-        # Déterminer quels documents sont "existants" vs orphelins
+        # Determine which documents are "existing" vs orphans
         num_existing = int(num_docs * (1 - orphan_ratio))
         existing_doc_ids = {str(i) for i in range(num_existing)}
         
-        # Mesurer le temps de nettoyage
+        # Measure cleanup time
         start_time = time.time()
         cleanup_result = vector_store.clean_orphans(
             existing_document_ids=existing_doc_ids,
-            create_backup=False  # Pas de backup pour les benchmarks
+            create_backup=False  # No backup for benchmarks
         )
         cleanup_time = time.time() - start_time
         
-        # Calculer les métriques
+        # Calculate metrics
         orphan_chunks = (num_docs - num_existing) * chunks_per_doc
         chunks_per_second = total_chunks / upsert_time if upsert_time > 0 else 0
         cleanup_rate = cleanup_result['cleaned_chunks'] / cleanup_time if cleanup_time > 0 else 0
@@ -116,10 +116,10 @@ class TestCleanupPerformance:
     
     @pytest.mark.performance
     def test_small_dataset_performance(self, vector_store):
-        """Test de performance sur un petit dataset (100 docs)"""
+        """Performance test on a small dataset (100 docs)"""
         result = self.benchmark_cleanup(vector_store, num_docs=100, chunks_per_doc=5)
         
-        # Assertions de performance pour petit dataset
+        # Performance assertions for small dataset
         assert result['cleanup_time'] < 2.0, f"Cleanup too slow: {result['cleanup_time']:.2f}s"
         assert result['chunks_per_second_cleanup'] > 50, f"Cleanup rate too low: {result['chunks_per_second_cleanup']:.1f} chunks/s"
         
@@ -127,10 +127,10 @@ class TestCleanupPerformance:
     
     @pytest.mark.performance
     def test_medium_dataset_performance(self, vector_store):
-        """Test de performance sur un dataset moyen (1000 docs)"""
+        """Performance test on a medium dataset (1000 docs)"""
         result = self.benchmark_cleanup(vector_store, num_docs=1000, chunks_per_doc=10)
         
-        # Assertions de performance pour dataset moyen
+        # Performance assertions for medium dataset
         assert result['cleanup_time'] < 10.0, f"Cleanup too slow: {result['cleanup_time']:.2f}s"
         assert result['chunks_per_second_cleanup'] > 100, f"Cleanup rate too low: {result['chunks_per_second_cleanup']:.1f} chunks/s"
         
@@ -139,10 +139,10 @@ class TestCleanupPerformance:
     @pytest.mark.performance
     @pytest.mark.slow
     def test_large_dataset_performance(self, vector_store):
-        """Test de performance sur un grand dataset (5000 docs)"""
+        """Performance test on a large dataset (5000 docs)"""
         result = self.benchmark_cleanup(vector_store, num_docs=5000, chunks_per_doc=15)
         
-        # Assertions de performance pour grand dataset
+        # Performance assertions for large dataset
         assert result['cleanup_time'] < 120.0, f"Cleanup too slow: {result['cleanup_time']:.2f}s"
         assert result['chunks_per_second_cleanup'] > 50, f"Cleanup rate too low: {result['chunks_per_second_cleanup']:.1f} chunks/s"
         
@@ -150,14 +150,14 @@ class TestCleanupPerformance:
     
     @pytest.mark.performance
     def test_varying_orphan_ratios(self, vector_store):
-        """Test de performance avec différents ratios d'orphelins"""
+        """Performance test with varying orphan ratios"""
         num_docs = 500
         chunks_per_doc = 8
         orphan_ratios = [0.1, 0.3, 0.5, 0.7, 0.9]
         
         results = []
         for ratio in orphan_ratios:
-            # Réinitialiser le store pour chaque test
+            # Reset the store for each test
             vector_store.metadata.clear()
             vector_store.document_to_chunks.clear()
             vector_store._create_new_index()
@@ -167,17 +167,17 @@ class TestCleanupPerformance:
             
             print(f"Orphan ratio {ratio:.1%}: {result['cleanup_time']:.2f}s, {result['chunks_per_second_cleanup']:.1f} chunks/s")
         
-        # Analyser les tendances
+        # Analyze trends
         cleanup_times = [r['cleanup_time'] for r in results]
         assert max(cleanup_times) < 15.0, "Cleanup time too high for any orphan ratio"
         
-        # Le temps de nettoyage devrait augmenter avec le ratio d'orphelins
-        # mais pas de façon linéaire (optimisations internes)
+        # Cleanup time should increase with orphan ratio
+        # but not linearly (internal optimizations)
         print(f"Cleanup time range: {min(cleanup_times):.2f}s - {max(cleanup_times):.2f}s")
     
     @pytest.mark.performance
     def test_memory_usage_scaling(self, vector_store):
-        """Test de l'utilisation mémoire avec différentes tailles"""
+        """Test memory usage with different sizes"""
         dataset_sizes = [
             (100, 5),    # 500 chunks
             (500, 10),   # 5000 chunks
@@ -187,7 +187,7 @@ class TestCleanupPerformance:
         memory_usage = []
         
         for num_docs, chunks_per_doc in dataset_sizes:
-            # Réinitialiser
+            # Reset
             vector_store.metadata.clear()
             vector_store.document_to_chunks.clear()
             vector_store._create_new_index()
@@ -198,23 +198,23 @@ class TestCleanupPerformance:
             
             print(f"Dataset {num_docs}x{chunks_per_doc}: {result['memory_usage_mb']:.1f} MB")
         
-        # Vérifier que l'utilisation mémoire reste raisonnable
+        # Verify memory usage stays reasonable
         assert all(mem < 500 for mem in memory_usage), "Memory usage too high"
         
-        # L'utilisation mémoire devrait augmenter avec la taille du dataset
+        # Memory usage should increase with dataset size
         assert memory_usage[-1] > memory_usage[0], "Memory usage should scale with dataset size"
     
     @pytest.mark.performance
     def test_validation_performance(self, vector_store):
-        """Test de performance de la validation"""
-        # Créer un dataset de taille moyenne
+        """Performance test for validation"""
+        # Create a medium-sized dataset
         chunks = self.create_test_chunks(num_docs=1000, chunks_per_doc=8)
         vector_store.upsert(chunks)
         
-        # Mock du repository
+        # Mock the repository
         mock_repo = Mock()
         mock_docs = []
-        for i in range(500):  # 50% des documents existent
+        for i in range(500):  # 50% of documents exist
             doc = Mock()
             doc.id = i
             doc.status = "indexed"
@@ -228,7 +228,7 @@ class TestCleanupPerformance:
         
         mock_repo.get_all.return_value = mock_docs
         
-        # Mesurer la performance de validation
+        # Measure validation performance
         validator = VectorStoreValidator(vector_store, mock_repo)
         
         start_time = time.time()
@@ -239,19 +239,19 @@ class TestCleanupPerformance:
         print(f"Issues found: {result['issues_found']['total_issues']}")
         print(f"Consistency score: {result['consistency_score']:.2%}")
         
-        # Assertions de performance
+        # Performance assertions
         assert validation_time < 30.0, f"Validation too slow: {validation_time:.2f}s"
         assert result['issues_found']['total_issues'] > 0, "Should detect orphans"
     
     @pytest.mark.performance
     def test_backup_creation_performance(self, vector_store, temp_dir):
-        """Test de performance de création de backup"""
-        # Créer un dataset
+        """Performance test for backup creation"""
+        # Create a dataset
         chunks = self.create_test_chunks(num_docs=1000, chunks_per_doc=10)
         vector_store.upsert(chunks)
         vector_store.persist()
         
-        # Mesurer le temps de création de backup
+        # Measure backup creation time
         start_time = time.time()
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
         vector_store._create_backup(timestamp)
@@ -259,21 +259,21 @@ class TestCleanupPerformance:
         
         print(f"Backup creation for 10000 chunks in {backup_time:.2f}s")
         
-        # Vérifier que les fichiers de backup existent
+        # Verify backup files exist
         backup_files = list(Path(temp_dir).glob(f"*.backup_{timestamp}"))
         assert len(backup_files) == 2, "Should create index and metadata backups"
         
-        # Assertions de performance
+        # Performance assertions
         assert backup_time < 3.0, f"Backup too slow: {backup_time:.2f}s"
     
     @pytest.mark.performance
     def test_rebuild_optimization_performance(self, vector_store):
-        """Test de performance de l'optimisation/reconstruction"""
-        # Créer un dataset avec beaucoup de chunks supprimés
+        """Performance test for optimization/rebuild"""
+        # Create a dataset avec beaucoup de chunks supprimés
         chunks = self.create_test_chunks(num_docs=2000, chunks_per_doc=5)
         vector_store.upsert(chunks)
         
-        # Marquer 60% des chunks comme supprimés
+        # Mark 60% of chunks as deleted
         deleted_count = 0
         target_deleted = int(len(vector_store.metadata) * 0.6)
         
@@ -283,19 +283,19 @@ class TestCleanupPerformance:
                 meta['deleted_at'] = datetime.utcnow().isoformat()
                 deleted_count += 1
         
-        # Mesurer la performance de l'optimisation
+        # Measure optimization performance
         start_time = time.time()
         vector_store.optimize()
         optimization_time = time.time() - start_time
         
         print(f"Optimization removed {deleted_count} chunks in {optimization_time:.2f}s")
         
-        # Vérifier l'état final
+        # Verify final state
         final_stats = vector_store.get_stats()
         assert final_stats['deleted_vectors'] == 0, "All deleted chunks should be removed"
         assert final_stats['active_vectors'] == len(chunks) - deleted_count
         
-        # Assertions de performance
+        # Performance assertions
         assert optimization_time < 60.0, f"Optimization too slow: {optimization_time:.2f}s"
 
         optimization_rate = deleted_count / optimization_time if optimization_time > 0 else 0
@@ -304,7 +304,7 @@ class TestCleanupPerformance:
 
 
 class TestCleanupStressTest:
-    """Tests de stress pour le système de nettoyage"""
+    """Stress tests for the cleanup system"""
     
     @pytest.fixture
     def temp_dir(self):
@@ -328,7 +328,7 @@ class TestCleanupStressTest:
     @pytest.mark.stress
     @pytest.mark.slow
     def test_repeated_cleanup_cycles(self, vector_store):
-        """Test de cycles répétés de nettoyage"""
+        """Test repeated cleanup cycles"""
         num_cycles = 10
         docs_per_cycle = 200
         chunks_per_doc = 5

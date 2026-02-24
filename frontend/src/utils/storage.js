@@ -1,6 +1,6 @@
-// Utilitaires pour la gestion sécurisée du stockage local
+// Utilities for safe local storage management
 
-// Fonction utilitaire pour gérer sessionStorage de manière sécurisée
+// Utility function for safe sessionStorage handling
 export const safeSessionStorage = {
   getItem: (key) => {
     try {
@@ -32,7 +32,7 @@ export const safeSessionStorage = {
     }
   },
 
-  // Gestion spécifique pour les objets JSON
+  // JSON object handling
   getJSON: (key, fallback = null) => {
     try {
       const item = safeSessionStorage.getItem(key);
@@ -42,7 +42,7 @@ export const safeSessionStorage = {
       return parsed;
     } catch (error) {
       console.error(`Erreur lors du parsing JSON de ${key}:`, error);
-      // Nettoyer les données corrompues
+      // Clean up corrupted data
       safeSessionStorage.removeItem(key);
       return fallback;
     }
@@ -63,9 +63,9 @@ export const safeSessionStorage = {
   }
 };
 
-// Gestion spécifique pour l'historique des chats
+// Chat history management
 export const chatHistoryStorage = {
-  // Limites de sécurité
+  // Safety limits
   MAX_MESSAGES: 50,
   MAX_MESSAGE_SIZE: 50000, // 50KB per message
 
@@ -73,14 +73,14 @@ export const chatHistoryStorage = {
     const key = `chat_history_${sessionId}`;
     const messages = safeSessionStorage.getJSON(key, []);
 
-    // Validation et nettoyage des messages
+    // Validate and clean messages
     if (!Array.isArray(messages)) {
       console.warn('Historique chat corrompu, réinitialisation');
       chatHistoryStorage.clearHistory(sessionId);
       return [];
     }
 
-    // Filtrer et valider les messages
+    // Filter and validate messages
     const validMessages = messages.filter(msg => {
       return msg &&
              typeof msg === 'object' &&
@@ -96,7 +96,7 @@ export const chatHistoryStorage = {
   saveHistory: (sessionId, messages) => {
     if (!sessionId || !Array.isArray(messages)) return false;
 
-    // Limiter le nombre de messages
+    // Limit the number of messages
     const limitedMessages = messages.slice(-chatHistoryStorage.MAX_MESSAGES);
 
     // Strip chunk_text from sources to reduce storage size.
@@ -128,7 +128,7 @@ export const chatHistoryStorage = {
     return safeSessionStorage.removeItem(key);
   },
 
-  // Nettoyage automatique des anciennes sessions
+  // Automatic cleanup of old sessions
   cleanupOldSessions: (maxAgeHours = 24) => {
     try {
       const cutoffTime = Date.now() - (maxAgeHours * 60 * 60 * 1000);
@@ -136,7 +136,7 @@ export const chatHistoryStorage = {
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
         if (key && key.startsWith('chat_history_')) {
-          // Extraire l'ID de session et vérifier l'âge
+          // Extract session ID and check age
           const sessionId = key.replace('chat_history_', '');
           const messages = chatHistoryStorage.getHistory(sessionId);
 
@@ -156,7 +156,7 @@ export const chatHistoryStorage = {
   }
 };
 
-// Gestion des sessions de chat
+// Chat session management
 export const chatSessionStorage = {
   getCurrentSessionId: () => {
     return safeSessionStorage.getItem('current_session_id');

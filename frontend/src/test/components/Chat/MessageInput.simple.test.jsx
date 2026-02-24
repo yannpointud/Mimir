@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { act } from 'react';
 import MessageInput from '../../../components/Chat/MessageInput';
 
-// Mock des icônes
+// Mock the icons
 vi.mock('lucide-react', () => ({
   Send: ({ className, ...props }) => <div className={className} data-testid="send-icon" {...props} />,
   Paperclip: ({ className, ...props }) => <div className={className} data-testid="paperclip-icon" {...props} />,

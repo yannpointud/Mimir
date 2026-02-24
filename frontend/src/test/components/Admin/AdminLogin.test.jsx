@@ -4,7 +4,7 @@ import { act } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import AdminLogin from '../../../components/Admin/AdminLogin';
 
-// Mock du hook useAuth
+// Mock the useAuth hook
 const mockLogin = vi.fn();
 const mockUseAuth = {
   login: mockLogin,
@@ -17,7 +17,7 @@ vi.mock('../../../hooks/useAuth', () => ({
   AuthProvider: ({ children }) => children,
 }));
 
-// Wrapper pour les tests
+// Wrapper for tests
 const TestWrapper = ({ children }) => (
   <BrowserRouter>
     {children}
@@ -118,7 +118,7 @@ describe('AdminLogin', () => {
     );
 
     const passwordInput = screen.getByLabelText('Mot de passe');
-    // Le bouton toggle est le seul bouton de type button qui n'est pas le submit
+    // The toggle button is the only button of type button that is not the submit
     const toggleButton = screen.getAllByRole('button').find(btn => btn.type === 'button');
 
     expect(passwordInput.type).toBe('password');

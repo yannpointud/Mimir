@@ -6,17 +6,17 @@ import LoadingIndicator from './LoadingIndicator';
 const ChatWindow = ({ messages, isLoading, messagesEndRef }) => {
   const scrollAreaRef = useRef(null);
 
-  // Vérifier si un message est en cours de streaming
+  // Check if a message is currently streaming
   const hasStreamingMessage = messages.some(msg => msg.isStreaming);
 
-  // Auto-scroll intelligent : seulement si l'utilisateur est proche du bas
+  // Smart auto-scroll: only if user is near the bottom
   useEffect(() => {
     const scrollArea = scrollAreaRef.current;
     if (!scrollArea) return;
 
     const isNearBottom =
       scrollArea.scrollTop + scrollArea.clientHeight >=
-      scrollArea.scrollHeight - 100; // 100px de marge
+      scrollArea.scrollHeight - 100; // 100px margin
 
     if (isNearBottom) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -29,7 +29,7 @@ const ChatWindow = ({ messages, isLoading, messagesEndRef }) => {
         ref={scrollAreaRef}
         className="h-full overflow-y-auto px-4 py-6 space-y-6"
       >
-        {/* Messages vides */}
+        {/* Empty messages */}
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
@@ -48,13 +48,13 @@ const ChatWindow = ({ messages, isLoading, messagesEndRef }) => {
           </div>
         )}
 
-        {/* Liste des messages */}
+        {/* Messages list */}
         <MessageList messages={messages} />
 
-        {/* Indicateur de chargement - seulement si pas de streaming */}
+        {/* Loading indicator - only if not streaming */}
         {isLoading && !hasStreamingMessage && <LoadingIndicator />}
 
-        {/* Référence pour l'auto-scroll */}
+        {/* Reference for auto-scroll */}
         <div ref={messagesEndRef} />
       </div>
     </div>

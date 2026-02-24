@@ -68,7 +68,7 @@ const LogViewer = ({ onRefresh }) => {
     loadLogs();
   }, []);
 
-  // Écouter le refreshTrigger du parent pour le refresh global
+  // Listen to parent refreshTrigger for global refresh
   useEffect(() => {
     if (refreshTrigger > 0) {
       loadLogs();
@@ -165,7 +165,7 @@ const LogViewer = ({ onRefresh }) => {
 
   return (
     <div className="card p-6">
-      {/* En-tête avec filtres */}
+      {/* Header with filters */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <Activity className="h-5 w-5 text-gray-600 mr-2" />
@@ -194,9 +194,9 @@ const LogViewer = ({ onRefresh }) => {
         </div>
       </div>
 
-      {/* Filtres */}
+      {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        {/* Niveau */}
+        {/* Level */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Niveau
@@ -230,7 +230,7 @@ const LogViewer = ({ onRefresh }) => {
           </select>
         </div>
 
-        {/* Recherche */}
+        {/* Search */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Recherche
@@ -247,7 +247,7 @@ const LogViewer = ({ onRefresh }) => {
           </div>
         </div>
 
-        {/* Limite */}
+        {/* Limit */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Limite
@@ -266,7 +266,7 @@ const LogViewer = ({ onRefresh }) => {
       </div>
 
 
-      {/* Résumé */}
+      {/* Summary */}
       {summary && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center justify-between text-sm text-gray-600">
@@ -281,7 +281,7 @@ const LogViewer = ({ onRefresh }) => {
         </div>
       )}
 
-      {/* Message d'erreur */}
+      {/* Error message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
           <div className="flex">
@@ -294,7 +294,7 @@ const LogViewer = ({ onRefresh }) => {
         </div>
       )}
 
-      {/* Liste des logs */}
+      {/* Logs list */}
       {logs.length === 0 ? (
         <div className="p-8 text-center">
           <Activity className="h-8 w-8 text-gray-400 mx-auto mb-2" />

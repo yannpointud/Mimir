@@ -183,7 +183,7 @@ class FaissVectorStore(AbstractVectorStore):
                     # Prepare metadata
                     metadata = {
                         'document_id': chunk.document_id,
-                        'text': chunk.text,  # Pas de troncature - déjà géré par le chunking
+                        'text': chunk.text,  # No truncation - already handled by chunking
                         'source': chunk.source,
                         'chunk_index': chunk.chunk_index,
                         'total_chunks': chunk.total_chunks,
@@ -552,23 +552,23 @@ class FaissVectorStore(AbstractVectorStore):
 
     def clean_orphans(self, existing_document_ids: set = None, create_backup: bool = True) -> Dict[str, Any]:
         """
-        Nettoie les chunks orphelins dont les documents n'existent plus en base
-        
+        Clean orphaned chunks whose documents no longer exist in the database.
+
         Args:
-            existing_document_ids: Set des document_ids existants en DB (optionnel)
-            create_backup: Créer un backup avant nettoyage
-            
+            existing_document_ids: Set of document_ids existing in DB (optional)
+            create_backup: Create a backup before cleanup
+
         Returns:
-            Dict avec les statistiques du nettoyage
-            
+            Dict with cleanup statistics
+
         Raises:
-            VectorStoreOperationError: Si le nettoyage échoue
+            VectorStoreOperationError: If cleanup fails
         """
         with self._lock:
             try:
                 start_time = time.time()
                 
-                # Statistiques initiales
+                # Initial statistics
                 initial_stats = {
                     'total_chunks': len(self.metadata),
                     'active_chunks': sum(1 for meta in self.metadata if not meta.get('deleted', False)),
@@ -578,7 +578,7 @@ class FaissVectorStore(AbstractVectorStore):
                 
                 logger.info(f"Starting orphan cleanup - Initial state: {initial_stats}")
                 
-                # Créer un backup si demandé
+                # Create backup if requested
                 if create_backup:
                     backup_timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
                     try:
@@ -586,20 +586,20 @@ class FaissVectorStore(AbstractVectorStore):
                         logger.info(f"Backup created: {backup_timestamp}")
                     except Exception as e:
                         logger.warning(f"Backup creation failed: {e}")
-                        # Continue malgré l'échec du backup
+                        # Continue despite backup failure
                 
-                # Si pas de document_ids fournis, récupérer depuis la DB
+                # If no document_ids provided, retrieve from DB
                 if existing_document_ids is None:
                     existing_document_ids = self._get_existing_document_ids()
                     
-                # Identifier les chunks orphelins
+                # Identify orphaned chunks
                 orphaned_chunks = []
                 orphaned_docs = set()
                 
                 for meta in self.metadata:
                     doc_id = meta.get('document_id')
                     if doc_id and doc_id not in existing_document_ids:
-                        if not meta.get('deleted', False):  # Pas encore marqué comme supprimé
+                        if not meta.get('deleted', False):  # Not yet marked as deleted
                             orphaned_chunks.append(meta)
                             orphaned_docs.add(doc_id)
                 
@@ -617,7 +617,7 @@ class FaissVectorStore(AbstractVectorStore):
                 
                 logger.info(f"Found {len(orphaned_chunks)} orphaned chunks from {len(orphaned_docs)} documents")
                 
-                # Marquer les chunks orphelins comme supprimés
+                # Mark orphaned chunks as deleted
                 cleaned_count = 0
                 for meta in orphaned_chunks:
                     if not meta.get('deleted', False):
@@ -626,13 +626,13 @@ class FaissVectorStore(AbstractVectorStore):
                         meta['deletion_reason'] = 'orphan_cleanup'
                         cleaned_count += 1
                 
-                # Nettoyer le mapping document_to_chunks pour les docs orphelins
+                # Clean document_to_chunks mapping for orphaned documents
                 for doc_id in orphaned_docs:
                     if doc_id in self.document_to_chunks:
                         del self.document_to_chunks[doc_id]
                         logger.debug(f"Removed orphaned document mapping: {doc_id}")
                 
-                # Déterminer si on doit déclencher l'optimisation
+                # Determine whether to trigger optimization
                 total_chunks_after = len(self.metadata)
                 deleted_chunks_after = sum(1 for meta in self.metadata if meta.get('deleted', False))
                 optimization_triggered = False
@@ -644,9 +644,9 @@ class FaissVectorStore(AbstractVectorStore):
                         optimization_triggered = True
                     except Exception as e:
                         logger.warning(f"Optimization failed after cleanup: {e}")
-                        # Ne pas faire échouer le nettoyage si l'optimisation échoue
+                        # Don't fail the cleanup if optimization fails
                 
-                # Sauvegarder les changements
+                # Save changes
                 try:
                     self.persist()
                     logger.info("Orphan cleanup changes persisted successfully")
@@ -654,7 +654,7 @@ class FaissVectorStore(AbstractVectorStore):
                     logger.error(f"Failed to persist cleanup changes: {e}")
                     raise VectorStoreOperationError(f"Cleanup persistence failed: {e}")
                 
-                # Statistiques finales
+                # Final statistics
                 final_stats = {
                     'total_chunks': len(self.metadata),
                     'active_chunks': sum(1 for meta in self.metadata if not meta.get('deleted', False)),
@@ -751,25 +751,25 @@ class FaissVectorStore(AbstractVectorStore):
             logger.warning(f"Backup rotation failed: {e}")
     
     def _get_existing_document_ids(self) -> set:
-        """Récupère les document_ids existants depuis la base de données"""
+        """Retrieve existing document_ids from the database."""
         try:
-            # Import dynamique pour éviter les dépendances circulaires
+            # Dynamic import to avoid circular dependencies
             from ...database.connection import DatabaseManager
             from ...database.repository import DocumentRepository
             
-            # Utiliser get_session() directement plutôt que get_db_session() qui est un generator
+            # Use get_session() directly rather than get_db_session() which is a generator
             db_manager = DatabaseManager()
             session = db_manager.get_session()
             try:
                 doc_repo = DocumentRepository(session)
-                documents = doc_repo.get_all()  # Récupère tous les documents
+                documents = doc_repo.get_all()  # Retrieve all documents
                 return {str(doc.id) for doc in documents}
             finally:
                 session.close()
                 
         except Exception as e:
             logger.error(f"Failed to get existing document IDs from database: {e}")
-            # Fallback: utiliser les IDs présents dans le mapping FAISS
+            # Fallback: use IDs present in the FAISS mapping
             return set(self.document_to_chunks.keys())
 
     def optimize(self):
@@ -850,14 +850,14 @@ class FaissVectorStore(AbstractVectorStore):
 
     def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True) -> Dict[str, Any]:
         """
-        Reconstruit complètement le vector store avec nettoyage optionnel des orphelins
-        
+        Completely rebuild the vector store with optional orphan cleanup.
+
         Args:
-            force_rebuild: Force la reconstruction même sans chunks supprimés
-            cleanup_orphans: Nettoie les chunks orphelins avant reconstruction
-            
+            force_rebuild: Force rebuild even without deleted chunks
+            cleanup_orphans: Clean orphaned chunks before rebuild
+
         Returns:
-            Dict avec les statistiques de la reconstruction
+            Dict with rebuild statistics
         """
         with self._lock:
             try:
@@ -865,10 +865,10 @@ class FaissVectorStore(AbstractVectorStore):
                 
                 logger.info(f"Starting vector store rebuild (force={force_rebuild}, cleanup_orphans={cleanup_orphans})")
                 
-                # Statistiques initiales
+                # Initial statistics
                 initial_stats = self.get_stats()
                 
-                # Nettoyage des orphelins si demandé
+                # Orphan cleanup if requested
                 cleanup_result = None
                 if cleanup_orphans:
                     try:
@@ -876,9 +876,9 @@ class FaissVectorStore(AbstractVectorStore):
                         logger.info(f"Orphan cleanup completed: {cleanup_result['cleaned_chunks']} chunks cleaned")
                     except Exception as e:
                         logger.warning(f"Orphan cleanup failed during rebuild: {e}")
-                        # Continuer la reconstruction même si le nettoyage échoue
+                        # Continue rebuild even if cleanup fails
                 
-                # Vérifier si une reconstruction est nécessaire
+                # Check if rebuild is needed
                 deleted_count = sum(1 for meta in self.metadata if meta.get('deleted', False))
                 total_count = len(self.metadata)
                 
@@ -896,10 +896,10 @@ class FaissVectorStore(AbstractVectorStore):
                         'final_stats': self.get_stats()
                     }
                 
-                # Exécuter l'optimisation (reconstruction)
+                # Execute optimization (rebuild)
                 self.optimize()
                 
-                # Statistiques finales
+                # Final statistics
                 final_stats = self.get_stats()
                 duration_ms = (time.time() - start_time) * 1000
                 
@@ -950,11 +950,11 @@ class FaissVectorStore(AbstractVectorStore):
                             not meta.get('deleted', False) and
                             meta.get('document_id') == document_id):
 
-                            # Récupérer le vecteur depuis FAISS
+                            # Retrieve the vector from FAISS
                             if i < self.index.ntotal:
                                 vector = self.index.reconstruct(i)
 
-                                # Créer l'objet Chunk
+                                # Create the Chunk object
                                 chunk = Chunk(
                                     text=meta.get('text', ''),
                                     embedding=vector,
@@ -968,7 +968,7 @@ class FaissVectorStore(AbstractVectorStore):
                                 chunks.append(chunk)
                             break
 
-                # Trier par chunk_index
+                # Sort by chunk_index
                 chunks.sort(key=lambda x: x.chunk_index)
 
                 logger.debug(f"Retrieved {len(chunks)} chunks for document {document_id}")

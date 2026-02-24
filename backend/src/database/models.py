@@ -1,6 +1,6 @@
 """
-Modèles SQLAlchemy pour Mimir
-Définit la structure des tables selon les spécifications LLD
+SQLAlchemy models for Mimir
+Defines table structure according to LLD specifications
 """
 
 from sqlalchemy import (
@@ -18,8 +18,8 @@ Base = declarative_base()
 
 class Document(Base):
     """
-    Table des documents indexés
-    Suit le schéma défini dans le LLD avec gestion des statuts et préservation
+    Indexed documents table
+    Follows the schema defined in the LLD with status management and preservation
     """
     __tablename__ = 'documents'
     
@@ -39,7 +39,7 @@ class Document(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     indexed_at = Column(DateTime, nullable=True)
     
-    # Contrainte sur les statuts valides
+    # Constraint on valid statuses
     __table_args__ = (
         CheckConstraint(
             "status IN ('pending', 'indexing', 'indexed', 'error')",
@@ -49,7 +49,7 @@ class Document(Base):
     )
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convertit le modèle en dictionnaire pour serialization"""
+        """Convert the model to a dictionary for serialization"""
         return {
             'id': self.id,
             'filename': self.filename,
@@ -64,15 +64,15 @@ class Document(Base):
         }
     
     def is_indexed(self) -> bool:
-        """Vérifie si le document est indexé avec succès"""
+        """Check if the document is successfully indexed"""
         return self.status == 'indexed' and self.chunk_count > 0
     
     def is_processing(self) -> bool:
-        """Vérifie si le document est en cours de traitement"""
+        """Check if the document is being processed"""
         return self.status in ['pending', 'indexing']
     
     def has_error(self) -> bool:
-        """Vérifie si le document a une erreur"""
+        """Check if the document has an error"""
         return self.status == 'error'
     
     def __repr__(self):
@@ -81,8 +81,8 @@ class Document(Base):
 
 class Configuration(Base):
     """
-    Table de configuration système
-    Stockage clé-valeur pour paramètres dynamiques
+    System configuration table
+    Key-value storage for dynamic parameters
     """
     __tablename__ = 'configuration'
     
@@ -97,7 +97,7 @@ class Configuration(Base):
     )
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convertit le modèle en dictionnaire"""
+        """Convert the model to a dictionary"""
         return {
             'key': self.key,
             'value': self.value,
@@ -107,8 +107,8 @@ class Configuration(Base):
     @staticmethod
     def get_typed_value(value: str, value_type: str = 'string'):
         """
-        Convertit une valeur string en type approprié
-        Utile pour récupérer des configs typées
+        Convert a string value to the appropriate type
+        Useful for retrieving typed configs
         """
         if value_type == 'bool':
             return value.lower() in ('true', '1', 'yes', 'on')
@@ -125,8 +125,8 @@ class Configuration(Base):
 
 class AuditLog(Base):
     """
-    Table d'audit pour traçabilité des actions
-    Suit les spécifications de sécurité avec logging des actions critiques
+    Audit table for action traceability
+    Follows security specifications with logging of critical actions
     """
     __tablename__ = 'audit_log'
     
@@ -139,7 +139,7 @@ class AuditLog(Base):
     success = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     
-    # Contrainte sur les types d'utilisateurs valides
+    # Constraint on valid user types
     __table_args__ = (
         CheckConstraint(
             "user_type IN ('admin', 'user', 'system')",
@@ -149,7 +149,7 @@ class AuditLog(Base):
     )
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convertit le modèle en dictionnaire"""
+        """Convert the model to a dictionary"""
         return {
             'id': self.id,
             'user_type': self.user_type,
@@ -164,7 +164,7 @@ class AuditLog(Base):
     @classmethod
     def create_admin_action(cls, action: str, details: str = None, 
                           ip_address: str = None, success: bool = True):
-        """Factory method pour créer des logs d'actions admin"""
+        """Factory method to create admin action logs"""
         return cls(
             user_type='admin',
             action=action,
@@ -176,7 +176,7 @@ class AuditLog(Base):
     @classmethod
     def create_user_action(cls, action: str, details: str = None, 
                          ip_address: str = None, success: bool = True):
-        """Factory method pour créer des logs d'actions utilisateur"""
+        """Factory method to create user action logs"""
         return cls(
             user_type='user',
             action=action,
@@ -188,7 +188,7 @@ class AuditLog(Base):
     @classmethod
     def create_system_action(cls, action: str, details: str = None, 
                            success: bool = True):
-        """Factory method pour créer des logs d'actions système"""
+        """Factory method to create system action logs"""
         return cls(
             user_type='system',
             action=action,
@@ -201,13 +201,13 @@ class AuditLog(Base):
                 f"action='{self.action}', created_at='{self.created_at}')>")
 
 
-# Fonctions utilitaires pour les modèles
+# Utility functions for models
 
 def create_tables(engine):
-    """Crée toutes les tables dans la base de données"""
+    """Create all tables in the database"""
     Base.metadata.create_all(bind=engine)
 
 
 def drop_tables(engine):
-    """Supprime toutes les tables de la base de données (pour tests)"""
+    """Drop all tables from the database (for tests)"""
     Base.metadata.drop_all(bind=engine)

@@ -23,7 +23,7 @@ const DocumentsList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filtres et pagination
+  // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,12 +31,12 @@ const DocumentsList = () => {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const itemsPerPage = 10;
 
-  // États pour les actions
+  // Action states
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Charger les documents
+  // Load documents
   const loadDocuments = useCallback(async (page = currentPage, search = searchTerm, status = statusFilter) => {
     try {
       setLoading(true);
@@ -49,11 +49,11 @@ const DocumentsList = () => {
         search || null
       );
 
-      // Validation et nettoyage des données
+      // Validate and clean data
       const validatedDocuments = (response.documents || []).map(validateDocumentData);
       setDocuments(validatedDocuments);
 
-      // Adapter la structure de réponse du backend
+      // Adapt backend response structure
       const totalCount = response.total_count || 0;
       const pagination = response.pagination || {};
       const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
@@ -71,12 +71,12 @@ const DocumentsList = () => {
     }
   }, [currentPage, searchTerm, statusFilter]);
 
-  // Effets
+  // Effects
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
 
-  // Recherche avec debounce
+  // Debounced search
   useEffect(() => {
     const timeout = setTimeout(() => {
       setCurrentPage(1);
@@ -86,14 +86,14 @@ const DocumentsList = () => {
     return () => clearTimeout(timeout);
   }, [searchTerm, statusFilter, loadDocuments]);
 
-  // Écouter le refreshTrigger du parent pour le refresh global
+  // Listen to parent refreshTrigger for global refresh
   useEffect(() => {
     if (refreshTrigger > 0) {
       loadDocuments();
     }
   }, [refreshTrigger, loadDocuments]);
 
-  // Gestion de la pagination
+  // Pagination handling
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
@@ -101,7 +101,7 @@ const DocumentsList = () => {
     }
   };
 
-  // Actions sur les documents
+  // Document actions
   const handleDeleteDocument = async (document, force = false) => {
     if (!document) return;
 
@@ -109,7 +109,7 @@ const DocumentsList = () => {
       setActionLoading(true);
       await documentsAPI.deleteDocument(document.id, force);
 
-      // Actualiser la liste
+      // Refresh the list
       await loadDocuments();
       onRefresh?.();
 
@@ -129,7 +129,7 @@ const DocumentsList = () => {
       setActionLoading(true);
       await documentsAPI.togglePreservation(document.id, !document.preserve);
 
-      // Actualiser la liste
+      // Refresh the list
       await loadDocuments();
       onRefresh?.();
 
@@ -146,7 +146,7 @@ const DocumentsList = () => {
       setActionLoading(true);
       await documentsAPI.reprocessDocument(document.id, 'high');
 
-      // Actualiser la liste
+      // Refresh the list
       await loadDocuments();
       onRefresh?.();
 
@@ -161,10 +161,10 @@ const DocumentsList = () => {
   return (
     <div className="flex flex-col h-full max-w-7xl p-4">
       <div className="card p-0 flex flex-col h-full">
-        {/* En-tête avec filtres */}
+        {/* Header with filters */}
         <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-          {/* Recherche */}
+          {/* Search */}
           <div className="flex-1 max-w-lg">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -178,7 +178,7 @@ const DocumentsList = () => {
             </div>
           </div>
 
-          {/* Filtres */}
+          {/* Filters */}
           <div className="flex items-center space-x-3">
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -195,11 +195,11 @@ const DocumentsList = () => {
               </select>
             </div>
 
-            {/* Bouton refresh retiré - utilisé depuis le dashboard principal */}
+            {/* Refresh button removed - used from main dashboard */}
           </div>
         </div>
 
-        {/* Résumé */}
+        {/* Summary */}
         <div className="mt-3 text-sm text-gray-600">
           {totalDocuments > 0 ? (
             <>
@@ -212,7 +212,7 @@ const DocumentsList = () => {
         </div>
       </div>
 
-      {/* Message d'erreur */}
+      {/* Error message */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 m-4">
           <div className="flex">
@@ -230,7 +230,7 @@ const DocumentsList = () => {
         </div>
       )}
 
-      {/* Contenu principal */}
+      {/* Main content */}
       <div className="flex-1 overflow-y-auto admin-scroll">
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -339,7 +339,7 @@ const DocumentsList = () => {
         </div>
       )}
 
-      {/* Dialog de confirmation de suppression */}
+      {/* Delete confirmation dialog */}
       <DeleteConfirmDialog
         isOpen={showDeleteConfirm}
         document={selectedDocument}
@@ -355,7 +355,7 @@ const DocumentsList = () => {
   );
 };
 
-// Composant pour une ligne de document
+// Component for a document row
 const DocumentRow = ({ document, onDelete, onTogglePreservation, onReprocess, actionLoading }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -462,7 +462,7 @@ const DocumentRow = ({ document, onDelete, onTogglePreservation, onReprocess, ac
   );
 };
 
-// Dialog de confirmation de suppression
+// Delete confirmation dialog
 const DeleteConfirmDialog = ({ isOpen, document, onConfirm, onCancel, loading }) => {
   if (!isOpen || !document) return null;
 

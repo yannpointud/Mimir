@@ -14,7 +14,7 @@ const SourcesList = ({ sources }) => {
     return null;
   }
 
-  // Regrouper les sources par document_id
+  // Group sources by document_id
   const groupedSources = sources.reduce((acc, source) => {
     if (!acc[source.document_id]) {
       acc[source.document_id] = [];
@@ -23,7 +23,7 @@ const SourcesList = ({ sources }) => {
     return acc;
   }, {});
 
-  // Créer les éléments de document avec métadonnées
+  // Create document items with metadata
   const documentItems = Object.entries(groupedSources).map(([documentId, chunks]) => {
     const scores = chunks.map(c => c.similarity_score).filter(s => s != null && !isNaN(s));
 
@@ -44,11 +44,11 @@ const SourcesList = ({ sources }) => {
     };
   });
 
-  // Trier par pertinence max décroissante
+  // Sort by max relevance descending
   documentItems.sort((a, b) => (b.maxScore || 0) - (a.maxScore || 0));
 
   const handleSourceClick = (documentItem) => {
-    // Ouvrir la modal avec le document et les chunks pertinents
+    // Open modal with document and relevant chunks
     if (documentItem.documentId) {
       console.log(`[SourcesList] Ouverture modal pour document ${documentItem.documentId}`, {
         chunksCount: documentItem.chunks?.length || 0,
@@ -71,7 +71,7 @@ const SourcesList = ({ sources }) => {
   return (
     <>
       <div className="bg-gray-50 rounded-lg border border-gray-200">
-        {/* Header cliquable */}
+        {/* Clickable header */}
         <div
           className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100 transition-colors duration-200"
           onClick={() => setIsExpanded(!isExpanded)}
@@ -81,7 +81,7 @@ const SourcesList = ({ sources }) => {
             Sources ({sources.length})
           </div>
 
-          {/* Icône chevron */}
+          {/* Chevron icon */}
           {isExpanded ? (
             <ChevronUp className="h-4 w-4 text-gray-500" />
           ) : (
@@ -89,7 +89,7 @@ const SourcesList = ({ sources }) => {
           )}
         </div>
 
-        {/* Contenu déroulant */}
+        {/* Expandable content */}
         {isExpanded && (
           <div className="px-3 pb-3 space-y-2 border-t border-gray-200">
             {documentItems.map((documentItem, index) => (
@@ -104,7 +104,7 @@ const SourcesList = ({ sources }) => {
         )}
       </div>
 
-      {/* Modal de document */}
+      {/* Document modal */}
       <DocumentModal
         isOpen={selectedDocumentId !== null}
         onClose={() => {
@@ -143,19 +143,19 @@ const DocumentSourceItem = ({ documentItem, onOpenModal, onOpenBrowser }) => {
           onClick={handleOpenBrowser}
           title="Ouvrir le document dans le navigateur"
         >
-          {/* Nom du document avec nombre de sections */}
+          {/* Document name with section count */}
           <p className="text-sm font-medium text-gray-900 truncate">
             📄 {documentItem.filename} ({documentItem.chunksCount} section{documentItem.chunksCount > 1 ? 's' : ''})
           </p>
 
-          {/* Extrait du chunk le plus pertinent */}
+          {/* Excerpt from most relevant chunk */}
           {(documentItem.chunks[0]?.chunk_text || documentItem.chunks[0]?.text) && (
             <p className="text-xs text-gray-600 mt-1 line-clamp-2">
               {truncateText(documentItem.chunks[0]?.chunk_text || documentItem.chunks[0]?.text || '', 120)}
             </p>
           )}
 
-          {/* Affichage de pertinence min-max */}
+          {/* Min-max relevance display */}
           <div className="flex items-center mt-1">
             <span className="text-xs text-gray-500">
               Pertinence: {documentItem.pertinence}
@@ -171,7 +171,7 @@ const DocumentSourceItem = ({ documentItem, onOpenModal, onOpenBrowser }) => {
           </div>
         </div>
 
-        {/* Icône d'action pour modal */}
+        {/* Action icon for modal */}
         <div
           className="flex-shrink-0 ml-2 cursor-pointer p-1 rounded hover:bg-gray-100"
           onClick={handleOpenModal}

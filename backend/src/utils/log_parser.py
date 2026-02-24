@@ -16,7 +16,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Chemins des fichiers de logs
+# Log file paths
 LOG_DIR = Path(__file__).parent.parent.parent.parent / "logs"
 BACKEND_LOG_DIR = Path(__file__).parent.parent.parent / "logs"
 
@@ -67,7 +67,7 @@ def get_chat_requests_last_hour() -> int:
                 try:
                     log_entry = json.loads(line.strip())
 
-                    # Chercher les logs de génération de texte (indicateur de chat)
+                    # Look for text generation logs (chat indicator)
                     if (log_entry.get('module') == 'mistral_api' and
                         'Text generation successful' in log_entry.get('message', '') and
                         log_entry.get('type') == 'text_generation'):
@@ -107,7 +107,7 @@ def get_average_response_time() -> float:
                 try:
                     log_entry = json.loads(line.strip())
 
-                    # Chercher les logs de génération de texte avec temps de réponse
+                    # Look for text generation logs with response time
                     if (log_entry.get('module') == 'mistral_api' and
                         'Text generation successful' in log_entry.get('message', '') and
                         log_entry.get('type') == 'text_generation'):
@@ -125,7 +125,7 @@ def get_average_response_time() -> float:
                     continue
 
         if response_times:
-            # Convertir de millisecondes en secondes avec 1 décimale
+            # Convert from milliseconds to seconds with 1 decimal place
             avg_ms = sum(response_times) / len(response_times)
             return round(avg_ms / 1000, 1)
         return 0.0
@@ -152,7 +152,7 @@ def get_average_tokens_per_request() -> int:
 
         total_tokens = []
 
-        # Récupérer les requêtes chat pour estimer les tokens d'entrée
+        # Retrieve chat requests to estimate input tokens
         chat_requests = []
         if UVICORN_LOG.exists():
             with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
@@ -160,17 +160,17 @@ def get_average_tokens_per_request() -> int:
                     if 'POST /api/v1/chat/' in line and ' 200 OK' in line:
                         chat_requests.append(line)
 
-        # Moyenne estimée des caractères par question (basée sur observation)
-        # Questions typiques : "Comment faire X ?", "Explique-moi Y", etc.
-        avg_input_chars = 150  # Estimation conservative
-        avg_input_tokens = avg_input_chars // 4  # 1 token ≈ 4 caractères
+        # Estimated average characters per question (based on observation)
+        # Typical questions: "How to do X?", "Explain Y to me", etc.
+        avg_input_chars = 150  # Conservative estimate
+        avg_input_tokens = avg_input_chars // 4  # 1 token ~ 4 characters
 
         with open(APP_LOG, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
 
-                    # Chercher les logs de génération de texte avec tokens de sortie
+                    # Look for text generation logs with output tokens
                     if (log_entry.get('module') == 'mistral_api' and
                         'Text generation successful' in log_entry.get('message', '') and
                         log_entry.get('type') == 'text_generation'):
@@ -179,7 +179,7 @@ def get_average_tokens_per_request() -> int:
                         if _is_within_last_hour(timestamp):
                             output_tokens = log_entry.get('tokens', 0)
                             if output_tokens > 0:
-                                # Total = tokens de sortie + estimation tokens d'entrée
+                                # Total = output tokens + estimated input tokens
                                 total_tokens_for_request = output_tokens + avg_input_tokens
                                 total_tokens.append(total_tokens_for_request)
 
@@ -216,9 +216,9 @@ def get_success_rate() -> float:
 
         with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
             for line in f:
-                # Chercher les requêtes POST chat
+                # Look for POST chat requests
                 if 'POST /api/v1/chat/' in line:
-                    # Extraire le timestamp du log uvicorn (format: YYYY-MM-DD HH:MM:SS)
+                    # Extract timestamp from uvicorn log (format: YYYY-MM-DD HH:MM:SS)
                     timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                     if timestamp_match:
                         try:
@@ -251,12 +251,12 @@ def get_errors_last_hour() -> int:
         error_count = 0
         one_hour_ago = datetime.utcnow() - timedelta(hours=1)
 
-        # Compter les erreurs HTTP dans uvicorn.log (avec filtre temporel)
+        # Count HTTP errors in uvicorn.log (with time filter)
         if UVICORN_LOG.exists():
             with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
                 for line in f:
                     if 'POST /api/v1/chat/' in line and (' 4' in line or ' 5' in line):
-                        # Extraire le timestamp du log uvicorn (format: YYYY-MM-DD HH:MM:SS)
+                        # Extract timestamp from uvicorn log (format: YYYY-MM-DD HH:MM:SS)
                         timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                         if timestamp_match:
                             try:
@@ -267,7 +267,7 @@ def get_errors_last_hour() -> int:
                             except ValueError:
                                 continue
 
-        # Compter les erreurs dans error.log (avec filtre temporel)
+        # Count errors in error.log (with time filter)
         if ERROR_LOG.exists():
             try:
                 with open(ERROR_LOG, 'r', encoding='utf-8') as f:
@@ -306,14 +306,14 @@ def get_performance_status(avg_response_time: float, success_rate: float, errors
         Performance status: 'excellent', 'good', 'degraded', or 'poor'
     """
     try:
-        # Critères de performance
+        # Performance criteria
         if errors_count > 10:
             return 'poor'
-        elif avg_response_time > 3000:  # > 3 secondes
+        elif avg_response_time > 3000:  # > 3 seconds
             return 'degraded'
         elif success_rate < 90:
             return 'degraded'
-        elif avg_response_time > 1500:  # > 1.5 secondes
+        elif avg_response_time > 1500:  # > 1.5 seconds
             return 'good'
         elif success_rate < 95:
             return 'good'
@@ -333,24 +333,24 @@ def get_active_sessions_estimate() -> int:
         Estimated number of active sessions
     """
     try:
-        # Estimation basée sur l'activité des 15 dernières minutes
+        # Estimate based on activity in the last 15 minutes
         if not APP_LOG.exists():
             return 0
 
         unique_ips = set()
         fifteen_minutes_ago = datetime.utcnow() - timedelta(minutes=15)
 
-        # Analyser uvicorn.log pour les IPs uniques des requêtes chat récentes
+        # Analyze uvicorn.log for unique IPs from recent chat requests
         if UVICORN_LOG.exists():
             with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
                 for line in f:
                     if 'POST /api/v1/chat/' in line:
-                        # Extraire l'IP
+                        # Extract the IP
                         match = re.search(r'(\d+\.\d+\.\d+\.\d+)', line)
                         if match:
                             unique_ips.add(match.group(1))
 
-        # Estimation : chaque IP unique = une session active potentielle
+        # Estimate: each unique IP = one potentially active session
         return len(unique_ips)
 
     except Exception as e:
@@ -405,10 +405,10 @@ def get_usage_analytics() -> Dict:
         from datetime import datetime, timedelta
         import os
 
-        # Période d'analyse
+        # Analysis period
         now = datetime.utcnow()
 
-        # Calculer les métriques pour différentes périodes
+        # Calculate metrics for different periods
         periods = {
             "last_hour": timedelta(hours=1),
             "last_24h": timedelta(hours=24),
@@ -512,7 +512,7 @@ def _count_requests_in_timeframe(start_time: datetime, end_time: datetime) -> in
                         log_entry.get('type') == 'text_generation'):
 
                         timestamp = _parse_timestamp(log_entry['timestamp'])
-                        # Ajuster les timezones pour la comparaison
+                        # Adjust timezones for comparison
                         start_tz = start_time.replace(tzinfo=timestamp.tzinfo)
                         end_tz = end_time.replace(tzinfo=timestamp.tzinfo)
 
@@ -539,16 +539,16 @@ def _get_avg_daily_requests(period: timedelta) -> float:
 def _calculate_growth_rate(current_period: timedelta, previous_period: timedelta) -> float:
     """Calculate growth rate between two periods."""
     try:
-        # Calculer les requêtes pour la période actuelle
+        # Calculate requests for the current period
         current_count = _count_requests_in_period(current_period)
 
-        # Calculer les requêtes pour la période précédente (même durée, décalée)
-        # Ex: si current_period = 24h, previous_period = 24h précédentes
+        # Calculate requests for the previous period (same duration, shifted)
+        # E.g.: if current_period = 24h, previous_period = previous 24h
         from datetime import datetime
         now = datetime.utcnow()
 
-        # Période précédente : même durée mais décalée
-        previous_start = now - (current_period * 2)  # 2x la période pour aller dans le passé
+        # Previous period: same duration but shifted
+        previous_start = now - (current_period * 2)  # 2x the period to go back in time
         previous_end = now - current_period
 
         previous_count = _count_requests_in_timeframe(previous_start, previous_end)
@@ -556,7 +556,7 @@ def _calculate_growth_rate(current_period: timedelta, previous_period: timedelta
         if previous_count == 0:
             return 100 if current_count > 0 else 0
 
-        # Calcul du taux de croissance : ((nouveau - ancien) / ancien) * 100
+        # Growth rate calculation: ((new - old) / old) * 100
         growth_rate = ((current_count - previous_count) / previous_count) * 100
         return round(growth_rate)
 
@@ -571,10 +571,10 @@ def _get_hourly_distribution() -> Dict[str, int]:
         if not APP_LOG.exists():
             return {}
 
-        # Initialiser la distribution (24 heures)
+        # Initialize the distribution (24 hours)
         distribution = {f"{hour:02d}:00": 0 for hour in range(24)}
 
-        # Analyser les logs des 7 derniers jours pour avoir assez de données
+        # Analyze logs from the last 7 days to have enough data
         from datetime import datetime, timedelta
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
@@ -605,11 +605,11 @@ def _get_daily_distribution() -> Dict[str, int]:
         if not APP_LOG.exists():
             return {}
 
-        # Noms des jours en français
+        # Day names in French
         days_fr = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
         distribution = {day: 0 for day in days_fr}
 
-        # Analyser les logs des 30 derniers jours pour avoir assez de données
+        # Analyze logs from the last 30 days to have enough data
         from datetime import datetime, timedelta
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
 
@@ -623,7 +623,7 @@ def _get_daily_distribution() -> Dict[str, int]:
 
                         timestamp = _parse_timestamp(log_entry['timestamp'])
                         if timestamp >= thirty_days_ago.replace(tzinfo=timestamp.tzinfo):
-                            # weekday() retourne 0=Lundi, 1=Mardi, etc.
+                            # weekday() returns 0=Monday, 1=Tuesday, etc.
                             day_index = timestamp.weekday()
                             day_name = days_fr[day_index]
                             distribution[day_name] += 1
@@ -669,7 +669,7 @@ def _get_avg_response_time_period(period: timedelta) -> float:
 def _get_success_rate_period(period: timedelta) -> float:
     """Get success rate for a period."""
     try:
-        # Simulation basée sur l'observation que le système est stable
+        # Simulation based on the observation that the system is stable
         return 97.8
     except:
         return 100.0
@@ -678,7 +678,7 @@ def _get_success_rate_period(period: timedelta) -> float:
 def _get_peak_usage_time() -> str:
     """Get the peak usage time of day."""
     try:
-        return "14:00-15:00"  # Basé sur l'observation typique
+        return "14:00-15:00"  # Based on typical observation
     except:
         return "N/A"
 
@@ -702,7 +702,7 @@ def _get_total_tokens_period(period: timedelta) -> int:
                         if _is_within_period(timestamp, period):
                             output_tokens = log_entry.get('tokens', 0)
                             if output_tokens > 0:
-                                # Total = tokens de sortie + estimation tokens d'entrée (37)
+                                # Total = output tokens + estimated input tokens (37)
                                 total_tokens += output_tokens + 37
                 except:
                     continue
@@ -767,7 +767,7 @@ def _estimate_system_uptime() -> str:
         if not APP_LOG.exists():
             return "N/A"
 
-        # Chercher le dernier démarrage dans les logs
+        # Find the last startup in the logs
         with open(APP_LOG, 'r', encoding='utf-8') as f:
             for line in reversed(list(f)):
                 try:
@@ -800,8 +800,8 @@ def _get_error_rate_period(period: timedelta) -> float:
         if total_requests == 0:
             return 0.0
 
-        # Les erreurs sont rares dans ce système
-        error_count = max(0, total_requests // 50)  # ~2% d'erreurs
+        # Errors are rare in this system
+        error_count = max(0, total_requests // 50)  # ~2% error rate
         return round((error_count / total_requests) * 100, 2)
     except:
         return 0.0
@@ -810,10 +810,10 @@ def _get_error_rate_period(period: timedelta) -> float:
 def _calculate_health_score() -> int:
     """Calculate system health score (0-100)."""
     try:
-        # Basé sur plusieurs facteurs
+        # Based on multiple factors
         base_score = 100
 
-        # Pénalités basées sur les métriques
+        # Penalties based on metrics
         error_rate = _get_error_rate_period(timedelta(hours=24))
         if error_rate > 5:
             base_score -= 15

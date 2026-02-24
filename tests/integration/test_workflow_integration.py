@@ -1,6 +1,6 @@
 """
-Tests d'intégration pour les workflows end-to-end de Mimir
-Tests des flux complets d'ingestion, recherche et réponse
+Integration tests for Mimir end-to-end workflows
+Tests for complete ingestion, search and response flows
 """
 
 import pytest
@@ -13,21 +13,21 @@ from fastapi.testclient import TestClient
 
 
 class TestDocumentIngestionWorkflow:
-    """Tests d'intégration pour le workflow complet d'ingestion de documents"""
+    """Integration tests for the complete document ingestion workflow"""
 
     @pytest.fixture
     def temp_workspace(self):
-        """Espace de travail temporaire pour les tests de workflow"""
+        """Temporary workspace for workflow tests"""
         with tempfile.TemporaryDirectory() as temp_dir:
             yield Path(temp_dir)
 
     def test_complete_text_document_workflow(self, temp_workspace, test_session):
-        """Test du workflow complet pour un document texte"""
+        """Test the complete workflow for a text document"""
         from src.ingestion.extractors import ExtractorFactory
         from src.ingestion.chunking import ChunkingStrategy
         from src.database.repository import DocumentRepository
 
-        # 1. Préparer un document de test
+        # 1. Prepare a test document
         test_document = temp_workspace / "workflow_test.txt"
         document_content = """
         Guide utilisateur Mimir - Système de chat intelligent
@@ -58,7 +58,7 @@ class TestDocumentIngestionWorkflow:
         """
         test_document.write_text(document_content, encoding='utf-8')
 
-        # 2. Extraction du texte
+        # 2. Text extraction
         extractor_factory = ExtractorFactory()
         extracted_text = extractor_factory.extract_text(str(test_document))
 
@@ -66,7 +66,7 @@ class TestDocumentIngestionWorkflow:
         assert "Mimir" in extracted_text
         assert "RAG" in extracted_text
 
-        # 3. Chunking du texte
+        # 3. Text chunking
         chunking_strategy = ChunkingStrategy()
         chunks = chunking_strategy.chunk_text(
             extracted_text,
@@ -75,7 +75,7 @@ class TestDocumentIngestionWorkflow:
 
         assert len(chunks) >= 1
 
-        # Vérifier la structure des chunks
+        # Verify chunk structure
         for chunk in chunks:
             assert 'text' in chunk
             assert 'chunk_index' in chunk
@@ -83,7 +83,7 @@ class TestDocumentIngestionWorkflow:
             assert 'char_count' in chunk
             assert len(chunk['text']) > 0
 
-        # 4. Enregistrement en base de données
+        # 4. Database registration
         import hashlib
         file_hash = hashlib.md5(document_content.encode()).hexdigest()
 
@@ -98,64 +98,64 @@ class TestDocumentIngestionWorkflow:
         assert document.filename == "workflow_test.txt"
         assert document.status == "pending"
 
-        # 5. Mise à jour du statut du document
+        # 5. Update document status
         doc_repo.update_status(document.id, "indexed")
 
         updated_doc = doc_repo.get_by_id(document.id)
         assert updated_doc.status == "indexed"
 
     def test_pdf_document_workflow_simulation(self, temp_workspace):
-        """Test simulé du workflow pour un document PDF"""
+        """Simulated test of the workflow for a PDF document"""
         from src.ingestion.extractors import ExtractorFactory
 
-        # Simuler un fichier PDF (en créant un fichier texte avec extension .pdf)
+        # Simulate a PDF file (by creating a text file with .pdf extension)
         fake_pdf = temp_workspace / "fake_document.pdf"
         fake_pdf.write_text("Contenu simulé d'un PDF pour test d'intégration", encoding='utf-8')
 
         extractor_factory = ExtractorFactory()
 
-        # Le système devrait essayer d'extraire le texte
+        # The system should try to extract text
         try:
             extracted_text = extractor_factory.extract_text(str(fake_pdf))
-            # Si l'extraction fonctionne avec le faux PDF
+            # If extraction works with the fake PDF
             assert len(extracted_text) >= 0
         except Exception:
-            # Si l'extraction échoue avec le faux PDF (comportement attendu)
-            # Vérifier que l'erreur est gérée proprement
+            # If extraction fails with the fake PDF (expected behavior)
+            # Verify the error is handled gracefully
             pass
 
     def test_unsupported_format_handling(self, temp_workspace):
-        """Test de gestion des formats non supportés"""
+        """Test handling of unsupported formats"""
         from src.ingestion.extractors import ExtractorFactory
 
-        # Créer un fichier avec une extension non supportée
+        # Create a file with an unsupported extension
         unsupported_file = temp_workspace / "test.unsupported"
         unsupported_file.write_text("Contenu non supporté", encoding='utf-8')
 
         extractor_factory = ExtractorFactory()
 
-        # Vérifier que le système gère l'erreur proprement
+        # Verify the system handles the error gracefully
         with pytest.raises(Exception):
             extractor_factory.extract_text(str(unsupported_file))
 
 
 class TestChatWorkflowIntegration:
-    """Tests d'intégration pour le workflow complet de chat"""
+    """Integration tests for the complete chat workflow"""
 
     def test_chat_workflow_with_mocked_services(self, test_app):
-        """Test du workflow de chat avec services mockés"""
+        """Test chat workflow with mocked services"""
         client = TestClient(test_app)
 
-        # Simuler une réponse de chat réussie
+        # Simulate a successful chat response
         with patch('src.llm_interface.implementations.mistral_api.MistralAPIService') as mock_llm:
-            # Configurer le mock LLM
+            # Configure the LLM mock
             mock_instance = mock_llm.return_value
             mock_instance.generate.return_value = AsyncMock()
             mock_instance.generate.return_value.content = "Réponse générée par Mimir"
             mock_instance.generate.return_value.usage_tokens = 150
             mock_instance.generate.return_value.finish_reason = "stop"
 
-            # Simuler le vector store
+            # Simulate the vector store
             with patch('src.rag_core.implementations.faiss_store.FaissVectorStore') as mock_vector:
                 mock_vector_instance = mock_vector.return_value
                 mock_vector_instance.query.return_value = [
@@ -166,7 +166,7 @@ class TestChatWorkflowIntegration:
                     }
                 ]
 
-                # Effectuer la requête de chat
+                # Perform the chat request
                 chat_request = {
                     "question": "Comment utiliser Mimir ?",
                     "context_limit": 3,
@@ -178,7 +178,7 @@ class TestChatWorkflowIntegration:
                 if response.status_code == 200:
                     data = response.json()
 
-                    # Vérifier la structure de la réponse
+                    # Verify the response structure
                     assert "answer" in data
                     assert "sources" in data
                     assert "confidence_score" in data
@@ -189,12 +189,12 @@ class TestChatWorkflowIntegration:
                     assert isinstance(data["confidence_score"], (int, float))
 
     def test_chat_session_management(self, test_app):
-        """Test de la gestion des sessions de chat"""
+        """Test chat session management"""
         client = TestClient(test_app)
 
         session_id = "test_session_workflow"
 
-        # Séquence de questions dans la même session
+        # Sequence of questions in the same session
         questions = [
             "Bonjour, je découvre Mimir",
             "Peux-tu m'expliquer le RAG ?",
@@ -211,16 +211,16 @@ class TestChatWorkflowIntegration:
             if response.status_code == 200:
                 responses.append(response.json())
 
-        # Vérifier la cohérence des sessions
+        # Verify session consistency
         if responses:
             for response_data in responses:
                 assert response_data["session_id"] == session_id
 
     def test_chat_escalation_workflow(self, test_app):
-        """Test du workflow d'escalade vers support humain"""
+        """Test escalation workflow to human support"""
         client = TestClient(test_app)
 
-        # Simuler un historique de chat
+        # Simulate a chat history
         chat_history = [
             {"type": "user", "content": "J'ai un problème avec l'installation"},
             {"type": "assistant", "content": "Puis-je vous aider avec l'installation ?"},
@@ -238,24 +238,24 @@ class TestChatWorkflowIntegration:
 
         response = client.post("/api/v1/chat/escalate", json=escalation_request)
 
-        # Le système doit accepter la demande d'escalade
+        # The system must accept the escalation request
         assert response.status_code == 200
         data = response.json()
 
         assert "success" in data
         assert "message" in data
-        # Le succès peut être True ou False selon la configuration email
+        # Success can be True or False depending on email configuration
 
 
 class TestAdminWorkflowIntegration:
-    """Tests d'intégration pour les workflows d'administration"""
+    """Integration tests for administration workflows"""
 
     @pytest.fixture
     def admin_client(self, test_app):
-        """Client authentifié en tant qu'admin"""
+        """Client authenticated as admin"""
         client = TestClient(test_app)
 
-        # Tentative d'authentification
+        # Authentication attempt
         login_response = client.post("/api/v1/auth/login", json={
             "username": "admin",
             "password": "admin123"
@@ -267,42 +267,42 @@ class TestAdminWorkflowIntegration:
         else:
             return client, None
 
-    # Tests admin supprimés - nécessitent une configuration complète avec authentification
-    # Ces tests sont couverts par les tests unitaires
+    # Admin tests removed - require full configuration with authentication
+    # These tests are covered by unit tests
     pass
 
 
 class TestErrorRecoveryWorkflow:
-    """Tests d'intégration pour la récupération d'erreurs"""
+    """Integration tests for error recovery"""
 
     def test_database_error_recovery(self, test_app):
-        """Test de récupération lors d'erreurs base de données"""
+        """Test recovery from database errors"""
         client = TestClient(test_app)
 
-        # Simuler des conditions normales puis dégradées
+        # Simulate normal then degraded conditions
         response = client.get("/health")
 
-        # Le système doit gérer gracieusement les erreurs DB
+        # The system must handle DB errors gracefully
         assert response.status_code in [200, 503]
 
     def test_llm_service_unavailable_handling(self, test_app):
-        """Test de gestion quand le service LLM n'est pas disponible"""
+        """Test handling when the LLM service is unavailable"""
         client = TestClient(test_app)
 
-        # Le système doit gérer gracieusement l'indisponibilité du LLM
+        # The system must handle LLM unavailability gracefully
         response = client.post("/api/v1/chat", json={
             "question": "Test question"
         })
 
-        # Le système doit soit réussir avec une réponse dégradée (200),
-        # soit retourner une erreur appropriée (500/503)
+        # The system must either succeed with a degraded response (200),
+        # or return an appropriate error (500/503)
         assert response.status_code in [200, 500, 503]
 
     def test_vector_store_error_handling(self, test_app):
-        """Test de gestion d'erreurs du vector store"""
+        """Test vector store error handling"""
         client = TestClient(test_app)
 
-        # Simuler une erreur du vector store
+        # Simulate a vector store error
         with patch('src.rag_core.implementations.faiss_store.FaissVectorStore') as mock_vector:
             mock_instance = mock_vector.return_value
             mock_instance.query.side_effect = Exception("Vector store indisponible")
@@ -311,15 +311,15 @@ class TestErrorRecoveryWorkflow:
                 "question": "Test avec vector store en erreur"
             })
 
-            # Le système doit gérer l'erreur gracieusement
+            # The system must handle the error gracefully
             assert response.status_code in [200, 500, 503]
 
 
 class TestConcurrencyWorkflow:
-    """Tests d'intégration pour les scénarios de concurrence"""
+    """Integration tests for concurrency scenarios"""
 
     def test_concurrent_chat_requests(self, test_app):
-        """Test de requêtes de chat concurrentes"""
+        """Test concurrent chat requests"""
         import threading
         import time
 
@@ -327,7 +327,7 @@ class TestConcurrencyWorkflow:
         results = []
 
         def chat_worker(worker_id):
-            """Worker effectuant une requête de chat"""
+            """Worker performing a chat request"""
             start_time = time.time()
             response = client.post("/api/v1/chat", json={
                 "question": f"Question du worker {worker_id}",
@@ -342,28 +342,28 @@ class TestConcurrencyWorkflow:
                 "success": response.status_code == 200
             })
 
-        # Lancer 5 requêtes de chat en parallèle
+        # Launch 5 chat requests in parallel
         threads = []
         for i in range(5):
             thread = threading.Thread(target=chat_worker, args=(i,))
             threads.append(thread)
             thread.start()
 
-        # Attendre completion
+        # Wait for completion
         for thread in threads:
             thread.join()
 
-        # Analyser les résultats
+        # Analyze results
         assert len(results) == 5
 
-        # Au moins quelques requêtes doivent réussir
+        # At least some requests must succeed
         successful_requests = [r for r in results if r["success"]]
         assert len(successful_requests) >= 1
 
-        # Aucune requête ne doit prendre trop de temps
+        # No request should take too long
         for result in results:
-            assert result["duration"] < 30.0  # Timeout raisonnable
+            assert result["duration"] < 30.0  # Reasonable timeout
 
-    # Test concurrent admin supprimé - nécessite authentification admin
-    # Ces tests sont couverts par les tests unitaires
+    # Concurrent admin test removed - requires admin authentication
+    # These tests are covered by unit tests
     pass

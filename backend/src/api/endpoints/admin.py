@@ -117,14 +117,14 @@ async def get_cache_stats() -> Dict[str, Any]:
         main_cache_stats = cache_service.get_stats()
         chat_cache_stats = chat_cache_service.get_stats()
 
-        # Adapter les données pour le frontend
+        # Adapt data for the frontend
         def adapt_cache_stats(stats):
             adapted = stats.copy()
-            # Ajouter 'utilization' que le frontend attend
+            # Add 'utilization' expected by the frontend
             adapted['utilization'] = stats.get('utilization_percent', 0.0)
             return adapted
 
-        # Calculer les stats globales pour le frontend
+        # Compute global stats for the frontend
         total_requests = main_cache_stats["total_requests"] + chat_cache_stats["total_requests"]
         total_hits = main_cache_stats["hits"] + chat_cache_stats["hits"]
         hit_ratio = (total_hits / max(1, total_requests)) if total_requests > 0 else 0.0
@@ -535,7 +535,7 @@ async def test_email_service(
 
 
 # ============= DOCUMENT MANAGEMENT ENDPOINTS =============
-# Ajout des endpoints documents pour cohérence avec le frontend
+# Document endpoints added for frontend consistency
 
 @router.get("/documents", response_model=Dict[str, Any])
 async def admin_list_documents(
@@ -546,27 +546,27 @@ async def admin_list_documents(
     current_user: Dict[str, Any] = Depends(require_admin)
 ) -> Dict[str, Any]:
     """List documents via admin interface."""
-    # Import ici pour éviter les imports circulaires
+    # Import here to avoid circular imports
     from src.database.repository import DocumentRepository
     from src.api.dependencies import get_document_repository
 
-    # Utiliser une nouvelle instance du repository
+    # Use a new repository instance
     from src.database.connection import get_db_session
     db = next(get_db_session())
     doc_repo = DocumentRepository(db)
 
     try:
-        # Calculer offset
+        # Compute offset
         offset = (page - 1) * limit
 
-        # Récupérer documents avec filtres
+        # Retrieve documents with filters
         documents = doc_repo.get_all(
             offset=offset,
             limit=limit,
             order_by='created_at'
         )
 
-        # Compter le total (approximation simple)
+        # Count total (simple approximation)
         total = len(doc_repo.get_all())
 
         return {
@@ -634,7 +634,7 @@ async def admin_upload_document(
             detail="No filename provided"
         )
 
-    # Valider le fichier
+    # Validate the file
     if not validate_filename(file.filename):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -645,24 +645,24 @@ async def admin_upload_document(
     doc_repo = DocumentRepository(db)
 
     try:
-        # Créer le répertoire d'upload si nécessaire
+        # Create upload directory if needed
         upload_dir = Path(settings.upload_dir)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        # Nettoyer le nom de fichier
+        # Sanitize the filename
         clean_filename = sanitize_filename(file.filename)
         file_path = upload_dir / clean_filename
 
-        # Sauvegarder le fichier
+        # Save the file
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Calculer le hash
+        # Compute the hash
         import hashlib
         with open(file_path, "rb") as f:
             file_hash = hashlib.md5(f.read()).hexdigest()
 
-        # Créer l'enregistrement en base
+        # Create the database record
         document = doc_repo.create(
             filename=clean_filename,
             file_hash=file_hash,
@@ -684,7 +684,7 @@ async def admin_upload_document(
 
     except Exception as e:
         logger.error(f"Upload error: {e}")
-        # Nettoyer le fichier en cas d'erreur
+        # Clean up the file on error
         if 'file_path' in locals() and file_path.exists():
             file_path.unlink(missing_ok=True)
         raise HTTPException(
@@ -696,13 +696,13 @@ async def admin_upload_document(
 
 
 # ============= CONFIG ALIAS ENDPOINTS =============
-# Alias pour cohérence avec le frontend
+# Aliases for frontend consistency
 
 @router.get("/config", response_model=Dict[str, Any])
 async def get_config_alias(
     config_repo: ConfigurationRepository = Depends(get_configuration_repository)
 ) -> Dict[str, Any]:
-    """Alias pour /configuration - pour cohérence frontend."""
+    """Alias for /configuration - for frontend consistency."""
     return await get_configuration(config_repo)
 
 
@@ -713,7 +713,7 @@ async def update_config_alias(
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
-    """Alias pour /configuration - pour cohérence frontend."""
+    """Alias for /configuration - for frontend consistency."""
 
 
 @router.get("/metrics/chat", response_model=Dict[str, Any])
@@ -742,13 +742,13 @@ async def get_chat_metrics(
         HTTPException: If user lacks admin privileges
     """
     try:
-        # Import du module log_parser pour extraire les métriques réelles
+        # Import log_parser module to extract real metrics
         from ...utils.log_parser import get_chat_metrics
 
-        # Obtenir toutes les métriques depuis les logs
+        # Get all metrics from logs
         metrics = get_chat_metrics()
 
-        # Ajouter le timestamp
+        # Add timestamp
         metrics["timestamp"] = datetime.utcnow().isoformat() + "Z"
 
         logger.info("Chat metrics retrieved successfully from logs")
@@ -786,13 +786,13 @@ async def get_usage_analytics(
         HTTPException: If user lacks admin privileges
     """
     try:
-        # Import du module log_parser pour extraire les analytics
+        # Import log_parser module to extract analytics
         from ...utils.log_parser import get_usage_analytics
 
-        # Obtenir toutes les analytics depuis les logs et la base
+        # Get all analytics from logs and database
         analytics = get_usage_analytics()
 
-        # Ajouter le timestamp
+        # Add timestamp
         analytics["timestamp"] = datetime.utcnow().isoformat() + "Z"
 
         logger.info("Usage analytics retrieved successfully from logs and database")

@@ -1,9 +1,8 @@
 """
-RAG Debug Logger - Système de logs détaillé pour les interactions RAG
+RAG Debug Logger - Detailed logging system for RAG interactions
 
-Ce module fournit un logging complet du pipeline RAG pour debug et optimisation.
-Inclut tous les détails : requête utilisateur, recherche vectorielle, contexte,
-appels LLM et réponses finales.
+This module provides comprehensive logging of the RAG pipeline for debugging and optimization.
+Includes all details: user query, vector search, context, LLM calls, and final responses.
 """
 
 import json
@@ -16,9 +15,9 @@ from .logger import setup_logger
 
 
 def _make_json_serializable(obj):
-    """Convertit récursivement tous les objets en types JSON serializable."""
+    """Recursively convert all objects to JSON-serializable types."""
     if isinstance(obj, datetime):
-        # Convertir datetime en ISO 8601 avec timezone UTC
+        # Convert datetime to ISO 8601 with UTC timezone
         return obj.isoformat() + 'Z'
     elif isinstance(obj, dict):
         return {k: _make_json_serializable(v) for k, v in obj.items()}
@@ -31,20 +30,20 @@ def _make_json_serializable(obj):
     elif isinstance(obj, (int, float, str, bool, type(None))):
         return obj
     else:
-        # Pour tous les autres objets, essayer de les convertir en string
+        # For all other objects, try to convert them to string
         return str(obj)
 
 
 class RagDebugService:
     """
-    Service de debug pour tracer complètement les interactions RAG.
+    Debug service to fully trace RAG interactions.
 
     Logs all pipeline steps with detailed information for debugging and optimization.
     """
 
     def __init__(self):
         """Initialize RAG debug service with dedicated logger."""
-        # Logger dédié pour les logs RAG debug
+        # Dedicated logger for RAG debug logs
         self.logger = self._setup_rag_debug_logger()
         self.enabled = False  # Will be set from config
 
@@ -96,7 +95,7 @@ class RagDebugService:
 
     def _format_log(self, data: Dict[str, Any]) -> str:
         """Format log data as JSON with proper serialization."""
-        # Nettoyer les données pour la sérialisation JSON
+        # Clean data for JSON serialization
         clean_data = _make_json_serializable(data)
         return json.dumps(clean_data, ensure_ascii=False, indent=None)
 

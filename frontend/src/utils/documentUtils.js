@@ -1,10 +1,10 @@
 import { documentsAPI } from '../services/api';
 
 /**
- * Ouvre un document dans le navigateur en gérant le téléchargement et les popups bloqués
- * @param {string} documentId - ID du document à ouvrir
- * @param {string} filename - Nom du fichier (optionnel, pour le fallback download)
- * @returns {Promise<boolean>} - true si ouvert avec succès, false sinon
+ * Opens a document in the browser, handling downloads and blocked popups
+ * @param {string} documentId - ID of the document to open
+ * @param {string} filename - Filename (optional, for download fallback)
+ * @returns {Promise<boolean>} - true if opened successfully, false otherwise
  */
 export const openDocumentInBrowser = async (documentId, filename = 'document') => {
   if (!documentId) {
@@ -15,33 +15,33 @@ export const openDocumentInBrowser = async (documentId, filename = 'document') =
   try {
     console.log(`[DocumentUtils] Ouverture du document ${documentId} dans le navigateur`);
 
-    // Télécharger le document via API authentifiée
+    // Download document via authenticated API
     const response = await documentsAPI.downloadDocument(documentId);
 
-    // Créer une URL blob temporaire
+    // Create a temporary blob URL
     const blob = response.data;
     const blobUrl = URL.createObjectURL(blob);
 
-    // Ouvrir dans un nouvel onglet
+    // Open in a new tab
     const newWindow = window.open(blobUrl, '_blank');
 
-    // Nettoyer l'URL blob après ouverture
+    // Clean up blob URL after opening
     setTimeout(() => {
       URL.revokeObjectURL(blobUrl);
     }, 2000);
 
-    // Vérifier si l'ouverture a réussi
+    // Check if opening succeeded
     if (!newWindow) {
       console.warn('Popup bloqué par le navigateur, fallback vers téléchargement');
 
-      // Fallback : télécharger le fichier normalement
+      // Fallback: download the file normally
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = filename || 'document';
       link.click();
       URL.revokeObjectURL(blobUrl);
 
-      return false; // Popup bloqué mais téléchargement effectué
+      return false; // Popup blocked but download completed
     }
 
     console.log(`[DocumentUtils] Document ${documentId} ouvert avec succès`);
@@ -50,17 +50,17 @@ export const openDocumentInBrowser = async (documentId, filename = 'document') =
   } catch (error) {
     console.error(`[DocumentUtils] Erreur lors de l'ouverture du document ${documentId}:`, error);
 
-    // En cas d'erreur, afficher un message à l'utilisateur
+    // On error, show a message to the user
     alert('Impossible d\'ouvrir le document. Vérifiez votre connexion.');
     return false;
   }
 };
 
 /**
- * Valide que les chunk_index correspondent entre deux sources
- * @param {Array} relevantChunks - Chunks pertinents du backend recherche
- * @param {Array} documentChunks - Chunks du document complet
- * @returns {Object} - Résultat de validation avec statistiques
+ * Validates that chunk_index values match between two sources
+ * @param {Array} relevantChunks - Relevant chunks from the search backend
+ * @param {Array} documentChunks - Chunks from the full document
+ * @returns {Object} - Validation result with statistics
  */
 export const validateChunkIndexes = (relevantChunks, documentChunks) => {
   if (!relevantChunks || !documentChunks) {

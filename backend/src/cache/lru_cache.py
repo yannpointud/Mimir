@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 class CacheService:
     """
-    Service de cache utilisant cachetools pour la robustesse.
+    Cache service using cachetools for robustness.
 
-    Choix pragmatique : utiliser une lib éprouvée plutôt que réinventer.
-    Thread-safe et optimisé pour les cas d'usage RAG.
+    Pragmatic choice: use a proven library rather than reinventing the wheel.
+    Thread-safe and optimized for RAG use cases.
     """
 
     def __init__(self, max_size: int = 100, ttl_seconds: int = 3600):
@@ -32,7 +32,7 @@ class CacheService:
             max_size: Maximum number of entries in cache
             ttl_seconds: Time to live for cache entries in seconds
         """
-        # Utilisation de cachetools.LRUCache au lieu d'une implémentation custom
+        # Using cachetools.LRUCache instead of a custom implementation
         self._cache = LRUCache(maxsize=max_size)
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self._ttl_seconds = ttl_seconds

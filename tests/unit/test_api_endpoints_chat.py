@@ -1,5 +1,5 @@
 """
-Tests unitaires pour les endpoints de chat.
+Unit tests for chat endpoints.
 """
 
 import pytest
@@ -16,10 +16,10 @@ from backend.src.api.endpoints.chat import (
 
 
 class TestChatModels:
-    """Tests pour les modèles de chat."""
+    """Tests for chat models."""
 
     def test_chat_request_model_valid(self):
-        """Test du modèle de requête de chat valide."""
+        """Test valid chat request model."""
         request = ChatRequest(
             question="Qu'est-ce que l'intelligence artificielle ?",
             session_id="test_session_123",
@@ -33,7 +33,7 @@ class TestChatModels:
         assert request.include_sources is True
 
     def test_chat_request_model_defaults(self):
-        """Test des valeurs par défaut du modèle de requête."""
+        """Test default values of request model."""
         request = ChatRequest(question="Test question")
 
         assert request.question == "Test question"
@@ -42,19 +42,19 @@ class TestChatModels:
         assert request.include_sources is True
 
     def test_chat_request_model_validation_question_too_long(self):
-        """Test de validation avec question trop longue."""
-        long_question = "a" * 1001  # 1001 caractères
+        """Test validation with question too long."""
+        long_question = "a" * 1001  # 1001 characters
 
         with pytest.raises(ValidationError):
             ChatRequest(question=long_question)
 
     def test_chat_request_model_validation_question_empty(self):
-        """Test de validation avec question vide."""
+        """Test validation with empty question."""
         with pytest.raises(ValidationError):
             ChatRequest(question="")
 
     def test_chat_request_model_validation_context_limit_invalid(self):
-        """Test de validation avec limite de contexte invalide."""
+        """Test validation with invalid context limit."""
         with pytest.raises(ValidationError):
             ChatRequest(question="Test", context_limit=0)  # Minimum 1
 
@@ -62,7 +62,7 @@ class TestChatModels:
             ChatRequest(question="Test", context_limit=11)  # Maximum 10
 
     def test_source_reference_model(self):
-        """Test du modèle de référence source."""
+        """Test source reference model."""
         source = SourceReference(
             document_id="doc_001",
             filename="test.pdf",
@@ -78,7 +78,7 @@ class TestChatModels:
         assert source.chunk_index == 2
 
     def test_chat_response_model(self):
-        """Test du modèle de réponse de chat."""
+        """Test chat response model."""
         response = ChatResponse(
             answer="Voici la réponse",
             sources=[],
@@ -95,7 +95,7 @@ class TestChatModels:
         assert response.cached is False
 
     def test_escalation_request_model(self):
-        """Test du modèle de requête d'escalade."""
+        """Test escalation request model."""
         request = EscalationRequest(
             question="Question complexe",
             session_id="session_123",
@@ -110,7 +110,7 @@ class TestChatModels:
         assert request.user_email == "user@example.com"
 
     def test_escalation_response_model(self):
-        """Test du modèle de réponse d'escalade."""
+        """Test escalation response model."""
         response = EscalationResponse(
             success=True,
             message="Escalade réussie",
@@ -123,11 +123,11 @@ class TestChatModels:
 
 
 class TestChatEndpoint:
-    """Tests pour l'endpoint de chat principal."""
+    """Tests for the main chat endpoint."""
 
     @pytest.fixture
     def mock_request(self):
-        """Mock request FastAPI."""
+        """Mock FastAPI request."""
         mock_req = Mock()
         mock_req.client.host = "127.0.0.1"
         mock_req.headers = {}
@@ -135,12 +135,12 @@ class TestChatEndpoint:
 
     @pytest.fixture
     def mock_chat_cache(self):
-        """Mock service de cache chat."""
+        """Mock chat cache service."""
         return Mock()
 
     @pytest.fixture
     def mock_rag_debug(self):
-        """Mock service de debug RAG."""
+        """Mock RAG debug service."""
         mock = Mock()
         mock.log_user_request = Mock()
         mock.log_response = Mock()
@@ -148,7 +148,7 @@ class TestChatEndpoint:
 
     @pytest.fixture
     def mock_llm_service(self):
-        """Mock service LLM."""
+        """Mock LLM service."""
         return Mock()
 
     @pytest.fixture
@@ -167,11 +167,11 @@ class TestChatEndpoint:
         self, mock_session_id, mock_process_rag, mock_request, mock_chat_cache,
         mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository
     ):
-        """Test de chat réussi sans cache."""
+        """Test successful chat without cache."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_session_id.return_value = "session_123"
-        mock_chat_cache.get_chat_response.return_value = None  # Pas de cache
+        mock_chat_cache.get_chat_response.return_value = None  # No cache
         mock_process_rag.return_value = {
             "answer": "Réponse générée",
             "sources": [],
@@ -183,7 +183,7 @@ class TestChatEndpoint:
 
         chat_request = ChatRequest(question="Test question")
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(chat(
             request=mock_request,
             chat_request=chat_request,
@@ -195,7 +195,7 @@ class TestChatEndpoint:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications
+        # Assertions
         assert result.answer == "Réponse générée"
         assert result.session_id == "session_123"
         assert result.cached is False
@@ -206,23 +206,23 @@ class TestChatEndpoint:
     @patch('backend.src.api.endpoints.chat._generate_session_id')
     def test_chat_success_with_cache(self, mock_session_id, mock_request, mock_chat_cache,
                                      mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
-        """Test de chat réussi avec cache hit."""
+        """Test successful chat with cache hit."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_session_id.return_value = "session_123"
         cached_response = {
             "answer": "Réponse en cache",
             "sources": [],
             "confidence_score": 0.9,
             "response_time_ms": 50,
-            "cached": False,  # Sera modifié à True
+            "cached": False,  # Will be changed to True
             "timestamp": datetime.utcnow()
         }
         mock_chat_cache.get_chat_response.return_value = cached_response
 
         chat_request = ChatRequest(question="Test question")
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(chat(
             request=mock_request,
             chat_request=chat_request,
@@ -234,7 +234,7 @@ class TestChatEndpoint:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications
+        # Assertions
         assert result.answer == "Réponse en cache"
         assert result.session_id == "session_123"
         assert result.cached is True
@@ -243,9 +243,9 @@ class TestChatEndpoint:
     @patch('backend.src.api.endpoints.chat._process_question_with_rag')
     def test_chat_with_user_context(self, mock_process_rag, mock_request, mock_chat_cache,
                                      mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
-        """Test de chat avec utilisateur authentifié."""
+        """Test chat with authenticated user."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_chat_cache.get_chat_response.return_value = None
         mock_process_rag.return_value = {
             "answer": "Réponse avec contexte utilisateur",
@@ -259,7 +259,7 @@ class TestChatEndpoint:
         chat_request = ChatRequest(question="Test question")
         current_user = {"sub": "admin", "user_type": "admin"}
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(chat(
             request=mock_request,
             chat_request=chat_request,
@@ -271,21 +271,21 @@ class TestChatEndpoint:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications
+        # Assertions
         assert result.answer == "Réponse avec contexte utilisateur"
 
     @patch('backend.src.api.endpoints.chat._process_question_with_rag')
     def test_chat_exception_handling(self, mock_process_rag, mock_request, mock_chat_cache,
                                      mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
-        """Test de gestion d'exception dans chat."""
+        """Test exception handling in chat."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_chat_cache.get_chat_response.return_value = None
         mock_process_rag.side_effect = Exception("Erreur RAG")
 
         chat_request = ChatRequest(question="Test question")
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(chat(
             request=mock_request,
             chat_request=chat_request,
@@ -297,16 +297,16 @@ class TestChatEndpoint:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications
+        # Assertions
         assert "erreur s'est produite" in result.answer
         assert result.confidence_score == 0.0
         assert result.cached is False
 
     def test_chat_custom_session_id(self, mock_request, mock_chat_cache,
                                      mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
-        """Test de chat avec session ID personnalisé."""
+        """Test chat with custom session ID."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_chat_cache.get_chat_response.return_value = None
 
         chat_request = ChatRequest(
@@ -324,7 +324,7 @@ class TestChatEndpoint:
                 "timestamp": datetime.utcnow()
             }
 
-            # Appel de la fonction
+            # Call the function
             result = asyncio.run(chat(
                 request=mock_request,
                 chat_request=chat_request,
@@ -336,16 +336,16 @@ class TestChatEndpoint:
                 rag_debug=mock_rag_debug
             ))
 
-            # Vérifications
+            # Assertions
             assert result.session_id == "custom_session_456"
 
 
 class TestEscalationEndpoint:
-    """Tests pour l'endpoint d'escalade."""
+    """Tests for the escalation endpoint."""
 
     @pytest.fixture
     def mock_request(self):
-        """Mock request FastAPI."""
+        """Mock FastAPI request."""
         mock_req = Mock()
         mock_req.client.host = "127.0.0.1"
         mock_req.headers = {}
@@ -353,7 +353,7 @@ class TestEscalationEndpoint:
 
     @pytest.fixture
     def mock_email_service(self):
-        """Mock service email."""
+        """Mock email service."""
         return AsyncMock()
 
     @patch('backend.src.api.endpoints.chat._generate_escalation_id')
@@ -362,9 +362,9 @@ class TestEscalationEndpoint:
         self, mock_extract_sources, mock_escalation_id,
         mock_request, mock_email_service
     ):
-        """Test d'escalade réussie."""
+        """Test successful escalation."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_escalation_id.return_value = "ESC-20231201-ABC123"
         mock_extract_sources.return_value = ["doc1.pdf", "doc2.txt"]
         mock_email_service.send_escalation_email.return_value = True
@@ -376,7 +376,7 @@ class TestEscalationEndpoint:
             user_email="user@example.com"
         )
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(escalate_to_human(
             request=mock_request,
             escalation_request=escalation_request,
@@ -384,7 +384,7 @@ class TestEscalationEndpoint:
             email_service=mock_email_service
         ))
 
-        # Vérifications
+        # Assertions
         assert result.success is True
         assert result.escalation_id == "ESC-20231201-ABC123"
         assert "transmise à notre équipe" in result.message
@@ -394,9 +394,9 @@ class TestEscalationEndpoint:
     def test_escalate_to_human_email_failure(
         self, mock_escalation_id, mock_request, mock_email_service
     ):
-        """Test d'escalade avec échec email."""
+        """Test escalation with email failure."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_escalation_id.return_value = "ESC-20231201-ABC123"
         mock_email_service.send_escalation_email.return_value = False
 
@@ -405,7 +405,7 @@ class TestEscalationEndpoint:
             session_id="session_123"
         )
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(escalate_to_human(
             request=mock_request,
             escalation_request=escalation_request,
@@ -413,15 +413,15 @@ class TestEscalationEndpoint:
             email_service=mock_email_service
         ))
 
-        # Vérifications
+        # Assertions
         assert result.success is False
         assert result.escalation_id is None
         assert "Impossible d'envoyer" in result.message
 
     def test_escalate_to_human_with_authenticated_user(self, mock_request, mock_email_service):
-        """Test d'escalade avec utilisateur authentifié."""
+        """Test escalation with authenticated user."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_email_service.send_escalation_email.return_value = True
 
         escalation_request = EscalationRequest(question="Question complexe")
@@ -430,7 +430,7 @@ class TestEscalationEndpoint:
         with patch('backend.src.api.endpoints.chat._generate_escalation_id') as mock_id:
             mock_id.return_value = "ESC-20231201-ABC123"
 
-            # Appel de la fonction
+            # Call the function
             result = asyncio.run(escalate_to_human(
                 request=mock_request,
                 escalation_request=escalation_request,
@@ -438,18 +438,18 @@ class TestEscalationEndpoint:
                 email_service=mock_email_service
             ))
 
-            # Vérifications
+            # Assertions
             assert result.success is True
 
     def test_escalate_to_human_exception_handling(self, mock_request, mock_email_service):
-        """Test de gestion d'exception dans escalade."""
+        """Test exception handling in escalation."""
 
-        # Configuration du mock pour lever une exception
+        # Configure mock to raise an exception
         mock_email_service.send_escalation_email.side_effect = Exception("Email service error")
 
         escalation_request = EscalationRequest(question="Question complexe")
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(escalate_to_human(
             request=mock_request,
             escalation_request=escalation_request,
@@ -457,99 +457,99 @@ class TestEscalationEndpoint:
             email_service=mock_email_service
         ))
 
-        # Vérifications
+        # Assertions
         assert result.success is False
         assert result.escalation_id is None
         assert "erreur s'est produite" in result.message
 
 
 class TestSessionHistoryEndpoints:
-    """Tests pour les endpoints de gestion d'historique de session."""
+    """Tests for session history management endpoints."""
 
     def test_get_session_history_placeholder(self):
-        """Test de récupération d'historique de session."""
+        """Test session history retrieval."""
 
         session_id = "test_session_123"
         current_user = None
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(get_session_history(
             session_id=session_id,
             current_user=current_user
         ))
 
-        # Vérifications
+        # Assertions
         assert result["session_id"] == session_id
         assert result["messages"] == []
         assert "created_at" in result
 
     def test_get_session_history_with_user(self):
-        """Test de récupération d'historique avec utilisateur authentifié."""
+        """Test session history retrieval with authenticated user."""
 
         session_id = "test_session_123"
         current_user = {"sub": "admin", "user_type": "admin"}
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(get_session_history(
             session_id=session_id,
             current_user=current_user
         ))
 
-        # Vérifications
+        # Assertions
         assert result["session_id"] == session_id
 
     def test_clear_session_history_placeholder(self):
-        """Test de suppression d'historique de session (placeholder)."""
+        """Test session history clearing (placeholder)."""
 
         session_id = "test_session_123"
         current_user = None
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(clear_session_history(
             session_id=session_id,
             current_user=current_user
         ))
 
-        # Vérifications
+        # Assertions
         assert result.success is True
         assert session_id in result.message
         assert "cleared" in result.message
 
     def test_clear_session_history_with_user(self):
-        """Test de suppression d'historique avec utilisateur authentifié."""
+        """Test session history clearing with authenticated user."""
 
         session_id = "test_session_123"
         current_user = {"sub": "admin", "user_type": "admin"}
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(clear_session_history(
             session_id=session_id,
             current_user=current_user
         ))
 
-        # Vérifications
+        # Assertions
         assert result.success is True
 
 
 class TestChatHelperFunctions:
-    """Tests pour les fonctions utilitaires de chat."""
+    """Tests for chat utility functions."""
 
     def test_process_question_with_rag_placeholder(self):
-        """Test de traitement RAG (placeholder)."""
+        """Test RAG processing (placeholder)."""
         from backend.src.api.endpoints.chat import _process_question_with_rag
 
-        # Mock des dépendances
+        # Mock dependencies
         mock_llm_service = AsyncMock()
         mock_vector_store = Mock()
         mock_document_repository = Mock()
         mock_rag_debug = Mock()
 
-        # Mock pour log_user_request et autres méthodes
+        # Mock log_user_request and other methods
         mock_rag_debug.log_user_request = Mock()
         mock_rag_debug.log_vector_search = Mock()
         mock_rag_debug.log_llm_generation = Mock()
 
-        # Configuration des mocks pour retourner les valeurs attendues
+        # Configure mocks to return expected values
         mock_vector_store.query.return_value = []
         mock_llm_service.embed.return_value = AsyncMock(embeddings=[[0.1] * 1024], usage_tokens=10)
         mock_llm_service.generate.return_value = AsyncMock(
@@ -559,7 +559,7 @@ class TestChatHelperFunctions:
             finish_reason="stop"
         )
 
-        # Appel de la fonction avec tous les paramètres requis
+        # Call the function with all required parameters
         result = asyncio.run(_process_question_with_rag(
             question="Qu'est-ce que l'IA ?",
             context_limit=5,
@@ -571,7 +571,7 @@ class TestChatHelperFunctions:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications
+        # Assertions
         assert isinstance(result, dict)
         assert "answer" in result
         assert "session_id" in result
@@ -580,21 +580,21 @@ class TestChatHelperFunctions:
         assert result["session_id"] == "session_123"
 
     def test_process_question_with_rag_no_sources(self):
-        """Test de traitement RAG sans sources."""
+        """Test RAG processing without sources."""
         from backend.src.api.endpoints.chat import _process_question_with_rag
 
-        # Mock des dépendances
+        # Mock dependencies
         mock_llm_service = AsyncMock()
         mock_vector_store = Mock()
         mock_document_repository = Mock()
         mock_rag_debug = Mock()
 
-        # Mock pour log methods
+        # Mock log methods
         mock_rag_debug.log_user_request = Mock()
         mock_rag_debug.log_vector_search = Mock()
         mock_rag_debug.log_llm_generation = Mock()
 
-        # Configuration des mocks - pas de sources trouvées
+        # Configure mocks - no sources found
         mock_vector_store.query.return_value = []
         mock_llm_service.embed.return_value = AsyncMock(embeddings=[[0.1] * 1024], usage_tokens=10)
         mock_llm_service.generate.return_value = AsyncMock(
@@ -604,7 +604,7 @@ class TestChatHelperFunctions:
             finish_reason="stop"
         )
 
-        # Appel de la fonction avec tous les paramètres requis
+        # Call the function with all required parameters
         result = asyncio.run(_process_question_with_rag(
             question="Test question",
             context_limit=3,
@@ -616,13 +616,13 @@ class TestChatHelperFunctions:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications
+        # Assertions
         assert isinstance(result, dict)
         assert "sources" in result
         assert isinstance(result["sources"], list)
 
     def test_get_client_ip_forwarded(self):
-        """Test d'extraction d'IP avec header X-Forwarded-For."""
+        """Test IP extraction with X-Forwarded-For header."""
         from backend.src.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
@@ -633,7 +633,7 @@ class TestChatHelperFunctions:
         assert ip == "192.168.1.100"
 
     def test_get_client_ip_real_ip(self):
-        """Test d'extraction d'IP avec header X-Real-IP."""
+        """Test IP extraction with X-Real-IP header."""
         from backend.src.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
@@ -644,7 +644,7 @@ class TestChatHelperFunctions:
         assert ip == "192.168.1.200"
 
     def test_get_client_ip_direct(self):
-        """Test d'extraction d'IP directe."""
+        """Test direct IP extraction."""
         from backend.src.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
@@ -655,7 +655,7 @@ class TestChatHelperFunctions:
         assert ip == "192.168.1.50"
 
     def test_get_client_ip_no_client(self):
-        """Test d'extraction d'IP sans client."""
+        """Test IP extraction without client."""
         from backend.src.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
@@ -666,32 +666,32 @@ class TestChatHelperFunctions:
         assert ip == "unknown"
 
     def test_generate_session_id(self):
-        """Test de génération d'ID de session."""
+        """Test session ID generation."""
         from backend.src.api.endpoints.chat import _generate_session_id
 
         session_id = _generate_session_id("Test question", "127.0.0.1")
 
         assert isinstance(session_id, str)
-        assert len(session_id) == 16  # MD5 hash tronqué
+        assert len(session_id) == 16  # Truncated MD5 hash
 
     def test_generate_cache_key(self):
-        """Test de génération de clé de cache."""
+        """Test cache key generation."""
         from backend.src.api.endpoints.chat import _generate_cache_key
 
         cache_key = _generate_cache_key("Test Question")
 
         assert isinstance(cache_key, str)
-        assert len(cache_key) == 32  # MD5 hash complet
+        assert len(cache_key) == 32  # Full MD5 hash
 
-        # Test de normalisation
+        # Test normalization
         key1 = _generate_cache_key("Test Question")
         key2 = _generate_cache_key("test question")
         key3 = _generate_cache_key("  TEST QUESTION  ")
 
-        assert key1 == key2 == key3  # Normalisation case-insensitive et trim
+        assert key1 == key2 == key3  # Case-insensitive normalization and trim
 
     def test_generate_escalation_id(self):
-        """Test de génération d'ID d'escalade."""
+        """Test escalation ID generation."""
         from backend.src.api.endpoints.chat import _generate_escalation_id
 
         escalation_id = _generate_escalation_id()
@@ -701,7 +701,7 @@ class TestChatHelperFunctions:
         assert len(escalation_id.split("-")) == 3  # ESC-timestamp-hash
 
     def test_extract_sources_from_history_with_sources(self):
-        """Test d'extraction de sources depuis l'historique avec sources."""
+        """Test source extraction from history with sources."""
         from backend.src.api.endpoints.chat import _extract_sources_from_history
 
         chat_history = [
@@ -729,7 +729,7 @@ class TestChatHelperFunctions:
         assert len(sources) == 3
 
     def test_extract_sources_from_history_no_sources(self):
-        """Test d'extraction de sources depuis l'historique sans sources."""
+        """Test source extraction from history without sources."""
         from backend.src.api.endpoints.chat import _extract_sources_from_history
 
         chat_history = [
@@ -741,7 +741,7 @@ class TestChatHelperFunctions:
         assert sources == []
 
     def test_extract_sources_from_history_empty(self):
-        """Test d'extraction de sources depuis historique vide."""
+        """Test source extraction from empty history."""
         from backend.src.api.endpoints.chat import _extract_sources_from_history
 
         sources = _extract_sources_from_history([])
@@ -749,14 +749,14 @@ class TestChatHelperFunctions:
 
 
 class TestChatIntegration:
-    """Tests d'intégration pour les endpoints de chat."""
+    """Integration tests for chat endpoints."""
 
     @patch('backend.src.api.endpoints.chat._process_question_with_rag')
     @patch('backend.src.api.endpoints.chat._generate_session_id')
     def test_full_chat_workflow(self, mock_session_id, mock_process_rag):
-        """Test du workflow complet de chat."""
+        """Test full chat workflow."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_session_id.return_value = "session_123"
         mock_process_rag.return_value = {
             "answer": "Réponse complète avec sources",
@@ -783,7 +783,7 @@ class TestChatIntegration:
         mock_cache = Mock()
         mock_cache.get_chat_response.return_value = None
 
-        # Mocks supplémentaires nécessaires
+        # Additional required mocks
         mock_llm = Mock()
         mock_vector = Mock()
         mock_repo = Mock()
@@ -797,7 +797,7 @@ class TestChatIntegration:
             include_sources=True
         )
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(chat(
             request=mock_request,
             chat_request=chat_request,
@@ -809,7 +809,7 @@ class TestChatIntegration:
             rag_debug=mock_rag_debug
         ))
 
-        # Vérifications complètes
+        # Full assertions
         assert result.answer == "Réponse complète avec sources"
         assert len(result.sources) == 1
         assert result.sources[0].filename == "guide.pdf"
@@ -819,9 +819,9 @@ class TestChatIntegration:
 
     @patch('backend.src.api.endpoints.chat._generate_escalation_id')
     def test_full_escalation_workflow(self, mock_escalation_id):
-        """Test du workflow complet d'escalade."""
+        """Test full escalation workflow."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_escalation_id.return_value = "ESC-20231201-ABC123"
 
         mock_request = Mock()
@@ -844,7 +844,7 @@ class TestChatIntegration:
 
         current_user = {"sub": "john.doe", "user_type": "user"}
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(escalate_to_human(
             request=mock_request,
             escalation_request=escalation_request,
@@ -852,12 +852,12 @@ class TestChatIntegration:
             email_service=mock_email_service
         ))
 
-        # Vérifications complètes
+        # Full assertions
         assert result.success is True
         assert result.escalation_id == "ESC-20231201-ABC123"
         assert "transmise à notre équipe" in result.message
 
-        # Vérification de l'appel du service email
+        # Verify email service call
         call_args = mock_email_service.send_escalation_email.call_args
         assert call_args[1]["user_question"] == escalation_request.question
         assert call_args[1]["chat_history"] == escalation_request.chat_history

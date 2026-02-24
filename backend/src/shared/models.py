@@ -1,6 +1,6 @@
 """
-Modèles Pydantic partagés pour validation et sérialisation
-Utilisés par les APIs pour garantir la cohérence des données
+Shared Pydantic models for validation and serialization
+Used by APIs to ensure data consistency
 """
 
 from pydantic import BaseModel, Field, validator, ConfigDict
@@ -10,7 +10,7 @@ from enum import Enum
 
 
 class DocumentStatus(str, Enum):
-    """Énumération des statuts de documents"""
+    """Document status enumeration"""
     PENDING = "pending"
     INDEXING = "indexing"
     INDEXED = "indexed"
@@ -18,16 +18,16 @@ class DocumentStatus(str, Enum):
 
 
 class UserType(str, Enum):
-    """Types d'utilisateurs pour l'audit"""
+    """User types for audit logging"""
     ADMIN = "admin"
     USER = "user"
     SYSTEM = "system"
 
 
-# Modèles de base
+# Base models
 
 class BaseResponse(BaseModel):
-    """Modèle de réponse de base avec timestamps"""
+    """Base response model with timestamps"""
     model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
     success: bool = True
@@ -36,24 +36,24 @@ class BaseResponse(BaseModel):
 
 
 class PaginationModel(BaseModel):
-    """Modèle pour la pagination"""
+    """Pagination model"""
     limit: int = Field(default=50, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
     order_by: str = Field(default="created_at")
     desc_order: bool = Field(default=True)
 
 
-# Modèles Document
+# Document models
 
 class DocumentBase(BaseModel):
-    """Modèle de base pour les documents"""
+    """Base model for documents"""
     filename: str = Field(..., min_length=1, max_length=255)
     path: Optional[str] = Field(None, max_length=500)
     preserve: bool = Field(default=False)
 
 
 class DocumentCreate(DocumentBase):
-    """Modèle pour créer un document"""
+    """Model for creating a document"""
     file_hash: str = Field(..., min_length=64, max_length=64)
     
     @validator('file_hash')
@@ -64,7 +64,7 @@ class DocumentCreate(DocumentBase):
 
 
 class DocumentUpdate(BaseModel):
-    """Modèle pour mettre à jour un document"""
+    """Model for updating a document"""
     status: Optional[DocumentStatus] = None
     error_message: Optional[str] = Field(None, max_length=1000)
     chunk_count: Optional[int] = Field(None, ge=0)
@@ -72,7 +72,7 @@ class DocumentUpdate(BaseModel):
 
 
 class DocumentResponse(DocumentBase):
-    """Modèle de réponse pour les documents"""
+    """Response model for documents"""
     id: int
     file_hash: str
     status: DocumentStatus
@@ -82,11 +82,11 @@ class DocumentResponse(DocumentBase):
     indexed_at: Optional[datetime] = None
     
     class Config:
-        from_attributes = True  # Pour SQLAlchemy compatibility
+        from_attributes = True  # For SQLAlchemy compatibility
 
 
 class ChunkResponse(BaseModel):
-    """Modèle de réponse pour les chunks de document"""
+    """Response model for document chunks"""
     id: int
     document_id: int
     chunk_index: int
@@ -98,7 +98,7 @@ class ChunkResponse(BaseModel):
 
 
 class DocumentWithChunksResponse(DocumentBase):
-    """Modèle de réponse pour un document avec ses chunks"""
+    """Response model for a document with its chunks"""
     id: int
     file_hash: str
     status: DocumentStatus
@@ -107,7 +107,7 @@ class DocumentWithChunksResponse(DocumentBase):
     created_at: datetime
     indexed_at: Optional[datetime] = None
     chunks: List[ChunkResponse] = []
-    content: Optional[str] = None  # Contenu original si disponible
+    content: Optional[str] = None  # Original content if available
     file_size: Optional[int] = None
     mime_type: Optional[str] = None
 
@@ -116,37 +116,37 @@ class DocumentWithChunksResponse(DocumentBase):
 
 
 class DocumentListResponse(BaseResponse):
-    """Réponse pour la liste des documents"""
+    """Response for the document list"""
     documents: List[DocumentResponse]
     total_count: int
     pagination: Dict[str, Any]
 
 
 class DocumentStatsResponse(BaseResponse):
-    """Réponse pour les statistiques des documents"""
+    """Response for document statistics"""
     stats: Dict[str, Any]
 
 
-# Modèles Configuration
+# Configuration models
 
 class ConfigurationBase(BaseModel):
-    """Modèle de base pour la configuration"""
+    """Base model for configuration"""
     key: str = Field(..., min_length=1, max_length=100)
     value: str = Field(..., min_length=0)
 
 
 class ConfigurationCreate(ConfigurationBase):
-    """Modèle pour créer une configuration"""
+    """Model for creating a configuration"""
     pass
 
 
 class ConfigurationUpdate(BaseModel):
-    """Modèle pour mettre à jour une configuration"""
+    """Model for updating a configuration"""
     value: str = Field(..., min_length=0)
 
 
 class ConfigurationResponse(ConfigurationBase):
-    """Modèle de réponse pour les configurations"""
+    """Response model for configurations"""
     updated_at: datetime
     
     class Config:
@@ -154,14 +154,14 @@ class ConfigurationResponse(ConfigurationBase):
 
 
 class ConfigurationListResponse(BaseResponse):
-    """Réponse pour la liste des configurations"""
+    """Response for the configuration list"""
     configurations: List[ConfigurationResponse]
 
 
-# Modèles Audit
+# Audit models
 
 class AuditLogBase(BaseModel):
-    """Modèle de base pour les logs d'audit"""
+    """Base model for audit logs"""
     user_type: UserType
     action: str = Field(..., min_length=1, max_length=100)
     details: Optional[str] = Field(None, max_length=1000)
@@ -171,12 +171,12 @@ class AuditLogBase(BaseModel):
 
 
 class AuditLogCreate(AuditLogBase):
-    """Modèle pour créer un log d'audit"""
+    """Model for creating an audit log"""
     pass
 
 
 class AuditLogResponse(AuditLogBase):
-    """Modèle de réponse pour les logs d'audit"""
+    """Response model for audit logs"""
     id: int
     created_at: datetime
     
@@ -185,15 +185,15 @@ class AuditLogResponse(AuditLogBase):
 
 
 class AuditLogListResponse(BaseResponse):
-    """Réponse pour la liste des logs d'audit"""
+    """Response for the audit log list"""
     logs: List[AuditLogResponse]
     total_count: int
 
 
-# Modèles pour les futures fonctionnalités (prêts pour Jalon 2-3)
+# Models for future features (ready for Milestone 2-3)
 
 class HealthCheckResponse(BaseResponse):
-    """Réponse des health checks"""
+    """Health check response"""
     status: str = Field(default="healthy")
     checks: Dict[str, Any] = Field(default_factory=dict)
     uptime_seconds: Optional[float] = None
@@ -201,7 +201,7 @@ class HealthCheckResponse(BaseResponse):
 
 
 class ErrorResponse(BaseModel):
-    """Modèle de réponse d'erreur standardisé"""
+    """Standardized error response model"""
     success: bool = False
     error_code: str
     error_message: str
@@ -209,10 +209,10 @@ class ErrorResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
-# Modèles de validation spécialisés
+# Specialized validation models
 
 class FileUploadValidation(BaseModel):
-    """Validation pour les uploads de fichiers"""
+    """Validation for file uploads"""
     max_size_mb: int = Field(default=100, ge=1, le=1000)
     allowed_extensions: List[str] = Field(
         default=['.pdf', '.docx', '.txt', '.md'],
@@ -228,29 +228,29 @@ class FileUploadValidation(BaseModel):
 
 
 class DatabaseStatsResponse(BaseResponse):
-    """Statistiques de la base de données"""
+    """Database statistics"""
     table_counts: Dict[str, int]
     database_size_mb: Optional[float] = None
     last_backup: Optional[datetime] = None
 
 
-# Utilitaires de validation
+# Validation utilities
 
 def validate_filename(filename: str) -> bool:
-    """Valide un nom de fichier pour la sécurité"""
+    """Validate a filename for security"""
     import os
     import re
     
-    # Pas de chemins relatifs ou absolus
+    # No relative or absolute paths
     if os.path.isabs(filename) or '..' in filename:
         return False
     
-    # Pas de caractères dangereux
+    # No dangerous characters
     dangerous_chars = r'[<>:"|?*\x00-\x1f]'
     if re.search(dangerous_chars, filename):
         return False
     
-    # Longueur raisonnable
+    # Reasonable length
     if len(filename) == 0 or len(filename) > 255:
         return False
     
@@ -258,20 +258,20 @@ def validate_filename(filename: str) -> bool:
 
 
 def sanitize_filename(filename: str) -> str:
-    """Assainit un nom de fichier"""
+    """Sanitize a filename"""
     import re
     import unicodedata
     
-    # Normalise Unicode
+    # Normalize Unicode
     filename = unicodedata.normalize('NFKD', filename)
     
-    # Remplace les caractères dangereux
+    # Replace dangerous characters
     filename = re.sub(r'[<>:"|?*\x00-\x1f]', '_', filename)
     
-    # Supprime les espaces en début/fin
+    # Strip leading/trailing whitespace
     filename = filename.strip()
     
-    # Limite la longueur
+    # Limit the length
     if len(filename) > 255:
         name, ext = os.path.splitext(filename)
         filename = name[:255-len(ext)] + ext
@@ -279,17 +279,17 @@ def sanitize_filename(filename: str) -> str:
     return filename
 
 
-# Configuration des modèles Pydantic
+# Pydantic models configuration
 
 class Config:
-    """Configuration globale pour tous les modèles"""
-    # Permet l'utilisation avec SQLAlchemy
+    """Global configuration for all models"""
+    # Enable usage with SQLAlchemy
     from_attributes = True
     
-    # Validation stricte
+    # Strict validation
     validate_assignment = True
     
-    # Sérialisation JSON des datetime
+    # JSON serialization for datetime
     json_encoders = {
         datetime: lambda v: v.isoformat()
     }

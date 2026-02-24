@@ -18,7 +18,7 @@ const AdminDashboard = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Configuration des en-têtes par page
+  // Page header configuration
   const pageInfo = {
     '/admin/documents': {
       title: 'Gestion des Documents',
@@ -42,14 +42,14 @@ const AdminDashboard = () => {
     }
   };
 
-  // Obtenir les informations de la page actuelle
+  // Get current page information
   const currentPageInfo = pageInfo[location.pathname] || {
     title: 'Panneau d\'Administration',
     description: 'Gestion du système documentaire Mimir'
   };
 
 
-  // Charger les statistiques système
+  // Load system statistics
   const loadSystemStats = async () => {
     try {
       setLoading(true);
@@ -73,38 +73,38 @@ const AdminDashboard = () => {
     }
   };
 
-  // Charger les données au montage
+  // Load data on mount
   useEffect(() => {
     loadSystemStats();
   }, []);
 
-  // Actualisation automatique optimisée
+  // Optimized automatic refresh
   useEffect(() => {
     let interval;
 
-    // Fonction de polling intelligent
+    // Smart polling function
     const startPolling = () => {
       interval = setInterval(() => {
-        // Seulement si la page est visible
+        // Only if the page is visible
         if (!document.hidden) {
           handleRefresh(); // Utilise handleRefresh pour déclencher aussi les enfants
         }
-      }, 60000); // 60 secondes
+      }, 60000); // 60 seconds
     };
 
-    // Démarrer le polling
+    // Start polling
     startPolling();
 
-    // Gérer la visibilité de la page
+    // Handle page visibility
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Page cachée, arrêter le polling
+        // Page hidden, stop polling
         if (interval) {
           clearInterval(interval);
           interval = null;
         }
       } else {
-        // Page visible, redémarrer le polling et actualiser immédiatement
+        // Page visible, restart polling and refresh immediately
         handleRefresh(); // Utilise handleRefresh pour déclencher aussi les enfants
         if (!interval) {
           startPolling();
@@ -120,7 +120,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // Actualisation manuelle
+  // Manual refresh
   const handleRefresh = () => {
     loadSystemStats();
     setRefreshTrigger(prev => prev + 1);
@@ -128,7 +128,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* En-tête */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6">
         <div className="max-w-7xl flex items-center justify-between">
           <div>
@@ -155,10 +155,10 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Statistiques rapides */}
+        {/* Quick statistics */}
         {systemStats && (
           <div className="max-w-7xl mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {/* Documents total */}
+            {/* Total documents */}
             <div className="bg-blue-50 rounded-md p-2">
               <div className="flex items-center">
                 <FileText className="h-4 w-4 text-blue-600" />
@@ -169,7 +169,7 @@ const AdminDashboard = () => {
               </p>
             </div>
 
-            {/* Documents indexés */}
+            {/* Indexed documents */}
             <div className="bg-green-50 rounded-md p-2">
               <div className="flex items-center">
                 <BarChart3 className="h-4 w-4 text-green-600" />
@@ -180,7 +180,7 @@ const AdminDashboard = () => {
               </p>
             </div>
 
-            {/* En cours de traitement */}
+            {/* Processing */}
             <div className="bg-yellow-50 rounded-md p-2">
               <div className="flex items-center">
                 <RefreshCw className="h-4 w-4 text-yellow-600" />
@@ -194,7 +194,7 @@ const AdminDashboard = () => {
               </p>
             </div>
 
-            {/* Documents en erreur */}
+            {/* Documents with errors */}
             <div className="bg-red-50 rounded-md p-2">
               <div className="flex items-center">
                 <AlertCircle className="h-4 w-4 text-red-600" />
@@ -205,7 +205,7 @@ const AdminDashboard = () => {
               </p>
             </div>
 
-            {/* État système */}
+            {/* System status */}
             <div className={`rounded-md p-2 ${
               safeGetProperty(systemStats, 'health.status') === 'healthy'
                 ? 'bg-green-50'
@@ -237,7 +237,7 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* Message d'erreur global */}
+      {/* Global error message */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4 max-w-7xl">
           <div className="flex">
@@ -255,7 +255,7 @@ const AdminDashboard = () => {
       )}
 
 
-      {/* Contenu principal */}
+      {/* Main content */}
       <div className="flex-1 overflow-hidden">
         <div className="h-full overflow-y-auto admin-scroll">
           <Outlet context={{ onRefresh: handleRefresh, refreshTrigger, onUploadSuccess: handleRefresh }} />

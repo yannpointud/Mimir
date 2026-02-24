@@ -5,7 +5,7 @@ import LoadingSpinner from './LoadingSpinner';
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
-  // Affichage du loading pendant la vérification
+  // Show loading spinner during auth verification
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -17,12 +17,12 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Redirection vers la page de login si non authentifié
+  // Redirect to login page if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/admin/login" replace />;
   }
 
-  // Vérification que l'utilisateur est bien admin
+  // Verify the user has admin privileges
   if (user && user.user_type !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">

@@ -34,7 +34,7 @@ const AnalyticsPanel = () => {
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  // Charger les données analytics
+  // Load analytics data
   const loadAnalyticsData = async () => {
     try {
       setLoading(true);
@@ -61,14 +61,14 @@ const AnalyticsPanel = () => {
     loadAnalyticsData();
   }, []);
 
-  // Écouter le refreshTrigger du parent pour le refresh global
+  // Listen to parent refreshTrigger for global refresh
   useEffect(() => {
     if (refreshTrigger > 0) {
       loadAnalyticsData();
     }
   }, [refreshTrigger]);
 
-  // Obtenir l'icône de statut
+  // Get the status icon
   const getStatusIcon = (status) => {
     switch (status) {
       case 'healthy':
@@ -84,12 +84,12 @@ const AnalyticsPanel = () => {
     }
   };
 
-  // Formatter les pourcentages
+  // Format percentages
   const formatPercentage = (value) => {
     return value ? `${Math.round(value)}%` : '0%';
   };
 
-  // Formatter les nombres
+  // Format numbers
   const formatNumber = (value) => {
     return value ? value.toLocaleString() : '0';
   };
@@ -108,7 +108,7 @@ const AnalyticsPanel = () => {
   return (
     <div className="p-4 max-w-7xl h-full">
 
-      {/* Message d'erreur */}
+      {/* Error message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="flex">
@@ -121,10 +121,10 @@ const AnalyticsPanel = () => {
         </div>
       )}
 
-      {/* Métriques principales - Ligne 1 */}
+      {/* Main metrics - Row 1 */}
       {(chatMetrics || analyticsData?.overview) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Requêtes par heure */}
+          {/* Requests per hour */}
           {chatMetrics && (
             <div className="card p-6">
               <div className="flex items-center justify-between">
@@ -142,7 +142,7 @@ const AnalyticsPanel = () => {
             </div>
           )}
 
-          {/* Requêtes 24h */}
+          {/* Requests 24h */}
           {analyticsData?.overview && (
             <div className="card p-6">
               <div className="flex items-center justify-between">
@@ -160,7 +160,7 @@ const AnalyticsPanel = () => {
             </div>
           )}
 
-          {/* Requêtes 7 jours */}
+          {/* Requests 7 days */}
           {analyticsData?.overview && (
             <div className="card p-6">
               <div className="flex items-center justify-between">
@@ -178,7 +178,7 @@ const AnalyticsPanel = () => {
             </div>
           )}
 
-          {/* Temps de réponse */}
+          {/* Response time */}
           {chatMetrics && (
             <div className="card p-6">
               <div className="flex items-center justify-between">
@@ -198,10 +198,10 @@ const AnalyticsPanel = () => {
         </div>
       )}
 
-      {/* Métriques secondaires - Ligne 2 */}
+      {/* Secondary metrics - Row 2 */}
       {chatMetrics && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Taux de succès */}
+          {/* Success rate */}
           <div className="card p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -217,7 +217,7 @@ const AnalyticsPanel = () => {
             </p>
           </div>
 
-          {/* Erreurs par heure */}
+          {/* Errors per hour */}
           <div className="card p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -233,7 +233,7 @@ const AnalyticsPanel = () => {
             </p>
           </div>
 
-          {/* Sessions actives */}
+          {/* Active sessions */}
           <div className="card p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -249,7 +249,7 @@ const AnalyticsPanel = () => {
             </p>
           </div>
 
-          {/* Tokens par requête */}
+          {/* Tokens per request */}
           <div className="card p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -267,10 +267,10 @@ const AnalyticsPanel = () => {
         </div>
       )}
 
-      {/* Tendances et Performance */}
+      {/* Trends and Performance */}
       {(analyticsData?.trends || analyticsData?.performance) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Tendances de croissance */}
+          {/* Growth trends */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <TrendingUp className="h-5 w-5 mr-2" />
@@ -308,7 +308,7 @@ const AnalyticsPanel = () => {
             </div>
           </div>
 
-          {/* Performance et taux de succès */}
+          {/* Performance and success rate */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <BarChart3 className="h-5 w-5 mr-2" />
@@ -346,9 +346,9 @@ const AnalyticsPanel = () => {
         </div>
       )}
 
-      {/* Ressources et tokens */}
+      {/* Resources and tokens */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Consommation de tokens */}
+        {/* Token consumption */}
         {analyticsData?.resources && (
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -376,7 +376,7 @@ const AnalyticsPanel = () => {
           </div>
         )}
 
-        {/* État système */}
+        {/* System status */}
         {analyticsData?.system && (
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -418,7 +418,7 @@ const AnalyticsPanel = () => {
       </div>
 
 
-      {/* Informations de mise à jour automatique */}
+      {/* Automatic update information */}
       <div className="mt-6 bg-gray-50 rounded-lg p-4">
         <div className="flex items-center text-sm text-gray-600">
           <RefreshCw className="h-4 w-4 mr-2" />

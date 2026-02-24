@@ -18,14 +18,14 @@ const UploadZone = () => {
   const [uploads, setUploads] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Configuration de react-dropzone
+  // react-dropzone configuration
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
-    // Traiter les fichiers rejetés
+    // Handle rejected files
     rejectedFiles.forEach(({ file, errors }) => {
       console.error('Fichier rejeté:', file.name, errors);
     });
 
-    // Ajouter les fichiers acceptés à la liste d'upload
+    // Add accepted files to the upload list
     const newUploads = acceptedFiles.map(file => ({
       id: Date.now() + Math.random(),
       file,
@@ -50,12 +50,12 @@ const UploadZone = () => {
     multiple: true
   });
 
-  // Supprimer un fichier de la liste
+  // Remove a file from the list
   const removeUpload = (id) => {
     setUploads(prev => prev.filter(upload => upload.id !== id));
   };
 
-  // Basculer le statut de préservation
+  // Toggle preservation status
   const togglePreserve = (id) => {
     setUploads(prev => prev.map(upload =>
       upload.id === id
@@ -64,7 +64,7 @@ const UploadZone = () => {
     ));
   };
 
-  // Uploader un fichier
+  // Upload a file
   const uploadFile = async (upload) => {
     setUploads(prev => prev.map(u =>
       u.id === upload.id
@@ -81,7 +81,7 @@ const UploadZone = () => {
           : u
       ));
 
-      // Notifier le parent du succès
+      // Notify parent of success
       onUploadSuccess?.();
 
     } catch (error) {
@@ -99,7 +99,7 @@ const UploadZone = () => {
     }
   };
 
-  // Uploader tous les fichiers en attente
+  // Upload all pending files
   const uploadAllFiles = async () => {
     const pendingUploads = uploads.filter(upload => upload.status === 'pending');
     if (pendingUploads.length === 0) return;
@@ -107,7 +107,7 @@ const UploadZone = () => {
     setIsUploading(true);
 
     try {
-      // Uploader les fichiers en série pour éviter la surcharge
+      // Upload files sequentially to avoid overload
       for (const upload of pendingUploads) {
         await uploadFile(upload);
       }
@@ -116,7 +116,7 @@ const UploadZone = () => {
     }
   };
 
-  // Nettoyer la liste (supprimer les succès et erreurs)
+  // Clean the list (remove successes and errors)
   const clearCompleted = () => {
     setUploads(prev => prev.filter(upload =>
       upload.status === 'pending' || upload.status === 'uploading'
@@ -129,7 +129,7 @@ const UploadZone = () => {
 
   return (
     <div className="p-4 max-w-7xl h-full">
-      {/* Zone de drop */}
+      {/* Drop zone */}
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 ${
@@ -156,7 +156,7 @@ const UploadZone = () => {
         )}
       </div>
 
-      {/* Statistiques */}
+      {/* Statistics */}
       {uploads.length > 0 && (
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="bg-blue-50 rounded-lg p-4">
@@ -195,7 +195,7 @@ const UploadZone = () => {
         </div>
       )}
 
-      {/* Actions globales */}
+      {/* Global actions */}
       {uploads.length > 0 && (
         <div className="mt-6 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -233,7 +233,7 @@ const UploadZone = () => {
         </div>
       )}
 
-      {/* Liste des fichiers */}
+      {/* File list */}
       {uploads.length > 0 && (
         <div className="mt-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -286,7 +286,7 @@ const UploadZone = () => {
   );
 };
 
-// Composant pour un fichier individuel
+// Component for an individual file
 const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) => {
   const getStatusIcon = () => {
     switch (upload.status) {
@@ -348,7 +348,7 @@ const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) =
         </div>
 
         <div className="flex items-center space-x-3 ml-4">
-          {/* Option de préservation */}
+          {/* Preservation option */}
           {upload.status === 'pending' && (
             <button
               onClick={onTogglePreserve}
@@ -364,7 +364,7 @@ const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) =
             </button>
           )}
 
-          {/* Bouton de retry pour les erreurs */}
+          {/* Retry button for errors */}
           {upload.status === 'error' && (
             <button
               onClick={onRetry}
@@ -375,7 +375,7 @@ const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) =
             </button>
           )}
 
-          {/* Bouton de suppression */}
+          {/* Delete button */}
           {upload.status !== 'uploading' && (
             <button
               onClick={onRemove}
@@ -389,7 +389,7 @@ const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) =
         </div>
       </div>
 
-      {/* Barre de progression */}
+      {/* Progress bar */}
       {upload.status === 'uploading' && (
         <div className="mt-3">
           <div className="bg-gray-200 rounded-full h-2">

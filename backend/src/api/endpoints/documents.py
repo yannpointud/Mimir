@@ -153,37 +153,37 @@ async def get_document_with_chunks(
             detail=f"Document with ID {document_id} not found"
         )
 
-    # Récupérer les chunks depuis le vector store
+    # Retrieve chunks from the vector store
     chunk_responses = []
     try:
-        # Récupérer tous les chunks pour ce document depuis le vector store
-        # Le vector store stocke les chunks avec document_id comme métadonnée
+        # Retrieve all chunks for this document from the vector store
+        # The vector store stores chunks with document_id as metadata
         all_chunks = vector_store.get_document_chunks(str(document_id))
 
-        # Convertir en ChunkResponse - utiliser le chunk_index original pour cohérence
+        # Convert to ChunkResponse - use the original chunk_index for consistency
         chunk_indexes = []
         for i, chunk in enumerate(all_chunks):
-            # Les chunks du vector store ont toujours un chunk_index cohérent
-            # Plus de fallback artificiel qui causait des incohérences
+            # Vector store chunks always have a consistent chunk_index
+            # No more artificial fallback that caused inconsistencies
             chunk_indexes.append(chunk.chunk_index)
             chunk_responses.append(ChunkResponse(
-                id=i,  # Index temporaire car pas d'ID réel
+                id=i,  # Temporary index since there is no real ID
                 document_id=document_id,
-                chunk_index=chunk.chunk_index,  # Toujours présent dans les métadonnées FAISS
+                chunk_index=chunk.chunk_index,  # Always present in FAISS metadata
                 text=chunk.text,
                 metadata=chunk.metadata if hasattr(chunk, 'metadata') else {}
             ))
 
-        # Logging pour validation de cohérence
+        # Logging for consistency validation
         if chunk_indexes:
             logger.info(f"Document {document_id} chunks loaded: {len(chunk_indexes)} chunks, chunk_indexes: {chunk_indexes[:10]}")
         else:
-            logger.warning(f"Document {document_id}: Aucun chunk trouvé dans le vector store")
+            logger.warning(f"Document {document_id}: No chunks found in vector store")
     except Exception as e:
         logger.warning(f"Could not retrieve chunks for document {document_id}: {e}")
-        # Continuer sans chunks si erreur
+        # Continue without chunks on error
 
-    # Lire le contenu original du fichier si possible
+    # Read original file content if possible
     content = None
     file_size = None
     mime_type = None
@@ -192,7 +192,7 @@ async def get_document_with_chunks(
         try:
             file_size = os.path.getsize(document.path)
 
-            # Déterminer le type MIME basé sur l'extension
+            # Determine MIME type based on file extension
             file_ext = Path(document.path).suffix.lower()
             mime_type_mapping = {
                 '.txt': 'text/plain',
@@ -204,7 +204,7 @@ async def get_document_with_chunks(
             }
             mime_type = mime_type_mapping.get(file_ext, 'application/octet-stream')
 
-            # Utiliser l'ExtractorFactory pour lire le contenu (comme lors de l'indexation)
+            # Use ExtractorFactory to read content (same as during indexing)
             extractor_factory = ExtractorFactory()
             try:
                 content = extractor_factory.extract_text(document.path)
@@ -216,7 +216,7 @@ async def get_document_with_chunks(
         except Exception as e:
             logger.warning(f"Could not read file metadata for document {document_id}: {e}")
 
-    # Créer la réponse avec tous les détails
+    # Build the response with all details
     return DocumentWithChunksResponse(
         id=document.id,
         filename=document.filename,
@@ -258,14 +258,14 @@ async def download_document(
             detail=f"Document with ID {document_id} not found"
         )
 
-    # Vérifier que le fichier existe
+    # Verify the file exists
     if not document.path or not os.path.exists(document.path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Original document file not found on disk"
         )
 
-    # Déterminer le type MIME
+    # Determine MIME type
     file_ext = Path(document.path).suffix.lower()
     mime_type_mapping = {
         '.txt': 'text/plain',
@@ -280,10 +280,10 @@ async def download_document(
     }
     media_type = mime_type_mapping.get(file_ext, 'application/octet-stream')
 
-    # Encoder le nom de fichier pour les caractères Unicode (accents français, etc.)
+    # Encode filename for Unicode characters (French accents, etc.)
     encoded_filename = urllib.parse.quote(document.filename.encode('utf-8'))
 
-    # Retourner le fichier pour affichage dans le navigateur
+    # Return the file for display in the browser
     return FileResponse(
         path=document.path,
         media_type=media_type,
@@ -528,20 +528,20 @@ async def delete_document(
             if vector_deleted:
                 logger.info(f"Document chunks removed from vector store: {filename} (ID: {document_id})")
                 
-                # Déclencher un nettoyage des orphelins si nécessaire
-                # (après plusieurs suppressions, il peut y avoir des incohérences)
+                # Trigger orphan cleanup if necessary
+                # (after multiple deletions, inconsistencies may occur)
                 try:
                     stats = vector_store.get_stats()
                     deleted_ratio = stats.get('deleted_vectors', 0) / max(stats.get('total_vectors', 1), 1)
                     
-                    # Si plus de 20% de chunks supprimés, déclencher nettoyage préventif
+                    # If more than 20% of chunks are deleted, trigger preventive cleanup
                     if deleted_ratio > 0.20:
                         logger.info(f"Triggering orphan cleanup after deletion (deleted ratio: {deleted_ratio:.2%})")
                         cleanup_result = vector_store.clean_orphans(create_backup=False)
                         logger.info(f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed")
                 except Exception as cleanup_error:
                     logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
-                    # Ne pas faire échouer la suppression si le nettoyage échoue
+                    # Do not fail the deletion if cleanup fails
                     
             else:
                 logger.warning(f"Failed to remove document chunks from vector store: {filename}")
@@ -770,10 +770,10 @@ async def get_document_stats(
         dict: Document statistics with vector store info
     """
     try:
-        # Statistiques de la base de données
+        # Database statistics
         db_stats = doc_repo.get_statistics()
         
-        # Statistiques du vector store
+        # Vector store statistics
         vector_stats = vector_store.get_stats()
 
         return {
@@ -818,32 +818,32 @@ async def cleanup_orphan_chunks(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> Dict[str, Any]:
     """
-    Nettoie manuellement les chunks orphelins du vector store.
-    
+    Manually clean orphan chunks from the vector store.
+
     Args:
-        force_rebuild: Force la reconstruction du vector store après nettoyage
-        current_user: Utilisateur authentifié
-        vector_store: Service vector store
-        audit_repo: Repository d'audit
-        
+        force_rebuild: Force vector store rebuild after cleanup
+        current_user: Authenticated user
+        vector_store: Vector store service
+        audit_repo: Audit log repository
+
     Returns:
-        Dict: Résultats du nettoyage
+        Dict: Cleanup results
     """
     try:
         logger.info(f"Manual orphan cleanup initiated by {current_user.get('username', 'unknown')}")
         
-        # Exécuter le nettoyage des orphelins
+        # Execute orphan cleanup
         cleanup_result = vector_store.clean_orphans(create_backup=True)
         
-        # Reconstruction forcée si demandée
+        # Forced rebuild if requested
         rebuild_result = None
         if force_rebuild:
             rebuild_result = vector_store.rebuild_vector_store(
                 force_rebuild=True, 
-                cleanup_orphans=False  # Déjà fait
+                cleanup_orphans=False  # Already done
             )
         
-        # Logger l'événement d'audit
+        # Log the audit event
         audit_repo.create_log(
             user_type="admin",
             action="maintenance_orphan_cleanup",
@@ -878,7 +878,7 @@ async def cleanup_orphan_chunks(
     except Exception as e:
         logger.error(f"Manual orphan cleanup failed: {e}")
         
-        # Logger l'échec
+        # Log the failure
         audit_repo.create_log(
             user_type="admin",
             action="maintenance_orphan_cleanup",
@@ -906,28 +906,28 @@ async def rebuild_vector_store(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> Dict[str, Any]:
     """
-    Reconstruit manuellement le vector store.
-    
+    Manually rebuild the vector store.
+
     Args:
-        force_rebuild: Force la reconstruction même sans chunks supprimés
-        cleanup_orphans: Nettoie les orphelins avant reconstruction
-        current_user: Utilisateur authentifié
-        vector_store: Service vector store
-        audit_repo: Repository d'audit
-        
+        force_rebuild: Force rebuild even without deleted chunks
+        cleanup_orphans: Clean orphans before rebuild
+        current_user: Authenticated user
+        vector_store: Vector store service
+        audit_repo: Audit log repository
+
     Returns:
-        Dict: Résultats de la reconstruction
+        Dict: Rebuild results
     """
     try:
         logger.info(f"Manual vector store rebuild initiated by {current_user.get('username', 'unknown')}")
         
-        # Exécuter la reconstruction
+        # Execute the rebuild
         rebuild_result = vector_store.rebuild_vector_store(
             force_rebuild=force_rebuild,
             cleanup_orphans=cleanup_orphans
         )
         
-        # Logger l'événement d'audit
+        # Log the audit event
         audit_repo.create_log(
             user_type="admin",
             action="maintenance_vectorstore_rebuild",
@@ -960,7 +960,7 @@ async def rebuild_vector_store(
     except Exception as e:
         logger.error(f"Manual vector store rebuild failed: {e}")
         
-        # Logger l'échec
+        # Log the failure
         audit_repo.create_log(
             user_type="admin",
             action="maintenance_vectorstore_rebuild",
@@ -989,46 +989,46 @@ async def validate_vector_store_consistency(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> Dict[str, Any]:
     """
-    Valide la cohérence entre SQLite et FAISS avec correction optionnelle.
-    
+    Validate consistency between SQLite and FAISS with optional auto-fix.
+
     Args:
-        fix_issues: Corriger automatiquement les problèmes détectés
-        save_report: Sauvegarder le rapport détaillé
-        current_user: Utilisateur authentifié
-        doc_repo: Repository des documents
-        vector_store: Service vector store
-        audit_repo: Repository d'audit
-        
+        fix_issues: Automatically fix detected issues
+        save_report: Save detailed report to file
+        current_user: Authenticated user
+        doc_repo: Document repository
+        vector_store: Vector store service
+        audit_repo: Audit log repository
+
     Returns:
-        Dict: Résultats de la validation
+        Dict: Validation results
     """
     try:
         logger.info(f"Consistency validation initiated by {current_user.get('username', 'unknown')}")
         
-        # Import du validateur
+        # Import the validator
         from src.rag_core.implementations.validation_utils import VectorStoreValidator
         
-        # Créer le validateur et exécuter la validation
+        # Create the validator and run the validation
         validator = VectorStoreValidator(vector_store, doc_repo)
         validation_result = validator.validate_consistency(fix_issues=fix_issues)
         
-        # Sauvegarder le rapport si demandé
+        # Save the report if requested
         report_path = None
         if save_report:
             try:
                 from pathlib import Path
                 import json
                 
-                # Créer le répertoire de rapports
+                # Create the reports directory
                 reports_dir = Path(settings.upload_dir).parent / "reports" / "validation"
                 reports_dir.mkdir(parents=True, exist_ok=True)
                 
-                # Nom du fichier avec timestamp
+                # Filename with timestamp
                 timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
                 report_filename = f"consistency_validation_{timestamp}.json"
                 report_path = reports_dir / report_filename
                 
-                # Sauvegarder
+                # Save
                 with open(report_path, 'w', encoding='utf-8') as f:
                     json.dump(validation_result, f, indent=2, default=str)
                 
@@ -1036,9 +1036,9 @@ async def validate_vector_store_consistency(
                 
             except Exception as e:
                 logger.warning(f"Failed to save validation report: {e}")
-                # Ne pas faire échouer la validation si la sauvegarde échoue
+                # Do not fail the validation if saving the report fails
         
-        # Logger l'événement d'audit
+        # Log the audit event
         audit_repo.create_log(
             user_type="admin",
             action="maintenance_consistency_validation",
@@ -1058,7 +1058,7 @@ async def validate_vector_store_consistency(
             }
         )
         
-        # Formater la réponse
+        # Format the response
         issues_found = validation_result.get('issues_found', {})
         total_issues = issues_found.get('total_issues', 0)
         consistency_score = validation_result.get('consistency_score', 1.0)
@@ -1083,7 +1083,7 @@ async def validate_vector_store_consistency(
     except Exception as e:
         logger.error(f"Consistency validation failed: {e}")
         
-        # Logger l'échec
+        # Log the failure
         audit_repo.create_log(
             user_type="admin",
             action="maintenance_consistency_validation",

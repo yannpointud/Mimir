@@ -1,5 +1,5 @@
 """
-Tests unitaires pour les endpoints de gestion de documents.
+Unit tests for document management endpoints.
 """
 
 import pytest
@@ -31,19 +31,19 @@ from backend.src.api.endpoints.documents import (
     indexed_at=getattr(obj, 'indexed_at', datetime.utcnow())
 ))
 class TestDocumentEndpoints:
-    """Tests pour les endpoints de documents."""
+    """Tests for document endpoints."""
 
     def create_mock_document(self, **kwargs):
-        """Crée un mock document avec tous les attributs requis."""
+        """Create a mock document with all required attributes."""
         mock_doc = Mock()
 
-        # Valeurs par défaut
+        # Default values
         defaults = {
             'id': 1,
             'filename': 'test.pdf',
             'path': '/uploads/test.pdf',
             'preserve': False,
-            'file_hash': 'a' * 64,  # Hash hexadécimal de 64 caractères
+            'file_hash': 'a' * 64,  # 64-character hexadecimal hash
             'status': 'indexed',
             'error_message': None,
             'chunk_count': 5,
@@ -51,10 +51,10 @@ class TestDocumentEndpoints:
             'indexed_at': datetime.utcnow()
         }
 
-        # Merge avec les kwargs fournis
+        # Merge with provided kwargs
         defaults.update(kwargs)
 
-        # Assigner tous les attributs
+        # Assign all attributes
         for key, value in defaults.items():
             setattr(mock_doc, key, value)
 
@@ -62,22 +62,22 @@ class TestDocumentEndpoints:
 
     @pytest.fixture
     def mock_doc_repo(self):
-        """Mock repository de documents."""
+        """Mock document repository."""
         return Mock()
 
     @pytest.fixture
     def mock_audit_repo(self):
-        """Mock repository d'audit."""
+        """Mock audit repository."""
         return Mock()
 
     @pytest.fixture
     def mock_current_user(self):
-        """Mock utilisateur authentifié."""
+        """Mock authenticated user."""
         return {"sub": "admin", "user_type": "admin"}
 
     @pytest.fixture
     def mock_pagination(self):
-        """Mock paramètres de pagination."""
+        """Mock pagination parameters."""
         mock_pagination = Mock()
         mock_pagination.offset = 0
         mock_pagination.limit = 20
@@ -85,14 +85,14 @@ class TestDocumentEndpoints:
 
 
 class TestListDocumentsEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint de listing des documents."""
+    """Tests for the document listing endpoint."""
 
     @patch('backend.src.api.endpoints.documents.DocumentListResponse')
     def test_list_documents_success(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
-        """Test de listing des documents réussi."""
+        """Test successful document listing."""
         from datetime import datetime
 
-        # Configuration des mocks avec tous les attributs requis
+        # Configure mocks with all required attributes
         mock_doc1 = self.create_mock_document(
             id=1,
             filename="doc1.pdf",
@@ -117,14 +117,14 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_documents = [mock_doc1, mock_doc2]
         mock_doc_repo.get_all_paginated.return_value = (mock_documents, 2)
 
-        # Mock de la réponse pour éviter la validation Pydantic incohérente
+        # Mock response to avoid inconsistent Pydantic validation
         mock_response = Mock()
-        mock_response.documents = []  # Sera rempli après DocumentResponse.from_orm()
+        mock_response.documents = []  # Will be populated after DocumentResponse.from_orm()
         mock_response.total_count = 2
         mock_response.pagination = {"offset": 0, "limit": 20, "has_more": False}
         mock_doc_list_response.return_value = mock_response
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(list_documents(
             pagination=mock_pagination,
             status_filter=None,
@@ -132,25 +132,25 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
             doc_repo=mock_doc_repo
         ))
 
-        # Vérifications
+        # Assertions
         assert result == mock_response
         mock_doc_list_response.assert_called_once()
 
     @patch('backend.src.api.endpoints.documents.DocumentListResponse')
     def test_list_documents_with_filters(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
-        """Test de listing avec filtres."""
+        """Test listing with filters."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_documents = [self.create_mock_document(id=1, filename="doc1.pdf", status="indexed")]
         mock_doc_repo.get_all_paginated.return_value = (mock_documents, 1)
 
-        # Mock de la réponse
+        # Mock response
         mock_response = Mock()
         mock_response.documents = []
         mock_response.total_count = 1
         mock_doc_list_response.return_value = mock_response
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(list_documents(
             pagination=mock_pagination,
             status_filter="indexed",
@@ -158,7 +158,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
             doc_repo=mock_doc_repo
         ))
 
-        # Vérifications
+        # Assertions
         assert result == mock_response
         mock_doc_repo.get_all_paginated.assert_called_once_with(
             offset=0,
@@ -169,9 +169,9 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
 
     @patch('backend.src.api.endpoints.documents.DocumentListResponse')
     def test_list_documents_pagination(self, mock_doc_list_response, mock_doc_repo):
-        """Test de listing avec pagination."""
+        """Test listing with pagination."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_pagination = Mock()
         mock_pagination.offset = 20
         mock_pagination.limit = 10
@@ -179,14 +179,14 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_documents = [self.create_mock_document(id=i, filename=f"doc{i}.pdf") for i in range(21, 31)]
         mock_doc_repo.get_all_paginated.return_value = (mock_documents, 50)
 
-        # Mock de la réponse
+        # Mock response
         mock_response = Mock()
         mock_response.documents = []
         mock_response.total_count = 50
         mock_response.pagination = {"offset": 20, "limit": 10, "has_more": True}
         mock_doc_list_response.return_value = mock_response
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(list_documents(
             pagination=mock_pagination,
             status_filter=None,
@@ -194,16 +194,16 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
             doc_repo=mock_doc_repo
         ))
 
-        # Vérifications
+        # Assertions
         assert result == mock_response
 
     def test_list_documents_exception_handling(self, mock_doc_repo, mock_pagination):
-        """Test de gestion d'exception dans listing."""
+        """Test exception handling in listing."""
 
-        # Configuration du mock pour lever une exception
+        # Configure mock to raise an exception
         mock_doc_repo.get_all_paginated.side_effect = Exception("Database error")
 
-        # Test que l'exception est gérée
+        # Test that exception is handled
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(list_documents(
                 pagination=mock_pagination,
@@ -216,32 +216,32 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
 
 
 class TestGetDocumentEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint de récupération d'un document."""
+    """Tests for the document retrieval endpoint."""
 
     def test_get_document_success(self, mock_doc_repo):
-        """Test de récupération de document réussie."""
+        """Test successful document retrieval."""
 
-        # Configuration du mock
+        # Configure mock
         mock_document = self.create_mock_document(id=1, filename="test.pdf", status="indexed")
         mock_doc_repo.get_by_id.return_value = mock_document
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(get_document(
             document_id=1,
             doc_repo=mock_doc_repo
         ))
 
-        # Vérifications
+        # Assertions
         mock_doc_repo.get_by_id.assert_called_once_with(1)
-        # Le résultat sera converti par DocumentResponse.from_orm()
+        # Result will be converted by DocumentResponse.from_orm()
 
     def test_get_document_not_found(self, mock_doc_repo):
-        """Test de récupération de document non trouvé."""
+        """Test document not found retrieval."""
 
-        # Configuration du mock
+        # Configure mock
         mock_doc_repo.get_by_id.return_value = None
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(get_document(
                 document_id=999,
@@ -253,11 +253,11 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
 
 
 class TestUploadDocumentEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint d'upload de documents."""
+    """Tests for the document upload endpoint."""
 
     @pytest.fixture
     def mock_upload_file(self):
-        """Mock fichier uploadé."""
+        """Mock uploaded file."""
         mock_file = Mock(spec=UploadFile)
         mock_file.filename = "test.pdf"
         mock_file.size = 1024 * 1024  # 1MB
@@ -265,7 +265,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
     @pytest.fixture
     def temp_upload_dir(self):
-        """Répertoire temporaire pour tests d'upload."""
+        """Temporary directory for upload tests."""
         with tempfile.TemporaryDirectory() as temp_dir:
             yield temp_dir
 
@@ -278,9 +278,9 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         self, mock_sanitize, mock_validate, mock_sha256, mock_path, mock_settings,
         mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test d'upload de document réussi."""
+        """Test successful document upload."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_settings.max_file_size_mb = 10
         mock_settings.supported_file_extensions = {".pdf", ".txt", ".docx"}
         mock_settings.upload_dir = "/uploads"
@@ -294,25 +294,25 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_hash.hexdigest.return_value = "abc123def456"
         mock_sha256.return_value = mock_hash
 
-        mock_doc_repo.get_by_hash.return_value = None  # Pas de doublon
+        mock_doc_repo.get_by_hash.return_value = None  # No duplicate
         mock_document = self.create_mock_document(id=1, filename="test.pdf")
         mock_doc_repo.create.return_value = mock_document
 
-        # Configuration du path mock pour gérer différents cas d'usage (copié du test qui fonctionne)
+        # Configure path mock to handle different use cases
         def path_side_effect(path_arg):
-            if str(path_arg) == "test.pdf":  # Pour Path(safe_filename) - le nom doit correspondre
+            if str(path_arg) == "test.pdf":  # For Path(safe_filename) - name must match
                 mock_file_path = Mock()
                 mock_file_path.suffix.lower.return_value = ".pdf"
                 return mock_file_path
-            elif str(path_arg) == "/uploads":  # Pour Path(settings.upload_dir)
+            elif str(path_arg) == "/uploads":  # For Path(settings.upload_dir)
                 mock_upload_dir = Mock()
                 mock_upload_dir.mkdir = Mock()
-                # Configurer l'opérateur / pour retourner un chemin de fichier valide
+                # Configure / operator to return a valid file path
                 mock_file_path = Mock()
                 mock_file_path.__str__ = Mock(return_value="/uploads/abc123def456_test.pdf")
                 mock_upload_dir.__truediv__ = Mock(return_value=mock_file_path)
                 return mock_upload_dir
-            else:  # Autres cas
+            else:  # Other cases
                 mock_other_path = Mock()
                 mock_other_path.mkdir = Mock()
                 return mock_other_path
@@ -323,7 +323,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_ingestion_processor = Mock()
         mock_ingestion_processor.queue_document.return_value = True
 
-        # Appel de la fonction
+        # Call the function
         with patch('builtins.open', mock_open()) as mock_file_open:
             result = asyncio.run(upload_document(
                 file=mock_upload_file,
@@ -335,7 +335,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 ingestion_processor=mock_ingestion_processor
             ))
 
-        # Vérifications
+        # Assertions
         mock_validate.assert_called_once_with("test.pdf")
         mock_sanitize.assert_called_once_with("test.pdf")
         mock_doc_repo.get_by_hash.assert_called_once_with("abc123def456")
@@ -343,12 +343,12 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_audit_repo.create_log.assert_called_once()
 
     def test_upload_document_no_filename(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test d'upload sans nom de fichier."""
+        """Test upload without filename."""
 
         mock_file = Mock(spec=UploadFile)
         mock_file.filename = None
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
                 file=mock_file,
@@ -366,11 +366,11 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
     def test_upload_document_invalid_filename(
         self, mock_validate, mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test d'upload avec nom de fichier invalide."""
+        """Test upload with invalid filename."""
 
         mock_validate.return_value = False
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
                 file=mock_upload_file,
@@ -389,13 +389,13 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
     def test_upload_document_file_too_large(
         self, mock_validate, mock_settings, mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test d'upload avec fichier trop volumineux."""
+        """Test upload with file too large."""
 
         mock_settings.max_file_size_mb = 5
         mock_validate.return_value = True
         mock_upload_file.size = 10 * 1024 * 1024  # 10MB
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
                 file=mock_upload_file,
@@ -416,14 +416,14 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         self, mock_sanitize, mock_validate, mock_settings, mock_upload_file,
         mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test d'upload avec extension non supportée."""
+        """Test upload with unsupported extension."""
 
         mock_settings.max_file_size_mb = 10
         mock_settings.supported_file_extensions = {".pdf", ".txt"}
         mock_validate.return_value = True
         mock_sanitize.return_value = "test.xyz"
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
                 file=mock_upload_file,
@@ -444,15 +444,15 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         self, mock_sanitize, mock_validate, mock_settings, mock_upload_file,
         mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test d'upload avec fichier vide."""
+        """Test upload with empty file."""
 
         mock_settings.max_file_size_mb = 10
         mock_settings.supported_file_extensions = {".pdf"}
         mock_validate.return_value = True
         mock_sanitize.return_value = "test.pdf"
-        mock_upload_file.read = AsyncMock(return_value=b"")  # Fichier vide
+        mock_upload_file.read = AsyncMock(return_value=b"")  # Empty file
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
                 file=mock_upload_file,
@@ -474,7 +474,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         self, mock_sha256, mock_sanitize, mock_validate, mock_settings, mock_upload_file,
         mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test d'upload avec fichier en doublon."""
+        """Test upload with duplicate file."""
 
         mock_settings.max_file_size_mb = 10
         mock_settings.supported_file_extensions = {".pdf"}
@@ -486,11 +486,11 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_hash.hexdigest.return_value = "abc123def456"
         mock_sha256.return_value = mock_hash
 
-        # Document existant avec même hash
+        # Existing document with same hash
         existing_doc = self.create_mock_document(filename="existing.pdf")
         mock_doc_repo.get_by_hash.return_value = existing_doc
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
                 file=mock_upload_file,
@@ -506,12 +506,12 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
 
 class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint de suppression de documents."""
+    """Tests for the document deletion endpoint."""
 
     def test_delete_document_success(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de suppression de document réussie."""
+        """Test successful document deletion."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_document = Mock(
             id=1,
             filename="test.pdf",
@@ -526,7 +526,7 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
 
             mock_exists.return_value = True
 
-            # Appel de la fonction
+            # Call the function
             result = asyncio.run(delete_document(
                 document_id=1,
                 force=False,
@@ -535,7 +535,7 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                 audit_repo=mock_audit_repo
             ))
 
-        # Vérifications
+        # Assertions
         assert result.success is True
         assert "test.pdf" in result.message
         mock_doc_repo.delete.assert_called_once_with(1, force=False)
@@ -543,12 +543,12 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         mock_audit_repo.create_log.assert_called_once()
 
     def test_delete_document_not_found(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de suppression de document non trouvé."""
+        """Test deletion of non-existent document."""
 
-        # Configuration du mock
+        # Configure mock
         mock_doc_repo.get_by_id.return_value = None
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(delete_document(
                 document_id=999,
@@ -561,9 +561,9 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
     def test_delete_document_protected_without_force(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de suppression de document protégé sans force."""
+        """Test deletion of protected document without force."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_document = Mock(
             id=1,
             filename="protected.pdf",
@@ -571,7 +571,7 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         )
         mock_doc_repo.get_by_id.return_value = mock_document
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(delete_document(
                 document_id=1,
@@ -585,9 +585,9 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         assert "protected" in str(exc_info.value.detail)
 
     def test_delete_document_protected_with_force(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de suppression de document protégé avec force."""
+        """Test deletion of protected document with force."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_document = Mock(
             id=1,
             filename="protected.pdf",
@@ -602,7 +602,7 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
 
             mock_exists.return_value = True
 
-            # Appel de la fonction
+            # Call the function
             result = asyncio.run(delete_document(
                 document_id=1,
                 force=True,
@@ -611,23 +611,23 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                 audit_repo=mock_audit_repo
             ))
 
-        # Vérifications
+        # Assertions
         assert result.success is True
         mock_doc_repo.delete.assert_called_once_with(1, force=True)
 
     def test_delete_document_database_failure(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de suppression avec échec base de données."""
+        """Test deletion with database failure."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_document = Mock(
             id=1,
             filename="test.pdf",
             preserve=False
         )
         mock_doc_repo.get_by_id.return_value = mock_document
-        mock_doc_repo.delete.return_value = False  # Échec
+        mock_doc_repo.delete.return_value = False  # Failure
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(delete_document(
                 document_id=1,
@@ -641,19 +641,19 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
 
 
 class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint de basculement de préservation."""
+    """Tests for the preservation toggle endpoint."""
 
     def test_toggle_document_preservation_success(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de basculement de préservation réussi."""
+        """Test successful preservation toggle."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_document = self.create_mock_document(id=1, filename="test.pdf")
         mock_doc_repo.get_by_id.return_value = mock_document
 
         updated_doc = self.create_mock_document(id=1, filename="test.pdf", preserve=True)
         mock_doc_repo.update_preserve_status.return_value = updated_doc
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(toggle_document_preservation(
             document_id=1,
             preserve=True,
@@ -662,17 +662,17 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
             audit_repo=mock_audit_repo
         ))
 
-        # Vérifications
+        # Assertions
         mock_doc_repo.update_preserve_status.assert_called_once_with(1, True)
         mock_audit_repo.create_log.assert_called_once()
 
     def test_toggle_document_preservation_not_found(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de basculement sur document non trouvé."""
+        """Test toggle on non-existent document."""
 
-        # Configuration du mock
+        # Configure mock
         mock_doc_repo.get_by_id.return_value = None
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(toggle_document_preservation(
                 document_id=999,
@@ -686,20 +686,20 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
 
 
 class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint de retraitement de documents."""
+    """Tests for the document reprocessing endpoint."""
 
     def test_reprocess_document_success(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de retraitement de document réussi."""
+        """Test successful document reprocessing."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_document = Mock(id=1, filename="test.pdf")
         mock_doc_repo.get_by_id.return_value = mock_document
 
-        # Mock du processeur d'ingestion
+        # Mock ingestion processor
         mock_ingestion_processor = Mock()
         mock_ingestion_processor.queue_document.return_value = True
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(reprocess_document(
             document_id=1,
             priority="high",
@@ -709,7 +709,7 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
             ingestion_processor=mock_ingestion_processor
         ))
 
-        # Vérifications
+        # Assertions
         assert result.success is True
         assert "test.pdf" in result.message
         assert "reprocessing" in result.message
@@ -717,12 +717,12 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
         mock_audit_repo.create_log.assert_called_once()
 
     def test_reprocess_document_not_found(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test de retraitement sur document non trouvé."""
+        """Test reprocessing of non-existent document."""
 
-        # Configuration du mock
+        # Configure mock
         mock_doc_repo.get_by_id.return_value = None
 
-        # Test que l'exception est levée
+        # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(reprocess_document(
                 document_id=999,
@@ -736,18 +736,18 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
 
 
 class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
-    """Tests pour l'endpoint de statistiques des documents."""
+    """Tests for the document statistics endpoint."""
 
     @patch('backend.src.api.endpoints.documents.settings')
     def test_get_document_stats_success(self, mock_settings, mock_doc_repo):
-        """Test de récupération de statistiques réussie."""
+        """Test successful statistics retrieval."""
 
-        # Configuration des mocks
+        # Configure mocks
         mock_settings.upload_dir = "/uploads"
         mock_settings.supported_file_extensions = {".pdf", ".txt", ".docx"}
         mock_settings.max_file_size_mb = 10
 
-        # Corrigé pour correspondre aux clés utilisées par le code de production
+        # Corrected to match keys used by production code
         mock_stats = {
             "total_documents": 25,
             "count_pending": 0,
@@ -770,10 +770,10 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
         }
         mock_vector_store.health_check.return_value = True
 
-        # Appel de la fonction
+        # Call the function
         result = asyncio.run(get_document_stats(doc_repo=mock_doc_repo, vector_store=mock_vector_store))
 
-        # Vérifications
+        # Assertions
         assert result["total_documents"] == 25
         assert result["by_status"]["indexed"] == 20
         assert result["by_status"]["indexing"] == 3
@@ -784,12 +784,12 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
         assert result["storage_info"]["max_file_size_mb"] == 10
 
     def test_get_document_stats_exception_handling(self, mock_doc_repo):
-        """Test de gestion d'exception dans statistiques."""
+        """Test exception handling in statistics."""
 
-        # Configuration du mock pour lever une exception
+        # Configure mock to raise an exception
         mock_doc_repo.get_statistics.side_effect = Exception("Database error")
 
-        # Test que l'exception est gérée
+        # Test that exception is handled
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(get_document_stats(doc_repo=mock_doc_repo))
 
@@ -797,14 +797,14 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
 
 
 class TestDocumentIntegration(TestDocumentEndpoints):
-    """Tests d'intégration pour les endpoints de documents."""
+    """Integration tests for document endpoints."""
 
     def test_full_document_lifecycle(
         self, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
-        """Test du cycle de vie complet d'un document (version simplifiée)."""
+        """Test full document lifecycle (simplified version)."""
 
-        # Mock document créé
+        # Mock created document
         mock_document = self.create_mock_document(
             id=1,
             filename="document.pdf",
@@ -813,28 +813,28 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             status="pending"
         )
 
-        # Configuration des retours de repo
+        # Configure repo returns
         mock_doc_repo.get_by_id.return_value = mock_document
         mock_doc_repo.update_preserve_status.return_value = self.create_mock_document(
             id=1, filename="document.pdf", preserve=True
         )
         mock_doc_repo.delete.return_value = True
 
-        # Mock ingestion processor requis
+        # Required mock ingestion processor
         mock_ingestion_processor = Mock()
         mock_ingestion_processor.queue_document.return_value = True
 
-        # Mock vector store requis pour delete_document
+        # Required mock vector store for delete_document
         mock_vector_store = Mock()
         mock_vector_store.delete.return_value = True
 
-        # 1. Récupération du document (skip upload car trop complexe à mocker)
+        # 1. Document retrieval (skip upload as too complex to mock)
         get_result = asyncio.run(get_document(
             document_id=1,
             doc_repo=mock_doc_repo
         ))
 
-        # 2. Basculement de préservation
+        # 2. Preservation toggle
         preserve_result = asyncio.run(toggle_document_preservation(
             document_id=1,
             preserve=True,
@@ -843,7 +843,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             audit_repo=mock_audit_repo
         ))
 
-        # 3. Retraitement
+        # 3. Reprocessing
         reprocess_result = asyncio.run(reprocess_document(
             document_id=1,
             priority="high",
@@ -853,12 +853,12 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             ingestion_processor=mock_ingestion_processor
         ))
 
-        # 4. Suppression forcée (car protégé)
+        # 4. Forced deletion (because protected)
         with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
              patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:
 
             mock_exists.return_value = True
-            mock_document.preserve = True  # Document maintenant protégé
+            mock_document.preserve = True  # Document now protected
 
             delete_result = asyncio.run(delete_document(
                 document_id=1,
@@ -869,19 +869,19 @@ class TestDocumentIntegration(TestDocumentEndpoints):
                 vector_store=mock_vector_store
             ))
 
-        # Vérifications du cycle complet
-        assert get_result is not None     # Récupération réussie
-        assert preserve_result is not None  # Préservation réussie
-        assert reprocess_result.success is True  # Retraitement réussi
-        assert delete_result.success is True     # Suppression réussie
+        # Full cycle assertions
+        assert get_result is not None     # Retrieval successful
+        assert preserve_result is not None  # Preservation successful
+        assert reprocess_result.success is True  # Reprocessing successful
+        assert delete_result.success is True     # Deletion successful
 
-        # Vérification des appels d'audit (3 actions: preserve, reprocess, delete)
+        # Verify audit calls (3 actions: preserve, reprocess, delete)
         assert mock_audit_repo.create_log.call_count == 3
 
     def test_document_upload_and_stats_workflow(self, mock_doc_repo, mock_audit_repo, mock_current_user):
-        """Test du workflow upload et statistiques."""
+        """Test upload and statistics workflow."""
 
-        # Corrigé pour correspondre aux clés utilisées par le code de production
+        # Corrected to match keys used by production code
         mock_stats = {
             "total_documents": 1,
             "count_pending": 1,
@@ -909,28 +909,28 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             mock_settings.supported_file_extensions = {".pdf", ".txt"}
             mock_settings.max_file_size_mb = 10
 
-            # Récupération des statistiques
+            # Retrieve statistics
             stats_result = asyncio.run(get_document_stats(doc_repo=mock_doc_repo, vector_store=mock_vector_store))
 
-        # Vérifications
+        # Assertions
         assert stats_result["total_documents"] == 1
         assert stats_result["by_status"]["pending"] == 1
         assert stats_result["total_chunks"] == 0
         assert stats_result["storage_info"]["max_file_size_mb"] == 10
 
     def test_simple_document_operations(self, mock_doc_repo):
-        """Tests simples pour améliorer la couverture."""
-        # Test simple - juste vérifier qu'on peut importer les fonctions
+        """Simple tests to improve coverage."""
+        # Simple test - just verify we can import the functions
         from backend.src.api.endpoints.documents import get_document, download_document, get_document_stats
 
-        # Ces imports prouvent que les modules sont accessible pour les tests
+        # These imports prove that the modules are accessible for tests
         assert get_document is not None
         assert download_document is not None
         assert get_document_stats is not None
 
     @patch('backend.src.api.endpoints.documents.FileResponse')
     def test_download_document_success(self, mock_file_response, mock_doc_repo):
-        """Test téléchargement d'un document - succès."""
+        """Test successful document download."""
         # Mock document
         mock_doc = self.create_mock_document(
             id=1,
@@ -944,18 +944,18 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             from backend.src.api.endpoints.documents import download_document
             asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
 
-        # Vérifications
+        # Assertions
         mock_doc_repo.get_by_id.assert_called_once_with(1)
         mock_file_response.assert_called_once()
 
-        # Vérifier les arguments du FileResponse
+        # Verify FileResponse arguments
         call_args = mock_file_response.call_args
         assert call_args[1]['path'] == "/uploads/test_document.pdf"
         assert call_args[1]['media_type'] == "application/pdf"
         assert "test_document.pdf" in call_args[1]['filename']
 
     def test_download_document_not_found(self, mock_doc_repo):
-        """Test téléchargement d'un document - document non trouvé."""
+        """Test document download - document not found."""
         mock_doc_repo.get_by_id.return_value = None
 
         from backend.src.api.endpoints.documents import download_document
@@ -967,8 +967,8 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         assert "Document with ID 999 not found" in str(exc_info.value.detail)
 
     def test_download_document_file_not_found(self, mock_doc_repo):
-        """Test téléchargement d'un document - fichier physique non trouvé."""
-        # Mock document avec un path qui n'existe pas
+        """Test document download - physical file not found."""
+        # Mock document with non-existent path
         mock_doc = self.create_mock_document(
             id=1,
             filename="missing.pdf",
@@ -988,11 +988,11 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
     @patch('backend.src.api.endpoints.documents.FileResponse')
     def test_download_document_unknown_extension(self, mock_file_response, mock_doc_repo):
-        """Test téléchargement d'un document - extension inconnue."""
+        """Test document download - unknown extension."""
         # Mock document with unknown extension
         mock_doc = self.create_mock_document(
             id=1,
-            filename="test.xyz",  # Extension non supportée
+            filename="test.xyz",  # Unsupported extension
             path="/uploads/test.xyz"
         )
         mock_doc_repo.get_by_id.return_value = mock_doc
@@ -1002,6 +1002,6 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             from backend.src.api.endpoints.documents import download_document
             asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
 
-        # Vérifier que le mime type par défaut est utilisé
+        # Verify default mime type is used
         call_args = mock_file_response.call_args
         assert call_args[1]['media_type'] == "application/octet-stream"

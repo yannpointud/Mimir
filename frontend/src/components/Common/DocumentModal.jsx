@@ -12,19 +12,19 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
   const [selectedChunk, setSelectedChunk] = useState(null);
   const [showAllChunks, setShowAllChunks] = useState(false);
 
-  // Charger le document quand le modal s'ouvre
+  // Load document when modal opens
   useEffect(() => {
     if (isOpen && documentId) {
       loadDocument();
     }
   }, [isOpen, documentId]);
 
-  // Auto-sélectionner le premier chunk pertinent quand les données sont chargées
+  // Auto-select the first relevant chunk when data is loaded
   useEffect(() => {
     if (documentData?.chunks && relevantChunks.length > 0) {
       console.log(`[DocumentModal] Validation des chunks pour document ${documentId}`);
 
-      // Valider la correspondance des chunk_index
+      // Validate chunk_index correspondence
       const validation = validateChunkIndexes(relevantChunks, documentData.chunks);
 
       if (!validation.isValid) {
@@ -35,7 +35,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
         });
       }
 
-      // Trouver le premier chunk pertinent dans les données du document
+      // Find the first relevant chunk in the document data
       const firstRelevantChunk = documentData.chunks.find(chunk =>
         relevantChunks.some(rc => rc.chunk_index === chunk.chunk_index)
       );
@@ -45,7 +45,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
         setSelectedChunk(firstRelevantChunk);
       } else if (validation.matchingCount === 0) {
         console.error(`[DocumentModal] Aucun chunk pertinent trouvé - problème de correspondance d'index`);
-        // Fallback : sélectionner le premier chunk du document
+        // Fallback: select the first chunk of the document
         if (documentData.chunks.length > 0) {
           setSelectedChunk(documentData.chunks[0]);
         }
@@ -58,7 +58,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
       setLoading(true);
       setError(null);
 
-      // Récupérer les détails du document avec chunks
+      // Fetch document details with chunks
       const docResponse = await documentsAPI.getDocumentWithChunks(documentId);
       setDocumentData(docResponse);
 
@@ -70,7 +70,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     }
   };
 
-  // Fonction pour surligner le texte recherché
+  // Highlight searched text in content
   const highlightTextInContent = (text, query) => {
     if (!query || !text) return text;
 
@@ -78,7 +78,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     return text.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
   };
 
-  // Fermer le modal
+  // Close the modal
   const handleClose = () => {
     setDocumentData(null);
     setSelectedChunk(null);
@@ -86,14 +86,14 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     onClose();
   };
 
-  // Ouvrir le document original dans le navigateur
+  // Open the original document in the browser
   const handleOpenDocument = async () => {
     if (!documentId) return;
 
     await openDocumentInBrowser(documentId, documentData?.filename);
   };
 
-  // Gestion des touches clavier
+  // Keyboard event handling
   useEffect(() => {
     const handleEscKey = (event) => {
       if (event.key === 'Escape') {
@@ -120,7 +120,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
 
         {/* Modal */}
         <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-          {/* En-tête */}
+          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center">
               <FileText className="h-6 w-6 text-gray-400 mr-3" />
@@ -135,7 +135,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Actions du document */}
+              {/* Document actions */}
               {documentData?.path && (
                 <button
                   onClick={handleOpenDocument}
@@ -155,7 +155,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
             </div>
           </div>
 
-          {/* Contenu */}
+          {/* Content */}
           <div className="flex-1 overflow-hidden flex">
             {loading ? (
               <div className="flex-1 flex items-center justify-center">
@@ -180,14 +180,14 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
               </div>
             ) : documentData ? (
               <>
-                {/* Navigation des chunks à gauche */}
+                {/* Chunk navigation on the left */}
                 {documentData.chunks && documentData.chunks.length > 0 && (() => {
-                  // Si on a des chunks pertinents, ne montrer que ceux-là
+                  // If we have relevant chunks, only show those
                   const relevantChunkIndices = new Set(
                     relevantChunks.map(rc => rc.chunk_index)
                   );
 
-                  // Filtrage avec validation des correspondances
+                  // Filtering with match validation
                   let chunksToDisplay = documentData.chunks;
 
                   if (relevantChunks.length > 0 && !showAllChunks) {
@@ -200,14 +200,14 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
                       filteredCount: chunksToDisplay.length
                     });
 
-                    // Si aucun chunk ne correspond, afficher tous les chunks avec un avertissement
+                    // If no chunks match, display all chunks with a warning
                     if (chunksToDisplay.length === 0) {
                       console.warn(`[DocumentModal] Aucun chunk ne correspond aux index pertinents - affichage de tous les chunks`);
                       chunksToDisplay = documentData.chunks;
                     }
                   }
 
-                  // Trier par chunk_index
+                  // Sort by chunk_index
                   const sortedChunks = [...chunksToDisplay].sort((a, b) =>
                     (a.chunk_index || 0) - (b.chunk_index || 0)
                   );
@@ -284,7 +284,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
                   );
                 })()}
 
-                {/* Contenu principal à droite */}
+                {/* Main content on the right */}
                 <div className="flex-1 overflow-y-auto">
                   <div className="p-6">
                     {selectedChunk ? (
@@ -343,7 +343,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
                           </div>
                         </div>
 
-                        {/* Contenu complet ou extrait */}
+                        {/* Full or excerpt content */}
                         {documentData.content ? (
                           <div
                             className="prose max-w-none text-gray-700 whitespace-pre-wrap"
@@ -397,7 +397,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
             ) : null}
           </div>
 
-          {/* Pied de page */}
+          {/* Footer */}
           <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
             <div className="text-sm text-gray-500">
               {searchQuery && (

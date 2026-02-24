@@ -1,6 +1,6 @@
 """
-Application FastAPI principale pour Mimir
-Point d'entrée de l'application avec configuration complète - Jalon 3: API & Services
+Main FastAPI application for Mimir
+Application entry point with full configuration - Milestone 3: API & Services
 """
 
 from fastapi import FastAPI, Request, HTTPException
@@ -37,14 +37,14 @@ from src.api.dependencies import get_llm_service, get_vector_store, get_document
 from pathlib import Path
 
 
-# Configuration du logging avec le système centralisé
+# Logging configuration with centralized system
 logger = setup_logger("main", level=settings.log_level.upper())
 
 # Global ingestion processor instance
 ingestion_processor = None
 
 
-# Encoder JSON personnalisé pour gérer les datetime
+# Custom JSON encoder to handle datetime objects
 class CustomJSONResponse(JSONResponse):
     def render(self, content) -> bytes:
         return json.dumps(
@@ -65,30 +65,30 @@ class CustomJSONResponse(JSONResponse):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gestionnaire du cycle de vie de l'application - Jalon 3
-    Initialisation au démarrage, nettoyage à l'arrêt
+    Application lifespan manager - Milestone 3
+    Initialization at startup, cleanup at shutdown
     """
     # Startup
     logger.info("Starting Mimir application - Jalon 3: API & Services...")
 
     try:
-        # Initialisation de la base de données
+        # Database initialization
         init_database()
         logger.info("Database initialized successfully")
 
-        # Initialisation des services de cache
+        # Cache services initialization
         cache_stats = cache_service.get_stats()
         chat_cache_stats = chat_cache_service.get_stats()
         logger.info(f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries")
 
-        # Vérification du service email
+        # Email service verification
         email_config = email_service.get_configuration_status()
         if email_config["configured"]:
             logger.info("Email service configured and ready")
         else:
             logger.warning("Email service not fully configured - escalation features will be limited")
 
-        # Initialisation des services d'ingestion
+        # Ingestion services initialization
         global ingestion_processor
         try:
             # Create chunking configuration
@@ -136,7 +136,7 @@ async def lifespan(app: FastAPI):
 
         except Exception as e:
             logger.error(f"Failed to initialize ingestion processor: {e}")
-            # Continue without ingestion processor
+            # Continue without ingestion processor (non-blocking)
 
         logger.info("Application startup completed successfully")
 
@@ -150,12 +150,12 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down Mimir application...")
 
     try:
-        # Nettoyage des caches
+        # Cache cleanup
         cache_service.invalidate_all()
         chat_cache_service.invalidate_all()
         logger.info("Cache services cleaned up")
 
-        # Arrêt propre des services d'ingestion
+        # Graceful shutdown of ingestion services
         if ingestion_processor:
             try:
                 success = await ingestion_processor.stop(timeout=10.0)
@@ -166,7 +166,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"Error stopping ingestion processor: {e}")
 
-        # Fermeture propre du service LLM pour éviter "Event loop is closed"
+        # Graceful LLM service shutdown to avoid "Event loop is closed"
         try:
             from src.api.dependencies import _llm_service
             if _llm_service is not None:
@@ -180,7 +180,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"Error during shutdown: {e}")
 
 
-# Configuration de l'application FastAPI
+# FastAPI application configuration
 app = FastAPI(
     title="Mimir",
     description="Chatbot documentaire d'entreprise on-premise - API & Services",
@@ -192,59 +192,59 @@ app = FastAPI(
 )
 
 
-# Configuration des middleware Jalon 3
+# Middleware configuration - Milestone 3
 
-# CORS middleware (configuration avancée)
+# CORS middleware (advanced configuration)
 configure_cors_middleware(app)
 
 # Rate limiting middleware
 configure_rate_limiting(app)
 
-# Protection contre les attaques Host Header
+# Host Header attack protection
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["localhost", "127.0.0.1", "*"] if not settings.is_production else ["*"]
 )
 
 
-# Middleware personnalisé pour le logging des requêtes
+# Custom middleware for request logging
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
-    """Log toutes les requêtes HTTP avec timing et informations détaillées"""
+    """Log all HTTP requests with timing and detailed information"""
     start_time = time.time()
 
-    # Extraction des informations client
+    # Client information extraction
     client_ip = request.headers.get("X-Forwarded-For",
                                    request.headers.get("X-Real-IP",
                                                      request.client.host if request.client else "unknown"))
 
-    # Log de la requête entrante (moins verbeux pour les health checks)
+    # Log incoming request (less verbose for health checks)
     if not request.url.path.startswith("/health"):
         logger.debug(f"Request: {request.method} {request.url.path} from {client_ip}")
 
-    # Traitement de la requête
+    # Process the request
     response = await call_next(request)
 
-    # Calcul du temps de traitement
+    # Calculate processing time
     process_time = time.time() - start_time
 
-    # Log de la réponse (avec niveau approprié selon le status code)
+    # Log response (with appropriate level based on status code)
     if response.status_code >= 400:
         logger.warning(f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
     elif not request.url.path.startswith("/health"):
         logger.debug(f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
 
-    # Ajout des headers de monitoring
+    # Add monitoring headers
     response.headers["X-Process-Time"] = f"{process_time:.3f}"
     response.headers["X-Request-ID"] = f"req_{int(start_time * 1000000)}"
 
     return response
 
 
-# Gestionnaire d'exceptions global
+# Global exception handler
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Gestionnaire standardisé pour les erreurs HTTP"""
+    """Standardized handler for HTTP errors"""
     return CustomJSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
@@ -257,7 +257,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
-    """Gestionnaire pour les erreurs de validation métier"""
+    """Handler for business validation errors"""
     logger.warning(f"Validation error on {request.url.path}: {exc}")
     return CustomJSONResponse(
         status_code=400,
@@ -271,10 +271,10 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Gestionnaire pour les erreurs non prévues"""
+    """Handler for unexpected errors"""
     logger.error(f"Unhandled error on {request.url.path}: {exc}", exc_info=True)
 
-    # En production, ne pas exposer les détails internes
+    # In production, do not expose internal details
     error_message = "Internal server error" if settings.is_production else str(exc)
 
     return CustomJSONResponse(
@@ -287,11 +287,11 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Routes de base
+# Base routes
 
 @app.get("/", response_model=dict)
 async def root():
-    """Point d'entrée principal de l'API"""
+    """Main API entry point"""
     return {
         "name": "Mimir",
         "description": "Chatbot documentaire d'entreprise",
@@ -301,7 +301,7 @@ async def root():
     }
 
 
-# Enregistrement des endpoints API - Jalon 3
+# API endpoints registration - Milestone 3
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
@@ -310,19 +310,19 @@ app.include_router(admin.router, prefix="/api/v1")
 app.include_router(logs.router, prefix="/api/v1")
 
 
-# Route de compatibilité pour health check à la racine
+# Compatibility route for root health check
 @app.get("/health", response_model=HealthCheckResponse)
 async def root_health_check():
     """
-    Health check à la racine pour compatibilité
-    Redirige vers le health check complet du Jalon 3
+    Root health check for compatibility
+    Delegates to the full Milestone 3 health check
     """
     try:
-        # Déléguer au health check complet
+        # Delegate to the full health check
         from src.api.endpoints.health import health_check
         from src.database.connection import get_db_session
 
-        # Créer une session pour le health check
+        # Create a session for the health check
         with db_manager.get_session_context() as session:
             return await health_check(db=session)
 
@@ -339,9 +339,9 @@ async def root_health_check():
         )
 
 
-# Configuration OpenAPI personnalisée
+# Custom OpenAPI configuration
 def custom_openapi():
-    """Configuration OpenAPI avec informations de sécurité"""
+    """OpenAPI configuration with security information"""
     if app.openapi_schema:
         return app.openapi_schema
     
@@ -352,7 +352,7 @@ def custom_openapi():
         routes=app.routes,
     )
     
-    # Ajout des informations de sécurité pour les futures APIs
+    # Add security information for API endpoints
     openapi_schema["components"]["securitySchemes"] = {
         "Bearer": {
             "type": "http",
@@ -368,7 +368,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 
-# Point d'entrée pour le développement
+# Development entry point
 if __name__ == "__main__":
     logger.info(f"Starting Mimir in development mode on {settings.api_host}:{settings.api_port}")
     
@@ -376,7 +376,7 @@ if __name__ == "__main__":
         "main:app",
         host=settings.api_host,
         port=settings.api_port,
-        reload=True,  # Hot reload en développement
+        reload=True,  # Hot reload in development
         log_level=settings.log_level.lower(),
         access_log=True
     )

@@ -11,7 +11,7 @@ import { chatHistoryStorage, chatSessionStorage } from '../../utils/storage';
 
 const ChatPage = () => {
   const [sessionId] = useState(() => {
-    // Réutiliser le sessionId existant ou en créer un nouveau
+    // Reuse existing sessionId or create a new one
     const existingSessionId = chatSessionStorage.getCurrentSessionId();
     if (existingSessionId) {
       return existingSessionId;
@@ -22,7 +22,7 @@ const ChatPage = () => {
   });
 
   const [messages, setMessages] = useState(() => {
-    // Charger l'historique depuis sessionStorage de manière sécurisée
+    // Safely load history from sessionStorage
     return chatHistoryStorage.getHistory(sessionId);
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -31,19 +31,19 @@ const ChatPage = () => {
   const [streamingMessageId, setStreamingMessageId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Sauvegarder l'historique à chaque changement de messages
+  // Save history on every message change
   useEffect(() => {
     if (messages.length > 0) {
       chatHistoryStorage.saveHistory(sessionId, messages);
     }
   }, [messages, sessionId]);
 
-  // Nettoyage automatique des anciennes sessions au montage
+  // Automatic cleanup of old sessions on mount
   useEffect(() => {
-    chatHistoryStorage.cleanupOldSessions(24); // Nettoyer les sessions de plus de 24h
+    chatHistoryStorage.cleanupOldSessions(24); // Clean sessions older than 24h
   }, []);
 
-  // Message de bienvenue initial si aucun historique
+  // Initial welcome message if no history
   useEffect(() => {
     if (messages.length === 0) {
       const welcomeMessage = {
@@ -57,7 +57,7 @@ const ChatPage = () => {
     }
   }, [messages.length]);
 
-  // Auto-scroll vers le bas
+  // Auto-scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -66,7 +66,7 @@ const ChatPage = () => {
     scrollToBottom();
   }, [messages.length]);
 
-  // Envoi d'un message avec streaming
+  // Send a message with streaming
   const handleSendMessage = async (content) => {
     if (!content.trim() || isLoading) {
       return;
@@ -83,7 +83,7 @@ const ChatPage = () => {
     setIsLoading(true);
     setError(null);
 
-    // Créer message assistant vide pour le streaming
+    // Create empty assistant message for streaming
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage = {
       id: assistantMessageId,
@@ -155,7 +155,7 @@ const ChatPage = () => {
     }
   };
 
-  // Escalade vers un humain
+  // Escalate to a human
   const handleEscalation = async (userEmail, escalationMessage) => {
     try {
       await chatAPI.escalateToHuman(sessionId, userEmail, escalationMessage, messages);
@@ -176,9 +176,9 @@ const ChatPage = () => {
     }
   };
 
-  // Nouvelle conversation
+  // New conversation
   const handleNewConversation = () => {
-    // Effacer l'historique de sessionStorage de manière sécurisée
+    // Safely clear sessionStorage history
     chatHistoryStorage.clearHistory(sessionId);
 
     const welcomeMessage = {
@@ -194,7 +194,7 @@ const ChatPage = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* En-tête */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6">
         <div className="flex items-center justify-between">
           <div>
@@ -224,7 +224,7 @@ const ChatPage = () => {
         </div>
       </div>
 
-      {/* Message d'erreur global */}
+      {/* Global error message */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
           <div className="flex">
@@ -242,7 +242,7 @@ const ChatPage = () => {
         </div>
       )}
 
-      {/* Zone de chat */}
+      {/* Chat area */}
       <div className="flex-1 flex flex-col min-h-0">
         <ChatWindow
           messages={messages}
@@ -256,7 +256,7 @@ const ChatPage = () => {
         />
       </div>
 
-      {/* Dialog d'escalade */}
+      {/* Escalation dialog */}
       <EscalationDialog
         isOpen={showEscalation}
         onClose={() => setShowEscalation(false)}

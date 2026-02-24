@@ -15,12 +15,12 @@ const AdminLogin = () => {
 
   const { login, isAuthenticated, loading } = useAuth();
 
-  // Rediriger si déjà connecté
+  // Redirect if already logged in
   if (isAuthenticated && !loading) {
     return <Navigate to="/admin" replace />;
   }
 
-  // Affichage du loading pendant la vérification initiale
+  // Show loading during initial verification
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -56,7 +56,7 @@ const AdminLogin = () => {
   return (
     <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo et titre */}
+        {/* Logo and title */}
         <div className="text-center">
           <div className="mx-auto h-16 w-16 rounded-full bg-primary-600 flex items-center justify-center">
             <Shield className="h-8 w-8 text-white" />
@@ -72,7 +72,7 @@ const AdminLogin = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* Message d'erreur */}
+          {/* Error message */}
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
               <div className="flex">
@@ -87,9 +87,9 @@ const AdminLogin = () => {
             </div>
           )}
 
-          {/* Formulaire de connexion */}
+          {/* Login form */}
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Nom d'utilisateur */}
+            {/* Username */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
                 Nom d&apos;utilisateur
@@ -110,7 +110,7 @@ const AdminLogin = () => {
               </div>
             </div>
 
-            {/* Mot de passe */}
+            {/* Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Mot de passe
@@ -143,7 +143,7 @@ const AdminLogin = () => {
               </div>
             </div>
 
-            {/* Bouton de connexion */}
+            {/* Login button */}
             <div>
               <button
                 type="submit"
@@ -162,7 +162,7 @@ const AdminLogin = () => {
             </div>
           </form>
 
-          {/* Informations de sécurité */}
+          {/* Security information */}
           <div className="mt-6 border-t border-gray-200 pt-6">
             <div className="text-center">
               <p className="text-xs text-gray-500">
@@ -174,7 +174,7 @@ const AdminLogin = () => {
             </div>
           </div>
 
-          {/* Lien retour */}
+          {/* Back link */}
           <div className="mt-4 text-center">
             <a
               href="/"

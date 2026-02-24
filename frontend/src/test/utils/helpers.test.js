@@ -40,7 +40,7 @@ describe('helpers utilities', () => {
 
   describe('formatNumber', () => {
     it('formate les nombres avec des espaces', () => {
-      // Le formatage peut varier selon la locale, testons que c'est une chaîne
+      // Formatting may vary by locale, just check it returns a string
       expect(typeof formatNumber(1000)).toBe('string');
       expect(formatNumber(1000).length).toBeGreaterThan(3);
       expect(typeof formatNumber(1234567)).toBe('string');

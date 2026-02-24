@@ -2,19 +2,19 @@ import axios from 'axios';
 import { getAuthToken, removeAuthToken, removeUser } from '../utils/auth';
 import { apiLogger } from '../utils/logger';
 
-// Configuration de base pour l'API
+// Base API configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
-// Instance axios configurée - Cache cleared 2025-09-20
+// Configured axios instance - Cache cleared 2025-09-20
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 120000, // 120 secondes pour le chat (rate limits API)
+  timeout: 120000, // 120 seconds for chat (API rate limits)
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Intercepteur pour ajouter le token JWT
+// Interceptor to add JWT token
 api.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
@@ -28,13 +28,13 @@ api.interceptors.request.use(
   }
 );
 
-// Intercepteur pour gérer les erreurs d'authentification et logging
+// Interceptor to handle authentication errors and logging
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Log automatique de toutes les erreurs API
+    // Automatic logging of all API errors
     if (error.response) {
-      // Erreur avec réponse du serveur
+      // Error with server response
       apiLogger.error(`API Error: ${error.config.method?.toUpperCase()} ${error.config.url}`, error, {
         status: error.response.status,
         statusText: error.response.statusText,
@@ -43,7 +43,7 @@ api.interceptors.response.use(
         method: error.config.method
       });
     } else if (error.request) {
-      // Erreur réseau (pas de réponse)
+      // Network error (no response)
       apiLogger.error(`Network Error: ${error.config.method?.toUpperCase()} ${error.config.url}`, error, {
         message: error.message,
         code: error.code,
@@ -51,15 +51,15 @@ api.interceptors.response.use(
         method: error.config.method
       });
     } else {
-      // Erreur de configuration
+      // Configuration error
       apiLogger.error('Request Configuration Error', error, {
         message: error.message
       });
     }
 
-    // Gestion spécifique de l'authentification
+    // Authentication-specific handling
     if (error.response?.status === 401) {
-      // Token expiré ou invalide
+      // Expired or invalid token
       removeAuthToken();
       removeUser();
       window.location.href = '/admin/login';
@@ -69,7 +69,7 @@ api.interceptors.response.use(
   }
 );
 
-// Service API pour le chat
+// Chat API service
 export const chatAPI = {
   sendMessage: async (question, sessionId = null) => {
     const response = await api.post('/chat/', {
@@ -169,7 +169,7 @@ export const chatAPI = {
   },
 };
 
-// Service API pour l'authentification
+// Authentication API service
 export const authAPI = {
   login: async (username, password) => {
     const response = await api.post('/auth/login', {
@@ -203,10 +203,10 @@ export const authAPI = {
   },
 };
 
-// Service API pour les documents
+// Documents API service
 export const documentsAPI = {
   getDocuments: async (page = 1, limit = 10, status = null, search = null) => {
-    const offset = (page - 1) * limit; // Convertir page en offset
+    const offset = (page - 1) * limit; // Convert page to offset
     const params = new URLSearchParams({
       offset: offset.toString(),
       limit: limit.toString(),
@@ -230,13 +230,13 @@ export const documentsAPI = {
 
   downloadDocument: async (documentId) => {
     const response = await api.get(`/documents/${documentId}/download`, {
-      responseType: 'blob', // Important pour le téléchargement de fichiers
+      responseType: 'blob', // Required for file downloads
     });
     return response;
   },
 
   getDocumentUrl: (documentId) => {
-    // Retourne l'URL directe pour ouvrir dans le navigateur
+    // Returns direct URL to open in browser
     return `${API_BASE_URL}/documents/${documentId}/download`;
   },
 
@@ -250,7 +250,7 @@ export const documentsAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 120000, // 2 minutes pour l'upload
+      timeout: 120000, // 2 minutes for upload
     });
     return response.data;
   },
@@ -278,7 +278,7 @@ export const documentsAPI = {
   },
 };
 
-// Service API pour l'administration
+// Administration API service
 export const adminAPI = {
   getSystemInfo: async () => {
     const response = await api.get('/admin/system-info');
@@ -311,7 +311,7 @@ export const adminAPI = {
   },
 
   getAuditLog: async (page = 1, limit = 20, userType = null, action = null) => {
-    const offset = (page - 1) * limit; // Convertir page en offset
+    const offset = (page - 1) * limit; // Convert page to offset
     const params = new URLSearchParams({
       offset: offset.toString(),
       limit: limit.toString(),
@@ -353,7 +353,7 @@ export const adminAPI = {
   },
 };
 
-// Service API pour les health checks
+// Health checks API service
 export const healthAPI = {
   getHealthStatus: async () => {
     const response = await api.get('/health/');

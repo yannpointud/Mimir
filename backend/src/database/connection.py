@@ -1,6 +1,6 @@
 """
-Gestion de la connexion à la base de données SQLite
-Configuration optimisée pour les performances et la concurrence
+SQLite database connection management
+Configuration optimized for performance and concurrency
 """
 
 from sqlalchemy import create_engine, event, text
@@ -21,34 +21,34 @@ logger = logging.getLogger(__name__)
 
 def configure_sqlite_performance(dbapi_connection, connection_record):
     """
-    Configure SQLite pour de meilleures performances et concurrence
-    Active le mode WAL et autres optimisations selon les specs
+    Configure SQLite for better performance and concurrency
+    Enables WAL mode and other optimizations per specs
     """
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
         
-        # Mode WAL pour améliorer la concurrence (spec requirement)
+        # WAL mode to improve concurrency (spec requirement)
         if config.settings and config.settings.sqlite_wal_mode:
             cursor.execute("PRAGMA journal_mode=WAL")
             logger.info("SQLite WAL mode activated")
         
-        # Optimisations de performance
-        cursor.execute("PRAGMA synchronous=NORMAL")  # Balance perf/sécurité
-        cursor.execute("PRAGMA cache_size=10000")    # Cache plus large
-        cursor.execute("PRAGMA temp_store=MEMORY")   # Tables temp en mémoire
+        # Performance optimizations
+        cursor.execute("PRAGMA synchronous=NORMAL")  # Balance perf/safety
+        cursor.execute("PRAGMA cache_size=10000")    # Larger cache
+        cursor.execute("PRAGMA temp_store=MEMORY")   # Temp tables in memory
         cursor.execute("PRAGMA mmap_size=268435456") # Memory mapping 256MB
-        
-        # Configuration pour concurrence
-        cursor.execute("PRAGMA busy_timeout=30000")  # Timeout 30s sur locks
+
+        # Concurrency configuration
+        cursor.execute("PRAGMA busy_timeout=30000")  # 30s timeout on locks
         
         cursor.close()
 
 
 class DatabaseManager:
     """
-    Gestionnaire centralisé de la base de données
-    Implémente le pattern Singleton pour éviter les connexions multiples
-    Support sync et async pendant la migration
+    Centralized database manager
+    Implements Singleton pattern to avoid multiple connections
+    Supports both sync and async during migration
     """
 
     _instance = None
@@ -67,24 +67,24 @@ class DatabaseManager:
             self._initialize_database()
     
     def _initialize_database(self):
-        """Initialise le moteur de base de données et la factory de sessions"""
+        """Initialize the database engine and session factory"""
         try:
-            # Création du moteur SYNC avec optimisations SQLite
+            # Create SYNC engine with SQLite optimizations
             self._engine = create_engine(
                 config.settings.database_url_sync if config.settings else "sqlite:///:memory:",
-                echo=False,  # Pas de logs SQL en prod
-                pool_pre_ping=True,  # Vérification connexions
-                pool_recycle=3600,   # Recyclage connexions chaque heure
+                echo=False,  # No SQL logs in prod
+                pool_pre_ping=True,  # Connection verification
+                pool_recycle=3600,   # Recycle connections every hour
                 connect_args={
-                    "check_same_thread": False,  # Permet utilisation multi-thread
-                    "timeout": 20  # Timeout connexion
+                    "check_same_thread": False,  # Allow multi-thread usage
+                    "timeout": 20  # Connection timeout
                 }
             )
 
-            # Activation des optimisations SQLite à chaque connexion
+            # Enable SQLite optimizations on each connection
             event.listen(self._engine, "connect", configure_sqlite_performance)
 
-            # Factory pour les sessions SYNC
+            # Factory for SYNC sessions
             self._session_factory = sessionmaker(
                 bind=self._engine,
                 autocommit=False,
@@ -92,7 +92,7 @@ class DatabaseManager:
                 expire_on_commit=False
             )
 
-            # Création du moteur ASYNC avec optimisations SQLite
+            # Create ASYNC engine with SQLite optimizations
             async_database_url = config.settings.database_url_sync.replace("sqlite:///", "sqlite+aiosqlite:///") if config.settings else "sqlite+aiosqlite:///:memory:"
             self._async_engine = create_async_engine(
                 async_database_url,
@@ -101,7 +101,7 @@ class DatabaseManager:
                 pool_recycle=3600
             )
 
-            # Factory pour les sessions ASYNC
+            # Factory for ASYNC sessions
             self._async_session_factory = async_sessionmaker(
                 bind=self._async_engine,
                 class_=AsyncSession,
@@ -119,26 +119,26 @@ class DatabaseManager:
     
     @property
     def engine(self) -> Engine:
-        """Retourne le moteur de base de données synchrone"""
+        """Return the synchronous database engine"""
         if self._engine is None:
             self._initialize_database()
         return self._engine
 
     @property
     def async_engine(self):
-        """Retourne le moteur de base de données asynchrone"""
+        """Return the asynchronous database engine"""
         if self._async_engine is None:
             self._initialize_database()
         return self._async_engine
     
     def get_session(self) -> Session:
-        """Crée une nouvelle session de base de données synchrone"""
+        """Create a new synchronous database session"""
         if self._session_factory is None:
             self._initialize_database()
         return self._session_factory()
 
     def get_async_session(self) -> AsyncSession:
-        """Crée une nouvelle session de base de données asynchrone"""
+        """Create a new asynchronous database session"""
         if self._async_session_factory is None:
             self._initialize_database()
         return self._async_session_factory()
@@ -146,7 +146,7 @@ class DatabaseManager:
     @contextmanager
     def get_session_context(self) -> Generator[Session, None, None]:
         """
-        Context manager pour sessions synchrones avec gestion automatique
+        Context manager for synchronous sessions with automatic management
         Usage: with db_manager.get_session_context() as session: ...
         """
         session = self.get_session()
@@ -163,7 +163,7 @@ class DatabaseManager:
     @asynccontextmanager
     async def get_async_session_context(self) -> AsyncGenerator[AsyncSession, None]:
         """
-        Context manager pour sessions asynchrones avec gestion automatique
+        Context manager for asynchronous sessions with automatic management
         Usage: async with db_manager.get_async_session_context() as session: ...
         """
         session = self.get_async_session()
@@ -178,7 +178,7 @@ class DatabaseManager:
             await session.close()
     
     def create_tables(self):
-        """Crée toutes les tables si elles n'existent pas (version synchrone)"""
+        """Create all tables if they do not exist (synchronous version)"""
         try:
             Base.metadata.create_all(bind=self.engine)
             logger.info("Database tables created successfully")
@@ -187,7 +187,7 @@ class DatabaseManager:
             raise
 
     async def create_tables_async(self):
-        """Crée toutes les tables si elles n'existent pas (version asynchrone)"""
+        """Create all tables if they do not exist (asynchronous version)"""
         try:
             async with self.async_engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
@@ -197,7 +197,7 @@ class DatabaseManager:
             raise
     
     def drop_tables(self):
-        """Supprime toutes les tables (pour tests uniquement)"""
+        """Drop all tables (for tests only)"""
         try:
             Base.metadata.drop_all(bind=self.engine)
             logger.warning("All database tables dropped")
@@ -207,8 +207,8 @@ class DatabaseManager:
     
     def health_check(self) -> bool:
         """
-        Vérifie la santé de la connexion database
-        Utilisé par les health checks de l'API
+        Check the database connection health
+        Used by API health checks
         """
         try:
             with self.get_session_context() as session:
@@ -219,15 +219,15 @@ class DatabaseManager:
             return False
 
 
-# Instance globale singleton
+# Global singleton instance
 db_manager = DatabaseManager()
 
 
-# Fonctions utilitaires pour FastAPI dependency injection
+# Utility functions for FastAPI dependency injection
 
 def get_db_session() -> Generator[Session, None, None]:
     """
-    Dependency function pour FastAPI (version synchrone)
+    Dependency function for FastAPI (synchronous version)
     Usage: def endpoint(db: Session = Depends(get_db_session)): ...
     """
     session = db_manager.get_session()
@@ -243,7 +243,7 @@ def get_db_session() -> Generator[Session, None, None]:
 
 async def get_async_db_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Dependency function pour FastAPI (version asynchrone)
+    Dependency function for FastAPI (asynchronous version)
     Usage: async def endpoint(db: AsyncSession = Depends(get_async_db_session)): ...
     """
     session = db_manager.get_async_session()
@@ -259,30 +259,30 @@ async def get_async_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 def get_db_manager() -> DatabaseManager:
     """
-    Dependency function pour récupérer le manager
+    Dependency function to retrieve the manager
     Usage: def endpoint(db_mgr: DatabaseManager = Depends(get_db_manager)): ...
     """
     return db_manager
 
 
-# Fonctions d'initialisation
+# Initialization functions
 
 def init_database():
     """
-    Initialise la base de données au démarrage de l'application
-    Crée les tables et vérifie la connectivité
+    Initialize the database at application startup
+    Creates tables and verifies connectivity
     """
     logger.info("Initializing database...")
     
     try:
-        # S'assurer que les répertoires existent
+        # Ensure directories exist
         if config.settings:
             config.settings._ensure_directories()
         
-        # Initialiser le manager et créer les tables
+        # Initialize the manager and create tables
         db_manager.create_tables()
         
-        # Test de connectivité
+        # Connectivity test
         if not db_manager.health_check():
             raise RuntimeError("Database health check failed after initialization")
         
@@ -295,8 +295,8 @@ def init_database():
 
 def reset_database():
     """
-    Remet à zéro la base de données (pour développement/tests)
-    ATTENTION: Supprime toutes les données !
+    Reset the database (for development/tests)
+    WARNING: Deletes all data!
     """
     if config.settings and config.settings.is_production:
         raise RuntimeError("Database reset not allowed in production")

@@ -39,7 +39,7 @@ const ConfigPanel = () => {
   const [passwordSuccess, setPasswordSuccess] = useState(null);
   const [passwordError, setPasswordError] = useState(null);
 
-  // Charger la configuration et les informations système
+  // Load configuration and system information
   const loadData = async () => {
     try {
       setLoading(true);
@@ -101,7 +101,7 @@ const ConfigPanel = () => {
     }
   };
 
-  // Basculer l'affichage des valeurs sensibles
+  // Toggle display of sensitive values
   const toggleSensitive = (key) => {
     setShowSensitive(prev => ({
       ...prev,
@@ -109,11 +109,11 @@ const ConfigPanel = () => {
     }));
   };
 
-  // Vérifier si une clé est sensible
+  // Check if a key is sensitive
   const isSensitiveKey = (key) => {
     const lowerKey = key.toLowerCase();
 
-    // Exceptions : ces clés contiennent des mots sensibles mais ne sont pas secrètes
+    // Exceptions: these keys contain sensitive words but are not secret
     const exceptions = [
       'api_version',
       'version',
@@ -127,7 +127,7 @@ const ConfigPanel = () => {
       return false;
     }
 
-    // Combinaisons sensibles (plus précises)
+    // Sensitive combinations (more precise)
     const sensitiveCombinations = [
       'api_key',
       'api-key',
@@ -146,7 +146,7 @@ const ConfigPanel = () => {
     );
   };
 
-  // Masquer les valeurs sensibles
+  // Mask sensitive values
   const maskValue = (key, value) => {
     if (!isSensitiveKey(key) || showSensitive[key]) {
       return value;
@@ -159,11 +159,11 @@ const ConfigPanel = () => {
     return '••••••••';
   };
 
-  // Organiser la configuration par catégories
+  // Organize configuration by categories
   const organizeConfig = (config) => {
     if (!config) return {};
 
-    // Fusionner database_config et application_config
+    // Merge database_config and application_config
     const flatConfig = {
       ...(config.database_config || {}),
       ...(config.application_config || {})
@@ -202,7 +202,7 @@ const ConfigPanel = () => {
       }
     });
 
-    // Supprimer les catégories vides
+    // Remove empty categories
     Object.keys(categories).forEach(category => {
       if (Object.keys(categories[category]).length === 0) {
         delete categories[category];
@@ -338,7 +338,7 @@ const ConfigPanel = () => {
         </form>
       </div>
 
-      {/* Avertissement lecture seule */}
+      {/* Read-only warning */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <div className="flex">
           <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
@@ -352,7 +352,7 @@ const ConfigPanel = () => {
         </div>
       </div>
 
-      {/* Message d'erreur */}
+      {/* Error message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="flex">
@@ -366,7 +366,7 @@ const ConfigPanel = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Informations système */}
+        {/* System information */}
         {systemInfo && (
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -375,7 +375,7 @@ const ConfigPanel = () => {
             </h3>
 
             <div className="space-y-4">
-              {/* Système d'exploitation */}
+              {/* Operating system */}
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-sm font-medium text-gray-600">Système</span>
                 <span className="text-sm text-gray-900">
@@ -391,7 +391,7 @@ const ConfigPanel = () => {
                 </span>
               </div>
 
-              {/* Version Python */}
+              {/* Python version */}
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-sm font-medium text-gray-600">Python</span>
                 <span className="text-sm text-gray-900">
@@ -399,7 +399,7 @@ const ConfigPanel = () => {
                 </span>
               </div>
 
-              {/* Mémoire */}
+              {/* Memory */}
               {systemInfo.hardware?.memory && (
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-sm font-medium text-gray-600 flex items-center">
@@ -417,7 +417,7 @@ const ConfigPanel = () => {
                 </div>
               )}
 
-              {/* Espace disque */}
+              {/* Disk space */}
               {systemInfo.hardware?.disk && (
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-sm font-medium text-gray-600 flex items-center">
@@ -435,7 +435,7 @@ const ConfigPanel = () => {
                 </div>
               )}
 
-              {/* Version de l'application */}
+              {/* Application version */}
               {systemInfo.application?.version && (
                 <div className="flex justify-between items-center py-2">
                   <span className="text-sm font-medium text-gray-600">Version Mimir</span>
@@ -448,7 +448,7 @@ const ConfigPanel = () => {
           </div>
         )}
 
-        {/* Configuration par catégories */}
+        {/* Configuration by categories */}
         <div className="space-y-6">
           {Object.entries(categorizedConfig).map(([category, configs]) => (
             <div key={category} className="card p-6">
@@ -488,7 +488,7 @@ const ConfigPanel = () => {
         </div>
       </div>
 
-      {/* Légende */}
+      {/* Legend */}
       <div className="mt-8 bg-gray-50 rounded-lg p-4">
         <h4 className="text-sm font-medium text-gray-900 mb-2">Légende</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">

@@ -1,7 +1,7 @@
 """
-Tests unitaires pour le module auth/jwt_handler.py
+Unit tests for the auth/jwt_handler.py module
 
-Ces tests couvrent la gestion des tokens JWT et le hashage de mots de passe.
+These tests cover JWT token management and password hashing.
 """
 
 import pytest
@@ -13,10 +13,10 @@ from backend.src.auth.jwt_handler import JWTHandler
 
 
 class TestJWTHandlerInit:
-    """Tests pour l'initialisation de JWTHandler."""
+    """Tests for JWTHandler initialization."""
 
     def test_init_with_valid_config(self):
-        """Test d'initialisation avec une configuration valide."""
+        """Test initialization with valid configuration."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
@@ -30,7 +30,7 @@ class TestJWTHandlerInit:
             assert handler.pwd_context is not None
 
     def test_init_with_short_secret_key(self):
-        """Test d'initialisation avec une clé secrète trop courte."""
+        """Test initialization with a secret key that is too short."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "short"
             mock_settings.jwt_algorithm = "HS256"
@@ -40,7 +40,7 @@ class TestJWTHandlerInit:
                 JWTHandler()
 
     def test_init_with_empty_secret_key(self):
-        """Test d'initialisation avec une clé secrète vide."""
+        """Test initialization with an empty secret key."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = ""
             mock_settings.jwt_algorithm = "HS256"
@@ -51,11 +51,11 @@ class TestJWTHandlerInit:
 
 
 class TestCreateAccessToken:
-    """Tests pour la création de tokens d'accès JWT."""
+    """Tests for JWT access token creation."""
 
     @pytest.fixture
     def jwt_handler(self):
-        """Fixture pour JWTHandler avec configuration valide."""
+        """Fixture for JWTHandler with valid configuration."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
@@ -64,7 +64,7 @@ class TestCreateAccessToken:
 
     @freeze_time("2023-01-01 12:00:00")
     def test_create_token_with_default_expiration(self, jwt_handler):
-        """Test de création de token avec expiration par défaut."""
+        """Test token creation with default expiration."""
         data = {"user_id": 123, "username": "testuser"}
 
         token = jwt_handler.create_access_token(data)
@@ -72,7 +72,7 @@ class TestCreateAccessToken:
         assert isinstance(token, str)
         assert len(token) > 0
 
-        # Décoder le token pour vérifier son contenu
+        # Decode the token to verify its content
         payload = jwt.decode(token, jwt_handler.secret_key, algorithms=[jwt_handler.algorithm])
         assert payload["user_id"] == 123
         assert payload["username"] == "testuser"
@@ -82,7 +82,7 @@ class TestCreateAccessToken:
 
     @freeze_time("2023-01-01 12:00:00")
     def test_create_token_with_custom_expiration(self, jwt_handler):
-        """Test de création de token avec expiration personnalisée."""
+        """Test token creation with custom expiration."""
         data = {"user_id": 123}
         custom_expiration = timedelta(hours=1)
 
@@ -92,11 +92,11 @@ class TestCreateAccessToken:
         expected_exp = datetime.utcnow() + custom_expiration
         actual_exp = datetime.utcfromtimestamp(payload["exp"])
 
-        # Vérifier que l'expiration est correcte (avec une tolérance de quelques secondes)
+        # Verify expiration is correct (with a few seconds tolerance)
         assert abs((actual_exp - expected_exp).total_seconds()) < 5
 
     def test_create_token_with_empty_data(self, jwt_handler):
-        """Test de création de token avec des données vides."""
+        """Test token creation with empty data."""
         token = jwt_handler.create_access_token({})
 
         payload = jwt.decode(token, jwt_handler.secret_key, algorithms=[jwt_handler.algorithm])
@@ -106,7 +106,7 @@ class TestCreateAccessToken:
 
     @patch('backend.src.auth.jwt_handler.jwt.encode')
     def test_create_token_encoding_error(self, mock_encode, jwt_handler):
-        """Test de gestion d'erreur lors de l'encodage du token."""
+        """Test error handling during token encoding."""
         mock_encode.side_effect = Exception("Encoding failed")
 
         with pytest.raises(Exception, match="Encoding failed"):
@@ -114,11 +114,11 @@ class TestCreateAccessToken:
 
 
 class TestVerifyToken:
-    """Tests pour la vérification de tokens JWT."""
+    """Tests for JWT token verification."""
 
     @pytest.fixture
     def jwt_handler(self):
-        """Fixture pour JWTHandler avec configuration valide."""
+        """Fixture for JWTHandler with valid configuration."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
@@ -126,7 +126,7 @@ class TestVerifyToken:
             return JWTHandler()
 
     def test_verify_valid_token(self, jwt_handler):
-        """Test de vérification d'un token valide."""
+        """Test verification of a valid token."""
         data = {"user_id": 123, "username": "testuser"}
         token = jwt_handler.create_access_token(data)
 
@@ -138,8 +138,8 @@ class TestVerifyToken:
         assert payload["type"] == "access"
 
     def test_verify_invalid_signature(self, jwt_handler):
-        """Test de vérification avec signature invalide."""
-        # Créer un token avec une clé différente
+        """Test verification with invalid signature."""
+        # Create a token with a different key
         fake_secret = "b" * 32
         data = {"user_id": 123, "type": "access"}
         fake_token = jwt.encode(data, fake_secret, algorithm="HS256")
@@ -149,18 +149,18 @@ class TestVerifyToken:
         assert payload is None
 
     def test_verify_expired_token(self, jwt_handler):
-        """Test de vérification d'un token expiré."""
+        """Test verification of an expired token."""
         with freeze_time("2023-01-01 12:00:00"):
             data = {"user_id": 123}
             token = jwt_handler.create_access_token(data, expires_delta=timedelta(seconds=1))
 
-        # Avancer le temps pour faire expirer le token
+        # Advance time to expire the token
         with freeze_time("2023-01-01 12:01:00"):
             payload = jwt_handler.verify_token(token)
             assert payload is None
 
     def test_verify_invalid_token_type(self, jwt_handler):
-        """Test de vérification avec type de token invalide."""
+        """Test verification with invalid token type."""
         data = {"user_id": 123, "type": "refresh"}
         token = jwt.encode(data, jwt_handler.secret_key, algorithm=jwt_handler.algorithm)
 
@@ -169,7 +169,7 @@ class TestVerifyToken:
         assert payload is None
 
     def test_verify_malformed_token(self, jwt_handler):
-        """Test de vérification d'un token malformé."""
+        """Test verification of a malformed token."""
         malformed_token = "invalid.token.format"
 
         payload = jwt_handler.verify_token(malformed_token)
@@ -177,7 +177,7 @@ class TestVerifyToken:
         assert payload is None
 
     def test_verify_token_without_type(self, jwt_handler):
-        """Test de vérification d'un token sans type."""
+        """Test verification of a token without type."""
         data = {"user_id": 123}
         token = jwt.encode(data, jwt_handler.secret_key, algorithm=jwt_handler.algorithm)
 
@@ -187,7 +187,7 @@ class TestVerifyToken:
 
     @patch('backend.src.auth.jwt_handler.jwt.decode')
     def test_verify_token_unexpected_error(self, mock_decode, jwt_handler):
-        """Test de gestion d'erreur inattendue lors de la vérification."""
+        """Test unexpected error handling during verification."""
         mock_decode.side_effect = Exception("Unexpected error")
 
         payload = jwt_handler.verify_token("some_token")
@@ -196,11 +196,11 @@ class TestVerifyToken:
 
 
 class TestPasswordOperations:
-    """Tests pour les opérations de mot de passe."""
+    """Tests for password operations."""
 
     @pytest.fixture
     def jwt_handler(self):
-        """Fixture pour JWTHandler avec configuration valide."""
+        """Fixture for JWTHandler with valid configuration."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
@@ -208,28 +208,28 @@ class TestPasswordOperations:
             return JWTHandler()
 
     def test_hash_password_valid(self, jwt_handler):
-        """Test de hashage d'un mot de passe valide."""
+        """Test hashing a valid password."""
         password = "testpassword123"
 
         hashed = jwt_handler.hash_password(password)
 
         assert isinstance(hashed, str)
         assert len(hashed) > 0
-        assert hashed != password  # Le hash ne doit pas être le mot de passe en clair
-        assert hashed.startswith("$2b$")  # Format bcrypt
+        assert hashed != password  # Hash must not be the plaintext password
+        assert hashed.startswith("$2b$")  # bcrypt format
 
     def test_hash_password_empty(self, jwt_handler):
-        """Test de hashage d'un mot de passe vide."""
+        """Test hashing an empty password."""
         with pytest.raises(ValueError, match="Password cannot be empty"):
             jwt_handler.hash_password("")
 
     def test_hash_password_none(self, jwt_handler):
-        """Test de hashage d'un mot de passe None."""
+        """Test hashing a None password."""
         with pytest.raises(ValueError, match="Password cannot be empty"):
             jwt_handler.hash_password(None)
 
     def test_verify_password_valid(self, jwt_handler):
-        """Test de vérification d'un mot de passe valide."""
+        """Test verification of a valid password."""
         password = "testpassword123"
         hashed = jwt_handler.hash_password(password)
 
@@ -238,7 +238,7 @@ class TestPasswordOperations:
         assert is_valid is True
 
     def test_verify_password_invalid(self, jwt_handler):
-        """Test de vérification d'un mot de passe invalide."""
+        """Test verification of an invalid password."""
         password = "testpassword123"
         wrong_password = "wrongpassword"
         hashed = jwt_handler.hash_password(password)
@@ -248,7 +248,7 @@ class TestPasswordOperations:
         assert is_valid is False
 
     def test_verify_password_empty_plain(self, jwt_handler):
-        """Test de vérification avec mot de passe en clair vide."""
+        """Test verification with empty plaintext password."""
         hashed = jwt_handler.hash_password("testpassword")
 
         is_valid = jwt_handler.verify_password("", hashed)
@@ -256,20 +256,20 @@ class TestPasswordOperations:
         assert is_valid is False
 
     def test_verify_password_empty_hash(self, jwt_handler):
-        """Test de vérification avec hash vide."""
+        """Test verification with empty hash."""
         is_valid = jwt_handler.verify_password("password", "")
 
         assert is_valid is False
 
     def test_verify_password_none_values(self, jwt_handler):
-        """Test de vérification avec valeurs None."""
+        """Test verification with None values."""
         assert jwt_handler.verify_password(None, "hash") is False
         assert jwt_handler.verify_password("password", None) is False
         assert jwt_handler.verify_password(None, None) is False
 
     @patch('backend.src.auth.jwt_handler.CryptContext.verify')
     def test_verify_password_exception(self, mock_verify, jwt_handler):
-        """Test de gestion d'exception lors de la vérification."""
+        """Test exception handling during verification."""
         mock_verify.side_effect = Exception("Verification failed")
 
         is_valid = jwt_handler.verify_password("password", "hash")
@@ -278,11 +278,11 @@ class TestPasswordOperations:
 
 
 class TestGetTokenExpiry:
-    """Tests pour l'extraction de la date d'expiration des tokens."""
+    """Tests for extracting token expiration date."""
 
     @pytest.fixture
     def jwt_handler(self):
-        """Fixture pour JWTHandler avec configuration valide."""
+        """Fixture for JWTHandler with valid configuration."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
@@ -291,7 +291,7 @@ class TestGetTokenExpiry:
 
     @freeze_time("2023-01-01 12:00:00")
     def test_get_token_expiry_valid(self, jwt_handler):
-        """Test d'extraction d'expiration d'un token valide."""
+        """Test expiry extraction from a valid token."""
         data = {"user_id": 123}
         token = jwt_handler.create_access_token(data)
 
@@ -303,7 +303,7 @@ class TestGetTokenExpiry:
         assert abs((expiry - expected_expiry).total_seconds()) < 5
 
     def test_get_token_expiry_invalid_token(self, jwt_handler):
-        """Test d'extraction d'expiration d'un token invalide."""
+        """Test expiry extraction from an invalid token."""
         invalid_token = "invalid.token"
 
         expiry = jwt_handler.get_token_expiry(invalid_token)
@@ -311,23 +311,23 @@ class TestGetTokenExpiry:
         assert expiry is None
 
     def test_get_token_expiry_expired_token(self, jwt_handler):
-        """Test d'extraction d'expiration d'un token expiré."""
+        """Test expiry extraction from an expired token."""
         with freeze_time("2023-01-01 12:00:00"):
             data = {"user_id": 123}
             token = jwt_handler.create_access_token(data, expires_delta=timedelta(seconds=1))
 
-        # Le token expire, mais on peut toujours extraire sa date d'expiration
+        # Token is expired, but we can still extract its expiration date
         with freeze_time("2023-01-01 12:01:00"):
             expiry = jwt_handler.get_token_expiry(token)
-            assert expiry is None  # verify_token retourne None pour un token expiré
+            assert expiry is None  # verify_token returns None for expired token
 
 
 class TestJWTHandlerIntegration:
-    """Tests d'intégration pour JWTHandler."""
+    """Integration tests for JWTHandler."""
 
     @pytest.fixture
     def jwt_handler(self):
-        """Fixture pour JWTHandler avec configuration valide."""
+        """Fixture for JWTHandler with valid configuration."""
         with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
@@ -335,48 +335,48 @@ class TestJWTHandlerIntegration:
             return JWTHandler()
 
     def test_full_authentication_flow(self, jwt_handler):
-        """Test du flux complet d'authentification."""
-        # Créer et hasher un mot de passe
+        """Test full authentication flow."""
+        # Create and hash a password
         password = "userpassword123"
         hashed_password = jwt_handler.hash_password(password)
 
-        # Vérifier le mot de passe
+        # Verify the password
         assert jwt_handler.verify_password(password, hashed_password) is True
 
-        # Créer un token
+        # Create a token
         user_data = {"user_id": 123, "username": "testuser"}
         token = jwt_handler.create_access_token(user_data)
 
-        # Vérifier le token
+        # Verify the token
         payload = jwt_handler.verify_token(token)
         assert payload is not None
         assert payload["user_id"] == 123
         assert payload["username"] == "testuser"
 
-        # Obtenir l'expiration
+        # Get the expiration
         expiry = jwt_handler.get_token_expiry(token)
         assert expiry is not None
         assert expiry > datetime.utcnow()
 
     def test_password_hash_uniqueness(self, jwt_handler):
-        """Test que le même mot de passe produit des hashes différents."""
+        """Test that the same password produces different hashes."""
         password = "samepassword"
 
         hash1 = jwt_handler.hash_password(password)
         hash2 = jwt_handler.hash_password(password)
 
-        # Les hashes doivent être différents (salt aléatoire)
+        # Hashes must be different (random salt)
         assert hash1 != hash2
 
-        # Mais les deux doivent être vérifiables
+        # But both must be verifiable
         assert jwt_handler.verify_password(password, hash1) is True
         assert jwt_handler.verify_password(password, hash2) is True
 
     def test_token_uniqueness(self, jwt_handler):
-        """Test que des tokens créés à des moments différents sont uniques."""
+        """Test that tokens created at different times are unique."""
         data = {"user_id": 123}
 
-        # Utiliser des dates futures pour éviter l'expiration
+        # Use future dates to avoid expiration
         future_date = datetime.now() + timedelta(hours=1)
 
         with freeze_time(future_date):
@@ -385,9 +385,9 @@ class TestJWTHandlerIntegration:
         with freeze_time(future_date + timedelta(seconds=1)):
             token2 = jwt_handler.create_access_token(data)
 
-        # Les tokens doivent être différents (timestamps différents)
+        # Tokens must be different (different timestamps)
         assert token1 != token2
 
-        # Mais les deux doivent être valides
+        # But both must be valid
         assert jwt_handler.verify_token(token1) is not None
         assert jwt_handler.verify_token(token2) is not None

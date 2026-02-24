@@ -34,7 +34,7 @@ const StatusBar = () => {
   const [clearingCache, setClearingCache] = useState(false);
   const [rebuildingIndex, setRebuildingIndex] = useState(false);
 
-  // Charger les données de monitoring
+  // Load monitoring data
   const loadMonitoringData = async () => {
     try {
       setLoading(true);
@@ -61,20 +61,20 @@ const StatusBar = () => {
     loadMonitoringData();
   }, []);
 
-  // Écouter le refreshTrigger du parent pour le refresh global
+  // Listen to parent refreshTrigger for global refresh
   useEffect(() => {
     if (refreshTrigger > 0) {
       loadMonitoringData();
     }
   }, [refreshTrigger]);
 
-  // Vider le cache
+  // Clear the cache
   const clearCache = async (cacheType = 'all') => {
     try {
       setClearingCache(true);
       await adminAPI.clearCache(cacheType);
 
-      // Recharger les statistiques
+      // Reload statistics
       await loadMonitoringData();
       onRefresh?.();
 
@@ -86,13 +86,13 @@ const StatusBar = () => {
     }
   };
 
-  // Rebuilder l'index vectoriel
+  // Rebuild the vector index
   const rebuildVectorIndex = async () => {
     try {
       setRebuildingIndex(true);
       await adminAPI.rebuildVectorIndex();
 
-      // Recharger les statistiques
+      // Reload statistics
       await loadMonitoringData();
       onRefresh?.();
 
@@ -104,23 +104,23 @@ const StatusBar = () => {
     }
   };
 
-  // Obtenir l'icône de statut
+  // Get the status icon
   const getStatusIcon = (status) => {
-    // Gérer les objets avec propriété healthy (booléen)
+    // Handle objects with healthy property (boolean)
     if (typeof status === 'object' && status !== null && 'healthy' in status) {
       return status.healthy ?
         <CheckCircle className="h-5 w-5 text-green-600" /> :
         <XCircle className="h-5 w-5 text-red-600" />;
     }
 
-    // Gérer les booléens directs
+    // Handle direct booleans
     if (typeof status === 'boolean') {
       return status ?
         <CheckCircle className="h-5 w-5 text-green-600" /> :
         <XCircle className="h-5 w-5 text-red-600" />;
     }
 
-    // Gérer les strings (format existant)
+    // Handle strings (existing format)
     switch (status) {
       case 'healthy':
       case 'ok':
@@ -135,7 +135,7 @@ const StatusBar = () => {
     }
   };
 
-  // Obtenir la couleur de fond pour le statut
+  // Get background color for status
   const getStatusBgColor = (status) => {
     switch (status) {
       case 'healthy':
@@ -165,7 +165,7 @@ const StatusBar = () => {
   return (
     <div className="p-4 max-w-7xl h-full">
 
-      {/* Message d'erreur */}
+      {/* Error message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="flex">
@@ -178,7 +178,7 @@ const StatusBar = () => {
         </div>
       )}
 
-      {/* Statut global */}
+      {/* Global status */}
       {healthData && (
         <div className={`border rounded-lg p-6 mb-6 ${getStatusBgColor(healthData.status)}`}>
           <div className="flex items-center justify-between">
@@ -198,7 +198,7 @@ const StatusBar = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Services système */}
+        {/* System services */}
         {healthData?.checks && (
           <div className="card p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -248,7 +248,7 @@ const StatusBar = () => {
           </div>
         )}
 
-        {/* Statistiques du cache */}
+        {/* Cache statistics */}
         {cacheStats && (
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
@@ -287,7 +287,7 @@ const StatusBar = () => {
             </div>
 
             <div className="space-y-4">
-              {/* Cache principal */}
+              {/* Main cache */}
               {cacheStats.main_cache && (
                 <div>
                   <div className="flex justify-between items-center mb-2">
@@ -318,7 +318,7 @@ const StatusBar = () => {
                 </div>
               )}
 
-              {/* Cache chat */}
+              {/* Chat cache */}
               {cacheStats.chat_cache && (
                 <div>
                   <div className="flex justify-between items-center mb-2">
@@ -349,7 +349,7 @@ const StatusBar = () => {
                 </div>
               )}
 
-              {/* Statistiques globales */}
+              {/* Global statistics */}
               {cacheStats.global_stats && (
                 <div className="pt-3 border-t border-gray-200">
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -373,10 +373,10 @@ const StatusBar = () => {
         )}
       </div>
 
-      {/* Logs système - Full width */}
+      {/* System logs - Full width */}
       <LogViewer onRefresh={onRefresh} />
 
-      {/* Informations de mise à jour automatique */}
+      {/* Automatic update information */}
       <div className="mt-6 bg-gray-50 rounded-lg p-4">
         <div className="flex items-center text-sm text-gray-600">
           <RefreshCw className="h-4 w-4 mr-2" />

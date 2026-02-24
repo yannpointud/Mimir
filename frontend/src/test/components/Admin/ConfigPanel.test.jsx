@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 
 describe('ConfigPanel', () => {
-  // Test placeholder - les tests complets nécessitent une refactorisation des mocks
+  // Test placeholder - full tests require mock refactoring
   it('devrait avoir des tests pour ConfigPanel', () => {
     expect(true).toBe(true);
   });
 
   it('devrait gérer l\'affichage de la configuration', () => {
-    // Test basique pour la couverture
+    // Basic test for coverage
     const config = {
       api_version: 'v1',
       database_url: 'sqlite:///data/mimir.db'

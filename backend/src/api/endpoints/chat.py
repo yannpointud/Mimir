@@ -250,7 +250,7 @@ async def chat_stream(
     """
 
     def convert_numpy_types(obj):
-        """Convertir récursivement les types numpy en types Python natifs"""
+        """Recursively convert numpy types to native Python types."""
         if isinstance(obj, dict):
             return {k: convert_numpy_types(v) for k, v in obj.items()}
         elif isinstance(obj, list):
@@ -309,7 +309,7 @@ async def chat_stream(
                 document_repository=document_repository,
                 rag_debug=rag_debug
             ):
-                # Convertir tous les types numpy avant sérialisation
+                # Convert all numpy types before serialization
                 event = convert_numpy_types(event)
                 yield f"data: {json.dumps(event)}\n\n"
 
@@ -446,25 +446,25 @@ async def clear_session_history(
 
 def _clean_filename(filename: str) -> str:
     """
-    Nettoie le filename pour extraire le nom lisible.
-    Enlève le hash, l'extension et les underscores.
+    Clean the filename to extract a human-readable name.
+    Removes the hash, extension and underscores.
 
-    Exemple: "2e821c8cd63bcacaca47f4f52576ff08fadbad66dde9e359a3fbae80da79a818_CV_Yann_POINTUD.pdf"
+    Example: "2e821c8cd63bcacaca47f4f52576ff08fadbad66dde9e359a3fbae80da79a818_CV_Yann_POINTUD.pdf"
             -> "CV Yann POINTUD"
     """
     import os
 
-    # Enlever le chemin si présent
+    # Remove the path if present
     filename = os.path.basename(filename)
 
-    # Enlever l'extension
+    # Remove the extension
     filename = os.path.splitext(filename)[0]
 
-    # Enlever le hash (64 caractères hex au début)
+    # Remove the hash (64 hex characters at the beginning)
     if '_' in filename and len(filename.split('_')[0]) == 64:
         filename = '_'.join(filename.split('_')[1:])
 
-    # Remplacer underscores par espaces
+    # Replace underscores with spaces
     filename = filename.replace('_', ' ')
 
     return filename.strip()
@@ -472,31 +472,31 @@ def _clean_filename(filename: str) -> str:
 
 def _find_documents_by_fuzzy_match(question: str, document_repository, threshold: int = 70) -> List[tuple]:
     """
-    Trouve les documents dont le filename matche avec la question via fuzzy matching.
+    Find documents whose filename matches the question via fuzzy matching.
 
     Args:
-        question: La question de l'utilisateur
-        document_repository: Repository des documents
-        threshold: Seuil minimum de score fuzzy (0-100)
+        question: The user question
+        document_repository: Document repository
+        threshold: Minimum fuzzy score threshold (0-100)
 
     Returns:
-        Liste de tuples (document_id, filename, fuzzy_score)
+        List of tuples (document_id, filename, fuzzy_score)
     """
     all_documents = document_repository.get_all()
     matches = []
 
     for doc in all_documents:
-        # Nettoyer le filename
+        # Clean the filename
         clean_name = _clean_filename(doc.filename)
 
-        # Calculer le score de fuzzy matching
+        # Calculate the fuzzy matching score
         fuzzy_score = fuzz.partial_ratio(question.lower(), clean_name.lower())
 
         if fuzzy_score >= threshold:
             matches.append((doc.id, doc.filename, fuzzy_score))
             logger.info(f"Fuzzy match trouvé: '{clean_name}' (score: {fuzzy_score}) pour question: '{question}'")
 
-    # Trier par score décroissant
+    # Sort by descending score
     matches.sort(key=lambda x: x[2], reverse=True)
 
     return matches
@@ -511,44 +511,44 @@ def _pre_include_document_chunks(
     filename_similarities: Dict[int, float]
 ) -> List[Any]:
     """
-    Récupère tous les chunks des documents spécifiés et applique le boost.
+    Retrieve all chunks from specified documents and apply the boost.
 
     Args:
-        document_ids: IDs des documents à pré-inclure
-        question_embedding: Embedding de la question
-        vector_store: Le vector store FAISS
-        document_repository: Repository des documents
-        boost_factor: Facteur de boost à appliquer
-        filename_similarities: Dictionnaire {document_id: fuzzy_score}
+        document_ids: IDs of documents to pre-include
+        question_embedding: Question embedding vector
+        vector_store: The FAISS vector store
+        document_repository: Document repository
+        boost_factor: Boost factor to apply
+        filename_similarities: Dictionary {document_id: fuzzy_score}
 
     Returns:
-        Liste des chunks avec scores boostés
+        List of chunks with boosted scores
     """
     pre_included_chunks = []
 
     for doc_id in document_ids:
-        # Récupérer le document
+        # Retrieve the document
         document = document_repository.get_by_id(doc_id)
         if not document:
             continue
 
-        # Récupérer tous les chunks de ce document depuis FAISS
-        # On va faire une recherche avec un top_k très grand et filtrer par document_id
+        # Retrieve all chunks for this document from FAISS
+        # Perform a search with a very large top_k and filter by document_id
         all_results = vector_store.query(question_embedding, top_k=1000)
 
-        # Filtrer pour ne garder que les chunks de ce document
+        # Filter to keep only chunks from this document
         doc_chunks = [r for r in all_results if int(r.document_id) == doc_id]
 
-        # Appliquer le boost à chaque chunk
-        filename_similarity = filename_similarities.get(doc_id, 0) / 100.0  # Normaliser 0-1
+        # Apply boost to each chunk
+        filename_similarity = filename_similarities.get(doc_id, 0) / 100.0  # Normalize 0-1
 
         for chunk in doc_chunks:
-            # Calculer le boost basé sur la similarité filename
+            # Calculate boost based on filename similarity
             boost_amount = boost_factor * filename_similarity
             boosted_score = chunk.similarity_score + boost_amount
             boosted_score = min(0.99, boosted_score)
 
-            # Mettre à jour le score
+            # Update the score
             chunk.similarity_score = boosted_score
             pre_included_chunks.append(chunk)
 
@@ -561,14 +561,14 @@ def _pre_include_document_chunks(
 
 def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "weighted") -> float:
     """
-    Calcule le score de confiance avec différents algorithmes.
+    Calculate confidence score using different algorithms.
 
     Args:
-        search_results: Liste des résultats de recherche
-        algorithm: "simple" ou "weighted"
+        search_results: List of search results
+        algorithm: "simple" or "weighted"
 
     Returns:
-        Score de confiance entre 0.0 et 0.95
+        Confidence score between 0.0 and 0.95
     """
     if not search_results:
         return 0.1
@@ -576,15 +576,15 @@ def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "
     scores = [r.similarity_score for r in search_results]
 
     if algorithm == "simple":
-        # Algorithme original (pour compatibilité)
+        # Original algorithm (for backward compatibility)
         avg_similarity = sum(scores) / len(scores)
         return min(0.9, avg_similarity * (len(search_results) / 5))
 
     elif algorithm == "weighted":
-        # Algorithme amélioré avec pondération dégresssive
+        # Improved algorithm with degressive weighting
 
-        # 1. Score pondéré par position (les premiers résultats comptent plus)
-        weights = [1.0, 0.8, 0.6, 0.4, 0.2]  # Pondération dégresssive
+        # 1. Position-weighted score (first results count more)
+        weights = [1.0, 0.8, 0.6, 0.4, 0.2]  # Degressive weighting
         weighted_sum = sum(
             score * weights[min(i, len(weights)-1)]
             for i, score in enumerate(scores)
@@ -592,16 +592,16 @@ def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "
         weight_total = sum(weights[:min(len(scores), len(weights))])
         base_score = weighted_sum / weight_total
 
-        # 2. Facteur de cohérence (pénalise les scores très dispersés)
+        # 2. Coherence factor (penalizes highly dispersed scores)
         if len(scores) > 1:
             std_dev = np.std(scores)
             max_score = max(scores)
-            # Cohérence élevée si écart-type faible par rapport au max
+            # High coherence if standard deviation is low relative to max
             coherence_factor = max(0.5, 1 - (std_dev / max(max_score, 0.1)))
         else:
             coherence_factor = 1.0
 
-        # 3. Facteur de qualité (bonus si le meilleur score est vraiment bon)
+        # 3. Quality factor (bonus if the best score is really good)
         best_score = max(scores)
         quality_bonus = 1.0
         if best_score > 0.9:
@@ -609,11 +609,11 @@ def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "
         elif best_score > 0.8:
             quality_bonus = 1.1
 
-        # 4. Score final combiné
+        # 4. Combined final score
         confidence = min(0.95,
-                        base_score * 0.7 +           # 70% score pondéré
-                        coherence_factor * 0.2 +     # 20% cohérence
-                        (best_score * 0.1) *         # 10% qualité du meilleur
+                        base_score * 0.7 +           # 70% weighted score
+                        coherence_factor * 0.2 +     # 20% coherence
+                        (best_score * 0.1) *         # 10% best result quality
                         quality_bonus
                         )
 
@@ -625,22 +625,22 @@ def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "
         return confidence
 
     else:
-        # Fallback sur l'algorithme simple
+        # Fallback to the simple algorithm
         logger.warning(f"Algorithme inconnu '{algorithm}', utilisation de 'simple'")
         return _calculate_weighted_confidence(search_results, "simple")
 
 
 def _filter_dynamic_sources(search_results: List[Any], config: Any, question: str = "") -> List[Any]:
     """
-    Filtre les sources de manière dynamique selon leur pertinence avec détection de gaps.
+    Dynamically filter sources based on relevance with gap detection.
 
     Args:
-        search_results: Liste des résultats de recherche (triés par score décroissant)
-        config: Configuration avec similarity_threshold, min_sources, max_sources
-        question: Question pour détecter les entités nommées
+        search_results: List of search results (sorted by descending score)
+        config: Configuration with similarity_threshold, min_sources, max_sources
+        question: Question for named entity detection
 
     Returns:
-        Liste filtrée des sources pertinentes
+        Filtered list of relevant sources
     """
     if not search_results:
         return []
@@ -650,8 +650,8 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
 
     logger.debug(f"Filtrage dynamique - Scores: {[f'{s:.3f}' for s in scores[:8]]}")
 
-    # Filtrage dynamique basé sur l'écart par rapport au meilleur score
-    # Seuil = max(SIMILARITY_THRESHOLD, best_score × (1 - DYNAMIC_FILTER_PERCENTAGE))
+    # Dynamic filtering based on gap from the best score
+    # Threshold = max(SIMILARITY_THRESHOLD, best_score x (1 - DYNAMIC_FILTER_PERCENTAGE))
     dynamic_threshold = best_score * (1 - config.dynamic_filter_percentage)
     final_threshold = max(config.similarity_threshold, dynamic_threshold)
     filtered_results = [r for r in search_results if r.similarity_score >= final_threshold]
@@ -660,7 +660,7 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
     logger.debug(f"Filtrage dynamique: best={best_score:.3f}, gap={config.dynamic_filter_percentage:.2f}, "
                 f"seuil={final_threshold:.3f}, {len(search_results)} → {len(filtered_results)} chunks")
 
-    # 4. Respecter les contraintes min/max
+    # 4. Enforce min/max constraints
     original_count = len(filtered_results)
 
     if len(filtered_results) < config.min_sources:
@@ -670,7 +670,7 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
         filtered_results = filtered_results[:config.max_sources]
         method += f"→max({config.max_sources})"
 
-    # 5. Log détaillé du filtrage
+    # 5. Detailed filtering log
     logger.info(
         f"Sources dynamiques: {len(search_results)} → {len(filtered_results)} sources "
         f"(méthode: {method})"
@@ -695,7 +695,7 @@ async def _process_question_with_rag(
     """
     Process question using RAG pipeline.
 
-    Implementation du vrai système RAG:
+    Full RAG system implementation:
     1. Generate embeddings for the question
     2. Search vector store for relevant documents
     3. Build context from retrieved documents
@@ -732,11 +732,11 @@ async def _process_question_with_rag(
             )
 
             if matched_docs:
-                # Préparer le dictionnaire des similarités
+                # Prepare the similarities dictionary
                 filename_similarities = {doc_id: score for doc_id, _, score in matched_docs}
                 document_ids = [doc_id for doc_id, _, _ in matched_docs]
 
-                # Pré-inclure tous les chunks des documents matchés
+                # Pre-include all chunks from matched documents
                 pre_included_chunks = _pre_include_document_chunks(
                     document_ids=document_ids,
                     question_embedding=question_embedding,
@@ -753,8 +753,8 @@ async def _process_question_with_rag(
         start_search = datetime.utcnow()
         search_results = vector_store.query(
             vector=question_embedding,
-            top_k=settings.max_sources * 2,  # Récupérer plus pour filtrer ensuite
-            filter_dict=None  # Pas de filtre pour l'instant
+            top_k=settings.max_sources * 2,  # Retrieve more to filter afterwards
+            filter_dict=None  # No filter for now
         )
         search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
 
@@ -766,21 +766,21 @@ async def _process_question_with_rag(
             search_time_ms=search_time
         )
 
-        # Step 2.1: Fusionner les chunks pré-inclus avec la recherche vectorielle
+        # Step 2.1: Merge pre-included chunks with vector search results
         if pre_included_chunks:
-            # Créer un set des chunk_ids pré-inclus pour éviter les doublons
+            # Create a set of pre-included chunk_ids to avoid duplicates
             pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
 
-            # Filtrer les résultats vectoriels pour enlever les doublons
+            # Filter vector results to remove duplicates
             unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
 
-            # Fusionner: pré-inclus en premier, puis résultats vectoriels
+            # Merge: pre-included first, then vector results
             search_results = pre_included_chunks + unique_vector_results
 
-            # Trier par score décroissant
+            # Sort by descending score
             search_results.sort(key=lambda x: x.similarity_score, reverse=True)
 
-            logger.info(f"Fusion: {len(pre_included_chunks)} pré-inclus + {len(unique_vector_results)} vectoriels = {len(search_results)} total")
+            logger.info(f"Merge: {len(pre_included_chunks)} pre-included + {len(unique_vector_results)} vector = {len(search_results)} total")
 
         # Step 2.5: Apply dynamic source filtering
         if search_results:
@@ -799,12 +799,12 @@ async def _process_question_with_rag(
                 )
 
                 if include_sources:
-                    # Récupérer le nom original du document
+                    # Retrieve the original document name
                     try:
                         document = document_repository.get_by_id(int(result.document_id))
                         filename = document.filename if document else str(result.source)
                     except Exception:
-                        # Fallback si erreur de récupération
+                        # Fallback if retrieval error
                         filename = str(result.source)
 
                     sources.append({
@@ -822,7 +822,7 @@ async def _process_question_with_rag(
             system_prompt = MIMIR_SYSTEM_PROMPT
             full_prompt = system_prompt.format(context=context_text)
         else:
-            # Pas de contexte trouvé
+            # No context found
             logger.warning("No relevant context found in vector store")
             context_text = ""
             system_prompt = """Vous êtes Mimir, un assistant documentaire intelligent.
@@ -890,7 +890,7 @@ Restez professionnel et utile."""
             stage="rag_pipeline"
         )
 
-        # Fallback response en cas d'erreur
+        # Fallback response in case of error
         return {
             "answer": "Je suis désolé, une erreur technique s'est produite lors du traitement de votre question. L'équipe technique a été notifiée. Veuillez réessayer dans quelques instants ou contacter le support si le problème persiste.",
             "sources": [],

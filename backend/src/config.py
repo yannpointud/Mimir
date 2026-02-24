@@ -1,6 +1,6 @@
 """
-Configuration centralisée pour Mimir
-Utilise Pydantic pour la validation et la sécurité des types
+Centralized configuration for Mimir
+Uses Pydantic for validation and type safety
 """
 
 from pydantic import Field
@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 class Settings(BaseSettings):
-    """Configuration principale de l'application Mimir"""
+    """Main configuration for the Mimir application"""
     
     # API Configuration
     api_version: str = Field(default="v1", description="Version de l'API")
@@ -169,7 +169,7 @@ class Settings(BaseSettings):
         description="TTL du cache en secondes"
     )
     
-    # Email Configuration (pour escalade)
+    # Email Configuration (for escalation)
     smtp_host: str = Field(default="", description="Host SMTP pour emails d'escalade")
     smtp_port: int = Field(default=587, description="Port SMTP")
     smtp_user: str = Field(default="", description="Utilisateur SMTP")
@@ -248,18 +248,18 @@ class Settings(BaseSettings):
         
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Créer les répertoires nécessaires
+        # Create required directories
         self._ensure_directories()
     
     def _ensure_directories(self):
-        """Crée les répertoires nécessaires s'ils n'existent pas"""
+        """Create required directories if they do not exist"""
         directories = [
             self.data_dir,
             self.upload_dir,
             self.watch_folder,
             Path(self.database_url.replace("sqlite:///", "")).parent,
             Path(self.faiss_index_path).parent,
-            Path(self.data_dir).parent / "logs"  # logs dans le parent de data_dir
+            Path(self.data_dir).parent / "logs"  # logs in the parent of data_dir
         ]
         
         for directory in directories:
@@ -267,20 +267,20 @@ class Settings(BaseSettings):
     
     @property
     def database_url_sync(self) -> str:
-        """URL de base de données pour SQLAlchemy synchrone"""
+        """Database URL for synchronous SQLAlchemy"""
         return self.database_url
     
     @property
     def is_production(self) -> bool:
-        """Détermine si nous sommes en environnement de production"""
+        """Determine if we are in a production environment"""
         return self.environment.lower() == "production"
 
 
-# Instance globale singleton de configuration
-# Chargée seulement si les variables sont disponibles
+# Global singleton configuration instance
+# Loaded only if variables are available
 try:
     settings = Settings()
 except Exception:
-    # En cas d'erreur (notamment dans les tests), on crée une instance vide
-    # qui sera override par les fixtures de test
+    # On error (especially in tests), create an empty instance
+    # that will be overridden by test fixtures
     settings = None
