@@ -15,11 +15,12 @@ from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user  # noqa: F401
 from src.database.repository import ConfigurationRepository, AuditLogRepository, UsageRepository
-from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor
+from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor, get_bm25_store
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
 from src.rag_core.implementations.faiss_store import FaissVectorStore
+from src.rag_core.implementations.bm25_store import Bm25LexicalStore
 from src.shared.models import BaseResponse, PaginationModel
 from src.shared.constants import MASKED_VALUE, mask_secrets
 from src.config import settings
@@ -419,7 +420,10 @@ async def get_audit_log(
                 "details": entry.details,
                 "ip_address": entry.ip_address,
                 "success": entry.success,
-                "additional_data": entry.additional_data
+                # additional_data is accepted by create_log for compatibility
+                # but not persisted on the AuditLog model; guard the read so a
+                # missing column cannot turn the audit-log GET into a 500.
+                "additional_data": getattr(entry, "additional_data", None)
             })
 
         return {
@@ -1064,7 +1068,8 @@ async def get_system_logs(
 async def rebuild_vector_store(
     current_user: Dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-    vector_store: FaissVectorStore = Depends(get_vector_store)
+    vector_store: FaissVectorStore = Depends(get_vector_store),
+    bm25_store: Bm25LexicalStore = Depends(get_bm25_store)
 ) -> BaseResponse:
     """
     Force complete rebuild of the FAISS vector index.
@@ -1073,7 +1078,8 @@ async def rebuild_vector_store(
     1. Get vector store instance from dependencies
     2. Force optimization/rebuild to remove deleted entries
     3. Persist the rebuilt index to disk
-    4. Clear related caches
+    4. Resync the BM25 lexical index from the optimized FAISS snapshot
+    5. Clear related caches
 
     Args:
         current_user: Current authenticated admin user
@@ -1081,6 +1087,9 @@ async def rebuild_vector_store(
         vector_store: Shared FAISS vector store singleton (same instance
             used by chat/documents endpoints, guarded by its internal
             threading.RLock)
+        bm25_store: Shared BM25 lexical store singleton; resynced from the
+            optimized FAISS snapshot so a manual rebuild leaves no ghost/orphan
+            chunk in the lexical index (anti-ghost, T-06-06-01)
 
     Returns:
         BaseResponse: Operation result with statistics
@@ -1097,6 +1106,16 @@ async def rebuild_vector_store(
         rebuild_result = await asyncio.to_thread(
             vector_store.rebuild_vector_store, force_rebuild=True, cleanup_orphans=True
         )
+
+        # Resync the BM25 lexical index from the freshly-optimized FAISS
+        # snapshot (anti-ghost, T-06-06-01). Rebuilding FAISS alone would leave
+        # the lexical index with ghost/orphan chunks that FAISS just dropped;
+        # snapshotting the active chunks and rebuilding BM25 from them keeps both
+        # indexes consistent. Both blocking calls are offloaded via
+        # asyncio.to_thread (same convention as every FAISS call here) so the
+        # event loop is never stalled (T-07-07-02).
+        active_chunks = await asyncio.to_thread(vector_store.snapshot_active_chunks)
+        await asyncio.to_thread(bm25_store.rebuild, active_chunks)
 
         # Get stats after rebuild (blocking FAISS call offloaded to a worker thread)
         stats_after = await asyncio.to_thread(vector_store.get_stats)

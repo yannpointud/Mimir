@@ -34,7 +34,7 @@ from src.email_service.smtp_client import email_service
 from src.monitoring.logger import setup_logger
 from src.ingestion.processor import IngestionProcessor
 from src.ingestion.chunking import ChunkingConfig
-from src.api.dependencies import get_llm_service, get_vector_store, get_document_repository, set_ingestion_processor
+from src.api.dependencies import get_llm_service, get_vector_store, get_document_repository, set_ingestion_processor, get_bm25_store
 from pathlib import Path
 
 
@@ -100,10 +100,14 @@ async def lifespan(app: FastAPI):
         # Ingestion services initialization
         global ingestion_processor
         try:
-            # Create chunking configuration
+            # Create chunking configuration. section_title_tracking is defaulted
+            # from the settings flag here (single caller-side default, RAG-05):
+            # when structure_aware_chunking_enabled is False (current default),
+            # chunking output stays byte-identical to today.
             chunking_config = ChunkingConfig(
                 chunk_size=settings.max_chunk_size,
-                overlap=settings.chunk_overlap
+                overlap=settings.chunk_overlap,
+                section_title_tracking=settings.structure_aware_chunking_enabled
             )
 
             # Get database session
@@ -118,12 +122,38 @@ async def lifespan(app: FastAPI):
                     document_repository=document_repo,
                     chunking_config=chunking_config,
                     max_file_size_mb=settings.max_file_size_mb,
-                    max_chunks_per_doc=settings.max_chunks_per_doc
+                    max_chunks_per_doc=settings.max_chunks_per_doc,
+                    bm25_store=get_bm25_store()
                 )
 
                 # Start the processor
                 await ingestion_processor.start()
                 logger.info("Ingestion processor started successfully")
+
+                # RAG-02: ensure the BM25 lexical index exists at startup. It is
+                # a derived artifact rebuilt from the FAISS source of truth only
+                # at ingestion/deletion; on a cold start or an upgrade of an
+                # existing FAISS install it may be missing on disk. With hybrid
+                # search enabled by default, a missing BM25 index would otherwise
+                # force every query to degrade to dense-only until the next
+                # ingestion. Rebuild it here (non-fatal) so hybrid works
+                # immediately. The per-query dense-only fallback in RagService
+                # remains the safety net if this rebuild fails.
+                try:
+                    _vs = get_vector_store()
+                    _bm25 = get_bm25_store()
+                    if not _bm25.load():
+                        _active = _vs.snapshot_active_chunks()
+                        if _active:
+                            _bm25.rebuild(_active)
+                            logger.info(
+                                f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
+                            )
+                except Exception as bm25_startup_error:
+                    logger.warning(
+                        f"BM25 startup rebuild failed - hybrid queries will degrade to "
+                        f"dense-only until next ingestion: {bm25_startup_error}"
+                    )
 
                 # Make the processor available to API endpoints
                 set_ingestion_processor(ingestion_processor)

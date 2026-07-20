@@ -133,6 +133,10 @@ export const chatAPI = {
                       callbacks.onChunk?.(event.content);
                       break;
 
+                    case 'citation':
+                      callbacks.onCitation?.(event.citations);
+                      break;
+
                     case 'done':
                       callbacks.onDone?.(event);
                       settled = true;

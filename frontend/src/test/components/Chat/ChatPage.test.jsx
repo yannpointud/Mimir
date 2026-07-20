@@ -5,10 +5,10 @@ import ChatPage from '../../../components/Chat/ChatPage';
 import { AuthProvider } from '../../../hooks/useAuth';
 import * as chatAPI from '../../../services/api';
 
-// Mock the API
+// Mock the API — the chat UI streams via sendMessageStream(question, sessionId, callbacks)
 vi.mock('../../../services/api', () => ({
   chatAPI: {
-    sendMessage: vi.fn(),
+    sendMessageStream: vi.fn(),
     escalateToHuman: vi.fn(),
   },
 }));
@@ -27,6 +27,13 @@ describe('ChatPage', () => {
     vi.clearAllMocks();
   });
 
+  const sendMessage = async (text) => {
+    const input = screen.getByPlaceholderText(/Tapez votre question ici/);
+    const sendButton = screen.getByTitle('Envoyer le message');
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.click(sendButton);
+  };
+
   it('affiche le message de bienvenue au démarrage', () => {
     render(
       <TestWrapper>
@@ -38,13 +45,13 @@ describe('ChatPage', () => {
   });
 
   it('permet d\'envoyer un message', async () => {
-    const mockResponse = {
-      answer: 'Voici ma réponse',
-      sources: [],
-      confidence_score: 0.9
-    };
-
-    chatAPI.chatAPI.sendMessage.mockResolvedValue(mockResponse);
+    // Drive the streaming callbacks to simulate a full answer.
+    chatAPI.chatAPI.sendMessageStream.mockImplementation((question, sessionId, callbacks) => {
+      callbacks.onStart?.(sessionId);
+      callbacks.onChunk?.('Voici ma réponse');
+      callbacks.onDone?.({ sources: [], confidence_score: 0.9 });
+      return Promise.resolve({});
+    });
 
     render(
       <TestWrapper>
@@ -52,14 +59,14 @@ describe('ChatPage', () => {
       </TestWrapper>
     );
 
-    const input = screen.getByPlaceholderText(/Tapez votre question ici/);
-    const sendButton = screen.getByTitle('Envoyer le message');
-
-    fireEvent.change(input, { target: { value: 'Test question' } });
-    fireEvent.click(sendButton);
+    await sendMessage('Test question');
 
     await waitFor(() => {
-      expect(chatAPI.chatAPI.sendMessage).toHaveBeenCalledWith('Test question', expect.any(String));
+      expect(chatAPI.chatAPI.sendMessageStream).toHaveBeenCalledWith(
+        'Test question',
+        expect.any(String),
+        expect.any(Object)
+      );
     });
 
     await waitFor(() => {
@@ -68,7 +75,10 @@ describe('ChatPage', () => {
   });
 
   it('affiche une erreur en cas de problème API', async () => {
-    chatAPI.chatAPI.sendMessage.mockRejectedValue(new Error('Erreur API'));
+    chatAPI.chatAPI.sendMessageStream.mockImplementation((question, sessionId, callbacks) => {
+      callbacks.onError?.('Erreur API');
+      return Promise.reject(new Error('Erreur API'));
+    });
 
     render(
       <TestWrapper>
@@ -76,14 +86,43 @@ describe('ChatPage', () => {
       </TestWrapper>
     );
 
-    const input = screen.getByPlaceholderText(/Tapez votre question ici/);
-    const sendButton = screen.getByTitle('Envoyer le message');
-
-    fireEvent.change(input, { target: { value: 'Test question' } });
-    fireEvent.click(sendButton);
+    await sendMessage('Test question');
 
     await waitFor(() => {
       expect(screen.getByText(/une erreur s'est produite/)).toBeInTheDocument();
+    });
+  });
+
+  it('stocke les citations reçues sur le message et rend une pastille', async () => {
+    // The citation event lands before done and must populate message.citations,
+    // producing a clickable pill for the valid [N] marker once streaming ends.
+    chatAPI.chatAPI.sendMessageStream.mockImplementation((question, sessionId, callbacks) => {
+      callbacks.onChunk?.('Réponse sourcée [1]');
+      callbacks.onCitation?.({
+        1: {
+          document_id: 42,
+          filename: 'Guide.pdf',
+          chunk_index: 0,
+          similarity_score: 0.9,
+          chunk_text: 'extrait',
+        },
+      });
+      callbacks.onDone?.({ sources: [], confidence_score: 0.9 });
+      return Promise.resolve({});
+    });
+
+    render(
+      <TestWrapper>
+        <ChatPage />
+      </TestWrapper>
+    );
+
+    await sendMessage('Question avec source');
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /Voir la source 1 : Guide\.pdf/ })
+      ).toBeInTheDocument();
     });
   });
 

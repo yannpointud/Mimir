@@ -21,7 +21,7 @@ from src.auth.middleware import require_admin, get_current_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.database.connection import get_db_session  # noqa: F401
 from src.database.repository import DocumentRepository, AuditLogRepository
-from src.api.dependencies import get_document_repository, get_audit_log_repository, get_ingestion_processor, get_vector_store
+from src.api.dependencies import get_document_repository, get_audit_log_repository, get_ingestion_processor, get_vector_store, get_bm25_store
 from src.shared.models import (
     DocumentResponse, DocumentListResponse, BaseResponse,
     DocumentWithChunksResponse, ChunkResponse,
@@ -479,7 +479,8 @@ async def delete_document(
     current_user: Dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-    vector_store = Depends(get_vector_store)
+    vector_store = Depends(get_vector_store),
+    bm25_store = Depends(get_bm25_store)
 ) -> BaseResponse:
     """
     Delete a document and its associated data.
@@ -491,6 +492,8 @@ async def delete_document(
         doc_repo: Document repository
         audit_repo: Audit log repository
         vector_store: Vector store service
+        bm25_store: BM25 lexical store; rebuilt from the FAISS source of truth
+            after deletion so both indexes stay synchronized (RAG-02)
 
     Returns:
         BaseResponse: Operation result
@@ -553,7 +556,23 @@ async def delete_document(
                 except Exception as cleanup_error:
                     logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
                     # Do not fail the deletion if cleanup fails
-                    
+
+                # Rebuild the BM25 lexical index from the FAISS source of truth
+                # (RAG-02). This is the SECOND single-writer call site (the
+                # ingestion worker is the first); no separate writer keeps the
+                # two indexes in sync. Read metadata AFTER orphan cleanup so the
+                # chunk_ids reflect any optimization. Offloaded via
+                # asyncio.to_thread (ROB-01) and non-fatal: a BM25 failure must
+                # not fail a deletion whose FAISS removal already succeeded.
+                try:
+                    # Snapshot active chunks UNDER the FAISS lock (WR-01).
+                    active_chunks = vector_store.snapshot_active_chunks()
+                    await asyncio.to_thread(bm25_store.rebuild, active_chunks)
+                except Exception as bm25_error:
+                    logger.warning(
+                        f"BM25 rebuild after deletion failed - continuing anyway: {bm25_error}"
+                    )
+
             else:
                 logger.warning(f"Failed to remove document chunks from vector store: {filename}")
         except Exception as e:

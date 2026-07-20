@@ -264,7 +264,8 @@ class FaissVectorStore(AbstractVectorStore):
     def query(self,
               vector: np.ndarray,
               top_k: int = 5,
-              filter_dict: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
+              filter_dict: Optional[Dict[str, Any]] = None,
+              similarity_floor: Optional[float] = None) -> List[SearchResult]:
         """
         Search for similar vectors
 
@@ -272,6 +273,12 @@ class FaissVectorStore(AbstractVectorStore):
             vector: Query embedding vector
             top_k: Maximum number of results to return
             filter_dict: Optional metadata filters
+            similarity_floor: Optional override for the minimum similarity a
+                result must reach to be kept. When None (default) the store's
+                own similarity_threshold is used -- byte-identical to the
+                pre-hybrid behavior. Hybrid retrieval passes similarity_floor=0.0
+                to obtain the RAW candidate pool, so RRF can re-rank chunks that
+                the cosine threshold would otherwise drop (RAG-02, Pitfall #1).
 
         Returns:
             List of search results ordered by similarity
@@ -315,8 +322,16 @@ class FaissVectorStore(AbstractVectorStore):
                     # Alternative: similarity = max(0, 1 - distance/2) for normalized vectors
                     similarity = max(0, 1 - dist / 2)
 
-                    # Apply similarity threshold
-                    if similarity < self.similarity_threshold:
+                    # Apply similarity threshold. Default (similarity_floor is
+                    # None) keeps the exact dense-only semantics; hybrid mode
+                    # passes similarity_floor=0.0 to keep the raw pool intact for
+                    # RRF fusion (Pitfall #1).
+                    threshold = (
+                        self.similarity_threshold
+                        if similarity_floor is None
+                        else similarity_floor
+                    )
+                    if similarity < threshold:
                         continue
 
                     # Get metadata
@@ -474,6 +489,21 @@ class FaissVectorStore(AbstractVectorStore):
         """
         with self._lock:
             return self._stats.get('last_updated') or 'none'
+
+    def snapshot_active_chunks(self) -> List[Dict[str, Any]]:
+        """Return a lock-safe snapshot of the non-deleted chunk metadata.
+
+        Used by the BM25 lexical store (RAG-02) to rebuild itself from the FAISS
+        source of truth. Copies each metadata dict under the store lock so the
+        BM25 rebuild — which may run off the event loop via asyncio.to_thread —
+        iterates a stable snapshot and can never hit a "list changed size during
+        iteration" race with a concurrent upsert/delete.
+
+        Returns:
+            List[Dict[str, Any]]: shallow copies of active chunk metadata dicts.
+        """
+        with self._lock:
+            return [dict(m) for m in self.metadata if not m.get('deleted', False)]
 
     def _estimate_memory_usage(self) -> float:
         """Estimate memory usage in MB"""

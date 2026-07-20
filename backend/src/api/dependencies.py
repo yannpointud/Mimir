@@ -19,8 +19,12 @@ from src.cost.usage_tracker import usage_tracker, UsageTracker
 from src.config import settings
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 from src.rag_core.implementations.faiss_store import FaissVectorStore
+from src.rag_core.implementations.bm25_store import Bm25LexicalStore
 from src.monitoring.rag_debug_logger import rag_debug_service
 from src.services.rag_service import RagService
+from src.monitoring.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def get_document_repository(db: Session = Depends(get_db_session)) -> DocumentRepository:
@@ -107,6 +111,28 @@ def get_vector_store() -> FaissVectorStore:
     return _vector_store
 
 
+# BM25 lexical store singleton (mirrors _vector_store above). Only consumed by
+# the hybrid retrieval path, which is gated behind settings.hybrid_search_enabled.
+_bm25_store = None
+
+
+def get_bm25_store() -> Bm25LexicalStore:
+    """Get BM25 lexical store instance (singleton).
+
+    Built once and, like get_vector_store(), loads any index already persisted on
+    disk (staying empty if none exists yet). Used by the hybrid retrieval branch
+    of RagService; the dense-only path never touches it.
+    """
+    global _bm25_store
+    if _bm25_store is None:
+        _bm25_store = Bm25LexicalStore(index_path=settings.bm25_index_path)
+        try:
+            _bm25_store.load()
+        except Exception as e:  # noqa: BLE001 - never fail startup on a bad/missing index
+            logger.warning(f"BM25 lexical index failed to load, starting empty: {e}")
+    return _bm25_store
+
+
 def get_ingestion_processor():
     """Get ingestion processor instance (singleton)."""
     global _ingestion_processor
@@ -155,5 +181,6 @@ def get_rag_service() -> RagService:
             budget_guard=get_budget_guard(),
             usage_tracker=get_usage_tracker(),
             chat_cache=get_chat_cache_service(),
+            bm25_store=get_bm25_store(),
         )
     return _rag_service

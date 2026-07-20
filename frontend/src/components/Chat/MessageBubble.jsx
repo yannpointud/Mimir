@@ -3,11 +3,20 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import SourcesList from './SourcesList';
+import CitationPill from './CitationPill';
+import DocumentModal from '../Common/DocumentModal';
+import remarkCitations from '../../utils/remarkCitations';
 import { formatRelativeDate, copyToClipboard } from '../../utils/helpers';
 import { Copy, Check, User, Bot, AlertTriangle, Info } from 'lucide-react';
 
 const MessageBubble = ({ message }) => {
   const [copied, setCopied] = useState(false);
+  // Single shared modal source for ALL citation pills in this message. Lifting
+  // this state up (rather than letting each CitationPill own its own modal)
+  // guarantees at most one source modal is ever open: clicking pill [2] while
+  // pill [1]'s modal is open just swaps the source, it never stacks a second
+  // overlay on top of the first.
+  const [openCitationSource, setOpenCitationSource] = useState(null);
 
   const handleCopy = async () => {
     const success = await copyToClipboard(message.content);
@@ -78,96 +87,116 @@ const MessageBubble = ({ message }) => {
   };
 
   return (
-    <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} ${getMessageStyle()}`}>
-      <div className="flex space-x-3 max-w-full">
-        {/* Avatar (sauf pour les messages utilisateur) */}
-        {message.type !== 'user' && (
-          <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getIconContainerStyle()}`}>
-            {getMessageIcon()}
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-          {/* Bulle de message */}
-          <div className={getBubbleStyle()}>
-            <div className="flex items-start justify-between">
-              {/* Contenu markdown */}
-              <div className="prose prose-sm max-w-none flex-1">
-                <ReactMarkdown
-                  components={{
-                    code({ inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || '');
-                      return !inline && match ? (
-                        <SyntaxHighlighter
-                          style={oneLight}
-                          language={match[1]}
-                          PreTag="div"
-                          {...props}
-                        >
-                          {String(children).replace(/\n$/, '')}
-                        </SyntaxHighlighter>
-                      ) : (
-                        <code className={className} {...props}>
-                          {children}
-                        </code>
-                      );
-                    },
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-                {message.isStreaming && (
-                  <span className="inline-block ml-1 w-2 h-4 bg-gray-600 animate-pulse" style={{ animation: 'blink 1s infinite' }}></span>
-                )}
-              </div>
-
-              {/* Bouton de copie à droite du texte */}
-              {message.type !== 'user' && (
-                <button
-                  onClick={handleCopy}
-                  className="ml-3 mt-1 text-gray-400 hover:text-gray-600 transition-colors duration-200 flex-shrink-0"
-                  title="Copier le message"
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </button>
-              )}
-            </div>
-
-            {/* Score de confiance pour l'assistant - seulement si pas en streaming et confiance > 0 */}
-            {message.type === 'assistant' && !message.isStreaming && message.confidence > 0 && (
-              <div className="mt-2 text-xs text-gray-500">
-                Confiance: {Math.round(message.confidence * 100)}%
-              </div>
-            )}
-          </div>
-
-          {/* Sources (pour les messages de l'assistant) */}
-          {message.type === 'assistant' && message.sources && message.sources.length > 0 && (
-            <div className="mt-2">
-              <SourcesList sources={message.sources} />
+    <>
+      <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} ${getMessageStyle()}`}>
+        <div className="flex space-x-3 max-w-full">
+          {/* Avatar (sauf pour les messages utilisateur) */}
+          {message.type !== 'user' && (
+            <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getIconContainerStyle()}`}>
+              {getMessageIcon()}
             </div>
           )}
 
-          {/* Métadonnées */}
-          <div className={`mt-2 ${message.type === 'user' ? 'text-right' : ''}`}>
-            <span className="text-xs text-gray-500">
-              {formatRelativeDate(message.timestamp)}
-            </span>
-          </div>
-        </div>
+          <div className="flex-1 min-w-0">
+            {/* Bulle de message */}
+            <div className={getBubbleStyle()}>
+              <div className="flex items-start justify-between">
+                {/* Contenu markdown */}
+                <div className="prose prose-sm max-w-none flex-1">
+                  <ReactMarkdown
+                    remarkPlugins={message.isStreaming ? [] : [[remarkCitations, message.citations || {}]]}
+                    components={{
+                      'citation-pill': ({ n }) => (
+                        <CitationPill
+                          n={n}
+                          source={message.citations?.[n]}
+                          onOpenSource={setOpenCitationSource}
+                        />
+                      ),
+                      code({ inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            style={oneLight}
+                            language={match[1]}
+                            PreTag="div"
+                            {...props}
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                  {message.isStreaming && (
+                    <span className="inline-block ml-1 w-2 h-4 bg-gray-600 animate-pulse" style={{ animation: 'blink 1s infinite' }}></span>
+                  )}
+                </div>
 
-        {/* Avatar pour les messages utilisateur */}
-        {message.type === 'user' && (
-          <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getIconContainerStyle()}`}>
-            {getMessageIcon()}
+                {/* Bouton de copie à droite du texte */}
+                {message.type !== 'user' && (
+                  <button
+                    onClick={handleCopy}
+                    className="ml-3 mt-1 text-gray-400 hover:text-gray-600 transition-colors duration-200 flex-shrink-0"
+                    title="Copier le message"
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Score de confiance pour l'assistant - seulement si pas en streaming et confiance > 0 */}
+              {message.type === 'assistant' && !message.isStreaming && message.confidence > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  Confiance: {Math.round(message.confidence * 100)}%
+                </div>
+              )}
+            </div>
+
+            {/* Sources (pour les messages de l'assistant) */}
+            {message.type === 'assistant' && message.sources && message.sources.length > 0 && (
+              <div className="mt-2">
+                <SourcesList sources={message.sources} />
+              </div>
+            )}
+
+            {/* Métadonnées */}
+            <div className={`mt-2 ${message.type === 'user' ? 'text-right' : ''}`}>
+              <span className="text-xs text-gray-500">
+                {formatRelativeDate(message.timestamp)}
+              </span>
+            </div>
           </div>
-        )}
+
+          {/* Avatar pour les messages utilisateur */}
+          {message.type === 'user' && (
+            <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getIconContainerStyle()}`}>
+              {getMessageIcon()}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Single shared modal for every citation pill in this message (see
+          openCitationSource above) — reuses the existing DocumentModal, never
+          stacked. */}
+      <DocumentModal
+        isOpen={openCitationSource != null}
+        onClose={() => setOpenCitationSource(null)}
+        documentId={openCitationSource?.document_id}
+        relevantChunks={openCitationSource ? [openCitationSource] : []}
+      />
+    </>
   );
 };
 

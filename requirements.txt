@@ -17,6 +17,12 @@ mistralai==0.4.2
 faiss-cpu==1.12.0
 numpy==2.3.3
 rapidfuzz==3.14.1
+# Lexical BM25 index (hybrid search, RAG-02). Native save/load is JSON+.npy with
+# allow_pickle=False -- no arbitrary-object deserialization (consistent with
+# ROB-02/T-02-01, the pickle vector removed from FaissVectorStore in phase 2).
+# Base package only (numpy dep): the [core] extra pulls in PyStemmer, which the
+# phase decision forbids (no stemming); tokenization is done in tokenizer_fr.py.
+bm25s==0.3.9
 
 # Document Processing
 pypdf==6.14.2

@@ -99,6 +99,40 @@ class Settings(BaseSettings):
         description="Pourcentage d'écart maximum par rapport au meilleur score pour filtrage dynamique"
     )
 
+    # Hybrid Search / RRF Configuration (feature flags — the cosine semantics of
+    # similarity_threshold above are left untouched; dense-only stays byte-identical
+    # when hybrid_search_enabled is False, so this flag is fully reversible).
+    # ADOPTED (06-07): measured on the frozen golden set, hybrid BM25+RRF beat
+    # dense-only by +17.8% context_recall (0.679->0.800) and +14.2% context_precision
+    # (0.579->0.661), NaN 0%, with NO exact-term regression -> flipped to True.
+    hybrid_search_enabled: bool = Field(
+        default=True,
+        description="Active la recherche hybride BM25 + dense (RRF). Adopté en 06-07 (gain RAGAS net et marqué, sans régression terme-exact) ; repli dense-only sûr si mis à False"
+    )
+    rrf_k: int = Field(
+        default=60,
+        ge=1,
+        description="Constante k de la Reciprocal Rank Fusion (fixée à 60 par le ROADMAP)"
+    )
+    rrf_score_threshold: float = Field(
+        default=0.015,
+        ge=0.0,
+        description="Seuil de score RRF dédié au mode hybride (0.015 validé empiriquement en 06-07 : contextes non vides + recall +18% sur le golden set)"
+    )
+    bm25_index_path: str = Field(
+        default="./data/bm25/index",
+        description="Chemin de persistance de l'index lexical BM25"
+    )
+
+    # Structure-aware Chunking (RAG-05 — feature flag, reversible). ADOPTED (07-06):
+    # default flipped False->True on a measured net RAGAS gain over the frozen corpus
+    # (context_precision +7.3%, context_recall +3.4%, 60-question golden set). Reversible
+    # to the byte-identical current splitter by setting this back to False.
+    structure_aware_chunking_enabled: bool = Field(
+        default=True,
+        description="Active le chunking structure-aware (métadonnée section_title, découpe alignée sur les titres). Défaut True : adopté sur delta RAGAS net (precision +7.3%, recall +3.4%) mesuré en 07-06"
+    )
+
     # Filename Pre-inclusion (fuzzy matching)
     filename_pre_inclusion: bool = Field(
         default=True,

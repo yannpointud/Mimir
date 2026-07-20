@@ -1,0 +1,99 @@
+{
+  "no_regression": true,
+  "dense_recall": 1.0,
+  "hybrid_recall": 1.0,
+  "per_query": [
+    {
+      "expected_doc_id": 22,
+      "dense_hit": true,
+      "hybrid_hit": true,
+      "dense_doc_ids": [
+        22,
+        22,
+        22,
+        18,
+        9
+      ],
+      "hybrid_doc_ids": [
+        22,
+        22,
+        22,
+        2,
+        10
+      ]
+    },
+    {
+      "expected_doc_id": 10,
+      "dense_hit": true,
+      "hybrid_hit": true,
+      "dense_doc_ids": [
+        10,
+        10,
+        10,
+        12
+      ],
+      "hybrid_doc_ids": [
+        10,
+        10,
+        10,
+        23,
+        22
+      ]
+    },
+    {
+      "expected_doc_id": 1,
+      "dense_hit": true,
+      "hybrid_hit": true,
+      "dense_doc_ids": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "hybrid_doc_ids": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "expected_doc_id": 19,
+      "dense_hit": true,
+      "hybrid_hit": true,
+      "dense_doc_ids": [
+        19,
+        19,
+        11,
+        18,
+        7
+      ],
+      "hybrid_doc_ids": [
+        19,
+        19,
+        7,
+        7,
+        7
+      ]
+    },
+    {
+      "expected_doc_id": 3,
+      "dense_hit": true,
+      "hybrid_hit": true,
+      "dense_doc_ids": [
+        3,
+        17,
+        1,
+        10,
+        7
+      ],
+      "hybrid_doc_ids": [
+        3,
+        10,
+        23
+      ]
+    }
+  ]
+}

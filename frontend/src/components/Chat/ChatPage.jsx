@@ -91,6 +91,7 @@ const ChatPage = () => {
       content: '',
       timestamp: new Date().toISOString(),
       sources: [],
+      citations: {},
       confidence: 0,
       isStreaming: true
     };
@@ -106,6 +107,17 @@ const ChatPage = () => {
           setMessages(prev => prev.map(msg =>
             msg.id === assistantMessageId
               ? { ...msg, content: msg.content + chunk }
+              : msg
+          ));
+        },
+
+        // The SSE `citation` event lands before `done`. Store the [N] -> source
+        // map via the same spread-preserve pattern as onChunk/onDone so sibling
+        // fields (content/sources/confidence) are never dropped.
+        onCitation: (citations) => {
+          setMessages(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, citations: citations || {} }
               : msg
           ));
         },

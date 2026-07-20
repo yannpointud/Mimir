@@ -1,0 +1,31 @@
+{
+  "run": 1,
+  "generated_at": "2026-07-13T19:47:36.815419+00:00",
+  "judge_model": "mistral-small-latest",
+  "embedding_model": "mistral-embed",
+  "run_config": {
+    "max_workers": 1,
+    "cache": false,
+    "temperature": 0
+  },
+  "n_samples": 40,
+  "n_adversarial": 0,
+  "metrics": [
+    "context_recall",
+    "context_precision"
+  ],
+  "per_metric": {
+    "context_recall": {
+      "mean": 0.6791666666666666,
+      "nan_rate": 0.0,
+      "nan_rate_corpus": 0.0,
+      "nan_rate_adversarial": 0.0
+    },
+    "context_precision": {
+      "mean": 0.5788194444013204,
+      "nan_rate": 0.0,
+      "nan_rate_corpus": 0.0,
+      "nan_rate_adversarial": 0.0
+    }
+  }
+}

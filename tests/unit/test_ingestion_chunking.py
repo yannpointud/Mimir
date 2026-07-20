@@ -4,6 +4,7 @@ Tests unitaires pour le chunking de texte intelligent
 
 import pytest
 from src.ingestion.chunking import ChunkingStrategy, ChunkingConfig
+from src.ingestion.extractors import MarkdownExtractor
 
 
 class TestChunkingConfig:
@@ -420,3 +421,161 @@ Once upon a time, in a land far away, there lived a princess who loved to read b
             # Chaque type de texte doit être traité correctement
             assert len(chunks) >= 1
             assert all(len(chunk['text'].strip()) > 0 for chunk in chunks)
+
+
+class TestStructureAwareChunking:
+    """Structure-aware chunking (RAG-05, 07-06): heading -> section_title metadata.
+
+    The load-bearing correctness fact (07-RESEARCH Pitfall 3): `.md` is ingested
+    as HTML via ``MarkdownExtractor(convert_to_html=True)``, so heading detection
+    must primarily target ``<h1>-<h6>`` tags. These tests therefore feed the REAL
+    extractor output (not hand-written ``#`` strings) for the HTML path, and only
+    exercise the raw ``#{1,6}`` path defensively.
+    """
+
+    # Small chunks force multiple boundaries so distinct sections land in
+    # distinct chunks regardless of the paragraph/sentence split path.
+    def _structure_config(self, enabled: bool) -> ChunkingConfig:
+        return ChunkingConfig(
+            chunk_size=300,
+            overlap=50,
+            min_chunk_size=30,
+            max_chunk_size=500,
+            section_title_tracking=enabled,
+        )
+
+    def _write_md(self, tmp_path, content: str) -> str:
+        path = tmp_path / "doc.md"
+        path.write_text(content, encoding="utf-8")
+        return str(path)
+
+    def test_config_defaults_section_tracking_off(self):
+        """The new flag defaults to False so chunking stays byte-identical."""
+        assert ChunkingConfig().section_title_tracking is False
+
+    def test_html_headings_drive_section_title(self, tmp_path):
+        """HTML <h1>-<h6> from the real extractor drive section_title."""
+        md = (
+            "# Document Title\n\n"
+            "## Section A\n\n"
+            + ("Alpha discusses the first topic in careful detail here. " * 12)
+            + "\n\n## Section B\n\n"
+            + ("Beta explains the second topic with thorough coverage now. " * 12)
+        )
+        html = MarkdownExtractor(convert_to_html=True).extract(
+            self._write_md(tmp_path, md)
+        )
+        # Sanity: the extractor really produced HTML heading tags, not `#`.
+        assert "<h2>Section A</h2>" in html
+        assert "<h2>Section B</h2>" in html
+
+        chunks = ChunkingStrategy(self._structure_config(True)).chunk_text(html)
+
+        titles = {c.get("section_title") for c in chunks}
+        assert "Section A" in titles
+        assert "Section B" in titles
+        # Every chunk carries the key when the flag is on.
+        assert all("section_title" in c for c in chunks)
+
+    def test_raw_markdown_headings_detected_defensively(self):
+        """Raw ``#{1,6}`` headings (e.g. a .txt) are detected defensively."""
+        text = (
+            "# Intro\n\n"
+            + ("Intro body sentence number one with content. " * 10)
+            + "\n\n## Details\n\n"
+            + ("Details body sentence with more content here. " * 10)
+        )
+        chunks = ChunkingStrategy(self._structure_config(True)).chunk_text(text)
+
+        titles = {c.get("section_title") for c in chunks}
+        assert "Intro" in titles
+        assert "Details" in titles
+
+    def test_flag_off_no_section_key_and_identical_boundaries(self, tmp_path):
+        """Flag off: no section_title key AND boundaries byte-identical to today."""
+        md = (
+            "# Document Title\n\n"
+            "## Section A\n\n"
+            + ("Alpha discusses the first topic in careful detail here. " * 12)
+            + "\n\n## Section B\n\n"
+            + ("Beta explains the second topic with thorough coverage now. " * 12)
+        )
+        html = MarkdownExtractor(convert_to_html=True).extract(
+            self._write_md(tmp_path, md)
+        )
+
+        off = ChunkingStrategy(self._structure_config(False)).chunk_text(html)
+        # Default config (no new field set) must match the explicit flag-off path.
+        default_cfg = ChunkingConfig(
+            chunk_size=300, overlap=50, min_chunk_size=30, max_chunk_size=500
+        )
+        baseline = ChunkingStrategy(default_cfg).chunk_text(html)
+
+        assert off == baseline
+        assert all("section_title" not in c for c in off)
+
+        # On-vs-off: identical text and character boundaries, only an extra key.
+        on = ChunkingStrategy(self._structure_config(True)).chunk_text(html)
+        assert len(on) == len(off)
+        for chunk_on, chunk_off in zip(on, off):
+            assert chunk_on["text"] == chunk_off["text"]
+            assert chunk_on["start_char"] == chunk_off["start_char"]
+            assert chunk_on["end_char"] == chunk_off["end_char"]
+
+    def test_small_single_chunk_gets_section_title_when_enabled(self, tmp_path):
+        """A short document that fits in one chunk still gets its section_title."""
+        md = "## Only Section\n\nA short body that fits within a single chunk."
+        html = MarkdownExtractor(convert_to_html=True).extract(
+            self._write_md(tmp_path, md)
+        )
+        chunks = ChunkingStrategy(self._structure_config(True)).chunk_text(html)
+
+        assert len(chunks) == 1
+        assert chunks[0]["section_title"] == "Only Section"
+
+
+class TestSectionTitleThreadingIntoMetadata:
+    """Task 2: section_title flows chunking dict -> Chunk.metadata (no migration)."""
+
+    def _new_processor(self):
+        # Bypass __init__ (heavy deps): _create_chunks uses only its arguments.
+        from src.ingestion.processor import IngestionProcessor
+
+        return IngestionProcessor.__new__(IngestionProcessor)
+
+    def test_section_title_reaches_chunk_metadata(self):
+        proc = self._new_processor()
+        chunks_data = [{
+            "text": "Alpha body.",
+            "chunk_index": 0,
+            "total_chunks": 1,
+            "start_char": 0,
+            "end_char": 11,
+            "word_count": 2,
+            "char_count": 11,
+            "section_title": "Section A",
+        }]
+        result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "src.md", {})
+
+        assert len(result) == 1
+        assert result[0].metadata["section_title"] == "Section A"
+
+    def test_flag_off_chunk_has_no_section_title_value(self):
+        """Flag-off chunk dict (no key) yields metadata section_title None, no error."""
+        proc = self._new_processor()
+        chunks_data = [{
+            "text": "Alpha body.",
+            "chunk_index": 0,
+            "total_chunks": 1,
+            "start_char": 0,
+            "end_char": 11,
+            "word_count": 2,
+            "char_count": 11,
+        }]
+        result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "src.md", {})
+
+        assert len(result) == 1
+        assert result[0].metadata.get("section_title") is None
+        # Existing metadata keys remain intact.
+        assert result[0].metadata["start_char"] == 0
+        assert result[0].metadata["char_count"] == 11

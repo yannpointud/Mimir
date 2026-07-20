@@ -335,6 +335,174 @@ class TestIngestionProcessor:
                 processor.vector_store.persist.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_pipeline_rebuilds_bm25_from_active_chunks(self, processor):
+        """RAG-02: a successful upsert rebuilds the BM25 index from the FAISS
+        active (non-deleted) chunks, through this single-writer worker."""
+        # Wire a BM25 store; the active-chunk snapshot comes from the FAISS
+        # store under its own lock (snapshot_active_chunks), so the worker just
+        # forwards whatever that lock-safe snapshot returns to rebuild().
+        processor.bm25_store = Mock()
+        processor.vector_store.snapshot_active_chunks = Mock(return_value=[
+            {"chunk_id": 0, "text": "active one"},
+            {"chunk_id": 2, "text": "active two"},
+        ])
+
+        task = IngestionTask(file_path="dummy_path", document_id="123", metadata={})
+        processor.llm_service.embed.return_value = EmbeddingResponse(
+            embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
+        )
+
+        with patch.object(processor, '_extract_text', return_value="Sample text"):
+            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
+                mock_chunk.return_value = [{
+                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+                }]
+
+                success = await processor._process_document_pipeline(task)
+
+        assert success is True
+        processor.vector_store.snapshot_active_chunks.assert_called_once()
+        processor.bm25_store.rebuild.assert_called_once()
+        rebuilt_chunks = processor.bm25_store.rebuild.call_args.args[0]
+        assert [c["chunk_id"] for c in rebuilt_chunks] == [0, 2]
+
+    @pytest.mark.asyncio
+    async def test_pipeline_bm25_rebuild_failure_is_non_fatal(self, processor):
+        """RAG-02: a BM25 rebuild that raises must NOT fail an ingestion whose
+        FAISS upsert/persist already succeeded (non-fatal, continuing anyway)."""
+        processor.bm25_store = Mock()
+        processor.bm25_store.rebuild.side_effect = RuntimeError("bm25 boom")
+        processor.vector_store.metadata = [
+            {"chunk_id": 0, "text": "active", "deleted": False},
+        ]
+
+        task = IngestionTask(file_path="dummy_path", document_id="123", metadata={})
+        processor.llm_service.embed.return_value = EmbeddingResponse(
+            embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
+        )
+
+        with patch.object(processor, '_extract_text', return_value="Sample text"):
+            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
+                mock_chunk.return_value = [{
+                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+                }]
+
+                success = await processor._process_document_pipeline(task)
+
+        # FAISS upsert succeeded, so the pipeline reports success despite BM25.
+        assert success is True
+        processor.bm25_store.rebuild.assert_called_once()
+        processor.vector_store.upsert.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_bulk_load_coalesces_bm25_rebuild(self, processor):
+        """RAG-06: N documents pre-enqueued before the worker starts trigger far
+        fewer than N BM25 rebuilds. The rebuild is coalesced to the queue-drain
+        point (Step 8 gated on queue_manager.is_empty()), removing the measured
+        quadratic bulk-load cost, while the FAISS upsert still runs once per
+        document (dense index stays authoritative throughout)."""
+        processor.bm25_store = Mock()
+        processor.vector_store.snapshot_active_chunks = Mock(return_value=[
+            {"chunk_id": 0, "text": "active"},
+        ])
+
+        n_docs = 5
+        processor.llm_service.embed.return_value = EmbeddingResponse(
+            embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
+        )
+
+        with patch.object(processor, '_extract_text', return_value="Sample text"):
+            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
+                mock_chunk.return_value = [{
+                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+                }]
+
+                # Pre-enqueue N documents BEFORE the worker starts: this is the
+                # realistic bulk-upload scenario where the queue is already full
+                # when the single-writer worker begins draining it.
+                for i in range(n_docs):
+                    task = IngestionTask(
+                        file_path=f"dummy_{i}", document_id=str(100 + i), metadata={}
+                    )
+                    assert processor.queue_manager.add_task(task) is True
+
+                await processor.start()
+                # Wait for the whole batch to drain (task_done for every item).
+                await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
+                await processor.stop()
+
+        # FAISS upsert ran once per document (dense index authoritative)...
+        assert processor.vector_store.upsert.call_count == n_docs
+        # ...but BM25 was rebuilt far fewer times than N (coalesced at drain).
+        # A tiny slack (<= 2) tolerates the self-correcting drain race without
+        # allowing the per-document quadratic behavior back in.
+        assert processor.bm25_store.rebuild.call_count <= 2, (
+            f"BM25 rebuilt {processor.bm25_store.rebuild.call_count} times for "
+            f"{n_docs} docs; expected coalescing to <= 2"
+        )
+
+    @pytest.mark.asyncio
+    async def test_last_doc_failure_still_rebuilds_bm25_for_earlier_docs(self, processor):
+        """WR-01 regression: in a batch of >=2 documents where the LAST document
+        fails before Step 8, the coalesced BM25 rebuild must still fire for the
+        earlier successfully-upserted documents. Previously the rebuild was gated
+        only on an empty queue inside the success path, so a trailing failure left
+        BM25 permanently stale vs FAISS (hybrid retrieval silently lost the earlier
+        docs from the lexical pool) until the next successful ingestion.
+
+        Only the coalescing test's all-success path was covered before; this proves
+        the failure-path drain rebuild, fired from _process_task's finally block."""
+        processor.bm25_store = Mock()
+        processor.vector_store.snapshot_active_chunks = Mock(return_value=[
+            {"chunk_id": 0, "text": "active"},
+        ])
+        processor.llm_service.embed.return_value = EmbeddingResponse(
+            embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
+        )
+
+        # Two documents: the first (100) succeeds through the whole pipeline; the
+        # second (101) fails at extraction -- BEFORE the FAISS upsert / Step 8 --
+        # then exhausts its retries so the batch drains with the last doc failed.
+        def _extract_side_effect(file_path):
+            if file_path == "dummy_fail":
+                raise ProcessingError("simulated extraction failure on last doc")
+            return "Sample text"
+
+        with patch.object(processor, '_extract_text', side_effect=_extract_side_effect):
+            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
+                mock_chunk.return_value = [{
+                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+                }]
+
+                ok_task = IngestionTask(
+                    file_path="dummy_ok", document_id="100", metadata={}
+                )
+                fail_task = IngestionTask(
+                    file_path="dummy_fail", document_id="101", metadata={},
+                )
+                # No retries for the failing task so the batch drains promptly.
+                fail_task.max_retries = 0
+                assert processor.queue_manager.add_task(ok_task) is True
+                assert processor.queue_manager.add_task(fail_task) is True
+
+                await processor.start()
+                await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
+                await processor.stop()
+
+        # The first document was upserted into FAISS...
+        assert processor.vector_store.upsert.call_count == 1
+        # ...and despite the last document failing, BM25 was rebuilt at drain so
+        # the earlier document is present in the lexical index (WR-01 fixed).
+        assert processor.bm25_store.rebuild.call_count >= 1, (
+            "BM25 was never rebuilt after the last doc of the batch failed; "
+            "the earlier successful document would be stale vs FAISS (WR-01)"
+        )
+
+    @pytest.mark.asyncio
     async def test_process_document_pipeline_empty_text(self, processor):
         """Test avec texte vide extrait"""
         task = IngestionTask(file_path="dummy", document_id="123")

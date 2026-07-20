@@ -432,6 +432,11 @@ async def chat_stream(
                 settle_state["settled"] = True
                 await asyncio.to_thread(budget_guard.release, reservation)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': cached_response['answer']})}\n\n"
+                # Replay the citation event before done so a cache hit is
+                # byte-for-byte indistinguishable from a fresh stream (RAG-04):
+                # the live pipeline yields chunk -> citation -> done, and the
+                # frontend must receive its [N] -> source map on hits too.
+                yield f"data: {json.dumps({'type': 'citation', 'citations': cached_response.get('citations', {})})}\n\n"
                 yield f"data: {json.dumps({'type': 'done', 'sources': cached_response.get('sources', []), 'confidence_score': cached_response.get('confidence_score', 0.0), 'cached': True})}\n\n"
                 return
 

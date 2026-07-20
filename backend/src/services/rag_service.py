@@ -22,12 +22,19 @@ from rapidfuzz import fuzz
 from src.database.repository import DocumentRepository
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 from src.rag_core.implementations.faiss_store import FaissVectorStore
+from src.rag_core.interfaces import SearchResult
+from src.rag_core.fusion import reciprocal_rank_fusion
 from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.cost.usage_tracker import UsageTracker
 from src.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Candidate pool size requested from each retriever in hybrid mode. Deliberately
+# larger than max_sources so RRF has enough ranked candidates to fuse before the
+# dedicated hybrid threshold trims the result (RESEARCH Pattern 2).
+_HYBRID_POOL_SIZE = 50
 
 # System prompt template for RAG context-based responses (moved from chat.py)
 MIMIR_SYSTEM_PROMPT = """Vous êtes Mimir, un assistant documentaire intelligent.
@@ -38,6 +45,9 @@ Règles importantes:
 2. Si la réponse n'est pas dans le contexte, dites-le clairement
 3. Soyez précis et factuel
 4. Utilisez un ton professionnel mais accessible
+5. Citez vos sources en utilisant la notation [N], où N correspond exactement au
+   numéro affiché devant chaque extrait de contexte ci-dessous. N'inventez jamais
+   un numéro de source qui n'existe pas dans le contexte fourni.
 
 Contexte documentaire:
 {context}
@@ -164,17 +174,127 @@ async def _pre_include_document_chunks(
     return pre_included_chunks
 
 
-def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "weighted") -> float:
+def _calculate_rrf_confidence(search_results: List[Any], rrf_k: int = 60) -> float:
+    """Confidence for hybrid (RRF) mode -- rank/consensus based (Option A).
+
+    RRF scores are NOT cosine similarities, so the weighted-magnitude formula
+    used in dense mode does not apply. A chunk retrieved by BOTH the dense and
+    lexical retrievers accumulates two 1/(k+rank) contributions, so its fused
+    magnitude already encodes cross-retriever consensus. Confidence is the best
+    fused score normalized by the theoretical two-retriever top-rank maximum
+    (2/(k+1) -- both retrievers ranking it #1), lightly boosted by how many
+    corroborating results agree, capped at 0.95 like the dense algorithm.
+
+    Args:
+        search_results: Fused search results (similarity_score = RRF score).
+        rrf_k: RRF damping constant used during fusion.
+
+    Returns:
+        Confidence score between 0.0 and 0.95.
+    """
+    if not search_results:
+        return 0.1
+
+    scores = [r.similarity_score for r in search_results]
+    best = max(scores)
+    max_possible = 2.0 / (rrf_k + 1)  # both retrievers rank the chunk #1
+    consensus = min(1.0, best / max_possible) if max_possible > 0 else 0.0
+    # Support factor: more corroborating results -> slightly higher confidence.
+    support = min(1.0, len(scores) / 5.0)
+    confidence = min(0.95, consensus * 0.8 + support * 0.15)
+
+    logger.debug(
+        f"RRF confidence: best={best:.4f}, max_possible={max_possible:.4f}, "
+        f"consensus={consensus:.3f}, support={support:.3f}, final={confidence:.3f}"
+    )
+    return confidence
+
+
+def _merge_and_attach_rrf_scores(
+    dense_pool: List[Any],
+    extra_results: List[Any],
+    fused_scores: Dict[int, float],
+    vector_store: Any,
+) -> List[Any]:
+    """Build a unified SearchResult list carrying fused RRF scores.
+
+    Dense hits are already SearchResult objects; chunk_ids known only to BM25
+    (or to a fuzzy pre-inclusion list) are reconstructed from the FAISS metadata
+    -- the single source of truth. Every result's similarity_score is REPLACED by
+    its fused RRF score so the downstream hybrid-mode filter/confidence operate on
+    rank scores rather than incompatible cosine magnitudes.
+
+    Args:
+        dense_pool: Raw dense SearchResult candidates (similarity_floor=0.0).
+        extra_results: Additional SearchResult objects usable for reconstruction
+            (e.g. filename pre-included chunks); may be empty.
+        fused_scores: chunk_id -> fused RRF score from reciprocal_rank_fusion.
+        vector_store: Source of FAISS metadata for lexical-only chunk_ids.
+
+    Returns:
+        SearchResult list sorted by descending fused score.
+    """
+    by_id: Dict[int, Any] = {}
+    for r in dense_pool:
+        by_id.setdefault(r.chunk_id, r)
+    for r in (extra_results or []):
+        by_id.setdefault(r.chunk_id, r)
+
+    # chunk_id -> metadata dict, restricted to non-deleted FAISS entries.
+    meta_by_id: Dict[int, Dict[str, Any]] = {}
+    for meta in (getattr(vector_store, "metadata", None) or []):
+        if isinstance(meta, dict) and not meta.get("deleted", False):
+            meta_by_id[meta["chunk_id"]] = meta
+
+    merged: List[Any] = []
+    for chunk_id, rrf_score in fused_scores.items():
+        existing = by_id.get(chunk_id)
+        if existing is not None:
+            existing.similarity_score = rrf_score
+            merged.append(existing)
+            continue
+        meta = meta_by_id.get(chunk_id)
+        if meta is None:
+            # chunk_id known to BM25 but absent from FAISS metadata (index
+            # drift) -- cannot reconstruct a source, skip it.
+            continue
+        merged.append(SearchResult(
+            chunk_id=meta["chunk_id"],
+            document_id=meta["document_id"],
+            text=meta["text"],
+            source=meta["source"],
+            similarity_score=rrf_score,
+            chunk_index=meta["chunk_index"],
+            total_chunks=meta["total_chunks"],
+            metadata=meta.get("metadata", {}),
+        ))
+
+    merged.sort(key=lambda x: x.similarity_score, reverse=True)
+    return merged
+
+
+def _calculate_weighted_confidence(
+    search_results: List[Any],
+    algorithm: str = "weighted",
+    mode: str = "dense",
+    rrf_k: int = 60,
+) -> float:
     """
     Calculate confidence score using different algorithms.
 
     Args:
         search_results: List of search results
         algorithm: "simple" or "weighted"
+        mode: "dense" (cosine magnitude, unchanged) or "hybrid" (RRF
+            rank/consensus based -- delegates to _calculate_rrf_confidence)
+        rrf_k: RRF damping constant, only used when mode == "hybrid"
 
     Returns:
         Confidence score between 0.0 and 0.95
     """
+    if mode == "hybrid":
+        return _calculate_rrf_confidence(search_results, rrf_k)
+
     if not search_results:
         return 0.1
 
@@ -187,6 +307,15 @@ def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "
 
     elif algorithm == "weighted":
         # Improved algorithm with degressive weighting
+
+        # Position-weighting assumes a descending-score order. Sort defensively so
+        # the metric is order-agnostic (WR-02): on the retrieval path the list is
+        # already sorted, so this is a no-op (byte-identical). After cross-encoder
+        # reranking the list is ordered by rerank score, NOT by similarity
+        # magnitude, so without this sort the degressive weights would be applied
+        # to a list whose position no longer reflects its score. The coherence and
+        # quality factors below use max()/std() and are already order-independent.
+        scores = sorted(scores, reverse=True)
 
         # 1. Position-weighted score (first results count more)
         weights = [1.0, 0.8, 0.6, 0.4, 0.2]  # Degressive weighting
@@ -235,7 +364,8 @@ def _calculate_weighted_confidence(search_results: List[Any], algorithm: str = "
         return _calculate_weighted_confidence(search_results, "simple")
 
 
-def _filter_dynamic_sources(search_results: List[Any], config: Any, question: str = "") -> List[Any]:
+def _filter_dynamic_sources(search_results: List[Any], config: Any, question: str = "",
+                            mode: str = "dense") -> List[Any]:
     """
     Dynamically filter sources based on relevance with gap detection.
 
@@ -243,6 +373,9 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
         search_results: List of search results (sorted by descending score)
         config: Configuration with similarity_threshold, min_sources, max_sources
         question: Question for named entity detection
+        mode: "dense" (cosine similarity_threshold floor, unchanged) or "hybrid"
+            (RRF rank scores -- use config.rrf_score_threshold, NEVER the cosine
+            0.5 floor which would filter every RRF result to zero, Pitfall #2)
 
     Returns:
         Filtered list of relevant sources
@@ -256,11 +389,18 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
     logger.debug(f"Dynamic filtering - Scores: {[f'{s:.3f}' for s in scores[:8]]}")
 
     # Dynamic filtering based on gap from the best score
-    # Threshold = max(SIMILARITY_THRESHOLD, best_score x (1 - DYNAMIC_FILTER_PERCENTAGE))
+    # Threshold = max(FLOOR, best_score x (1 - DYNAMIC_FILTER_PERCENTAGE))
+    # where FLOOR is the cosine similarity_threshold in dense mode and the
+    # dedicated rrf_score_threshold in hybrid mode. Using the cosine floor on RRF
+    # scores (~0.033 peak at k=60) would always wipe the whole result set.
     dynamic_threshold = best_score * (1 - config.dynamic_filter_percentage)
-    final_threshold = max(config.similarity_threshold, dynamic_threshold)
+    if mode == "hybrid":
+        final_threshold = max(config.rrf_score_threshold, dynamic_threshold)
+        method = f"hybrid@{final_threshold:.4f}"
+    else:
+        final_threshold = max(config.similarity_threshold, dynamic_threshold)
+        method = f"dynamic@{final_threshold:.3f}"
     filtered_results = [r for r in search_results if r.similarity_score >= final_threshold]
-    method = f"dynamic@{final_threshold:.3f}"
 
     logger.debug(f"Dynamic filtering: best={best_score:.3f}, gap={config.dynamic_filter_percentage:.2f}, "
                 f"threshold={final_threshold:.3f}, {len(search_results)} → {len(filtered_results)} chunks")
@@ -287,6 +427,82 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
     return filtered_results
 
 
+async def _hybrid_retrieve(
+    question: str,
+    question_embedding: np.ndarray,
+    vector_store: Any,
+    bm25_store: Any,
+    pre_included_chunks: List[Any],
+    rag_debug: RagDebugService,
+    session_id: str,
+    embedding_tokens: Any,
+) -> List[Any]:
+    """Run the hybrid retrieval branch: dense raw pool + BM25, fused via RRF.
+
+    The dense pool is fetched with similarity_floor=0.0 (raw ranking, Pitfall #1);
+    the BM25 pool comes from the lexical store. Filename pre-included chunks, when
+    present, are folded in as a THIRD ranked retriever so their signal stays on
+    the RRF scale (mixing their raw cosine boost scores into RRF scores would
+    reintroduce the threshold-wipeout pitfall). All blocking store calls go
+    through asyncio.to_thread, like the dense path.
+
+    Returns:
+        Unified SearchResult list with fused RRF scores (unsorted filtering is
+        applied by the caller via _filter_dynamic_sources(mode="hybrid")).
+    """
+    logger.info("Hybrid retrieval enabled: fusing dense + BM25 pools via RRF")
+    start_search = datetime.utcnow()
+
+    dense_pool = await asyncio.to_thread(
+        vector_store.query,
+        vector=question_embedding,
+        top_k=_HYBRID_POOL_SIZE,
+        filter_dict=None,
+        similarity_floor=0.0,
+    )
+    # Graceful degradation (milestone prime directive: never break the working
+    # engine). The BM25 index is only built at ingestion/deletion; on a cold
+    # start or an upgrade of an existing FAISS install it may not exist yet, and
+    # bm25_store.query() would raise. In that case fall back to dense-only for
+    # this query rather than let the exception break an otherwise-working engine.
+    try:
+        lexical_pool = await asyncio.to_thread(
+            bm25_store.query, question, _HYBRID_POOL_SIZE
+        )
+    except Exception as e:  # noqa: BLE001 -- any lexical-store failure degrades to dense-only
+        logger.warning(
+            f"BM25 lexical retrieval unavailable ({e}); degrading to dense-only for this query"
+        )
+        lexical_pool = []
+
+    rank_lists = [
+        [r.chunk_id for r in dense_pool],
+        [chunk_id for chunk_id, _ in lexical_pool],
+    ]
+    if pre_included_chunks:
+        rank_lists.append([c.chunk_id for c in pre_included_chunks])
+
+    fused_scores = reciprocal_rank_fusion(rank_lists, k=settings.rrf_k)
+    search_results = _merge_and_attach_rrf_scores(
+        dense_pool, pre_included_chunks, fused_scores, vector_store
+    )
+
+    search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
+    logger.info(
+        f"Hybrid fusion: dense={len(dense_pool)}, lexical={len(lexical_pool)}, "
+        f"fused={len(search_results)} candidates"
+    )
+
+    rag_debug.log_vector_search(
+        session_id=session_id,
+        search_results=search_results,
+        embedding_tokens=embedding_tokens,
+        search_time_ms=search_time,
+    )
+
+    return search_results
+
+
 async def _process_question_with_rag(
     question: str,
     context_limit: int,
@@ -298,7 +514,8 @@ async def _process_question_with_rag(
     rag_debug: RagDebugService,
     budget_guard: Optional["BudgetGuard"] = None,
     usage_tracker: Optional["UsageTracker"] = None,
-    reservation: Optional["BudgetReservation"] = None
+    reservation: Optional["BudgetReservation"] = None,
+    bm25_store: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
     Process question using RAG pipeline.
@@ -382,42 +599,60 @@ async def _process_question_with_rag(
                 logger.info(f"Pre-inclusion: {len(pre_included_chunks)} chunks from {len(matched_docs)} matched document(s)")
 
         # Step 2: Search vector store for relevant documents
-        logger.info(f"Searching for relevant context in vector store...")  # noqa: F541
-        start_search = datetime.utcnow()
-        search_results = await asyncio.to_thread(vector_store.query,
-            vector=question_embedding,
-            top_k=settings.max_sources * 2,  # Retrieve more to filter afterwards
-            filter_dict=None  # No filter for now
-        )
-        search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
+        hybrid_active = settings.hybrid_search_enabled and bm25_store is not None
+        retrieval_mode = "hybrid" if hybrid_active else "dense"
+        if hybrid_active:
+            # Hybrid branch: raw dense pool (similarity_floor=0.0) + BM25 pool,
+            # fused via RRF. Kept entirely separate from the dense-only code so
+            # the latter stays byte-identical (Option A).
+            search_results = await _hybrid_retrieve(
+                question=question,
+                question_embedding=question_embedding,
+                vector_store=vector_store,
+                bm25_store=bm25_store,
+                pre_included_chunks=pre_included_chunks,
+                rag_debug=rag_debug,
+                session_id=session_id,
+                embedding_tokens=embedding_response.usage_tokens,
+            )
+        else:
+            logger.info(f"Searching for relevant context in vector store...")  # noqa: F541
+            start_search = datetime.utcnow()
+            dense_top_k = settings.max_sources * 2
+            search_results = await asyncio.to_thread(vector_store.query,
+                vector=question_embedding,
+                top_k=dense_top_k,  # Retrieve more to filter afterwards
+                filter_dict=None  # No filter for now
+            )
+            search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
 
-        # 2. Log vector search results for RAG debug
-        rag_debug.log_vector_search(
-            session_id=session_id,
-            search_results=search_results,
-            embedding_tokens=embedding_response.usage_tokens,
-            search_time_ms=search_time
-        )
+            # 2. Log vector search results for RAG debug
+            rag_debug.log_vector_search(
+                session_id=session_id,
+                search_results=search_results,
+                embedding_tokens=embedding_response.usage_tokens,
+                search_time_ms=search_time
+            )
 
-        # Step 2.1: Merge pre-included chunks with vector search results
-        if pre_included_chunks:
-            # Create a set of pre-included chunk_ids to avoid duplicates
-            pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
+            # Step 2.1: Merge pre-included chunks with vector search results
+            if pre_included_chunks:
+                # Create a set of pre-included chunk_ids to avoid duplicates
+                pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
 
-            # Filter vector results to remove duplicates
-            unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
+                # Filter vector results to remove duplicates
+                unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
 
-            # Merge: pre-included first, then vector results
-            search_results = pre_included_chunks + unique_vector_results
+                # Merge: pre-included first, then vector results
+                search_results = pre_included_chunks + unique_vector_results
 
-            # Sort by descending score
-            search_results.sort(key=lambda x: x.similarity_score, reverse=True)
+                # Sort by descending score
+                search_results.sort(key=lambda x: x.similarity_score, reverse=True)
 
-            logger.info(f"Merge: {len(pre_included_chunks)} pre-included + {len(unique_vector_results)} vector = {len(search_results)} total")
+                logger.info(f"Merge: {len(pre_included_chunks)} pre-included + {len(unique_vector_results)} vector = {len(search_results)} total")
 
-        # Step 2.5: Apply dynamic source filtering
+        # Step 2.5: Apply dynamic source filtering.
         if search_results:
-            search_results = _filter_dynamic_sources(search_results, settings, question)
+            search_results = _filter_dynamic_sources(search_results, settings, question, mode=retrieval_mode)
 
         # Step 3: Build context from retrieved documents
         context_parts = []
@@ -426,10 +661,12 @@ async def _process_question_with_rag(
         if search_results:
             logger.info(f"Found {len(search_results)} relevant chunks")
 
-            for result in search_results:
-                context_parts.append(
-                    f"[Source: {result.source}] {result.text}"
-                )
+            # Single enumerate() pass builds the numbered context AND the sources
+            # list from the identical ordering, so the [N] markers fed to the LLM
+            # map one-to-one onto sources[N-1] (RAG-04, RESEARCH Pitfall 1). Do NOT
+            # re-sort or filter `sources` after this loop.
+            for i, result in enumerate(search_results, start=1):
+                context_parts.append(f"[{i}] {result.text}")
 
                 if include_sources:
                     # Retrieve the original document name
@@ -448,6 +685,10 @@ async def _process_question_with_rag(
                         "chunk_index": int(result.chunk_index),
                         "total_chunks": int(result.total_chunks)
                     })
+
+        # Derive the [N] -> source citation map from the SAME numbering used in the
+        # prompt above: citations[str(i+1)] is exactly sources[i] (RAG-04).
+        citations = {str(i + 1): sources[i] for i in range(len(sources))}
 
         # Step 4: Build prompt for LLM
         if context_parts:
@@ -507,17 +748,19 @@ Restez professionnel et utile."""
 
         # Calculate confidence score using the configured algorithm
         confidence_score = _calculate_weighted_confidence(
-            search_results, settings.confidence_algorithm
+            search_results, settings.confidence_algorithm,
+            mode=retrieval_mode, rrf_k=settings.rrf_k
         )
 
         logger.info(
             f"RAG response generated successfully - confidence: {confidence_score:.2f} "
-            f"(algorithm: {settings.confidence_algorithm})"
+            f"(algorithm: {settings.confidence_algorithm}, mode: {retrieval_mode})"
         )
 
         return {
             "answer": answer,
             "sources": sources,
+            "citations": citations,
             "confidence_score": round(confidence_score, 2),
             "session_id": session_id,
             "cached": False,
@@ -543,6 +786,7 @@ Restez professionnel et utile."""
         return {
             "answer": "Je suis désolé, une erreur technique s'est produite lors du traitement de votre question. L'équipe technique a été notifiée. Veuillez réessayer dans quelques instants ou contacter le support si le problème persiste.",
             "sources": [],
+            "citations": {},
             "confidence_score": 0.0,
             "session_id": session_id,
             "cached": False,
@@ -580,7 +824,8 @@ async def _process_question_with_rag_stream(
     usage_tracker: Optional["UsageTracker"] = None,
     reservation: Optional["BudgetReservation"] = None,
     chat_cache: Optional[Any] = None,
-    corpus_version: Optional[str] = None
+    corpus_version: Optional[str] = None,
+    bm25_store: Optional[Any] = None
 ):
     """
     Process question using RAG pipeline with streaming.
@@ -639,39 +884,57 @@ async def _process_question_with_rag_stream(
                 )
 
         # Step 2: Vector search
-        start_search = datetime.utcnow()
-        search_results = await asyncio.to_thread(vector_store.query,
-            vector=question_embedding,
-            top_k=settings.max_sources * 2,
-            filter_dict=None
-        )
-        search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
+        hybrid_active = settings.hybrid_search_enabled and bm25_store is not None
+        retrieval_mode = "hybrid" if hybrid_active else "dense"
+        if hybrid_active:
+            search_results = await _hybrid_retrieve(
+                question=question,
+                question_embedding=question_embedding,
+                vector_store=vector_store,
+                bm25_store=bm25_store,
+                pre_included_chunks=pre_included_chunks,
+                rag_debug=rag_debug,
+                session_id=session_id,
+                embedding_tokens=embedding_response.usage_tokens,
+            )
+        else:
+            start_search = datetime.utcnow()
+            dense_top_k = settings.max_sources * 2
+            search_results = await asyncio.to_thread(vector_store.query,
+                vector=question_embedding,
+                top_k=dense_top_k,
+                filter_dict=None
+            )
+            search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
 
-        rag_debug.log_vector_search(
-            session_id=session_id,
-            search_results=search_results,
-            embedding_tokens=embedding_response.usage_tokens,
-            search_time_ms=search_time
-        )
+            rag_debug.log_vector_search(
+                session_id=session_id,
+                search_results=search_results,
+                embedding_tokens=embedding_response.usage_tokens,
+                search_time_ms=search_time
+            )
 
-        # Step 2.1: Merge pre-included chunks
-        if pre_included_chunks:
-            pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
-            unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
-            search_results = pre_included_chunks + unique_vector_results
-            search_results.sort(key=lambda x: x.similarity_score, reverse=True)
+            # Step 2.1: Merge pre-included chunks
+            if pre_included_chunks:
+                pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
+                unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
+                search_results = pre_included_chunks + unique_vector_results
+                search_results.sort(key=lambda x: x.similarity_score, reverse=True)
 
-        # Step 2.5: Apply filtering
+        # Step 2.5: Apply filtering.
         if search_results:
-            search_results = _filter_dynamic_sources(search_results, settings, question)
+            search_results = _filter_dynamic_sources(search_results, settings, question, mode=retrieval_mode)
 
         # Step 3: Build context
         context_parts = []
         sources = []
 
         if search_results:
-            for result in search_results:
-                context_parts.append(f"[Source: {result.source}] {result.text}")
+            # Same single enumerate() pass as the non-stream path: numbered [N]
+            # context + sources built from one ordering so the derived citation
+            # map cannot drift from the prompt (RAG-04, RESEARCH Pitfall 1).
+            for i, result in enumerate(search_results, start=1):
+                context_parts.append(f"[{i}] {result.text}")
 
                 if include_sources:
                     try:
@@ -688,6 +951,10 @@ async def _process_question_with_rag_stream(
                         "chunk_index": int(result.chunk_index),
                         "total_chunks": int(result.total_chunks)
                     })
+
+        # Derive the [N] -> source citation map from the SAME numbering used above,
+        # emitted as its own SSE event before `done` (RAG-04).
+        citations = {str(i + 1): sources[i] for i in range(len(sources))}
 
         # Step 4: Build prompt
         if context_parts:
@@ -770,7 +1037,16 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                 chat_usage_recorded = True
 
         # Calculate confidence
-        confidence_score = _calculate_weighted_confidence(search_results, settings.confidence_algorithm)
+        confidence_score = _calculate_weighted_confidence(
+            search_results, settings.confidence_algorithm,
+            mode=retrieval_mode, rrf_k=settings.rrf_k
+        )
+
+        # Emit the [N] -> source citation map as its own SSE event immediately
+        # before `done` (RAG-04). The `done` event below is left untouched so the
+        # existing frontend contract stays byte-identical; the citation event is
+        # purely additive. Consumed by the 07-04 frontend as event.citations.
+        yield {"type": "citation", "citations": citations}
 
         # Send completion event - convert numpy types to Python native
         yield {
@@ -797,6 +1073,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                 {
                     "answer": full_answer,
                     "sources": sources,
+                    "citations": citations,
                     "confidence_score": float(round(confidence_score, 2)),
                 }
             )
@@ -852,6 +1129,7 @@ class RagService:
         budget_guard: Optional[BudgetGuard] = None,
         usage_tracker: Optional[UsageTracker] = None,
         chat_cache: Optional[Any] = None,
+        bm25_store: Optional[Any] = None,
     ):
         self.llm_service = llm_service
         self.vector_store = vector_store
@@ -859,6 +1137,9 @@ class RagService:
         self.budget_guard = budget_guard
         self.usage_tracker = usage_tracker
         self.chat_cache = chat_cache
+        # Optional lexical index for hybrid retrieval; only used when
+        # settings.hybrid_search_enabled is True (dense-only ignores it).
+        self.bm25_store = bm25_store
 
     async def answer(
         self,
@@ -889,6 +1170,7 @@ class RagService:
             budget_guard=self.budget_guard,
             usage_tracker=self.usage_tracker,
             reservation=reservation,
+            bm25_store=self.bm25_store,
         )
 
     async def answer_stream(
@@ -928,5 +1210,6 @@ class RagService:
             reservation=reservation,
             chat_cache=self.chat_cache,
             corpus_version=corpus_version,
+            bm25_store=self.bm25_store,
         ):
             yield event

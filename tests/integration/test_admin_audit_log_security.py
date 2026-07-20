@@ -77,6 +77,40 @@ class TestAuditLogAccessControl:
         assert response.status_code not in (401, 403)
 
 
+class TestAuditLogRegression:
+    """Regression coverage for the audit-log 500 deferred since phase 2.
+
+    The handler calls AuditLogRepository.get_logs_paginated() and reads
+    entry.additional_data; both were missing, so an authenticated admin GET
+    returned 500 instead of the audit trail. These tests lock the fix.
+    """
+
+    def test_get_with_admin_token_returns_200_and_wellformed_body(
+        self, test_app, admin_token
+    ):
+        """An authenticated admin GET returns 200 with a paginated body."""
+        client = TestClient(test_app)
+        response = client.get(
+            AUDIT_LOG_ROUTE, headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert "entries" in body and isinstance(body["entries"], list)
+        assert "total" in body and isinstance(body["total"], int)
+        assert "offset" in body and "limit" in body and "has_more" in body
+
+    def test_get_with_filters_returns_200(self, test_app, admin_token):
+        """Filtered admin GET (action + success) still returns 200."""
+        client = TestClient(test_app)
+        response = client.get(
+            AUDIT_LOG_ROUTE,
+            params={"action_filter": "login", "success_filter": True, "days_back": 30},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+        assert isinstance(response.json()["entries"], list)
+
+
 class TestAdminRouterDefaultDeny:
     """The /admin router carries a router-level require_admin dependency:
     no route under the prefix is reachable anonymously, even if an endpoint

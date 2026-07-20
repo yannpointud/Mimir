@@ -51,6 +51,23 @@ describe('useAuth - Tests Complets', () => {
     authUtils.getUser.mockReturnValue(null);
     authUtils.isAuthenticated.mockReturnValue(false);
     authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+
+    // Model the auth utils' real effect on token state. The provider's
+    // initial-auth effect depends on `logout` (which depends on
+    // isAuthenticated), so it re-runs on every auth toggle and re-derives
+    // auth from checkAndCleanExpiredAuth + getCurrentUser — exactly like
+    // production. These implementations make the mocks reflect that a stored
+    // token means "authenticated" and logout clears it, so the re-run effect
+    // does not wipe a just-completed login/logout.
+    authUtils.setAuthToken.mockImplementation(() => {
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(true);
+    });
+    authUtils.setUser.mockImplementation((u) => {
+      authAPI.getCurrentUser.mockResolvedValue(u);
+    });
+    authUtils.logout.mockImplementation(() => {
+      authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
+    });
   });
 
   afterEach(() => {
@@ -141,9 +158,12 @@ describe('useAuth - Tests Complets', () => {
 
   describe('Fonction de connexion', () => {
     it('devrait connecter l\'utilisateur avec succès', async () => {
-      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
+      // The backend LoginResponse returns access_token + user_type at the top
+      // level (no nested user object); the hook builds the stored user from the
+      // login username + the returned user_type.
       const mockToken = 'mock-jwt-token';
-      const mockResponse = { access_token: mockToken, user: mockUser };
+      const storedUser = { username: 'testuser', user_type: 'admin' };
+      const mockResponse = { access_token: mockToken, user_type: 'admin' };
 
       authAPI.login.mockResolvedValue(mockResponse);
       authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
@@ -163,9 +183,9 @@ describe('useAuth - Tests Complets', () => {
 
       expect(authAPI.login).toHaveBeenCalledWith('testuser', 'password123');
       expect(authUtils.setAuthToken).toHaveBeenCalledWith(mockToken);
-      expect(authUtils.setUser).toHaveBeenCalledWith(mockUser);
+      expect(authUtils.setUser).toHaveBeenCalledWith(storedUser);
       expect(loginResult).toEqual({ success: true });
-      expect(result.current.user).toEqual(mockUser);
+      expect(result.current.user).toEqual(storedUser);
       expect(result.current.isAuthenticated).toBe(true);
     });
 
@@ -217,9 +237,11 @@ describe('useAuth - Tests Complets', () => {
         loginResult = await result.current.login('testuser', 'password123');
       });
 
+      // getErrorMessage falls back to error.message when there is no
+      // response.data.detail, so a bare network Error surfaces its message.
       expect(loginResult).toEqual({
         success: false,
-        error: 'Erreur de connexion'
+        error: 'Network error'
       });
     });
   });
@@ -413,9 +435,9 @@ describe('useAuth - Tests Complets', () => {
 
   describe('Flux d\'authentification complexes', () => {
     it('devrait gérer une connexion suivie d\'une déconnexion', async () => {
-      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
       const mockToken = 'mock-jwt-token';
-      const mockResponse = { access_token: mockToken, user: mockUser };
+      const storedUser = { username: 'testuser', user_type: 'admin' };
+      const mockResponse = { access_token: mockToken, user_type: 'admin' };
 
       authAPI.login.mockResolvedValue(mockResponse);
       authAPI.logout.mockResolvedValue({});
@@ -435,7 +457,7 @@ describe('useAuth - Tests Complets', () => {
       });
 
       expect(result.current.isAuthenticated).toBe(true);
-      expect(result.current.user).toEqual(mockUser);
+      expect(result.current.user).toEqual(storedUser);
 
       // Logout
       await act(async () => {
@@ -482,11 +504,10 @@ describe('useAuth - Tests Complets', () => {
     });
 
     it('devrait gérer le rafraîchissement de token pendant une session active', async () => {
-      const mockUser = { id: 1, username: 'testuser', user_type: 'admin' };
       const mockToken = 'mock-jwt-token';
       const newToken = 'new-jwt-token';
 
-      authAPI.login.mockResolvedValue({ access_token: mockToken, user: mockUser });
+      authAPI.login.mockResolvedValue({ access_token: mockToken, user_type: 'admin' });
       authAPI.refreshToken.mockResolvedValue({ access_token: newToken });
       authUtils.checkAndCleanExpiredAuth.mockReturnValue(false);
 

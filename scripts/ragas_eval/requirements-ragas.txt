@@ -1,0 +1,30 @@
+# RAGAS scoring harness dependencies (RAG-01) -- installed in a SEPARATE
+# Python 3.11 virtualenv, NEVER in the main project venv.
+#
+# Rationale: ragas pulls heavy / conflicting transitive dependencies
+# (langchain, datasets, pandas) that must not collide with the main venv's
+# faiss-cpu / sqlalchemy / pydantic stack. The two venvs communicate only
+# through the eval_input.jsonl boundary file -- score_baseline.py imports
+# nothing from the Mimir backend.
+#
+# Versions are pinned. Both packages were flagged [SUS] (unknown-downloads /
+# too-new) by the offline legitimacy seam -- a documented false positive of the
+# same kind seen for ruff / pip-audit in phase 5 (see 06-RESEARCH.md "Package
+# Legitimacy Audit"). Human verification on pypi.org is gated by the plan's
+# checkpoint:human-verify (Task 1) before this file is installed.
+#
+#   ragas 0.4.3            -> https://pypi.org/project/ragas/0.4.3/
+#                            source: github.com/vibrantlabsai/ragas (ex explodinggradients)
+#   langchain-mistralai    -> https://pypi.org/project/langchain-mistralai/1.1.6/
+#                            official LangChain/Mistral integration (ChatMistralAI,
+#                            MistralAIEmbeddings) used as the RAGAS judge + embeddings.
+#
+# Install (separate venv only):
+#   python3.11 -m venv .venv-ragas
+#   . .venv-ragas/bin/activate
+#   pip install -r scripts/ragas_eval/requirements-ragas.txt
+#   # Verify the legacy metric import (Assumption A6):
+#   python -c "from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall; print('legacy API OK')"
+
+ragas==0.4.3
+langchain-mistralai==1.1.6

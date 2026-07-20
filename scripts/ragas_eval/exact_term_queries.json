@@ -1,0 +1,7 @@
+[
+  {"query": "Titan Security Core", "expected_doc_id": 22},
+  {"query": "Omega Protocol", "expected_doc_id": 10},
+  {"query": "Hyperion Analytics", "expected_doc_id": 1},
+  {"query": "Project Phoenix", "expected_doc_id": 19},
+  {"query": "Helios Initiative", "expected_doc_id": 3}
+]

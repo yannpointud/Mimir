@@ -392,6 +392,52 @@ class AuditLogRepository(BaseRepository):
             self._handle_db_error(e, "get audit logs")
             raise
     
+    def get_logs_paginated(self, offset: int = 0, limit: int = 100,
+                           filters: dict = None) -> tuple[List[AuditLog], int]:
+        """
+        Retrieve audit logs with pagination and total count
+
+        Args:
+            offset: Offset for pagination
+            limit: Maximum number of results
+            filters: Optional filters. Supported keys:
+                - action: partial match (LIKE %action%)
+                - user_type: exact match
+                - success: exact bool match
+                - since_date: created_at >= since_date
+
+        Returns:
+            Tuple (entries, total_count) where total_count reflects the
+            filtered set BEFORE pagination is applied.
+        """
+        try:
+            query = self.session.query(AuditLog)
+
+            if filters:
+                if filters.get("action"):
+                    query = query.filter(AuditLog.action.like(f"%{filters['action']}%"))
+                if filters.get("user_type"):
+                    query = query.filter_by(user_type=filters["user_type"])
+                if filters.get("success") is not None:
+                    query = query.filter(AuditLog.success == filters["success"])
+                if filters.get("since_date") is not None:
+                    query = query.filter(AuditLog.created_at >= filters["since_date"])
+
+            # Count the filtered set before pagination
+            total_count = query.count()
+
+            query = query.order_by(desc(AuditLog.created_at))
+            if offset > 0:
+                query = query.offset(offset)
+
+            entries = query.limit(limit).all()
+
+            return entries, total_count
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "get audit logs paginated")
+            raise
+
     def cleanup_old_logs(self, days_to_keep: int = 90) -> int:
         """
         Clean up old audit logs

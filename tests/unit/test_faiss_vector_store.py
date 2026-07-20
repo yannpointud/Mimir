@@ -225,6 +225,25 @@ class TestFaissVectorStore:
         c_texts = {c.text for c in store.get_document_chunks("doc_C")}
         assert c_texts == {"doc_C chunk 0", "doc_C chunk 1"}
 
+    def test_snapshot_active_chunks_excludes_deleted(self, temp_dir):
+        """snapshot_active_chunks returns lock-safe copies of non-deleted chunk
+        metadata only (WR-01 source for the BM25 rebuild)."""
+        store = FaissVectorStore(
+            dimension=128,
+            index_path=str(temp_dir / "snap.index"),
+            metadata_path=str(temp_dir / "snap.pkl")
+        )
+        store.metadata = [
+            {"chunk_id": 0, "text": "active one", "deleted": False},
+            {"chunk_id": 1, "text": "removed", "deleted": True},
+            {"chunk_id": 2, "text": "active two"},  # no 'deleted' key -> active
+        ]
+        snap = store.snapshot_active_chunks()
+        assert [c["chunk_id"] for c in snap] == [0, 2]
+        # Copies, not references: mutating the snapshot must not touch the store.
+        snap[0]["text"] = "mutated"
+        assert store.metadata[0]["text"] == "active one"
+
     def test_faiss_store_query_empty(self, temp_dir):
         """Test de requête sur store vide"""
         index_path = temp_dir / "empty.index"

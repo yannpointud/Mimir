@@ -10,6 +10,20 @@ from ..monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# Heading detection patterns (RAG-05, structure-aware chunking).
+# PRIMARY: HTML <h1>-<h6> tags, because `.md` is ingested as HTML via
+# MarkdownExtractor(convert_to_html=True) BEFORE chunking sees it (07-RESEARCH
+# Pitfall 3). Non-greedy `(.*?)` without DOTALL keeps the scan bounded per line,
+# mitigating catastrophic backtracking on pathological markup (T-07-06-02).
+_HTML_HEADING_RE = re.compile(r'<h[1-6][^>]*>(.*?)</h[1-6]>', re.IGNORECASE)
+# DEFENSIVE: raw Markdown-style headings for inputs that reach chunking as plain
+# text (e.g. a .txt carrying `#`-style headers). Anchored, line-bounded.
+_MD_HEADING_RE = re.compile(r'^#{1,6}\s+(.*)$', re.MULTILINE)
+# Strip any residual inline tags out of a captured HTML heading so the stored
+# section_title is plain-text DATA, never rendered markup (T-07-06-01).
+_INNER_TAG_RE = re.compile(r'<[^>]+>')
+
+
 @dataclass
 class ChunkingConfig:
     """Configuration for chunking strategy"""
@@ -19,6 +33,10 @@ class ChunkingConfig:
     max_chunk_size: int = 3000  # Maximum chunk size before force split (increased for resumes)
     preserve_sentences: bool = True  # Try to keep sentences intact
     preserve_paragraphs: bool = True  # Try to keep paragraphs intact
+    # Structure-aware chunking (RAG-05, feature flag). When True, each chunk dict
+    # gains a 'section_title' key derived from the nearest preceding heading.
+    # Default False keeps chunking output byte-identical to the current splitter.
+    section_title_tracking: bool = False
 
 class ChunkingStrategy:
     """Smart text chunking with sentence and paragraph boundaries"""
@@ -53,7 +71,7 @@ class ChunkingStrategy:
 
         if len(cleaned_text) <= self.config.chunk_size:
             # Text is small enough to be one chunk
-            return [{
+            single_chunk = [{
                 'text': cleaned_text,
                 'chunk_index': 0,
                 'total_chunks': 1,
@@ -62,6 +80,10 @@ class ChunkingStrategy:
                 'word_count': len(cleaned_text.split()),
                 'char_count': len(cleaned_text)
             }]
+            if self.config.section_title_tracking:
+                headings = self._detect_headings(cleaned_text)
+                self._assign_section_titles(single_chunk, headings)
+            return single_chunk
 
         chunks = []
 
@@ -80,6 +102,13 @@ class ChunkingStrategy:
                 'word_count': len(chunk_data['text'].split()),
                 'char_count': len(chunk_data['text'])
             })
+
+        # Structure-aware pass (flag-gated): tag each chunk with its section
+        # title. Runs AFTER boundaries are fixed, so it never alters chunk text
+        # or positions — the flag-off path stays byte-identical.
+        if self.config.section_title_tracking:
+            headings = self._detect_headings(cleaned_text)
+            self._assign_section_titles(chunks, headings)
 
         logger.info(
             f"Chunked text into {len(chunks)} chunks (avg: {sum(len(c['text']) for c in chunks) // len(chunks)} chars)",
@@ -123,6 +152,76 @@ class ChunkingStrategy:
         result = result.strip()
 
         return result
+
+    def _detect_headings(self, text: str) -> List[tuple]:
+        """
+        Detect document headings in reading order from the (line-intact) text.
+
+        Detection runs against the CLEANED text — before chunking joins sentences
+        with spaces and destroys line boundaries — so raw `#{1,6}` headings are
+        matched reliably (a chunk-local scan would over-capture once the newline
+        after the marker is gone). Scans HTML <h1>-<h6> PRIMARILY (the real shape
+        of ingested `.md`, 07-RESEARCH Pitfall 3) and raw `#{1,6}` DEFENSIVELY.
+
+        Each heading is returned with a compiled "signature" that re-matches the
+        heading in its MARKED form (tag- or `#`-prefixed) inside a chunk, so a
+        section title is never confused with the same words appearing in body
+        prose (e.g. "Details" the heading vs. "Details" in a sentence).
+
+        Args:
+            text: Cleaned document text
+
+        Returns:
+            List of (signature_regex, title) in order of appearance
+        """
+        found: List[tuple] = []  # (position, signature, title)
+
+        for match in _HTML_HEADING_RE.finditer(text):
+            # Strip any inner tags so the stored title is plain data (T-07-06-01).
+            title = _INNER_TAG_RE.sub('', match.group(1)).strip()
+            if title:
+                signature = re.compile(r'<h[1-6][^>]*>\s*' + re.escape(title))
+                found.append((match.start(), signature, title))
+
+        for match in _MD_HEADING_RE.finditer(text):
+            title = match.group(1).strip()
+            if title:
+                signature = re.compile(r'#{1,6}\s+' + re.escape(title))
+                found.append((match.start(), signature, title))
+
+        found.sort(key=lambda item: item[0])
+        return [(signature, title) for _, signature, title in found]
+
+    def _assign_section_titles(
+        self, chunks: List[Dict[str, Any]], headings: List[tuple]
+    ) -> None:
+        """
+        Tag each chunk with its section title by consuming headings in order.
+
+        Headings appear across chunks in document order, so a single forward
+        pointer suffices: for each chunk, consume every heading whose signature
+        matches inside it (updating the current section to the last consumed),
+        then assign the current section to the chunk. Chunks before the first
+        heading get None. This never touches chunk text or positions, so the
+        flag-off path stays byte-identical. Mutates the chunk dicts in place.
+
+        Args:
+            chunks: Chunk dicts (carrying 'text'); each gains a 'section_title'.
+            headings: Ordered (signature_regex, title) list from
+                ``_detect_headings``.
+        """
+        current_section: Optional[str] = None
+        index = 0
+        for chunk in chunks:
+            text = chunk['text']
+            while index < len(headings):
+                signature, title = headings[index]
+                if signature.search(text):
+                    current_section = title
+                    index += 1
+                else:
+                    break
+            chunk['section_title'] = current_section
 
     def _chunk_by_paragraphs(self, text: str) -> List[Dict[str, Any]]:
         """
