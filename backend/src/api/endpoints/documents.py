@@ -5,10 +5,10 @@ This module provides endpoints for uploading, managing, and monitoring
 documents in the RAG system.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any  # noqa: F401
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, Response
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  # noqa: F401
 from datetime import datetime
 import asyncio
 import logging
@@ -19,7 +19,7 @@ from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
-from src.database.connection import get_db_session
+from src.database.connection import get_db_session  # noqa: F401
 from src.database.repository import DocumentRepository, AuditLogRepository
 from src.api.dependencies import get_document_repository, get_audit_log_repository, get_ingestion_processor, get_vector_store
 from src.shared.models import (
@@ -28,7 +28,6 @@ from src.shared.models import (
     PaginationModel, validate_filename, sanitize_filename
 )
 from src.ingestion.extractors import ExtractorFactory
-from src.ingestion.queue_manager import TaskPriority
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -304,7 +303,6 @@ async def upload_document(
     response: Response,
     file: UploadFile = File(...),
     preserve: bool = Form(False, description="Protect document from automatic deletion"),
-    priority: str = Form("normal", description="Processing priority (urgent, high, normal, low)"),
     current_user: Dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
@@ -319,7 +317,6 @@ async def upload_document(
             X-RateLimit-* headers on successful (Pydantic) returns
         file: Uploaded file
         preserve: Whether to protect from deletion
-        priority: Processing priority
         current_user: Current authenticated user
         doc_repo: Document repository
         audit_repo: Audit log repository
@@ -408,27 +405,16 @@ async def upload_document(
                 "document_id": document.id,
                 "filename": safe_filename,
                 "file_size": len(content),
-                "preserve": preserve,
-                "priority": priority
+                "preserve": preserve
             }
         )
 
         # Queue document for processing with the ingestion processor
         try:
-            # Map string priority to TaskPriority enum
-            priority_mapping = {
-                "urgent": TaskPriority.URGENT,
-                "high": TaskPriority.HIGH,
-                "normal": TaskPriority.NORMAL,
-                "low": TaskPriority.LOW
-            }
-            task_priority = priority_mapping.get(priority.lower(), TaskPriority.NORMAL)
-
             # Queue the document for processing
             queued = ingestion_processor.queue_document(
                 file_path=file_path,
                 document_id=str(document.id),
-                priority=task_priority,
                 preserve=preserve,
                 metadata={"uploaded_by": current_user.get("username", "unknown")}
             )
@@ -669,7 +655,6 @@ async def toggle_document_preservation(
 @router.post("/{document_id}/reprocess", response_model=BaseResponse)
 async def reprocess_document(
     document_id: int,
-    priority: str = Query("normal", description="Processing priority"),
     current_user: Dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
@@ -680,7 +665,6 @@ async def reprocess_document(
 
     Args:
         document_id: Document ID to reprocess
-        priority: Processing priority
         current_user: Current authenticated user
         doc_repo: Document repository
         audit_repo: Audit log repository
@@ -700,22 +684,12 @@ async def reprocess_document(
         # Reset document status for reprocessing
         doc_repo.update_status(document_id, "pending", error_message=None)
 
-        # Queue document for reprocessing with specified priority
+        # Queue document for reprocessing
         try:
-            # Map string priority to TaskPriority enum
-            priority_mapping = {
-                "urgent": TaskPriority.URGENT,
-                "high": TaskPriority.HIGH,
-                "normal": TaskPriority.NORMAL,
-                "low": TaskPriority.LOW
-            }
-            task_priority = priority_mapping.get(priority.lower(), TaskPriority.NORMAL)
-
             # Queue the document for reprocessing
             queued = ingestion_processor.queue_document(
                 file_path=document.path,
                 document_id=str(document_id),
-                priority=task_priority,
                 preserve=document.preserve,
                 metadata={"reprocessed_by": current_user.get("username", "unknown")}
             )
@@ -756,8 +730,7 @@ async def reprocess_document(
             success=True,
             additional_data={
                 "document_id": document_id,
-                "filename": document.filename,
-                "priority": priority
+                "filename": document.filename
             }
         )
 

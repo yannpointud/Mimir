@@ -65,12 +65,25 @@ def admin_token():
 
 @pytest.fixture
 def mocked_rag():
-    """Override LLM service and vector store via app.dependency_overrides so
-    the chat tests never call the real Mistral API nor touch the real FAISS
-    index. The mocked pipeline produces a complete, deterministic SSE stream
-    (start -> chunk -> done)."""
+    """Override the RAG service via app.dependency_overrides so the chat tests
+    never call the real Mistral API nor touch the real FAISS index. The mocked
+    pipeline produces a complete, deterministic SSE stream (start -> chunk ->
+    done).
+
+    Since plan 04-04 the chat routes reach the pipeline exclusively through
+    Depends(get_rag_service) (the llm_service/vector_store collaborators live
+    inside the injected RagService), so overriding get_llm_service /
+    get_vector_store alone no longer reaches the pipeline -- the override must
+    target get_rag_service with a RagService built from the mock LLM + stub
+    vector store. The real budget_guard / usage_tracker / rag_debug / chat_cache
+    singletons are kept so the reservation is still settled and the usage row is
+    still written."""
     from main import app
-    from src.api.dependencies import get_llm_service, get_vector_store
+    from src.api.dependencies import (
+        get_rag_service, get_rag_debug_service, get_budget_guard,
+        get_usage_tracker, get_chat_cache_service,
+    )
+    from src.services.rag_service import RagService
 
     mock_llm = Mock()
     mock_llm.embed = AsyncMock(
@@ -93,13 +106,19 @@ def mocked_rag():
     mock_store = Mock()
     mock_store.query = Mock(return_value=[])
 
-    app.dependency_overrides[get_llm_service] = lambda: mock_llm
-    app.dependency_overrides[get_vector_store] = lambda: mock_store
+    rag_service = RagService(
+        llm_service=mock_llm,
+        vector_store=mock_store,
+        rag_debug=get_rag_debug_service(),
+        budget_guard=get_budget_guard(),
+        usage_tracker=get_usage_tracker(),
+        chat_cache=get_chat_cache_service(),
+    )
+    app.dependency_overrides[get_rag_service] = lambda: rag_service
 
     yield
 
-    app.dependency_overrides.pop(get_llm_service, None)
-    app.dependency_overrides.pop(get_vector_store, None)
+    app.dependency_overrides.pop(get_rag_service, None)
 
 
 class TestLoginRateLimit:

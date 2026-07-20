@@ -6,10 +6,37 @@ These tests cover JWT token management and password hashing.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock  # noqa: F401
 from freezegun import freeze_time
-from jose import jwt
+import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWTHandler
 from backend.src.auth.jwt_handler import JWTHandler
+
+
+# --- DEBT-02 backward-compatibility fixtures (frozen BEFORE the PyJWT/pwdlib migration) ---
+#
+# These constants were generated ONCE against the pre-migration stack (passlib bcrypt +
+# jose.jwt) and are frozen verbatim. They prove that credentials issued by the OLD stack
+# keep working under the NEW stack (T-4-01-03, DEBT-02 success criterion 2).
+#
+# Frozen bcrypt hash, generated with:
+#   passlib.context.CryptContext(schemes=["bcrypt"], deprecated="auto").hash(KNOWN_PASSWORD)
+KNOWN_PASSWORD_FOR_FROZEN_HASH = "MimirFrozenP@ss2026!"
+FROZEN_BCRYPT_HASH = "$2b$12$dGNdoXbBoi7bScG576fzSOAR2Tp7Ny7roMtY5F3CRJimQhj2yezRS"
+
+# Frozen JWT, generated with:
+#   jose.jwt.encode({"user_id": 42, "username": "frozen_user", "type": "access",
+#                     "iat": datetime(2026, 1, 1, tzinfo=timezone.utc),
+#                     "exp": datetime(2099, 1, 1, tzinfo=timezone.utc)},
+#                    "a" * 32, algorithm="HS256")
+# Secret matches the "a" * 32 secret used by the jwt_handler fixtures below.
+FROZEN_JWT_SECRET = "a" * 32
+FROZEN_JWT = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJ1c2VyX2lkIjo0MiwidXNlcm5hbWUiOiJmcm96ZW5fdXNlciIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3Nj"
+    "cyMjU2MDAsImV4cCI6NDA3MDkwODgwMH0.BJQR1r7Z6K-LIrgcNGGIgeTzV2qkPCq9vrgdj1FSosQ"
+)
+FROZEN_JWT_USER_ID = 42
+FROZEN_JWT_USERNAME = "frozen_user"
 
 
 class TestJWTHandlerInit:
@@ -216,7 +243,7 @@ class TestPasswordOperations:
         assert isinstance(hashed, str)
         assert len(hashed) > 0
         assert hashed != password  # Hash must not be the plaintext password
-        assert hashed.startswith("$2b$")  # bcrypt format
+        assert hashed.startswith("$argon2")  # Argon2 format (DEBT-02 migration, T-4-01-01)
 
     def test_hash_password_empty(self, jwt_handler):
         """Test hashing an empty password."""
@@ -267,7 +294,7 @@ class TestPasswordOperations:
         assert jwt_handler.verify_password("password", None) is False
         assert jwt_handler.verify_password(None, None) is False
 
-    @patch('backend.src.auth.jwt_handler.CryptContext.verify')
+    @patch('backend.src.auth.jwt_handler.PasswordHash.verify')
     def test_verify_password_exception(self, mock_verify, jwt_handler):
         """Test exception handling during verification."""
         mock_verify.side_effect = Exception("Verification failed")
@@ -275,6 +302,53 @@ class TestPasswordOperations:
         is_valid = jwt_handler.verify_password("password", "hash")
 
         assert is_valid is False
+
+
+class TestBackwardCompatibility:
+    """DEBT-02: frozen pre-migration credentials must keep working post-migration.
+
+    These tests are written and committed BEFORE jwt_handler.py is touched (frozen
+    constants generated against the OLD passlib/jose stack, see module-level comment).
+    They run GREEN against the unmodified code (proving the fixtures are valid) and
+    MUST still run GREEN after the PyJWT/pwdlib migration (Task 3) -- that persistence
+    across the swap is the actual proof required by success criterion 2.
+    """
+
+    @pytest.fixture
+    def jwt_handler(self):
+        """Fixture for JWTHandler with the secret matching the frozen JWT above."""
+        with patch('backend.src.auth.jwt_handler.settings') as mock_settings:
+            mock_settings.jwt_secret_key = FROZEN_JWT_SECRET
+            mock_settings.jwt_algorithm = "HS256"
+            mock_settings.jwt_expiration_hours = 24
+            return JWTHandler()
+
+    def test_bcrypt_hash_created_before_migration_still_verifies(self, jwt_handler):
+        """A bcrypt hash produced by the pre-migration passlib CryptContext must still
+        verify True through the (post-migration) pwdlib-based verify_password (T-4-01-03)."""
+        assert jwt_handler.verify_password(
+            KNOWN_PASSWORD_FOR_FROZEN_HASH, FROZEN_BCRYPT_HASH
+        ) is True
+
+    def test_bcrypt_hash_rejects_wrong_password(self, jwt_handler):
+        """Sanity check: the frozen hash does not verify against an arbitrary password."""
+        assert jwt_handler.verify_password("wrong-password", FROZEN_BCRYPT_HASH) is False
+
+    def test_jwt_created_before_migration_still_verifies(self, jwt_handler):
+        """A JWT signed by the pre-migration jose.jwt.encode must still decode through
+        the (post-migration) PyJWT-based verify_token (T-4-01-03)."""
+        payload = jwt_handler.verify_token(FROZEN_JWT)
+
+        assert payload is not None
+        assert payload["user_id"] == FROZEN_JWT_USER_ID
+        assert payload["username"] == FROZEN_JWT_USERNAME
+        assert payload["type"] == "access"
+
+    def test_new_hashes_use_argon2_not_bcrypt(self, jwt_handler):
+        """After migration, hash_password() must produce Argon2 hashes (no silent
+        downgrade to bcrypt for NEW passwords) -- threat T-4-01-01."""
+        hashed = jwt_handler.hash_password("some-brand-new-password")
+        assert hashed.startswith("$argon2")
 
 
 class TestGetTokenExpiry:

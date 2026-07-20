@@ -6,7 +6,7 @@ Provides extractors for PDF, DOCX, TXT, and Markdown files
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, Dict, Any
-import logging
+import logging  # noqa: F401
 
 # Import document processing libraries
 try:
@@ -128,6 +128,11 @@ class PDFExtractor(TextExtractor):
                         logger.warning(f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}")
                         continue
 
+                # Capture the page count while the handle is still open: pypdf
+                # reads the page tree lazily, so len(reader.pages) after the
+                # `with` block can raise "I/O operation on closed file".
+                page_count = len(reader.pages)
+
             if not text_parts:
                 logger.warning(f"No text extracted from PDF: {file_path}")
                 return ""
@@ -138,7 +143,7 @@ class PDFExtractor(TextExtractor):
                 f"Extracted {len(extracted_text)} characters from PDF: {Path(file_path).name}",
                 extra={'extra_fields': {
                     'file_path': file_path,
-                    'pages': len(reader.pages),
+                    'pages': page_count,
                     'characters': len(extracted_text),
                     'type': 'pdf_extraction'
                 }}

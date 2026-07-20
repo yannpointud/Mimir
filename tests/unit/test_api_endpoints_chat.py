@@ -6,11 +6,12 @@ import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status  # noqa: F401
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from backend.src.api.endpoints.chat import (
-    router, chat, escalate_to_human, get_session_history, clear_session_history,
+    escalate_to_human, get_session_history, clear_session_history,
     ChatRequest, ChatResponse, SourceReference, EscalationRequest, EscalationResponse
 )
 
@@ -123,43 +124,31 @@ class TestChatModels:
 
 
 class TestChatEndpoint:
-    """Tests for the main chat endpoint."""
+    """HTTP-contract tests for the main chat endpoint.
+
+    Route tests drive the endpoint through a FastAPI TestClient and override
+    the get_rag_service dependency with a mock RagService (answer = AsyncMock),
+    instead of patching the moved pipeline function. This is the DEBT-01 /
+    plan 04-04 replacement for the old module-level function patch: the route
+    now delegates to RagService via Depends(get_rag_service).
+    """
+
+    CHAT_ROUTE = "/api/v1/chat/"
 
     @pytest.fixture
-    def mock_request(self):
-        """Mock FastAPI request."""
-        mock_req = Mock()
-        mock_req.client.host = "127.0.0.1"
-        mock_req.headers = {}
-        return mock_req
-
-    @pytest.fixture
-    def mock_chat_cache(self):
-        """Mock chat cache service."""
-        return Mock()
-
-    @pytest.fixture
-    def mock_rag_debug(self):
-        """Mock RAG debug service."""
+    def mock_rag_service(self):
+        """Mock RagService whose answer() is an AsyncMock returning canned output."""
         mock = Mock()
-        mock.log_user_request = Mock()
-        mock.log_response = Mock()
+        mock.answer = AsyncMock()
         return mock
 
     @pytest.fixture
-    def mock_llm_service(self):
-        """Mock LLM service."""
-        return Mock()
-
-    @pytest.fixture
-    def mock_vector_store(self):
-        """Mock vector store."""
-        return Mock()
-
-    @pytest.fixture
-    def mock_document_repository(self):
-        """Mock document repository."""
-        return Mock()
+    def mock_chat_cache(self):
+        """Mock chat cache service: no cache hit by default."""
+        mock = Mock()
+        mock.get_chat_response.return_value = None
+        mock.set_chat_response = Mock()
+        return mock
 
     @pytest.fixture
     def mock_budget_guard(self):
@@ -171,25 +160,39 @@ class TestChatEndpoint:
         return mock
 
     @pytest.fixture
-    def mock_usage_tracker(self):
-        """Mock UsageTracker: record() returns a deterministic euro cost."""
-        mock = Mock()
-        mock.record = Mock(return_value=0.0)
-        return mock
+    def client(self, mock_rag_service, mock_chat_cache, mock_budget_guard):
+        """TestClient with the chat route's collaborators overridden by mocks.
 
-    @patch('backend.src.api.endpoints.chat._process_question_with_rag')
-    @patch('backend.src.api.endpoints.chat._generate_session_id')
-    def test_chat_success_no_cache(
-        self, mock_session_id, mock_process_rag, mock_request, mock_chat_cache,
-        mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
-        mock_budget_guard, mock_usage_tracker
-    ):
+        Overriding get_rag_service is the DEBT-01 replacement for patching the
+        module-level pipeline function; document_repository and rag_debug are
+        overridden with bare Mocks so no real DB session or debug-log file is
+        touched. TestClient is used WITHOUT the context manager so the app
+        lifespan (real DB / FAISS init) never runs -- every route dependency
+        is a mock.
+        """
+        from main import app
+        from src.api.dependencies import (
+            get_rag_service, get_chat_cache_service, get_budget_guard,
+            get_document_repository, get_rag_debug_service,
+        )
+        from src.auth.middleware import get_optional_user
+
+        app.dependency_overrides[get_rag_service] = lambda: mock_rag_service
+        app.dependency_overrides[get_chat_cache_service] = lambda: mock_chat_cache
+        app.dependency_overrides[get_budget_guard] = lambda: mock_budget_guard
+        app.dependency_overrides[get_document_repository] = lambda: Mock()
+        app.dependency_overrides[get_rag_debug_service] = lambda: Mock()
+
+        yield TestClient(app)
+
+        for dep in (get_rag_service, get_chat_cache_service, get_budget_guard,
+                    get_document_repository, get_rag_debug_service, get_optional_user):
+            app.dependency_overrides.pop(dep, None)
+
+    def test_chat_success_no_cache(self, client, mock_rag_service, mock_chat_cache):
         """Test successful chat without cache."""
 
-        # Configure mocks
-        mock_session_id.return_value = "session_123"
-        mock_chat_cache.get_chat_response.return_value = None  # No cache
-        mock_process_rag.return_value = {
+        mock_rag_service.answer.return_value = {
             "answer": "Réponse générée",
             "sources": [],
             "confidence_score": 0.8,
@@ -198,38 +201,24 @@ class TestChatEndpoint:
             "timestamp": datetime.utcnow()
         }
 
-        chat_request = ChatRequest(question="Test question")
-
-        # Call the function
-        result = asyncio.run(chat(
-            request=mock_request,
-            chat_request=chat_request,
-            current_user=None,
-            chat_cache=mock_chat_cache,
-            llm_service=mock_llm_service,
-            vector_store=mock_vector_store,
-            document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug,
-            budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
-        ))
+        response = client.post(
+            self.CHAT_ROUTE,
+            json={"question": "Test question", "session_id": "session_123"}
+        )
 
         # Assertions
-        assert result.answer == "Réponse générée"
-        assert result.session_id == "session_123"
-        assert result.cached is False
-        assert result.confidence_score == 0.8
-        mock_process_rag.assert_called_once()
+        assert response.status_code == 200
+        data = response.json()
+        assert data["answer"] == "Réponse générée"
+        assert data["session_id"] == "session_123"
+        assert data["cached"] is False
+        assert data["confidence_score"] == 0.8
+        mock_rag_service.answer.assert_awaited_once()
         mock_chat_cache.set_chat_response.assert_called_once()
 
-    @patch('backend.src.api.endpoints.chat._generate_session_id')
-    def test_chat_success_with_cache(self, mock_session_id, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
-                                     mock_budget_guard, mock_usage_tracker):
+    def test_chat_success_with_cache(self, client, mock_chat_cache, mock_budget_guard):
         """Test successful chat with cache hit."""
 
-        # Configure mocks
-        mock_session_id.return_value = "session_123"
         cached_response = {
             "answer": "Réponse en cache",
             "sources": [],
@@ -240,40 +229,31 @@ class TestChatEndpoint:
         }
         mock_chat_cache.get_chat_response.return_value = cached_response
 
-        chat_request = ChatRequest(question="Test question")
-
-        # Call the function
-        result = asyncio.run(chat(
-            request=mock_request,
-            chat_request=chat_request,
-            current_user=None,
-            chat_cache=mock_chat_cache,
-            llm_service=mock_llm_service,
-            vector_store=mock_vector_store,
-            document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug,
-            budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
-        ))
+        response = client.post(
+            self.CHAT_ROUTE,
+            json={"question": "Test question", "session_id": "session_123"}
+        )
 
         # Assertions
-        assert result.answer == "Réponse en cache"
-        assert result.session_id == "session_123"
-        assert result.cached is True
+        assert response.status_code == 200
+        data = response.json()
+        assert data["answer"] == "Réponse en cache"
+        assert data["session_id"] == "session_123"
+        assert data["cached"] is True
         mock_chat_cache.get_chat_response.assert_called_once()
         # Cache hit incurs no LLM call: the reservation must be released, not
         # left dangling (03-05).
         mock_budget_guard.release.assert_called_once()
 
-    @patch('backend.src.api.endpoints.chat._process_question_with_rag')
-    def test_chat_with_user_context(self, mock_process_rag, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
-                                     mock_budget_guard, mock_usage_tracker):
+    def test_chat_with_user_context(self, client, mock_rag_service):
         """Test chat with authenticated user."""
+        from main import app
+        from src.auth.middleware import get_optional_user
 
-        # Configure mocks
-        mock_chat_cache.get_chat_response.return_value = None
-        mock_process_rag.return_value = {
+        # Authenticated user resolved via dependency override (cleared in the
+        # client fixture teardown).
+        app.dependency_overrides[get_optional_user] = lambda: {"sub": "admin", "user_type": "admin"}
+        mock_rag_service.answer.return_value = {
             "answer": "Réponse avec contexte utilisateur",
             "sources": [],
             "confidence_score": 0.8,
@@ -282,96 +262,47 @@ class TestChatEndpoint:
             "timestamp": datetime.utcnow()
         }
 
-        chat_request = ChatRequest(question="Test question")
-        current_user = {"sub": "admin", "user_type": "admin"}
-
-        # Call the function
-        result = asyncio.run(chat(
-            request=mock_request,
-            chat_request=chat_request,
-            current_user=current_user,
-            chat_cache=mock_chat_cache,
-            llm_service=mock_llm_service,
-            vector_store=mock_vector_store,
-            document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug,
-            budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
-        ))
+        response = client.post(self.CHAT_ROUTE, json={"question": "Test question"})
 
         # Assertions
-        assert result.answer == "Réponse avec contexte utilisateur"
+        assert response.status_code == 200
+        assert response.json()["answer"] == "Réponse avec contexte utilisateur"
 
-    @patch('backend.src.api.endpoints.chat._process_question_with_rag')
-    def test_chat_exception_handling(self, mock_process_rag, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
-                                     mock_budget_guard, mock_usage_tracker):
+    def test_chat_exception_handling(self, client, mock_rag_service):
         """Test exception handling in chat."""
 
-        # Configure mocks
-        mock_chat_cache.get_chat_response.return_value = None
-        mock_process_rag.side_effect = Exception("Erreur RAG")
+        mock_rag_service.answer.side_effect = Exception("Erreur RAG")
 
-        chat_request = ChatRequest(question="Test question")
+        response = client.post(self.CHAT_ROUTE, json={"question": "Test question"})
 
-        # Call the function
-        result = asyncio.run(chat(
-            request=mock_request,
-            chat_request=chat_request,
-            current_user=None,
-            chat_cache=mock_chat_cache,
-            llm_service=mock_llm_service,
-            vector_store=mock_vector_store,
-            document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug,
-            budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
-        ))
+        # Assertions: the route catches every Exception and returns a friendly
+        # 200 ChatResponse (never propagates a raw error to the client).
+        assert response.status_code == 200
+        data = response.json()
+        assert "erreur s'est produite" in data["answer"]
+        assert data["confidence_score"] == 0.0
+        assert data["cached"] is False
 
-        # Assertions
-        assert "erreur s'est produite" in result.answer
-        assert result.confidence_score == 0.0
-        assert result.cached is False
-
-    def test_chat_custom_session_id(self, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
-                                     mock_budget_guard, mock_usage_tracker):
+    def test_chat_custom_session_id(self, client, mock_rag_service):
         """Test chat with custom session ID."""
 
-        # Configure mocks
-        mock_chat_cache.get_chat_response.return_value = None
+        mock_rag_service.answer.return_value = {
+            "answer": "Réponse",
+            "sources": [],
+            "confidence_score": 0.8,
+            "session_id": "custom_session_456",
+            "cached": False,
+            "timestamp": datetime.utcnow()
+        }
 
-        chat_request = ChatRequest(
-            question="Test question",
-            session_id="custom_session_456"
+        response = client.post(
+            self.CHAT_ROUTE,
+            json={"question": "Test question", "session_id": "custom_session_456"}
         )
 
-        with patch('backend.src.api.endpoints.chat._process_question_with_rag') as mock_rag:
-            mock_rag.return_value = {
-                "answer": "Réponse",
-                "sources": [],
-                "confidence_score": 0.8,
-                "session_id": "custom_session_456",
-                "cached": False,
-                "timestamp": datetime.utcnow()
-            }
-
-            # Call the function
-            result = asyncio.run(chat(
-                request=mock_request,
-                chat_request=chat_request,
-                current_user=None,
-                chat_cache=mock_chat_cache,
-                llm_service=mock_llm_service,
-                vector_store=mock_vector_store,
-                document_repository=mock_document_repository,
-                rag_debug=mock_rag_debug,
-                budget_guard=mock_budget_guard,
-                usage_tracker=mock_usage_tracker
-            ))
-
-            # Assertions
-            assert result.session_id == "custom_session_456"
+        # Assertions
+        assert response.status_code == 200
+        assert response.json()["session_id"] == "custom_session_456"
 
 
 class TestEscalationEndpoint:
@@ -566,94 +497,12 @@ class TestSessionHistoryEndpoints:
 
 
 class TestChatHelperFunctions:
-    """Tests for chat utility functions."""
+    """Tests for chat utility functions.
 
-    def test_process_question_with_rag_placeholder(self):
-        """Test RAG processing (placeholder)."""
-        from backend.src.api.endpoints.chat import _process_question_with_rag
-
-        # Mock dependencies
-        mock_llm_service = AsyncMock()
-        mock_vector_store = Mock()
-        mock_document_repository = Mock()
-        mock_rag_debug = Mock()
-
-        # Mock log_user_request and other methods
-        mock_rag_debug.log_user_request = Mock()
-        mock_rag_debug.log_vector_search = Mock()
-        mock_rag_debug.log_llm_generation = Mock()
-
-        # Configure mocks to return expected values
-        mock_vector_store.query.return_value = []
-        mock_llm_service.embed.return_value = AsyncMock(embeddings=[[0.1] * 1024], usage_tokens=10)
-        mock_llm_service.generate.return_value = AsyncMock(
-            content="L'IA (Intelligence Artificielle) est une technologie qui simule l'intelligence humaine.",
-            model="mistral",
-            usage_tokens=100,
-            finish_reason="stop"
-        )
-
-        # Call the function with all required parameters
-        result = asyncio.run(_process_question_with_rag(
-            question="Qu'est-ce que l'IA ?",
-            context_limit=5,
-            include_sources=True,
-            session_id="session_123",
-            llm_service=mock_llm_service,
-            vector_store=mock_vector_store,
-            document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug
-        ))
-
-        # Assertions
-        assert isinstance(result, dict)
-        assert "answer" in result
-        assert "session_id" in result
-        assert "confidence_score" in result
-        assert "cached" in result
-        assert result["session_id"] == "session_123"
-
-    def test_process_question_with_rag_no_sources(self):
-        """Test RAG processing without sources."""
-        from backend.src.api.endpoints.chat import _process_question_with_rag
-
-        # Mock dependencies
-        mock_llm_service = AsyncMock()
-        mock_vector_store = Mock()
-        mock_document_repository = Mock()
-        mock_rag_debug = Mock()
-
-        # Mock log methods
-        mock_rag_debug.log_user_request = Mock()
-        mock_rag_debug.log_vector_search = Mock()
-        mock_rag_debug.log_llm_generation = Mock()
-
-        # Configure mocks - no sources found
-        mock_vector_store.query.return_value = []
-        mock_llm_service.embed.return_value = AsyncMock(embeddings=[[0.1] * 1024], usage_tokens=10)
-        mock_llm_service.generate.return_value = AsyncMock(
-            content="Je ne peux pas répondre car aucune information pertinente n'a été trouvée.",
-            model="mistral",
-            usage_tokens=50,
-            finish_reason="stop"
-        )
-
-        # Call the function with all required parameters
-        result = asyncio.run(_process_question_with_rag(
-            question="Test question",
-            context_limit=3,
-            include_sources=False,
-            session_id="session_123",
-            llm_service=mock_llm_service,
-            vector_store=mock_vector_store,
-            document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug
-        ))
-
-        # Assertions
-        assert isinstance(result, dict)
-        assert "sources" in result
-        assert isinstance(result["sources"], list)
+    White-box RAG pipeline tests (direct pipeline calls) were migrated to
+    tests/unit/test_rag_service.py (DEBT-01, plan 04-04); only the HTTP-layer
+    helper tests remain here.
+    """
 
     def test_get_client_ip_forwarded(self):
         """Test IP extraction with X-Forwarded-For header."""
@@ -785,14 +634,16 @@ class TestChatHelperFunctions:
 class TestChatIntegration:
     """Integration tests for chat endpoints."""
 
-    @patch('backend.src.api.endpoints.chat._process_question_with_rag')
-    @patch('backend.src.api.endpoints.chat._generate_session_id')
-    def test_full_chat_workflow(self, mock_session_id, mock_process_rag):
-        """Test full chat workflow."""
+    def test_full_chat_workflow(self):
+        """Test full chat workflow through the HTTP layer with a mock RagService."""
+        from main import app
+        from src.api.dependencies import (
+            get_rag_service, get_chat_cache_service, get_budget_guard,
+            get_document_repository, get_rag_debug_service,
+        )
 
-        # Configure mocks
-        mock_session_id.return_value = "session_123"
-        mock_process_rag.return_value = {
+        mock_rag_service = Mock()
+        mock_rag_service.answer = AsyncMock(return_value={
             "answer": "Réponse complète avec sources",
             "sources": [
                 {
@@ -808,54 +659,48 @@ class TestChatIntegration:
             "session_id": "session_123",
             "cached": False,
             "timestamp": datetime.utcnow()
-        }
-
-        mock_request = Mock()
-        mock_request.client.host = "127.0.0.1"
-        mock_request.headers = {}
+        })
 
         mock_cache = Mock()
         mock_cache.get_chat_response.return_value = None
+        mock_cache.set_chat_response = Mock()
 
-        # Additional required mocks
-        mock_llm = Mock()
-        mock_vector = Mock()
-        mock_repo = Mock()
-        mock_rag_debug = Mock()
-        mock_rag_debug.log_user_request = Mock()
-        mock_rag_debug.log_response = Mock()
         mock_budget_guard = Mock()
         mock_budget_guard.reserve = Mock(return_value=Mock(today="2026-07-12", estimate_eur=0.01))
-        mock_usage_tracker = Mock()
-        mock_usage_tracker.record = Mock(return_value=0.0)
+        mock_budget_guard.finalize = Mock()
+        mock_budget_guard.release = Mock()
 
-        chat_request = ChatRequest(
-            question="Question détaillée nécessitant sources",
-            context_limit=5,
-            include_sources=True
-        )
+        app.dependency_overrides[get_rag_service] = lambda: mock_rag_service
+        app.dependency_overrides[get_chat_cache_service] = lambda: mock_cache
+        app.dependency_overrides[get_budget_guard] = lambda: mock_budget_guard
+        app.dependency_overrides[get_document_repository] = lambda: Mock()
+        app.dependency_overrides[get_rag_debug_service] = lambda: Mock()
 
-        # Call the function
-        result = asyncio.run(chat(
-            request=mock_request,
-            chat_request=chat_request,
-            current_user=None,
-            chat_cache=mock_cache,
-            llm_service=mock_llm,
-            vector_store=mock_vector,
-            document_repository=mock_repo,
-            rag_debug=mock_rag_debug,
-            budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
-        ))
+        try:
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/chat/",
+                json={
+                    "question": "Question détaillée nécessitant sources",
+                    "session_id": "session_123",
+                    "context_limit": 5,
+                    "include_sources": True
+                }
+            )
+        finally:
+            for dep in (get_rag_service, get_chat_cache_service, get_budget_guard,
+                        get_document_repository, get_rag_debug_service):
+                app.dependency_overrides.pop(dep, None)
 
         # Full assertions
-        assert result.answer == "Réponse complète avec sources"
-        assert len(result.sources) == 1
-        assert result.sources[0].filename == "guide.pdf"
-        assert result.confidence_score == 0.9
-        assert result.session_id == "session_123"
-        assert result.cached is False
+        assert response.status_code == 200
+        data = response.json()
+        assert data["answer"] == "Réponse complète avec sources"
+        assert len(data["sources"]) == 1
+        assert data["sources"][0]["filename"] == "guide.pdf"
+        assert data["confidence_score"] == 0.9
+        assert data["session_id"] == "session_123"
+        assert data["cached"] is False
 
     @patch('backend.src.api.endpoints.chat._generate_escalation_id')
     def test_full_escalation_workflow(self, mock_escalation_id):

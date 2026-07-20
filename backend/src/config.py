@@ -5,7 +5,7 @@ Uses Pydantic for validation and type safety
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Optional, Dict
+from typing import Optional, Dict  # noqa: F401
 import os
 from pathlib import Path
 
@@ -157,7 +157,15 @@ class Settings(BaseSettings):
         default=True,
         description="Active la surveillance de dossier"
     )
-    
+    sqlite_backup_dir: str = Field(
+        default="./data/backups",
+        description="Répertoire des sauvegardes SQLite (rotation)"
+    )
+    sqlite_backup_max_count: int = Field(
+        default=14,
+        description="Nombre de sauvegardes SQLite conservées (rotation)"
+    )
+
     # Cache Configuration
     cache_enabled: bool = Field(default=True, description="Active le cache LRU")
     cache_max_size: int = Field(
@@ -194,7 +202,11 @@ class Settings(BaseSettings):
         default="$2b$12$Kc32f7ibhcSNTkn/UkFOke32Q2A3XLNIG6RliCTq9.SnTj1/D2Eiy",
         description="Hash bcrypt du mot de passe admin (override via .env ADMIN_PASSWORD_HASH)"
     )
-    
+    trusted_hosts: str = Field(
+        default="*",
+        description="Hôtes autorisés (Host header) séparés par des virgules ; '*' désactive le filtre. En production, restreindre à vos domaines (ex: mimir.example.com,localhost)"
+    )
+
     # Rate Limiting Configuration
     rate_limit_enabled: bool = Field(
         default=True,
@@ -225,7 +237,15 @@ class Settings(BaseSettings):
         default=60,
         description="Intervalle des health checks en secondes"
     )
-    
+    alerting_enabled: bool = Field(
+        default=True,
+        description="Active la capture d'erreurs et l'alerte SMTP groupée (OPS-05)"
+    )
+    alert_throttle_seconds: int = Field(
+        default=900,
+        description="Fenêtre de dédup des alertes SMTP par fingerprint, en secondes"
+    )
+
     # Performance Configuration
     max_concurrent_requests: int = Field(
         default=50,

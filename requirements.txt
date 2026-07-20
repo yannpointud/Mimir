@@ -19,16 +19,20 @@ numpy==2.3.3
 rapidfuzz==3.14.1
 
 # Document Processing
-pypdf==3.17.0
+pypdf==6.14.2
 python-docx==1.1.0
 markdown==3.5.1
+# Direct pin: pypdf's AES crypto provider needs `cryptography` at runtime.
+# It used to be pulled in transitively via the old JOSE-based auth stack;
+# pinned explicitly now that stack is removed (DEBT-02, RESEARCH Pitfall 4).
+cryptography==45.0.7
 
 # Cache
 cachetools==5.3.2
 
 # Auth
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+PyJWT==2.13.0
+pwdlib[argon2,bcrypt]==0.3.0
 python-multipart==0.0.6
 
 # Monitoring
@@ -39,6 +43,14 @@ aiosmtplib==3.0.1
 
 # Rate Limiting
 slowapi==0.1.9
+
+# HTTP client (transitive dependency of the Mistral SDK, now pinned explicitly
+# for reproducibility -- was previously unpinned in this file)
+aiohttp==3.12.15
+
+# System metrics (used by the admin system-info endpoint, now pinned explicitly
+# for reproducibility -- was previously unpinned in this file)
+psutil==7.0.0
 
 # Testing
 pytest==7.4.3

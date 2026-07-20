@@ -3,10 +3,10 @@ Tests d'intégration pour l'API Jalon 3 - Version fonctionnelle
 Stratégie "light" : tests du chemin heureux pour les endpoints principaux
 """
 
-import pytest
-import tempfile
-import io
-from pathlib import Path
+import pytest  # noqa: F401
+import tempfile  # noqa: F401
+import io  # noqa: F401
+from pathlib import Path  # noqa: F401
 from fastapi.testclient import TestClient
 
 
@@ -259,7 +259,7 @@ class TestJalon3SystemHealthWorking:
         health_time = time.time() - start_time
 
         start_time = time.time()
-        response = client.post("/api/v1/chat", json={
+        response = client.post("/api/v1/chat", json={  # noqa: F841
             "question": "Test de performance"
         })
         chat_time = time.time() - start_time

@@ -3,11 +3,11 @@ Tests unitaires pour le module de configuration
 Vérifie la validation Pydantic et la gestion des environnements
 """
 
-import pytest
+import pytest  # noqa: F401
 import tempfile
 import os
 from pathlib import Path
-from pydantic import ValidationError
+from pydantic import ValidationError  # noqa: F401
 
 from src.config import Settings
 

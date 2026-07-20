@@ -376,7 +376,7 @@ class TestCleanupStressTest:
             avg_cleanup_time = statistics.mean(cleanup_times)
             max_cleanup_time = max(cleanup_times)
             
-            print(f"\\nStress test results:")
+            print(f"\\nStress test results:")  # noqa: F541
             print(f"Average cleanup time: {avg_cleanup_time:.2f}s")
             print(f"Max cleanup time: {max_cleanup_time:.2f}s")
             print(f"Total cycles: {num_cycles}")

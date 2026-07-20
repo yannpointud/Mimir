@@ -5,7 +5,7 @@ This module provides dependency injection functions for accessing
 various services throughout the API endpoints.
 """
 
-from typing import Generator
+from typing import Generator  # noqa: F401
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from src.config import settings
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.monitoring.rag_debug_logger import rag_debug_service
+from src.services.rag_service import RagService
 
 
 def get_document_repository(db: Session = Depends(get_db_session)) -> DocumentRepository:
@@ -130,3 +131,29 @@ def get_rag_debug_service():
         log_responses=settings.rag_debug_log_responses
     )
     return rag_debug_service
+
+
+# Global service instance (singleton pattern, mirrors _llm_service/_vector_store above)
+_rag_service = None
+
+
+def get_rag_service() -> RagService:
+    """Get RagService instance (singleton).
+
+    HTTP-agnostic: RagService imports nothing from FastAPI and is safe to
+    call directly outside a request context -- notably by the Phase 6 RAGAS
+    evaluation harness. document_repository is deliberately NOT baked in
+    here (it is request-scoped, see get_document_repository()); it stays a
+    per-call argument to RagService.answer()/answer_stream().
+    """
+    global _rag_service
+    if _rag_service is None:
+        _rag_service = RagService(
+            llm_service=get_llm_service(),
+            vector_store=get_vector_store(),
+            rag_debug=get_rag_debug_service(),
+            budget_guard=get_budget_guard(),
+            usage_tracker=get_usage_tracker(),
+            chat_cache=get_chat_cache_service(),
+        )
+    return _rag_service

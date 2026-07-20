@@ -340,3 +340,62 @@ async def _check_email_health() -> Dict[str, Any]:
             "healthy": False,
             "error": str(e)
         }
+
+
+@router.get("/live")
+async def liveness() -> Dict[str, str]:
+    """
+    Liveness probe (OPS-04).
+
+    Pure process check: returns 200 as long as the ASGI worker can execute
+    Python. It performs no dependency I/O (no DB session, no FAISS, no Mistral)
+    so a downstream outage (including a Mistral rate-limit/outage) can never
+    fail this probe. This is the target of the container HEALTHCHECK.
+
+    Returns:
+        dict: {"status": "alive"}
+    """
+    return {"status": "alive"}
+
+
+@router.get("/ready")
+async def readiness(
+    response: Response,
+    db: Session = Depends(get_db_session)
+) -> Dict[str, Any]:
+    """
+    Readiness probe (OPS-04).
+
+    Aggregates the cheap in-process dependency checks (database, vector store,
+    LLM API configuration) by reusing the existing `_check_*_health` helpers.
+    Sets HTTP 503 when any dependency is unhealthy so proxies / load balancers
+    stop routing traffic until the process is ready.
+
+    `_check_llm_health` only reads `bool(settings.mistral_api_key)` and issues
+    no live Mistral call, so readiness stays cheap and cannot amplify probe
+    traffic into free-tier API load. A Mistral failure surfaces only through
+    `llm_api` here and never affects `/live`.
+
+    The payload carries only component names + boolean health + a coarse status
+    (no secret values, no connection strings) to avoid information disclosure
+    (T-05-01-01).
+
+    Returns:
+        dict: {"status": "ready"|"not_ready", "checks": {...}, "unhealthy": [...]}
+    """
+    checks = {
+        "database": await _check_database_health(db),
+        "vector_store": await _check_vector_store_health(),
+        "llm_api": await _check_llm_health(),
+    }
+
+    unhealthy = [name for name, check in checks.items() if not check.get("healthy", False)]
+
+    if unhealthy:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return {
+        "status": "not_ready" if unhealthy else "ready",
+        "checks": checks,
+        "unhealthy": unhealthy,
+    }

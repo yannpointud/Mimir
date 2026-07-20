@@ -4,12 +4,12 @@ Tests unitaires pour les endpoints de santé système.
 
 import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime
+from unittest.mock import Mock, patch, AsyncMock  # noqa: F401
+from datetime import datetime  # noqa: F401
 from fastapi import HTTPException, status, Response
 from sqlalchemy.orm import Session
 
-from backend.src.api.endpoints.health import router, health_check, database_health, cache_health, disk_usage
+from backend.src.api.endpoints.health import router, health_check, database_health, cache_health, disk_usage  # noqa: F401
 
 
 class TestHealthModels:
@@ -294,7 +294,7 @@ class TestHealthHelperFunctions:
     def test_check_database_health_success(self, mock_text, mock_db_session):
         """Test de vérification santé base de données réussie."""
         from backend.src.api.endpoints.health import _check_database_health
-        from backend.src.database.models import Document
+        from backend.src.database.models import Document  # noqa: F401
 
         # Configuration des mocks
         mock_result = Mock()

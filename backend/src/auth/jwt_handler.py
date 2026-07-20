@@ -2,14 +2,17 @@
 JWT token handling for authentication.
 
 This module provides functionality for creating and validating JWT tokens,
-as well as password hashing/verification using bcrypt.
+as well as password hashing/verification using Argon2 (with Bcrypt kept as a
+legacy verification-only hasher for pre-migration credentials).
 """
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import logging
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt  # PyJWT
+from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
+from pwdlib.hashers.bcrypt import BcryptHasher
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -23,7 +26,9 @@ class JWTHandler:
         self.secret_key = settings.jwt_secret_key
         self.algorithm = settings.jwt_algorithm
         self.expiration_hours = settings.jwt_expiration_hours
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        # Argon2 is FIRST so new hashes are always Argon2; Bcrypt stays only to verify
+        # legacy hashes issued before this migration (no silent downgrade -- T-4-01-01).
+        self.pwd_context = PasswordHash((Argon2Hasher(), BcryptHasher()))
 
         # Validate configuration
         if not self.secret_key or len(self.secret_key) < 32:
@@ -80,7 +85,13 @@ class JWTHandler:
             payload = jwt.decode(
                 token,
                 self.secret_key,
-                algorithms=[self.algorithm]
+                algorithms=[self.algorithm],
+                # PyJWT validates "iat" as a not-before claim by default (unlike the
+                # previous jose-based implementation). Disabled to preserve prior
+                # behavior and avoid rejecting legitimate tokens under clock skew
+                # between servers -- exp is still enforced, so this is not a security
+                # regression (Rule 1 fix, DEBT-02 migration).
+                options={"verify_iat": False}
             )
 
             # Validate token type
@@ -94,10 +105,7 @@ class JWTHandler:
         except jwt.ExpiredSignatureError:
             logger.warning("JWT token has expired")
             return None
-        except jwt.JWTClaimsError:
-            logger.warning("JWT token has invalid claims")
-            return None
-        except JWTError as e:
+        except jwt.InvalidTokenError as e:
             logger.warning(f"JWT token validation failed: {e}")
             return None
         except Exception as e:
@@ -106,7 +114,7 @@ class JWTHandler:
 
     def hash_password(self, password: str) -> str:
         """
-        Hash a password using bcrypt.
+        Hash a password using Argon2 (current default hasher).
 
         Args:
             password: The plain text password

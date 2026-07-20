@@ -8,12 +8,12 @@ import shutil
 import asyncio
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
-import numpy as np
+import numpy as np  # noqa: F401
 
 from src.ingestion.processor import IngestionProcessor, ProcessingError
-from src.ingestion.queue_manager import IngestionTask, TaskPriority
+from src.ingestion.queue_manager import IngestionTask
 from src.ingestion.chunking import ChunkingConfig
-from src.llm_interface.interfaces import GenerationResponse, EmbeddingResponse, LLMException
+from src.llm_interface.interfaces import GenerationResponse, EmbeddingResponse, LLMException  # noqa: F401
 from src.rag_core.interfaces import Chunk
 from src.cost.budget_guard import BudgetReservation
 
@@ -176,8 +176,7 @@ class TestIngestionProcessor:
         success = processor.queue_document(
             str(sample_text_file),
             metadata=metadata,
-            preserve=True,
-            priority=TaskPriority.HIGH
+            preserve=True
         )
 
         assert success is True
@@ -524,10 +523,7 @@ class TestIngestionProcessor:
         initial_size = processor.get_queue_size()
         assert initial_size >= 0  # Peut être 0 ou 1 selon le timing
 
-        # Le code de production retourne une coroutine au lieu d'un int
-        # Nous devons await cette coroutine pour obtenir le résultat
-        cleared_coroutine = processor.clear_queue()
-        cleared = await cleared_coroutine
+        cleared = await processor.clear_queue()
         assert cleared >= 0  # Peut être 0 si la tâche a déjà été traitée
         assert processor.get_queue_size() == 0
 

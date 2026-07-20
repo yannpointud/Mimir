@@ -1,0 +1,13 @@
+# crontab.mimir.example -- example host crontab entry for the Mimir SQLite backup.
+#
+# Host cron is the default scheduler for Mimir's single on-premise server:
+# it adds no extra container or process and needs no code inside the FastAPI
+# app (Claude's Discretion, 05-RESEARCH.md A3). The backup script itself is
+# scheduler-agnostic, so a cron sidecar container or any other scheduler can
+# invoke it identically -- only this crontab line is host-specific.
+#
+# Install with `crontab -e` and adjust the paths for the target machine
+# (project root, virtualenv python, and log location).
+#
+# Nightly backup at 02:00, logging to a dedicated backup log:
+0 2 * * * cd /opt/mimir && /opt/mimir/venv/bin/python scripts/backup_sqlite.py >> /opt/mimir/logs/backup.log 2>&1

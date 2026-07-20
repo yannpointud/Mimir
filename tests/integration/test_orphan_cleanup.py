@@ -16,7 +16,7 @@ from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.rag_core.interfaces import Chunk
 from src.rag_core.implementations.validation_utils import VectorStoreValidator
 from src.database.repository import DocumentRepository
-from src.database.models import Document
+from src.database.models import Document  # noqa: F401
 
 
 class TestOrphanCleanupIntegration:
@@ -237,17 +237,25 @@ class TestOrphanCleanupIntegration:
         orphan_chunks = [self.create_test_chunk("orphan", i) for i in range(2)]
         
         vector_store.upsert(valid_chunks + orphan_chunks)
-        
+
         # Marquer certains chunks comme supprimés
         for meta in vector_store.metadata:
             if meta.get('document_id') == "orphan":
                 meta['deleted'] = True
-        
-        # Exécuter la reconstruction avec nettoyage
-        result = vector_store.rebuild_vector_store(
-            force_rebuild=True,
-            cleanup_orphans=True
-        )
+
+        # Isolate the orphan detection from the ambient DatabaseManager singleton:
+        # _get_existing_document_ids() queries the shared DB session, whose state
+        # leaks across the full test suite (a prior test can bind it to the real
+        # mimir.db). Pin the valid document ids so this test is deterministic and
+        # only the pre-marked "orphan" chunks are cleaned.
+        with patch.object(
+            vector_store, "_get_existing_document_ids", return_value={"valid"}
+        ):
+            # Exécuter la reconstruction avec nettoyage
+            result = vector_store.rebuild_vector_store(
+                force_rebuild=True,
+                cleanup_orphans=True
+            )
         
         # Vérifier les résultats
         assert result['rebuild_performed'] == True
@@ -278,7 +286,7 @@ class TestOrphanCleanupIntegration:
     def test_concurrent_access_safety(self, vector_store):
         """Test de la sécurité en cas d'accès concurrent (thread-safety)"""
         import threading
-        import time
+        import time  # noqa: F401
         
         # Ajouter des chunks initiaux
         chunks = [self.create_test_chunk("test", i) for i in range(10)]

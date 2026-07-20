@@ -6,8 +6,8 @@ et notifications du système Mimir.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime
+from unittest.mock import Mock, patch, AsyncMock  # noqa: F401
+from datetime import datetime  # noqa: F401
 
 from backend.src.email_service.smtp_client import EmailService
 
@@ -46,7 +46,7 @@ class TestEmailServiceInit:
         mock_settings.escalation_email = "support@example.com"
 
         with patch('backend.src.email_service.smtp_client.logger') as mock_logger:
-            service = EmailService()
+            service = EmailService()  # noqa: F841
             mock_logger.warning.assert_called_once()
 
 

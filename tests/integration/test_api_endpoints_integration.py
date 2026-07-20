@@ -4,11 +4,11 @@ Tests complets des fonctionnalités avec authentification, validation et cas d'e
 """
 
 import pytest
-import json
+import json  # noqa: F401
 import time
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch  # noqa: F401
 
 
 class TestHealthEndpointsIntegration:
@@ -68,7 +68,7 @@ class TestHealthEndpointsIntegration:
         data = response.json()
 
         # Structure attendue du health check détaillé
-        expected_fields = {"status", "timestamp", "services", "version", "environment"}
+        expected_fields = {"status", "timestamp", "services", "version", "environment"}  # noqa: F841
         present_fields = set(data.keys())
 
         # Au moins les champs de base doivent être présents
@@ -388,7 +388,7 @@ class TestPerformanceIntegration:
             if method == "GET":
                 response = client.get(endpoint)
             elif method == "POST":
-                response = client.post(endpoint, json={"question": "Test"})
+                response = client.post(endpoint, json={"question": "Test"})  # noqa: F841
 
             duration = time.time() - start_time
 

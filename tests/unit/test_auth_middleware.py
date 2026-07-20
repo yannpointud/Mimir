@@ -6,19 +6,19 @@ les tokens bearer, les dépendances utilisateur et les vérifications admin.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock, PropertyMock
+from unittest.mock import Mock, patch, AsyncMock, PropertyMock  # noqa: F401
 from fastapi import HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from freezegun import freeze_time
-from datetime import datetime, timezone, timedelta
+from freezegun import freeze_time  # noqa: F401
+from datetime import datetime, timezone, timedelta  # noqa: F401
 
 from backend.src.auth.middleware import (
     JWTBearer,
     get_current_user,
     require_admin,
     get_optional_user,
-    security,
-    optional_security
+    security,  # noqa: F401
+    optional_security  # noqa: F401
 )
 
 
@@ -510,8 +510,8 @@ class TestMiddlewareIntegration:
             get_current_user,
             require_admin,
             get_optional_user,
-            security,
-            optional_security
+            security,  # noqa: F811
+            optional_security  # noqa: F811
         )
 
         assert JWTBearer is not None

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Document, Configuration, AuditLog
+from src.database.models import Base, Document, Configuration, AuditLog  # noqa: F401
 from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository
 from src.shared.models import DocumentStatus
 
@@ -341,7 +341,7 @@ class TestTransactionIntegration:
             )
 
             # Enregistrer l'action dans l'audit
-            audit_log = audit_repo.create_log(
+            audit_log = audit_repo.create_log(  # noqa: F841
                 user_type="admin",
                 action="document_creation",
                 details=f"Created document {document.filename}",

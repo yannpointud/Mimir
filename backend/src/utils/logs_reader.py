@@ -5,10 +5,10 @@ Provides unified access to backend and frontend logs with filtering capabilities
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  # noqa: F401
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-import re
+import re  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

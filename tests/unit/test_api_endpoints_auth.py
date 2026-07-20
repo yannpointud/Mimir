@@ -5,12 +5,12 @@ Unit tests for authentication endpoints.
 import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  # noqa: F401
 from fastapi import HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm  # noqa: F401
 from pydantic import ValidationError
 
-from backend.src.api.endpoints.auth import router, LoginRequest, LoginResponse, TokenRefreshResponse
+from backend.src.api.endpoints.auth import router, LoginRequest, LoginResponse, TokenRefreshResponse  # noqa: F401
 
 
 class TestAuthModels:

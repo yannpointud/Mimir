@@ -2,7 +2,7 @@
 Tests for the rate limiting module (SEC-03).
 """
 
-import pytest
+import pytest  # noqa: F401
 from unittest.mock import Mock, patch
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient

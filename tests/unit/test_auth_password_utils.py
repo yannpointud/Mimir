@@ -5,8 +5,8 @@ Ces tests couvrent toutes les fonctions de validation et génération de mots de
 """
 
 import pytest
-import string
-from unittest.mock import patch
+import string  # noqa: F401
+from unittest.mock import patch  # noqa: F401
 from backend.src.auth.password_utils import (
     validate_password_strength,
     has_sequential_chars,

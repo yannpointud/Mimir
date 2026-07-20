@@ -7,19 +7,19 @@ import asyncio
 import hashlib
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple  # noqa: F401
+from datetime import datetime  # noqa: F401
 import numpy as np
 
 from .extractors import ExtractorFactory, ExtractionError, UnsupportedFormatError
 from .chunking import ChunkingStrategy, ChunkingConfig
 from .async_queue_manager import AsyncQueueManager
-from .queue_manager import IngestionTask, TaskPriority
+from .queue_manager import IngestionTask
 
 from ..llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
-from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException
+from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException  # noqa: F401
 from ..database.repository import DocumentRepository
-from ..database.models import Document
+from ..database.models import Document  # noqa: F401
 from ..monitoring.logger import setup_logger
 from ..config import settings
 from ..cost.budget_guard import BudgetExceededError, budget_guard as default_budget_guard
@@ -95,7 +95,6 @@ class IngestionProcessor:
     def queue_document(self,
                       file_path: str,
                       document_id: Optional[str] = None,
-                      priority: TaskPriority = TaskPriority.NORMAL,
                       preserve: bool = False,
                       metadata: Optional[Dict[str, Any]] = None) -> bool:
         """
@@ -104,7 +103,6 @@ class IngestionProcessor:
         Args:
             file_path: Path to the document file
             document_id: Optional document ID, will be generated if None
-            priority: Processing priority
             preserve: Whether to protect from deletion
             metadata: Additional metadata
 
@@ -162,7 +160,6 @@ class IngestionProcessor:
             task = IngestionTask(
                 file_path=file_path,
                 document_id=document_id,
-                priority=priority,
                 metadata=metadata or {}
             )
 
@@ -175,7 +172,6 @@ class IngestionProcessor:
                     extra={'extra_fields': {
                         'file_path': file_path,
                         'document_id': document_id,
-                        'priority': priority.name,
                         'file_size_mb': file_size / 1024 / 1024,
                         'type': 'document_queued'
                     }}
@@ -540,6 +536,6 @@ class IngestionProcessor:
         """Check if processor is running"""
         return self.queue_manager.is_running()
 
-    def clear_queue(self) -> int:
+    async def clear_queue(self) -> int:
         """Clear pending tasks"""
-        return self.queue_manager.clear_queue()
+        return await self.queue_manager.clear_queue()

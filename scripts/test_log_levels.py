@@ -12,7 +12,7 @@ import logging
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from src.config import settings
-from src.monitoring.logger import setup_logger, app_logger, frontend_logger
+from src.monitoring.logger import setup_logger, app_logger, frontend_logger  # noqa: F401
 
 def test_current_implementation():
     """Test de l'implémentation actuelle - PROUVE LE BUG"""
@@ -20,22 +20,22 @@ def test_current_implementation():
     print("TEST: Implémentation actuelle du système de logging")
     print("=" * 80)
 
-    print(f"\n1. Configuration depuis .env:")
+    print(f"\n1. Configuration depuis .env:")  # noqa: F541
     print(f"   - LOG_LEVEL = {settings.log_level}")
     print(f"   - ENVIRONMENT = {settings.environment}")
     print(f"   - RAG_DEBUG_ENABLED = {settings.rag_debug_enabled}")
 
-    print(f"\n2. Niveaux effectifs des loggers globaux:")
+    print(f"\n2. Niveaux effectifs des loggers globaux:")  # noqa: F541
     print(f"   - app_logger (mimir): {logging.getLevelName(app_logger.level)}")
     print(f"   - frontend_logger: {logging.getLevelName(frontend_logger.level)}")
 
-    print(f"\n3. Niveaux des handlers de app_logger:")
+    print(f"\n3. Niveaux des handlers de app_logger:")  # noqa: F541
     for i, handler in enumerate(app_logger.handlers):
         handler_type = handler.__class__.__name__
         handler_level = logging.getLevelName(handler.level)
         print(f"   - Handler {i} ({handler_type}): {handler_level}")
 
-    print(f"\n4. Test d'un logger enfant (comme dans les autres modules):")
+    print(f"\n4. Test d'un logger enfant (comme dans les autres modules):")  # noqa: F541
     test_logger = logging.getLogger("src.api.endpoints.chat")
     print(f"   - Logger 'src.api.endpoints.chat': {logging.getLevelName(test_logger.level)}")
     print(f"   - Effective level: {logging.getLevelName(test_logger.getEffectiveLevel())}")

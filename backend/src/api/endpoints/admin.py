@@ -5,7 +5,7 @@ This module provides endpoints for system administration,
 configuration management, and monitoring.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional  # noqa: F401
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request, Response
 from datetime import datetime, timedelta
 import asyncio
@@ -13,10 +13,9 @@ import logging
 import time
 from pathlib import Path
 
-from src.auth.middleware import require_admin, get_current_user
+from src.auth.middleware import require_admin, get_current_user  # noqa: F401
 from src.database.repository import ConfigurationRepository, AuditLogRepository, UsageRepository
 from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor
-from src.ingestion.queue_manager import TaskPriority
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
@@ -58,7 +57,7 @@ async def get_system_info(
         import psutil
         import platform
         import sys
-        from pathlib import Path
+        from pathlib import Path  # noqa: F401
 
         # System information
         system_info = {
@@ -634,7 +633,7 @@ async def admin_list_documents(
     """List documents via admin interface."""
     # Import here to avoid circular imports
     from src.database.repository import DocumentRepository
-    from src.api.dependencies import get_document_repository
+    from src.api.dependencies import get_document_repository  # noqa: F401
 
     # Use a new repository instance
     from src.database.connection import get_db_session
@@ -802,7 +801,6 @@ async def admin_upload_document(
             queued = ingestion_processor.queue_document(
                 file_path=file_path,
                 document_id=str(document.id),
-                priority=TaskPriority.NORMAL,
                 preserve=preserve,
                 metadata={"uploaded_by": current_user.get("username", "unknown")}
             )
@@ -1138,7 +1136,7 @@ async def rebuild_vector_store(
         )
 
         # Create informative message
-        message_parts = [f"Vector index rebuilt successfully."]
+        message_parts = [f"Vector index rebuilt successfully."]  # noqa: F541
         if orphans_cleaned > 0:
             message_parts.append(f"Cleaned {orphans_cleaned} orphaned chunks.")
         if deleted_removed > 0:

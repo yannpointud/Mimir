@@ -8,7 +8,7 @@ for efficient storage and retrieval of frequently accessed data.
 from cachetools import LRUCache
 from typing import Any, Optional, Dict, Callable
 import hashlib
-import json
+import json  # noqa: F401
 import threading
 from datetime import datetime, timedelta
 import logging
@@ -309,6 +309,66 @@ class ChatCacheService(CacheService):
         """
         cache_key = self._generate_key(question, context_hash)
         self.set(cache_key, response, ttl)
+
+    def _generate_stream_key(self, question: str, corpus_version: str) -> str:
+        """
+        Generate a corpus-aware SSE cache key.
+
+        Uses SHA-256 (not md5) over the normalised question plus the corpus
+        version so a collision that would serve a wrong answer is
+        cryptographically improbable (T-4-05-01), and so any corpus mutation
+        (which changes corpus_version) yields a different key -- an implicit
+        cache invalidation (T-4-05-02). The question is normalised (stripped +
+        lower-cased) so trivial whitespace/case variants share one entry.
+
+        Args:
+            question: The user question
+            corpus_version: The FaissVectorStore corpus version token
+
+        Returns:
+            str: 64-char hex SHA-256 cache key
+        """
+        key_data = f"{question.strip().lower()}|{corpus_version}"
+        return hashlib.sha256(key_data.encode('utf-8')).hexdigest()
+
+    def get_stream_response(
+        self, question: str, corpus_version: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a cached streamed chat response for the current corpus version.
+
+        Args:
+            question: The user question
+            corpus_version: The current FaissVectorStore corpus version
+
+        Returns:
+            Cached stream payload if present for this corpus version, else None
+        """
+        cache_key = self._generate_stream_key(question, corpus_version)
+        return self.get(cache_key)
+
+    def set_stream_response(
+        self,
+        question: str,
+        corpus_version: str,
+        payload: Dict[str, Any],
+        ttl: Optional[int] = None
+    ):
+        """
+        Cache a streamed chat response scoped to the current corpus version.
+
+        Callers MUST invoke this only after a fully successful stream
+        completion (never on an error or a mid-stream disconnect), so no
+        partial entry is ever stored (T-4-05-03).
+
+        Args:
+            question: The user question
+            corpus_version: The current FaissVectorStore corpus version
+            payload: The stream payload to cache (answer, sources, confidence)
+            ttl: Optional TTL override
+        """
+        cache_key = self._generate_stream_key(question, corpus_version)
+        self.set(cache_key, payload, ttl)
 
     def invalidate_on_document_change(self, document_ids: list = None):
         """

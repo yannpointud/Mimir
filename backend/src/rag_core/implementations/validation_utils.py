@@ -2,7 +2,7 @@
 Validation utilities for detecting inconsistencies between SQLite and FAISS
 """
 
-from typing import Dict, List, Set, Any, Tuple
+from typing import Dict, List, Set, Any, Tuple  # noqa: F401
 from datetime import datetime
 import logging
 from pathlib import Path
@@ -320,7 +320,7 @@ class VectorStoreValidator:
     
     def _calculate_consistency_score(self, issues: Dict[str, Any]) -> float:
         """Calculate a consistency score (0.0 = inconsistent, 1.0 = perfect)."""
-        total_issues = issues.get('total_issues', 0)
+        total_issues = issues.get('total_issues', 0)  # noqa: F841
         
         # Weighting of error types (some are more severe)
         weighted_issues = (

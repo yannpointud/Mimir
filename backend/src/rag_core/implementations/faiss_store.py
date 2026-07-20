@@ -21,7 +21,7 @@ from ..interfaces import (
     AbstractVectorStore,
     Chunk,
     SearchResult,
-    VectorStoreException,
+    VectorStoreException,  # noqa: F401
     VectorStoreConnectionError,
     VectorStoreOperationError
 )
@@ -69,7 +69,8 @@ class FaissVectorStore(AbstractVectorStore):
             index_path: Path to FAISS index file
             metadata_path: Path to metadata pickle file
             similarity_threshold: Minimum similarity score threshold
-            index_type: FAISS index type ("FlatL2", "HNSW", "IVFFlat")
+            index_type: FAISS index type (only "FlatL2" is built; the value is
+                otherwise a passthrough label used for logging/tests)
         """
         self.dimension = dimension
         self.index_path = Path(index_path)
@@ -140,27 +141,11 @@ class FaissVectorStore(AbstractVectorStore):
         """Create a new FAISS index"""
         with self._lock:
             try:
-                if self.index_type == "FlatL2":
-                    # Simple brute-force search (good for small datasets)
-                    self.index = faiss.IndexFlatL2(self.dimension)
-
-                elif self.index_type == "HNSW":
-                    # Hierarchical Navigable Small World (good for large datasets)
-                    # M: number of connections, larger = better quality but more memory
-                    M = 32
-                    self.index = faiss.IndexHNSWFlat(self.dimension, M)
-                    self.index.hnsw.efConstruction = 200  # Construction parameter
-                    self.index.hnsw.efSearch = 50  # Search parameter
-
-                elif self.index_type == "IVFFlat":
-                    # Inverted File Index (good balance, requires training)
-                    # For now, use FlatL2 as it doesn't require training data
-                    logger.warning("IVFFlat requires training data, falling back to FlatL2")
-                    self.index = faiss.IndexFlatL2(self.dimension)
-
-                else:
-                    logger.warning(f"Unknown index type {self.index_type}, using FlatL2")
-                    self.index = faiss.IndexFlatL2(self.dimension)
+                # Simple brute-force search (good for small datasets).
+                # This is the only index type ever configured in production
+                # (dependencies.py hardcodes "FlatL2"); the other unreachable
+                # branches were removed as dead code (DEBT-03).
+                self.index = faiss.IndexFlatL2(self.dimension)
 
                 # Reset metadata
                 self.metadata = []
@@ -474,6 +459,22 @@ class FaissVectorStore(AbstractVectorStore):
                 'memory_usage_mb': self._estimate_memory_usage()
             }
 
+    def get_corpus_version(self) -> str:
+        """Return a cheap corpus-version token used to scope cache entries.
+
+        This is the ISO-8601 `last_updated` timestamp already bumped by
+        `_update_stats()` at the end of every `upsert()` and `delete()`, i.e.
+        on every corpus mutation. Any ingestion or deletion therefore changes
+        this token, which implicitly invalidates all corpus-versioned cache
+        entries (COST-03) without any extra bookkeeping. Read under the same
+        lock as `get_stats()`, but without assembling the full stats dict.
+
+        Returns:
+            str: The corpus version token, or "none" if never mutated.
+        """
+        with self._lock:
+            return self._stats.get('last_updated') or 'none'
+
     def _estimate_memory_usage(self) -> float:
         """Estimate memory usage in MB"""
         if not self.index:
@@ -758,7 +759,7 @@ class FaissVectorStore(AbstractVectorStore):
                         'optimization_triggered': False,
                         'duration_ms': (time.time() - start_time) * 1000,
                         'initial_stats': initial_stats,
-                        'final_stats': initial_stats  # Pas de changement
+                        'final_stats': initial_stats  # No change
                     }
                 
                 logger.info(f"Found {len(orphaned_chunks)} orphaned chunks from {len(orphaned_docs)} documents")
@@ -960,6 +961,14 @@ class FaissVectorStore(AbstractVectorStore):
             # Create new index
             new_index = faiss.IndexFlatL2(self.dimension)
 
+            # Map each surviving chunk's OLD id (still referenced by
+            # document_to_chunks) to its NEW compacted position. The old id MUST
+            # be captured BEFORE meta['chunk_id'] is overwritten below: these ids
+            # double as direct indices into self.metadata in delete(), so
+            # rebuilding the mapping by comparing stale ids against reassigned
+            # ones would attribute chunks to the wrong document (silent
+            # cross-document data loss).
+            id_remap = {}
             if active_vectors:
                 # Add all active vectors to new index
                 vectors_array = np.array(active_vectors, dtype=np.float32)
@@ -967,6 +976,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 # Update chunk IDs in metadata to match new index positions
                 for i, meta in enumerate(active_entries):
+                    id_remap[meta['chunk_id']] = i
                     meta['chunk_id'] = i
 
             # Replace old index and metadata
@@ -974,22 +984,16 @@ class FaissVectorStore(AbstractVectorStore):
             self.index = new_index
             self.metadata = active_entries
 
-            # Clear document mapping for deleted documents
-            docs_to_remove = []
-            for doc_id, chunk_ids in self.document_to_chunks.items():
-                # Check if any chunks for this document still exist
-                remaining_chunks = [
-                    cid for cid in chunk_ids
-                    if any(meta.get('chunk_id') == cid and not meta.get('deleted', False)
-                          for meta in self.metadata)
-                ]
-                if remaining_chunks:
-                    self.document_to_chunks[doc_id] = remaining_chunks
-                else:
-                    docs_to_remove.append(doc_id)
-
-            for doc_id in docs_to_remove:
-                del self.document_to_chunks[doc_id]
+            # Rebuild the document mapping against the new positions. Chunk ids
+            # absent from id_remap belonged to vectors removed in this rebuild
+            # and are dropped; documents left without any surviving chunk are
+            # pruned entirely.
+            new_mapping = {}
+            for doc_id, old_chunk_ids in self.document_to_chunks.items():
+                remapped = [id_remap[cid] for cid in old_chunk_ids if cid in id_remap]
+                if remapped:
+                    new_mapping[doc_id] = remapped
+            self.document_to_chunks = new_mapping
 
             # Save optimized index
             try:

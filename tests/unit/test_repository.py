@@ -4,10 +4,10 @@ Vérifie les opérations CRUD et la logique métier
 """
 
 import pytest
-from datetime import datetime
-from sqlalchemy.exc import IntegrityError
+from datetime import datetime  # noqa: F401
+from sqlalchemy.exc import IntegrityError  # noqa: F401
 
-from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository
+from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository  # noqa: F401
 
 
 class TestDocumentRepository:
@@ -209,7 +209,7 @@ class TestDocumentRepository:
         
         # Ajouter des documents
         doc1 = repo.create("file1.pdf", "hash1")
-        doc2 = repo.create("file2.pdf", "hash2", preserve=True)
+        doc2 = repo.create("file2.pdf", "hash2", preserve=True)  # noqa: F841
         doc3 = repo.create("file3.pdf", "hash3")
         
         repo.update_status(doc1.id, "indexed", chunk_count=10)

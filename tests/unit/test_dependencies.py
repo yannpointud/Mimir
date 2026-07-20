@@ -3,7 +3,7 @@ Tests pour les dépendances FastAPI.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock  # noqa: F401
 from sqlalchemy.orm import Session
 
 from src.api.dependencies import (
@@ -18,9 +18,9 @@ from src.api.dependencies import (
     get_vector_store,
     get_ingestion_processor,
     set_ingestion_processor,
-    _llm_service,
-    _vector_store,
-    _ingestion_processor
+    _llm_service,  # noqa: F401
+    _vector_store,  # noqa: F401
+    _ingestion_processor  # noqa: F401
 )
 
 

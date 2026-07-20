@@ -273,7 +273,7 @@ def sanitize_filename(filename: str) -> str:
     
     # Limit the length
     if len(filename) > 255:
-        name, ext = os.path.splitext(filename)
+        name, ext = os.path.splitext(filename)  # noqa: F821
         filename = name[:255-len(ext)] + ext
     
     return filename

@@ -5,10 +5,10 @@ Tests for complete ingestion, search and response flows
 
 import pytest
 import tempfile
-import asyncio
-import json
+import asyncio  # noqa: F401
+import json  # noqa: F401
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock  # noqa: F401
 from fastapi.testclient import TestClient
 
 

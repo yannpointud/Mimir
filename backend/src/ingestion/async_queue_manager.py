@@ -6,11 +6,11 @@ Replaces threading-based QueueManager with full asyncio implementation
 
 import asyncio
 import time
-import logging
+import logging  # noqa: F401
 from typing import Callable, Optional, Dict, Any
 from datetime import datetime
 
-from .queue_manager import IngestionTask, TaskPriority
+from .queue_manager import IngestionTask
 from ..monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -138,11 +138,10 @@ class AsyncQueueManager:
             self.stats['queue_size'] = self.queue.qsize()
 
             logger.debug(
-                f"Added task to queue: {task.file_path} (priority={task.priority.name})",
+                f"Added task to queue: {task.file_path}",
                 extra={'extra_fields': {
                     'file_path': task.file_path,
                     'document_id': task.document_id,
-                    'priority': task.priority.name,
                     'queue_size': self.queue.qsize(),
                     'type': 'task_queued'
                 }}
@@ -237,7 +236,6 @@ class AsyncQueueManager:
                 extra={'extra_fields': {
                     'file_path': task.file_path,
                     'document_id': task.document_id,
-                    'priority': task.priority.name,
                     'retry_count': task.retry_count,
                     'type': 'task_processing'
                 }}

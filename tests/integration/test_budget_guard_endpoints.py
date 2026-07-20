@@ -129,23 +129,230 @@ def _mock_llm(model="mistral-small-latest", embed_model="mistral-embed", stream_
 
 @pytest.fixture
 def apply_mocked_llm():
-    """Yields a function that overrides get_llm_service/get_vector_store
-    with the given mock, so the RAG pipeline never hits a real Mistral API
-    nor a real FAISS index."""
+    """Yields a function that overrides get_rag_service with a RagService built
+    from the given mock LLM and a stub vector store, so the RAG pipeline never
+    hits a real Mistral API nor a real FAISS index.
+
+    Since plan 04-04 the chat routes reach the pipeline exclusively through
+    Depends(get_rag_service) (the llm_service/vector_store collaborators live
+    inside the injected RagService), so overriding get_llm_service /
+    get_vector_store alone no longer reaches the pipeline -- the override must
+    target get_rag_service. The real budget_guard / usage_tracker /
+    rag_debug singletons are kept so the reservation is still settled and the
+    llm_usage rows are still written to the isolated temporary database."""
     from main import app
-    from src.api.dependencies import get_llm_service, get_vector_store
+    from src.api.dependencies import (
+        get_rag_service, get_rag_debug_service, get_budget_guard,
+        get_usage_tracker, get_chat_cache_service,
+    )
+    from src.services.rag_service import RagService
 
     mock_store = Mock()
     mock_store.query = Mock(return_value=[])
 
     def _apply(mock_llm):
-        app.dependency_overrides[get_llm_service] = lambda: mock_llm
-        app.dependency_overrides[get_vector_store] = lambda: mock_store
+        rag_service = RagService(
+            llm_service=mock_llm,
+            vector_store=mock_store,
+            rag_debug=get_rag_debug_service(),
+            budget_guard=get_budget_guard(),
+            usage_tracker=get_usage_tracker(),
+            chat_cache=get_chat_cache_service(),
+        )
+        app.dependency_overrides[get_rag_service] = lambda: rag_service
 
     yield _apply
 
-    app.dependency_overrides.pop(get_llm_service, None)
-    app.dependency_overrides.pop(get_vector_store, None)
+    app.dependency_overrides.pop(get_rag_service, None)
+
+
+class _SpyBudgetGuard:
+    """A BudgetGuard stand-in that counts reserve/release/finalize so a stream
+    cache hit can be proven to release the reservation without charging it.
+    reserve() returns a truthy sentinel so the route proceeds past the gate."""
+
+    def __init__(self):
+        self.reserve_calls = 0
+        self.release_calls = 0
+        self.finalize_calls = 0
+
+    def reserve(self, category):
+        self.reserve_calls += 1
+        return object()
+
+    def release(self, reservation):
+        self.release_calls += 1
+
+    def finalize(self, reservation, cost_eur):
+        self.finalize_calls += 1
+
+
+def _mock_llm_counting():
+    """A mock LLM whose embed/generate_stream increment call counters -- zero
+    real Mistral calls. Returns (mock_llm, counters)."""
+    counters = {"embed": 0, "generate_stream": 0}
+
+    async def fake_embed(*args, **kwargs):
+        counters["embed"] += 1
+        return EmbeddingResponse(
+            embeddings=[[0.0] * settings.embedding_dimension],
+            model="mistral-embed",
+            usage_tokens=10,
+            prompt_tokens=10,
+            completion_tokens=0,
+        )
+
+    async def fake_generate_stream(*args, usage_out=None, **kwargs):
+        counters["generate_stream"] += 1
+        if usage_out is not None:
+            usage_out.update(
+                {"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
+            )
+        yield "mocked "
+        yield "answer"
+
+    mock_llm = Mock()
+    mock_llm.embed = fake_embed
+    mock_llm.generate_stream = fake_generate_stream
+    mock_llm.model_name = "mistral-small-latest"
+    return mock_llm, counters
+
+
+def _mock_llm_erroring():
+    """A mock LLM whose embed raises, forcing the streaming pipeline down its
+    error path (the client receives a generic error event, no done). Returns
+    (mock_llm, counters)."""
+    counters = {"embed": 0}
+
+    async def fake_embed(*args, **kwargs):
+        counters["embed"] += 1
+        raise RuntimeError("forced pipeline failure")
+
+    async def fake_generate_stream(*args, usage_out=None, **kwargs):
+        # Never reached: embed raises first. Present so the attribute exists.
+        if False:
+            yield ""
+
+    mock_llm = Mock()
+    mock_llm.embed = fake_embed
+    mock_llm.generate_stream = fake_generate_stream
+    mock_llm.model_name = "mistral-small-latest"
+    return mock_llm, counters
+
+
+def _drain_stream(client, question):
+    """POST a /chat/stream question and return the full SSE body as text."""
+    with client.stream(
+        "POST",
+        CHAT_STREAM_ROUTE,
+        json={"question": question, "include_sources": True},
+    ) as response:
+        assert response.status_code == 200
+        return "".join(chunk for chunk in response.iter_text())
+
+
+@pytest.fixture
+def apply_stream_rag(isolated_db_manager):
+    """Yields a builder that overrides get_rag_service and get_budget_guard
+    with a RagService (given mock LLM) and a spy budget guard, sharing the
+    singleton chat cache with the route's read. Returns (spy, cache, store).
+
+    The spy budget guard is used both by the route (reserve/release) and by
+    the RagService (finalize), so a hit that releases (never finalizes) can be
+    distinguished from a miss that finalizes."""
+    from main import app
+    from src.api.dependencies import (
+        get_rag_service, get_budget_guard, get_rag_debug_service,
+        get_usage_tracker, get_chat_cache_service,
+    )
+    from src.services.rag_service import RagService
+
+    cache = get_chat_cache_service()
+    cache.invalidate_all()
+    cache.reset_stats()
+    spy = _SpyBudgetGuard()
+    app.dependency_overrides[get_budget_guard] = lambda: spy
+
+    def _apply(mock_llm, corpus_version="v1"):
+        mock_store = Mock()
+        mock_store.query = Mock(return_value=[])
+        mock_store.get_corpus_version = Mock(return_value=corpus_version)
+        rag_service = RagService(
+            llm_service=mock_llm,
+            vector_store=mock_store,
+            rag_debug=get_rag_debug_service(),
+            budget_guard=spy,
+            usage_tracker=get_usage_tracker(),
+            chat_cache=cache,
+        )
+        app.dependency_overrides[get_rag_service] = lambda: rag_service
+        return spy, cache, mock_store
+
+    yield _apply
+
+    app.dependency_overrides.pop(get_rag_service, None)
+    app.dependency_overrides.pop(get_budget_guard, None)
+    cache.invalidate_all()
+    cache.reset_stats()
+
+
+class TestStreamCacheBudgetInteraction:
+    """COST-03 budget interaction: a /chat/stream cache hit releases the
+    reservation and spends nothing (no finalize, no Mistral call), while a
+    fresh question still reserves and finalizes normally (T-4-05-04)."""
+
+    def test_cache_hit_releases_without_charging(self, client, apply_stream_rag):
+        mock_llm, counters = _mock_llm_counting()
+        spy, _cache, _store = apply_stream_rag(mock_llm)
+
+        question = "budget cache-hit question"
+
+        # First call: a miss that runs the pipeline and finalizes.
+        _drain_stream(client, question)
+        generate_after_first = counters["generate_stream"]
+        finalize_after_first = spy.finalize_calls
+        release_after_first = spy.release_calls
+        assert generate_after_first == 1
+
+        # Second identical call: a cache hit.
+        _drain_stream(client, question)
+
+        # No Mistral generate call happened on the hit.
+        assert counters["generate_stream"] == generate_after_first
+        # The hit released its reservation but never finalized (no charge).
+        assert spy.release_calls == release_after_first + 1
+        assert spy.finalize_calls == finalize_after_first
+
+        # A fresh, different question still reserves and charges normally.
+        _drain_stream(client, "a different fresh question")
+        assert counters["generate_stream"] == generate_after_first + 1
+        assert spy.finalize_calls == finalize_after_first + 1
+
+
+class TestStreamCacheErrorNeverCached:
+    """WR-05: an error response is never cached -- the next identical question
+    re-runs the pipeline instead of being served a cached error (T-4-05-05)."""
+
+    def test_error_response_is_not_cached(self, client, apply_stream_rag):
+        mock_llm, counters = _mock_llm_erroring()
+        _spy, cache, _store = apply_stream_rag(mock_llm)
+
+        question = "question that triggers a pipeline error"
+
+        # First call: the pipeline errors, the client gets a generic error
+        # event and no done event.
+        body = _drain_stream(client, question)
+        assert '"type": "error"' in body
+        assert "Une erreur interne est survenue." in body
+        assert '"type": "done"' not in body
+        assert counters["embed"] == 1
+
+        # No entry was written for this question (error path never caches).
+        assert cache.get_stream_response(question, "v1") is None
+
+        # Second identical call: a MISS that re-runs the pipeline (embed again).
+        _drain_stream(client, question)
+        assert counters["embed"] == 2
 
 
 class TestBudgetExceededGate:

@@ -1,10 +1,10 @@
 """Tests unitaires pour l'application FastAPI principale."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock  # noqa: F401
 from fastapi.testclient import TestClient
 import logging
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock  # noqa: F401
 
 from backend.main import app
 

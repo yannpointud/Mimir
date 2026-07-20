@@ -4,10 +4,10 @@ Tests d'intégration pour la gestion centralisée des logs
 
 import pytest
 import tempfile
-import json
-import time
+import json  # noqa: F401
+import time  # noqa: F401
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock  # noqa: F401
 
 from src.monitoring.logger import setup_logger, log_ingestion_event, log_search_query, log_api_request
 from src.llm_interface.implementations.mistral_api import MistralAPIService
@@ -101,7 +101,7 @@ class TestLoggingIntegration:
 
         # Test query avec logging
         query_vector = np.random.rand(128).astype(np.float32)
-        results = store.query(query_vector, top_k=5)
+        results = store.query(query_vector, top_k=5)  # noqa: F841
 
         # Test health check avec logging
         is_healthy = store.health_check()
@@ -141,14 +141,14 @@ class TestLoggingIntegration:
     def test_concurrent_logging(self, temp_log_dir):
         """Test de logging concurrent (thread safety)"""
         import threading
-        import time
+        import time  # noqa: F811
 
         results = []
         log_counts = {}
 
         def log_worker(worker_id):
             """Worker qui génère des logs"""
-            logger = setup_logger(f"worker_{worker_id}")
+            logger = setup_logger(f"worker_{worker_id}")  # noqa: F841
 
             for i in range(5):
                 log_ingestion_event(
@@ -193,7 +193,7 @@ class TestJalon2AcceptanceCriteria:
 
     def test_jalon2_component_initialization(self, temp_workspace):
         """Critère: Tous les composants du Jalon 2 peuvent être initialisés"""
-        import numpy as np
+        import numpy as np  # noqa: F401
 
         # 1. LLM Interface - Mistral API
         llm_service = MistralAPIService(api_key="test_acceptance_key")

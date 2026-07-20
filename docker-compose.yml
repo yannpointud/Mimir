@@ -1,0 +1,44 @@
+# Mimir production stack (Compose v2). Single-server on-premise deployment.
+# Only the nginx frontend publishes a host port; the backend is reachable only
+# on the internal compose network.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # Secrets are injected at runtime, never COPY'd into an image layer
+    # (Information Disclosure mitigation T-05-05-01). Both files are optional so
+    # `docker compose config` validates whether the operator keeps the env at
+    # the repo root (./.env) or under backend/ (the current dev location).
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+    # PRODUCTION CONSTRAINT: the backend image runs a single uvicorn worker with
+    # no --reload. The in-memory FAISS singleton and the sequential ingestion
+    # queue are process-local and MUST NOT be scaled to multiple workers.
+    volumes:
+      # Named volume persists SQLite, the FAISS index and uploaded documents
+      # outside the image, surviving rebuilds (mounted at the backend data dir).
+      - mimir-data:/app/data
+    restart: unless-stopped
+    # NOTE: no `ports:` — 8000 is intentionally NOT host-published so the API /
+    # health surface is not directly reachable from the internet (T-05-05-03).
+
+  frontend:
+    build:
+      context: ./frontend
+    # The ONLY host-published port: nginx is the single ingress (:80).
+    ports:
+      - "80:80"
+    depends_on:
+      # Wait until the backend HEALTHCHECK reports healthy so nginx can resolve
+      # and reach the upstream on first start.
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mimir-data:

@@ -5,10 +5,10 @@ Tests des fonctionnalités API & Services
 """
 
 import requests
-import json
+import json  # noqa: F401
 import sys
 import time
-from pathlib import Path
+from pathlib import Path  # noqa: F401
 
 # Configuration du test
 BASE_URL = "http://localhost:8000"

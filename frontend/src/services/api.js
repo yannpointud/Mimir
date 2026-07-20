@@ -105,6 +105,7 @@ export const chatAPI = {
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
+          let settled = false;
 
           while (true) {
             const { done, value } = await reader.read();
@@ -134,11 +135,13 @@ export const chatAPI = {
 
                     case 'done':
                       callbacks.onDone?.(event);
+                      settled = true;
                       resolve(event);
                       break;
 
                     case 'error':
                       callbacks.onError?.(event.message);
+                      settled = true;
                       reject(new Error(event.message));
                       break;
                   }
@@ -147,6 +150,15 @@ export const chatAPI = {
                 }
               }
             }
+          }
+
+          // Stream ended without a terminal done/error event (e.g. a mid-stream
+          // backend disconnect). Settle the Promise so the chat UI does not stay
+          // stuck in its loading state forever.
+          if (!settled) {
+            const err = new Error('Stream closed before completion');
+            callbacks.onError?.(err.message);
+            reject(err);
           }
         } catch (error) {
           callbacks.onError?.(error.message);
@@ -240,11 +252,10 @@ export const documentsAPI = {
     return `${API_BASE_URL}/documents/${documentId}/download`;
   },
 
-  uploadDocument: async (file, preserve = false, priority = 'normal') => {
+  uploadDocument: async (file, preserve = false) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('preserve', preserve.toString());
-    formData.append('priority', priority);
 
     const response = await api.post('/documents/upload', formData, {
       headers: {
@@ -267,8 +278,8 @@ export const documentsAPI = {
     return response.data;
   },
 
-  reprocessDocument: async (documentId, priority = 'normal') => {
-    const response = await api.post(`/documents/${documentId}/reprocess?priority=${priority}`);
+  reprocessDocument: async (documentId) => {
+    const response = await api.post(`/documents/${documentId}/reprocess`);
     return response.data;
   },
 

@@ -16,7 +16,7 @@ import sys
 import random
 import time
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches  # noqa: F401
 from fpdf import FPDF
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage

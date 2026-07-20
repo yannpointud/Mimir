@@ -1,0 +1,27 @@
+# Mimir - Python tooling configuration.
+# This project had no Python linter before phase 05 (OPS-02); ruff is onboarded here
+# with a small, high-value rule set so local CI is green from the first commit and only
+# NEW violations fail going forward (pre-existing ones are baselined with inline noqa).
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+# Non-source / generated paths must never be linted.
+extend-exclude = [
+    "data",
+    "logs",
+    "coverage_report",
+    "backend/src/database/migrations",
+    "frontend",
+    ".venv",
+    "venv",
+]
+
+[tool.ruff.lint]
+# Deliberately small, high-value selection: real bugs, not style churn.
+# F  = pyflakes (unused imports, undefined names, f-string issues)
+# E9 = syntax errors / IndentationError
+# An aggressive rule set on a previously-unlinted ~800-test codebase would surface
+# hundreds of pre-existing findings (out of scope for this hardening milestone).
+select = ["F", "E9"]

@@ -4,16 +4,16 @@ Unit tests for document management endpoints.
 
 import pytest
 import asyncio
-import os
+import os  # noqa: F401
 import tempfile
 from unittest.mock import Mock, patch, AsyncMock, mock_open
 from datetime import datetime
 from pathlib import Path
 from fastapi import HTTPException, status, UploadFile
-from pydantic import ValidationError
+from pydantic import ValidationError  # noqa: F401
 
 from backend.src.api.endpoints.documents import (
-    router, list_documents, get_document, upload_document, delete_document,
+    router, list_documents, get_document, upload_document, delete_document,  # noqa: F401
     toggle_document_preservation, reprocess_document, get_document_stats
 )
 
@@ -90,7 +90,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
     @patch('backend.src.api.endpoints.documents.DocumentListResponse')
     def test_list_documents_success(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
         """Test successful document listing."""
-        from datetime import datetime
+        from datetime import datetime  # noqa: F401
 
         # Configure mocks with all required attributes
         mock_doc1 = self.create_mock_document(
@@ -226,7 +226,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.get_by_id.return_value = mock_document
 
         # Call the function
-        result = asyncio.run(get_document(
+        result = asyncio.run(get_document(  # noqa: F841
             document_id=1,
             doc_repo=mock_doc_repo
         ))
@@ -324,13 +324,12 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_ingestion_processor.queue_document.return_value = True
 
         # Call the function
-        with patch('builtins.open', mock_open()) as mock_file_open:
-            result = asyncio.run(upload_document(
+        with patch('builtins.open', mock_open()) as mock_file_open:  # noqa: F841
+            result = asyncio.run(upload_document(  # noqa: F841
                 request=Mock(),  # required by slowapi decorator (SEC-03)
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo,
@@ -357,7 +356,6 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -381,7 +379,6 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -408,7 +405,6 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -438,7 +434,6 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -469,7 +464,6 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -509,7 +503,6 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -612,7 +605,7 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.delete.return_value = True
 
         with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:
+             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:  # noqa: F841
 
             mock_exists.return_value = True
 
@@ -668,7 +661,7 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
         mock_doc_repo.update_preserve_status.return_value = updated_doc
 
         # Call the function
-        result = asyncio.run(toggle_document_preservation(
+        result = asyncio.run(toggle_document_preservation(  # noqa: F841
             document_id=1,
             preserve=True,
             current_user=mock_current_user,
@@ -716,7 +709,6 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
         # Call the function
         result = asyncio.run(reprocess_document(
             document_id=1,
-            priority="high",
             current_user=mock_current_user,
             doc_repo=mock_doc_repo,
             audit_repo=mock_audit_repo,
@@ -740,7 +732,6 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(reprocess_document(
                 document_id=999,
-                priority="normal",
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo
@@ -860,7 +851,6 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         # 3. Reprocessing
         reprocess_result = asyncio.run(reprocess_document(
             document_id=1,
-            priority="high",
             current_user=mock_current_user,
             doc_repo=mock_doc_repo,
             audit_repo=mock_audit_repo,
@@ -869,7 +859,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # 4. Forced deletion (because protected)
         with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:
+             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:  # noqa: F841
 
             mock_exists.return_value = True
             mock_document.preserve = True  # Document now protected
@@ -1059,7 +1049,6 @@ class TestUploadQueueFullCleanup:
                     response=Mock(),  # required by slowapi header injection (SEC-03)
                     file=mock_file,
                     preserve=False,
-                    priority="normal",
                     current_user={"sub": "admin", "user_type": "admin"},
                     doc_repo=mock_doc_repo,
                     audit_repo=Mock(),

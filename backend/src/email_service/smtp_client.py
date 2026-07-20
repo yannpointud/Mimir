@@ -5,8 +5,8 @@ This module provides asynchronous email sending capabilities for
 escalating user conversations to human support agents.
 """
 
-import asyncio
-import smtplib
+import asyncio  # noqa: F401
+import smtplib  # noqa: F401
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase

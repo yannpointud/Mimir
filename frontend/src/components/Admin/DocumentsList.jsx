@@ -144,7 +144,7 @@ const DocumentsList = () => {
   const handleReprocess = async (document) => {
     try {
       setActionLoading(true);
-      await documentsAPI.reprocessDocument(document.id, 'high');
+      await documentsAPI.reprocessDocument(document.id);
 
       // Refresh the list
       await loadDocuments();

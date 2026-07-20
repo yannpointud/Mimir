@@ -4,7 +4,7 @@ Vérifie la logique métier et les contraintes
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  # noqa: F401
 from sqlalchemy.exc import IntegrityError
 
 from src.database.models import Document, Configuration, AuditLog
@@ -151,7 +151,7 @@ class TestConfigurationModel:
         test_session.add(config)
         test_session.commit()
         
-        original_timestamp = config.updated_at
+        original_timestamp = config.updated_at  # noqa: F841
         
         # Simulation d'une pause (dans un vrai test, on pourrait mock datetime)
         config.value = "updated_value"

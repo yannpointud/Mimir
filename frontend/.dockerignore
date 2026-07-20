@@ -1,0 +1,9 @@
+# Frontend build-context excludes. Keeps installed deps, prior builds and any
+# local secrets out of the image context (deps are reinstalled via npm ci).
+node_modules/
+dist/
+.env
+.env.*
+.vite/
+coverage/
+*.log

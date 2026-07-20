@@ -4,8 +4,8 @@ Tests unitaires pour le module api/middleware/cors.py
 Ces tests couvrent la configuration du middleware CORS.
 """
 
-import pytest
-from unittest.mock import Mock, patch, call
+import pytest  # noqa: F401
+from unittest.mock import Mock, patch, call  # noqa: F401
 
 from backend.src.api.middleware.cors import configure_cors_middleware
 

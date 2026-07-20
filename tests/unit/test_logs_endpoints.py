@@ -4,7 +4,7 @@ Tests pour les endpoints de logs frontend.
 
 import pytest
 from unittest.mock import patch, MagicMock
-from datetime import datetime
+from datetime import datetime  # noqa: F401
 
 from src.api.endpoints.logs import (
     FrontendLogEntry,
@@ -12,7 +12,7 @@ from src.api.endpoints.logs import (
     receive_frontend_log,
     frontend_logging_health
 )
-from src.monitoring.logger import frontend_logger
+from src.monitoring.logger import frontend_logger  # noqa: F401
 
 
 class TestFrontendLogEntry:

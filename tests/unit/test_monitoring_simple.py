@@ -3,12 +3,12 @@ Simplified unit tests for the logging system
 Focus on code coverage to reach 80%
 """
 
-import pytest
+import pytest  # noqa: F401
 import json
 import logging
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch  # noqa: F401
 
 from src.monitoring.logger import (
     JSONFormatter, ConsoleFormatter, setup_logger

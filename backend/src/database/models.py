@@ -5,12 +5,12 @@ Defines table structure according to LLD specifications
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Text, Float,
-    ForeignKey, CheckConstraint, Index
+    ForeignKey, CheckConstraint, Index  # noqa: F401
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship  # noqa: F401
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional  # noqa: F401
 
 
 Base = declarative_base()
