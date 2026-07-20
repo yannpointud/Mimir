@@ -88,7 +88,12 @@ class IngestionProcessor:
         self.chunking_strategy = ChunkingStrategy(chunking_config)
 
         # Async queue manager for sequential processing with configurable max size
-        self.queue_manager = AsyncQueueManager(max_size=settings.ingestion_queue_max_size)
+        # and retry backoff (mitigates Mistral 429 bursts during batch upload).
+        self.queue_manager = AsyncQueueManager(
+            max_size=settings.ingestion_queue_max_size,
+            retry_base_delay=settings.ingestion_retry_base_delay,
+            retry_max_delay=settings.ingestion_retry_max_delay
+        )
 
         logger.info(
             f"Ingestion processor initialized (max_file_size={max_file_size_mb}MB, "
@@ -174,7 +179,8 @@ class IngestionProcessor:
             task = IngestionTask(
                 file_path=file_path,
                 document_id=document_id,
-                metadata=metadata or {}
+                metadata=metadata or {},
+                max_retries=settings.ingestion_max_retries
             )
 
             # Queue the task

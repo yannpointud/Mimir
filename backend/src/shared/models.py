@@ -259,6 +259,7 @@ def validate_filename(filename: str) -> bool:
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize a filename"""
+    import os
     import re
     import unicodedata
     
@@ -273,23 +274,7 @@ def sanitize_filename(filename: str) -> str:
     
     # Limit the length
     if len(filename) > 255:
-        name, ext = os.path.splitext(filename)  # noqa: F821
+        name, ext = os.path.splitext(filename)
         filename = name[:255-len(ext)] + ext
     
     return filename
-
-
-# Pydantic models configuration
-
-class Config:
-    """Global configuration for all models"""
-    # Enable usage with SQLAlchemy
-    from_attributes = True
-    
-    # Strict validation
-    validate_assignment = True
-    
-    # JSON serialization for datetime
-    json_encoders = {
-        datetime: lambda v: v.isoformat()
-    }

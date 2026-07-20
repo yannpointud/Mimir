@@ -20,6 +20,7 @@ class TestMaskSecrets:
             "smtp_password": "smtp-secret",
             "jwt_secret_key": "super-secret-jwt-key-32-chars-long",
             "admin_password_hash": "$2b$12$somerealhashvalue",
+            "admin_password": "ClearTextAdminPwd42!",
         }
 
         result = mask_secrets(config)
@@ -77,11 +78,12 @@ class TestMaskSecrets:
         """MASKED_VALUE is exactly ***MASKED*** (total mask, D-02)."""
         assert MASKED_VALUE == "***MASKED***"
 
-    def test_sensitive_config_keys_contains_exactly_the_four_keys(self):
-        """SENSITIVE_CONFIG_KEYS covers exactly the four known secret keys."""
+    def test_sensitive_config_keys_contains_exactly_the_known_secrets(self):
+        """SENSITIVE_CONFIG_KEYS covers exactly the known secret keys."""
         assert SENSITIVE_CONFIG_KEYS == frozenset({
             "mistral_api_key",
             "smtp_password",
             "jwt_secret_key",
             "admin_password_hash",
+            "admin_password",
         })

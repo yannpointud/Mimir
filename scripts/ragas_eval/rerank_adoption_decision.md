@@ -11,13 +11,13 @@ Même golden set gelé (`golden_set_v1.jsonl`) rejoué deux fois sur les **même
 
 | Métrique | Baseline (hybride) | Hybride + rerank | Delta absolu | Delta relatif |
 |----------|--------------------|------------------|--------------|---------------|
-| context_recall | 0.7625 | 0.7292 | -0.0333 | -4.4 % |
-| context_precision | 0.6058 | 0.6052 | -0.0007 | -0.1 % |
+| context_recall | 0.7625 | 0.7625 | 0.0000 | +0.0 % |
+| context_precision | 0.6058 | 0.5946 | -0.0113 | -1.9 % |
 | taux de NaN (max) | 1.7% | 0.0% | — | — |
 
-**p95 latence rerank :** 6567.3467 ms (budget 500 ms, n=59 appels).
+**p95 latence rerank :** 42703.1323 ms (budget 500 ms, n=19 appels).
 
-Sources : `rerank_baseline_run.json`, `rerank_rerank_run.json`, `rerank_latencies.json`.
+Sources : `rerank_baseline_run.json`, `rerank_multibert_run.json`, `rerank_latencies.json`.
 
 ## Jugement d'adoption
 
@@ -25,7 +25,7 @@ Règle conservatrice (mirroir de l'adoption hybride, phase 6) : adopter **unique
 
 - Delta net positif sur les deux métriques : **False**
 - Taux de NaN acceptable : **True** (baseline 1.7%, rerank 0.0%)
-- p95 dans le budget : **False** (p95=6567.3467 ms)
+- p95 dans le budget : **False** (p95=42703.1323 ms)
 - **Verdict : DO-NOT-ADOPT.**
 
 ## Réversibilité (garde-fou moteur)

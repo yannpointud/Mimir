@@ -16,7 +16,7 @@ stop_servers.sh
 ## Stack
 - **Backend**: Python 3.11, FastAPI, SQLite (WAL), FAISS, Mistral API
 - **Frontend**: React 18, Vite, Tailwind CSS, Axios
-- **Auth**: JWT + bcrypt
+- **Auth**: JWT (PyJWT) + Argon2 (pwdlib, bcrypt legacy)
 - **Tests**: pytest (backend), vitest (frontend)
 
 ## Project Structure
@@ -55,7 +55,7 @@ backend/
 │   └── utils/                       # Log parser, logs reader
 ├── data/                            # Runtime data (gitignored)
 │   ├── documents/                   # Uploaded files (hashed filenames)
-│   ├── faiss/                       # index.bin + metadata.pkl
+│   ├── faiss/                       # index.bin + metadata.json
 │   └── sqlite/                      # mimir.db
 └── logs/                            # App logs (gitignored)
 

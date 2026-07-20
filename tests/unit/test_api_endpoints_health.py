@@ -15,11 +15,12 @@ from backend.src.api.endpoints.health import router, health_check, database_heal
 class TestHealthModels:
     """Tests pour les modèles de santé."""
 
+    @pytest.mark.skip(reason="No-op placeholder: response structure is enforced by the Pydantic models themselves")
     def test_health_check_response_structure(self):
         """Test de la structure de réponse de health check."""
-        # Ce test vérifie que les réponses suivent la structure attendue
-        # Les modèles Pydantic valideront automatiquement la structure
-        pass  # Les modèles sont définis dans shared.models
+        # Structure guaranteed by the Pydantic response models in shared.models;
+        # nothing to assert here at the unit level.
+        pass
 
 
 class TestHealthCheckEndpoint:

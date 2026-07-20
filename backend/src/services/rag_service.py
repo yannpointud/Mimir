@@ -309,12 +309,11 @@ def _calculate_weighted_confidence(
         # Improved algorithm with degressive weighting
 
         # Position-weighting assumes a descending-score order. Sort defensively so
-        # the metric is order-agnostic (WR-02): on the retrieval path the list is
-        # already sorted, so this is a no-op (byte-identical). After cross-encoder
-        # reranking the list is ordered by rerank score, NOT by similarity
-        # magnitude, so without this sort the degressive weights would be applied
-        # to a list whose position no longer reflects its score. The coherence and
-        # quality factors below use max()/std() and are already order-independent.
+        # the metric stays order-agnostic (WR-02): on the retrieval path the list is
+        # already sorted, so this is a no-op (byte-identical); the sort only guards
+        # the scoring against any future caller that would pass an unsorted list. The
+        # coherence and quality factors below use max()/std() and are already
+        # order-independent.
         scores = sorted(scores, reverse=True)
 
         # 1. Position-weighted score (first results count more)

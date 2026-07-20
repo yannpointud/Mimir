@@ -159,28 +159,37 @@ def generate_secure_password(length: int = 16) -> str:
     uppercase = string.ascii_uppercase
     digits = string.digits
     special = "!@#$%^&*(),.?\":{}|<>"
-
-    # Ensure at least one character from each set
-    password_chars = [
-        secrets.choice(lowercase),
-        secrets.choice(uppercase),
-        secrets.choice(digits),
-        secrets.choice(special)
-    ]
-
-    # Fill remaining length with random characters
     all_chars = lowercase + uppercase + digits + special
-    for _ in range(length - 4):
-        password_chars.append(secrets.choice(all_chars))
 
-    # Shuffle the password
-    password = ''.join(password_chars)
-    password_list = list(password)
-    for i in range(len(password_list)):
-        j = secrets.randbelow(len(password_list))
-        password_list[i], password_list[j] = password_list[j], password_list[i]
+    # Regenerate until the candidate also passes validate_password_strength. By
+    # construction each candidate already has the four required character classes and
+    # the requested length; the only property not guaranteed up front is the absence
+    # of sequential runs (abc/123), which validate_password_strength rejects. Looping
+    # keeps the invariant "a generated password passes its own validation" and makes
+    # the generator deterministic against that check. The bounded attempts keep the
+    # function total: a valid-length candidate is still returned in the extremely
+    # unlikely case that every attempt contained a sequential run.
+    password = ""
+    for _attempt in range(1000):
+        password_chars = [
+            secrets.choice(lowercase),
+            secrets.choice(uppercase),
+            secrets.choice(digits),
+            secrets.choice(special)
+        ]
+        for _ in range(length - 4):
+            password_chars.append(secrets.choice(all_chars))
 
-    return ''.join(password_list)
+        # Shuffle so the guaranteed characters are not always in the first positions
+        for i in range(len(password_chars)):
+            j = secrets.randbelow(len(password_chars))
+            password_chars[i], password_chars[j] = password_chars[j], password_chars[i]
+
+        password = ''.join(password_chars)
+        if not has_sequential_chars(password):
+            return password
+
+    return password
 
 
 def is_password_compromised(password: str) -> bool:

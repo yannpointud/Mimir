@@ -314,12 +314,12 @@ class TestTokenRefresh:
         assert result.access_token == "new_token"
         assert result.token_type == "bearer"
 
+    @pytest.mark.skip(reason="Unreachable: the FastAPI auth dependency runs before this handler")
     def test_refresh_token_unauthorized(self):
         """Test unauthorized token refresh."""
-        # This test verifies behavior if the dependency middleware fails
-        # In the real system, this case should not happen because the
-        # FastAPI middleware handles authorization before the function is called
-        pass  # Skip this test as it tests an impossible case in FastAPI
+        # The require-auth dependency rejects the request before the handler runs,
+        # so this branch is not reachable at the unit level.
+        pass
 
     @patch('backend.src.api.endpoints.auth.jwt_handler')
     @patch('backend.src.api.endpoints.auth.settings')
@@ -378,12 +378,12 @@ class TestLogout:
         # Assertions
         assert result["message"] == "Successfully logged out"
 
+    @pytest.mark.skip(reason="Unreachable: the FastAPI auth dependency runs before this handler")
     def test_logout_unauthorized(self):
         """Test unauthorized logout."""
-        # This test verifies behavior if the dependency middleware fails
-        # In the real system, this case should not happen because the
-        # FastAPI middleware handles authorization before the function is called
-        pass  # Skip this test as it tests an impossible case in FastAPI
+        # The require-auth dependency rejects the request before the handler runs,
+        # so this branch is not reachable at the unit level.
+        pass
 
 
 class TestAuthIntegration:

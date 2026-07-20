@@ -18,13 +18,13 @@ logger = logging.getLogger(__name__)
 # Request models
 class FrontendLogEntry(BaseModel):
     """Frontend log entry model for API requests"""
-    timestamp: str = Field(..., description="ISO timestamp of the log entry")
-    level: str = Field(..., description="Log level (DEBUG, INFO, WARN, ERROR)")
-    module: str = Field(..., description="Frontend module name") 
-    message: str = Field(..., description="Log message")
-    url: Optional[str] = Field(None, description="Current page URL")
-    userAgent: Optional[str] = Field(None, description="Browser user agent")
-    timeSinceStart: Optional[str] = Field(None, description="Time since app start")
+    timestamp: str = Field(..., max_length=64, description="ISO timestamp of the log entry")
+    level: str = Field(..., max_length=16, description="Log level (DEBUG, INFO, WARN, ERROR)")
+    module: str = Field(..., max_length=128, description="Frontend module name")
+    message: str = Field(..., max_length=4000, description="Log message")
+    url: Optional[str] = Field(None, max_length=2048, description="Current page URL")
+    userAgent: Optional[str] = Field(None, max_length=512, description="Browser user agent")
+    timeSinceStart: Optional[str] = Field(None, max_length=32, description="Time since app start")
     extra_data: Optional[Dict[str, Any]] = Field(None, description="Additional log data")
 
 class LogResponse(BaseModel):

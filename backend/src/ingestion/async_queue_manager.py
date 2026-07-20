@@ -5,6 +5,7 @@ Replaces threading-based QueueManager with full asyncio implementation
 """
 
 import asyncio
+import random
 import time
 import logging  # noqa: F401
 from typing import Callable, Optional, Dict, Any
@@ -24,7 +25,9 @@ class AsyncQueueManager:
     def __init__(self,
                  max_size: int = 1000,
                  worker_timeout: float = 60.0,
-                 stats_interval: float = 300.0):  # 5 minutes
+                 stats_interval: float = 300.0,  # 5 minutes
+                 retry_base_delay: float = 2.0,
+                 retry_max_delay: float = 60.0):
         """
         Initialize async queue manager
 
@@ -32,10 +35,14 @@ class AsyncQueueManager:
             max_size: Maximum queue size (0 = unlimited)
             worker_timeout: Timeout for processing callback
             stats_interval: Interval for logging statistics
+            retry_base_delay: Base delay (s) for exponential backoff before re-queuing a failed task
+            retry_max_delay: Cap (s) for the exponential backoff between retries
         """
         self.max_size = max_size
         self.worker_timeout = worker_timeout
         self.stats_interval = stats_interval
+        self.retry_base_delay = retry_base_delay
+        self.retry_max_delay = retry_max_delay
 
         # Async queue for tasks
         self.queue: asyncio.Queue[IngestionTask] = asyncio.Queue(maxsize=max_size)
@@ -183,9 +190,18 @@ class AsyncQueueManager:
                     # Handle retry logic
                     if task.can_retry():
                         task.increment_retry()
+
+                        # Exponential backoff with jitter before retrying. The
+                        # dominant failure here is Mistral rate limiting (429):
+                        # re-queuing immediately would burn the retry budget
+                        # while the limit is still saturated. Waiting lets the
+                        # quota recover before the next attempt.
+                        delay = self._compute_retry_delay(task.retry_count)
                         logger.warning(
-                            f"Task failed, retrying ({task.retry_count}/{task.max_retries}): {task.file_path}"
+                            f"Task failed, retrying ({task.retry_count}/{task.max_retries}) "
+                            f"after {delay:.1f}s: {task.file_path}"
                         )
+                        await asyncio.sleep(delay)
 
                         # Re-queue for retry
                         try:
@@ -213,6 +229,21 @@ class AsyncQueueManager:
                 await asyncio.sleep(1.0)  # Brief pause to prevent tight error loop
 
         logger.info("Async worker task stopped")
+
+    def _compute_retry_delay(self, retry_count: int) -> float:
+        """
+        Compute the wait before a retry using capped exponential backoff + jitter.
+
+        Args:
+            retry_count: The task's retry attempt number (1 for the first retry)
+
+        Returns:
+            Delay in seconds: min(base * 2^(retry_count-1), max) + uniform jitter
+        """
+        exp = self.retry_base_delay * (2 ** max(0, retry_count - 1))
+        delay = min(exp, self.retry_max_delay)
+        # Full jitter within one base delay to desynchronize concurrent batches
+        return delay + random.uniform(0.0, self.retry_base_delay)
 
     async def _process_task(self, task: IngestionTask) -> bool:
         """

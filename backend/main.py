@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 
 from src.config import settings
 from src.database.connection import init_database, db_manager
+from src.security.admin_password import resolve_admin_password
 from src.security.startup_validation import validate_production_secrets
 from src.shared.models import ErrorResponse, HealthCheckResponse
 
@@ -73,6 +74,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Mimir application - Jalon 3: API & Services...")
 
     try:
+        # Derive the effective admin hash from ADMIN_PASSWORD first, so the
+        # SEC-02 checks below run against the hash actually used at runtime.
+        resolve_admin_password(settings)
+
         # SEC-02: fail fast on default secrets before any service initialization
         validate_production_secrets(settings)
 

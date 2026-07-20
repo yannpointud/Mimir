@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { documentsAPI } from '../../services/api';
 import { getErrorMessage, formatDate, translateDocumentStatus, getStatusColor, validateDocumentData, safeDisplayValue } from '../../utils/helpers';
@@ -25,19 +25,31 @@ const DocumentsList = () => {
 
   // Filters and pagination
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalDocuments, setTotalDocuments] = useState(0);
   const itemsPerPage = 10;
 
+  // Monotonic request id: guards against out-of-order responses overwriting
+  // the latest query result (e.g. page 3 request resolving after page 1).
+  const requestIdRef = useRef(0);
+
+  // Count of documents currently in error status (across all pages), used to
+  // offer a batch "retry all" action after a bulk upload.
+  const [errorCount, setErrorCount] = useState(0);
+
   // Action states
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [retryingAll, setRetryingAll] = useState(false);
 
-  // Load documents
-  const loadDocuments = useCallback(async (page = currentPage, search = searchTerm, status = statusFilter) => {
+  // Load documents. Stable identity (no reactive deps) so effects that call it
+  // don't re-run when page/search/filter change; those are passed explicitly.
+  const loadDocuments = useCallback(async (page, search, status) => {
+    const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
       setError(null);
@@ -49,55 +61,102 @@ const DocumentsList = () => {
         search || null
       );
 
+      // Ignore stale responses from a superseded request
+      if (requestId !== requestIdRef.current) return;
+
       // Validate and clean data
       const validatedDocuments = (response.documents || []).map(validateDocumentData);
       setDocuments(validatedDocuments);
 
-      // Adapt backend response structure
+      // Page state is driven by the UI, not derived from the response, so we
+      // only sync totals here.
       const totalCount = response.total_count || 0;
-      const pagination = response.pagination || {};
-      const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
-      const currentPage = Math.floor((pagination.offset || 0) / itemsPerPage) + 1;
-
-      setTotalPages(totalPages);
+      setTotalPages(Math.ceil(totalCount / itemsPerPage) || 1);
       setTotalDocuments(totalCount);
-      setCurrentPage(currentPage);
 
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Erreur lors du chargement des documents:', error);
       setError(getErrorMessage(error));
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [currentPage, searchTerm, statusFilter]);
+  }, []);
 
-  // Effects
+  // Refresh the total count of documents in error status (limit=1: we only
+  // need total_count, not the rows). Stable identity for use in effects.
+  const refreshErrorCount = useCallback(async () => {
+    try {
+      const response = await documentsAPI.getDocuments(1, 1, 'error', null);
+      setErrorCount(response.total_count || 0);
+    } catch (error) {
+      // Non-critical: leave the previous count on failure
+      console.error('Erreur lors du comptage des documents en erreur:', error);
+    }
+  }, []);
+
+  // Debounce the search input into its own state
   useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments]);
-
-  // Debounced search
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setCurrentPage(1);
-      loadDocuments(1, searchTerm, statusFilter);
-    }, 300);
-
+    const timeout = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timeout);
-  }, [searchTerm, statusFilter, loadDocuments]);
+  }, [searchTerm]);
 
-  // Listen to parent refreshTrigger for global refresh
+  // Reset to the first page whenever the effective query changes (new search
+  // or status filter) — but NOT when only the page changes.
   useEffect(() => {
-    if (refreshTrigger > 0) {
-      loadDocuments();
-    }
-  }, [refreshTrigger, loadDocuments]);
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  // Single source of loading: reacts to page, effective query, and global refresh
+  useEffect(() => {
+    loadDocuments(currentPage, debouncedSearch, statusFilter);
+    refreshErrorCount();
+  }, [currentPage, debouncedSearch, statusFilter, refreshTrigger, loadDocuments, refreshErrorCount]);
+
+  // Clamp the page if it falls out of range (e.g. deleting the last item of
+  // the last page); the load effect then refetches the corrected page.
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
 
   // Pagination handling
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
-      loadDocuments(newPage, searchTerm, statusFilter);
+    }
+  };
+
+  // Retry every document currently in error status. Collects them across all
+  // pages (limit is capped at 1000 backend-side) and re-queues each via the
+  // reprocess endpoint; the backend queue paces the actual work with backoff.
+  const handleRetryAllErrors = async () => {
+    try {
+      setRetryingAll(true);
+      setError(null);
+
+      const pageSize = 1000;
+      const erroredDocs = [];
+      for (let page = 1; page <= 100; page++) {
+        const response = await documentsAPI.getDocuments(page, pageSize, 'error', null);
+        const docs = response.documents || [];
+        erroredDocs.push(...docs);
+        if (docs.length < pageSize) break;
+      }
+
+      // Re-queue sequentially to keep the requests gentle
+      for (const doc of erroredDocs) {
+        await documentsAPI.reprocessDocument(doc.id);
+      }
+
+      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await refreshErrorCount();
+      onRefresh?.();
+
+    } catch (error) {
+      console.error('Erreur lors de la relance des documents en erreur:', error);
+      setError(getErrorMessage(error));
+    } finally {
+      setRetryingAll(false);
     }
   };
 
@@ -110,7 +169,8 @@ const DocumentsList = () => {
       await documentsAPI.deleteDocument(document.id, force);
 
       // Refresh the list
-      await loadDocuments();
+      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await refreshErrorCount();
       onRefresh?.();
 
       setShowDeleteConfirm(false);
@@ -130,7 +190,7 @@ const DocumentsList = () => {
       await documentsAPI.togglePreservation(document.id, !document.preserve);
 
       // Refresh the list
-      await loadDocuments();
+      await loadDocuments(currentPage, debouncedSearch, statusFilter);
       onRefresh?.();
 
     } catch (error) {
@@ -147,7 +207,8 @@ const DocumentsList = () => {
       await documentsAPI.reprocessDocument(document.id);
 
       // Refresh the list
-      await loadDocuments();
+      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await refreshErrorCount();
       onRefresh?.();
 
     } catch (error) {
@@ -225,6 +286,35 @@ const DocumentsList = () => {
               className="ml-auto text-red-400 hover:text-red-600"
             >
               ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Failed-ingestion banner: offer to retry all documents in error */}
+      {errorCount > 0 && (
+        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 m-4">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            <p className="ml-3 text-sm text-amber-800">
+              {errorCount} document{errorCount > 1 ? 's' : ''} en erreur d&apos;indexation.
+            </p>
+            <button
+              onClick={handleRetryAllErrors}
+              disabled={retryingAll || actionLoading}
+              className="ml-auto btn-secondary text-sm flex items-center"
+            >
+              {retryingAll ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Relance en cours...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Réessayer tout ({errorCount})
+                </>
+              )}
             </button>
           </div>
         </div>

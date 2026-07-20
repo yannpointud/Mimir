@@ -17,6 +17,9 @@ SENSITIVE_CONFIG_KEYS = frozenset({
     "smtp_password",
     "jwt_secret_key",
     "admin_password_hash",
+    # Clear-text admin password accepted at startup (ADMIN_PASSWORD): the only
+    # unhashed credential in settings, so it must never reach a response.
+    "admin_password",
 })
 
 

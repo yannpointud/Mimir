@@ -5,17 +5,30 @@
 services:
   backend:
     build:
+      # Context stays the repo root: the image needs requirements.txt (root) and
+      # backend/, and ./.dockerignore — read at the context root — is what keeps
+      # secrets and runtime data out of the context (T-05-05-01).
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: docker/backend.Dockerfile
     # Secrets are injected at runtime, never COPY'd into an image layer
     # (Information Disclosure mitigation T-05-05-01). Both files are optional so
     # `docker compose config` validates whether the operator keeps the env at
     # the repo root (./.env) or under backend/ (the current dev location).
+    #
+    # `format: raw` disables Compose variable interpolation inside the env
+    # files. Without it, a `$word` sequence is expanded as a Compose variable
+    # and silently blanked: bcrypt hashes ($2b$12$<salt>...) lose their salt,
+    # which breaks admin login AND defeats the SEC-02 default-secret check,
+    # since the corrupted hash no longer verifies against the known default.
+    # Trade-off: raw also keeps surrounding quotes literal, so values in these
+    # files must stay unquoted (they are).
     env_file:
       - path: .env
         required: false
+        format: raw
       - path: backend/.env
         required: false
+        format: raw
     # PRODUCTION CONSTRAINT: the backend image runs a single uvicorn worker with
     # no --reload. The in-memory FAISS singleton and the sequential ingestion
     # queue are process-local and MUST NOT be scaled to multiple workers.
@@ -29,7 +42,11 @@ services:
 
   frontend:
     build:
+      # Context stays ./frontend so nginx.conf and the npm sources are in scope
+      # and frontend/.dockerignore still applies. The Dockerfile itself lives
+      # outside that context: BuildKit reads it client-side, so `../` is fine.
       context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
     # The ONLY host-published port: nginx is the single ingress (:80).
     ports:
       - "80:80"

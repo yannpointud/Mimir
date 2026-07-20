@@ -30,6 +30,7 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 - Configuration email d'escalade
 - Indicateurs de santé système en temps réel
 - Tableau de bord avec métriques d'utilisation
+- Suivi des coûts IA : plafond budgétaire quotidien + dépense par modèle
 
 ### Module Ingestion
 - Extraction de texte multi-format
@@ -42,12 +43,12 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 - Nettoyage automatique des chunks orphelins
 
 ### Module RAG
-- Recherche sémantique par similarité
+- Recherche hybride BM25 + dense avec fusion RRF (repli dense-only)
+- Chunking structure-aware (titres de section) mesuré via RAGAS
+- Citations vérifiables : marqueurs `[N]` cliquables ouvrant la source
 - Scoring multi-critères (pertinence + boost nom de fichier)
-- Contexte limité à la documentation
-- Pas d'hallucination (réponse "je ne sais pas" si incertitude)
-- Filtrage dynamique des sources
-- Cache intelligent des réponses
+- Contexte limité à la documentation, pas d'hallucination ("je ne sais pas" si incertitude)
+- Filtrage dynamique des sources + cache intelligent des réponses
 
 ## 🏗️ Architecture
 
@@ -171,6 +172,15 @@ L'application sera accessible sur :
 - Backend API : http://localhost:8000
 - Documentation API : http://localhost:8000/docs
 
+### Déploiement Docker Compose (production)
+
+```bash
+# Backend non-root + frontend statique nginx (proxy SSE), worker unique, volume data nommé
+docker compose up -d --build
+```
+
+Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin avant le premier démarrage : en production, le backend refuse de démarrer si ces secrets sont aux valeurs par défaut.
+
 ## ⚙️ Configuration
 
 ### Variables d'environnement principales
@@ -194,7 +204,7 @@ MISTRAL_EMBEDDING_MODEL=mistral-embed
 # Vector Store
 VECTOR_STORE_TYPE=faiss
 FAISS_INDEX_PATH=./data/faiss/index.bin
-FAISS_METADATA_PATH=./data/faiss/metadata.pkl
+FAISS_METADATA_PATH=./data/faiss/metadata.json
 EMBEDDING_DIMENSION=1024
 SIMILARITY_THRESHOLD=0.5
 MAX_SOURCES=8
@@ -288,7 +298,7 @@ python -m pytest tests/performance/ -v
 python -m pytest --cov=backend/src --cov-report=html
 ```
 
-La suite de tests (~800 tests, ~75% coverage) couvre : auth, cache, database, API endpoints, ingestion, RAG core et performance.
+La suite de tests (backend ~1000 pytest + frontend ~138 vitest, ~83% coverage backend) couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance.
 
 ## 🛠️ API Documentation
 
@@ -313,6 +323,7 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 
 #### Admin
 - `GET /api/v1/admin/system-info` : Infos système
+- `GET /api/v1/admin/usage` : Dépense IA (jour, par modèle, vs plafond)
 - `GET /api/v1/admin/cache/stats` : Statistiques cache
 - `POST /api/v1/admin/cache/clear` : Vider le cache
 - `POST /api/v1/admin/vector-store/rebuild` : **Rebuild index + nettoyage orphelins**
@@ -323,6 +334,8 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 - `POST /api/v1/auth/refresh` : Rafraîchir le token
 
 #### Health
+- `GET /api/v1/health/live` : Liveness (processus seul)
+- `GET /api/v1/health/ready` : Readiness (dépendances : DB, vector store, LLM)
 - `GET /api/v1/health` : Health check complet
 - `GET /api/v1/health/database` : Santé de la BD
 - `GET /api/v1/health/cache` : Santé du cache
@@ -343,7 +356,8 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 
 ### Mesures Implémentées
 - **Authentification** : JWT avec tokens signés
-- **Passwords** : Hash bcrypt avec salt
+- **Passwords** : Hash Argon2 (pwdlib), bcrypt legacy rétrocompatible
+- **Secrets** : fail-fast au démarrage en production si JWT_SECRET ou mot de passe admin par défaut
 - **Rate Limiting** : Par type d'endpoint (chat, admin, upload, auth)
 - **CORS** : Configuré selon environnement
 - **Validation** : Pydantic sur tous les inputs
@@ -383,7 +397,7 @@ sqlite3 backend/data/sqlite/mimir.db "PRAGMA journal_mode=WAL;"
 
 ```bash
 # Supprimer et reconstruire
-rm backend/data/faiss/index.bin backend/data/faiss/metadata.pkl
+rm backend/data/faiss/index.bin backend/data/faiss/metadata.json
 
 # Retraiter tous les documents via l'admin
 # Endpoint: POST /api/v1/documents/{id}/reprocess
@@ -441,7 +455,7 @@ Ce projet est libre.
 - **Python** : PEP 8, type hints, docstrings
 - **JavaScript** : ESLint
 - **Commits** : Conventional Commits
-- **Tests** : Couverture ~75%
+- **Tests** : Couverture ~83% (backend)
 
 ## 📝 License MIT
 

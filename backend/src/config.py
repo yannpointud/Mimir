@@ -152,6 +152,24 @@ class Settings(BaseSettings):
         le=100000,
         description="Taille maximale de la queue d'ingestion (protection DoS, ~0.35MB RAM par 1000 docs)"
     )
+    ingestion_max_retries: int = Field(
+        default=5,
+        ge=0,
+        le=20,
+        description="Nombre maximum de re-tentatives par document en cas d'échec d'ingestion (ex. 429 Mistral)"
+    )
+    ingestion_retry_base_delay: float = Field(
+        default=2.0,
+        ge=0.0,
+        le=60.0,
+        description="Délai de base (s) du backoff exponentiel avant re-tentative d'un document échoué"
+    )
+    ingestion_retry_max_delay: float = Field(
+        default=60.0,
+        ge=1.0,
+        le=600.0,
+        description="Plafond (s) du backoff exponentiel entre deux re-tentatives d'ingestion"
+    )
     max_chunk_size: int = Field(
         default=1000,
         description="Taille maximale des chunks en caractères"
@@ -235,6 +253,15 @@ class Settings(BaseSettings):
     admin_password_hash: str = Field(
         default="$2b$12$Kc32f7ibhcSNTkn/UkFOke32Q2A3XLNIG6RliCTq9.SnTj1/D2Eiy",
         description="Hash bcrypt du mot de passe admin (override via .env ADMIN_PASSWORD_HASH)"
+    )
+    admin_password: str = Field(
+        default="",
+        description=(
+            "Mot de passe admin en clair, haché au démarrage vers admin_password_hash "
+            "(ADMIN_PASSWORD). Prioritaire sur ADMIN_PASSWORD_HASH. Destiné aux "
+            "déploiements conteneurisés, où pré-calculer un hash à la main n'est pas "
+            "praticable ; vide par défaut"
+        )
     )
     trusted_hosts: str = Field(
         default="*",

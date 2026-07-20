@@ -7,24 +7,27 @@
 # through the eval_input.jsonl boundary file -- score_baseline.py imports
 # nothing from the Mimir backend.
 #
-# Versions are pinned. Both packages were flagged [SUS] (unknown-downloads /
-# too-new) by the offline legitimacy seam -- a documented false positive of the
-# same kind seen for ruff / pip-audit in phase 5 (see 06-RESEARCH.md "Package
-# Legitimacy Audit"). Human verification on pypi.org is gated by the plan's
-# checkpoint:human-verify (Task 1) before this file is installed.
+# Version note (Assumption A6 resolved empirically): ragas 0.4.3 (latest) hard-
+# imports langchain 0.2/0.3-era paths at import time (e.g.
+# `langchain_community.chat_models.vertexai`). The langchain 1.x line removed
+# those, so a naive `langchain-mistralai==1.1.6` (which pulls langchain 1.x)
+# makes `from ragas.metrics import ...` fail with ModuleNotFoundError. The
+# coherent, working set pins the whole langchain stack to the 0.3 era and
+# langchain-mistralai to its langchain-core-0.3-compatible 0.2 line.
 #
 #   ragas 0.4.3            -> https://pypi.org/project/ragas/0.4.3/
-#                            source: github.com/vibrantlabsai/ragas (ex explodinggradients)
-#   langchain-mistralai    -> https://pypi.org/project/langchain-mistralai/1.1.6/
-#                            official LangChain/Mistral integration (ChatMistralAI,
-#                            MistralAIEmbeddings) used as the RAGAS judge + embeddings.
+#   langchain-mistralai    -> official LangChain/Mistral integration
+#                            (ChatMistralAI, MistralAIEmbeddings) = RAGAS judge.
 #
 # Install (separate venv only):
 #   python3.11 -m venv .venv-ragas
-#   . .venv-ragas/bin/activate
-#   pip install -r scripts/ragas_eval/requirements-ragas.txt
-#   # Verify the legacy metric import (Assumption A6):
-#   python -c "from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall; print('legacy API OK')"
+#   .venv-ragas/bin/pip install -r scripts/ragas_eval/requirements-ragas.txt
+#   # Verify the legacy metric import:
+#   .venv-ragas/bin/python -c "from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall; print('legacy API OK')"
 
 ragas==0.4.3
-langchain-mistralai==1.1.6
+langchain-mistralai==0.2.4
+langchain-core<0.4
+langchain<0.4
+langchain-community<0.4
+langchain-openai<0.3
