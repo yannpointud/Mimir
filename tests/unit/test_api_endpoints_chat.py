@@ -161,11 +161,28 @@ class TestChatEndpoint:
         """Mock document repository."""
         return Mock()
 
+    @pytest.fixture
+    def mock_budget_guard(self):
+        """Mock BudgetGuard: reserve() always accepts (03-05 gate)."""
+        mock = Mock()
+        mock.reserve = Mock(return_value=Mock(today="2026-07-12", estimate_eur=0.01))
+        mock.finalize = Mock()
+        mock.release = Mock()
+        return mock
+
+    @pytest.fixture
+    def mock_usage_tracker(self):
+        """Mock UsageTracker: record() returns a deterministic euro cost."""
+        mock = Mock()
+        mock.record = Mock(return_value=0.0)
+        return mock
+
     @patch('backend.src.api.endpoints.chat._process_question_with_rag')
     @patch('backend.src.api.endpoints.chat._generate_session_id')
     def test_chat_success_no_cache(
         self, mock_session_id, mock_process_rag, mock_request, mock_chat_cache,
-        mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository
+        mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
+        mock_budget_guard, mock_usage_tracker
     ):
         """Test successful chat without cache."""
 
@@ -192,7 +209,9 @@ class TestChatEndpoint:
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug
+            rag_debug=mock_rag_debug,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         ))
 
         # Assertions
@@ -205,7 +224,8 @@ class TestChatEndpoint:
 
     @patch('backend.src.api.endpoints.chat._generate_session_id')
     def test_chat_success_with_cache(self, mock_session_id, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
+                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
+                                     mock_budget_guard, mock_usage_tracker):
         """Test successful chat with cache hit."""
 
         # Configure mocks
@@ -231,7 +251,9 @@ class TestChatEndpoint:
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug
+            rag_debug=mock_rag_debug,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         ))
 
         # Assertions
@@ -239,10 +261,14 @@ class TestChatEndpoint:
         assert result.session_id == "session_123"
         assert result.cached is True
         mock_chat_cache.get_chat_response.assert_called_once()
+        # Cache hit incurs no LLM call: the reservation must be released, not
+        # left dangling (03-05).
+        mock_budget_guard.release.assert_called_once()
 
     @patch('backend.src.api.endpoints.chat._process_question_with_rag')
     def test_chat_with_user_context(self, mock_process_rag, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
+                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
+                                     mock_budget_guard, mock_usage_tracker):
         """Test chat with authenticated user."""
 
         # Configure mocks
@@ -268,7 +294,9 @@ class TestChatEndpoint:
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug
+            rag_debug=mock_rag_debug,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         ))
 
         # Assertions
@@ -276,7 +304,8 @@ class TestChatEndpoint:
 
     @patch('backend.src.api.endpoints.chat._process_question_with_rag')
     def test_chat_exception_handling(self, mock_process_rag, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
+                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
+                                     mock_budget_guard, mock_usage_tracker):
         """Test exception handling in chat."""
 
         # Configure mocks
@@ -294,7 +323,9 @@ class TestChatEndpoint:
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
-            rag_debug=mock_rag_debug
+            rag_debug=mock_rag_debug,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         ))
 
         # Assertions
@@ -303,7 +334,8 @@ class TestChatEndpoint:
         assert result.cached is False
 
     def test_chat_custom_session_id(self, mock_request, mock_chat_cache,
-                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository):
+                                     mock_rag_debug, mock_llm_service, mock_vector_store, mock_document_repository,
+                                     mock_budget_guard, mock_usage_tracker):
         """Test chat with custom session ID."""
 
         # Configure mocks
@@ -333,7 +365,9 @@ class TestChatEndpoint:
                 llm_service=mock_llm_service,
                 vector_store=mock_vector_store,
                 document_repository=mock_document_repository,
-                rag_debug=mock_rag_debug
+                rag_debug=mock_rag_debug,
+                budget_guard=mock_budget_guard,
+                usage_tracker=mock_usage_tracker
             ))
 
             # Assertions
@@ -790,6 +824,10 @@ class TestChatIntegration:
         mock_rag_debug = Mock()
         mock_rag_debug.log_user_request = Mock()
         mock_rag_debug.log_response = Mock()
+        mock_budget_guard = Mock()
+        mock_budget_guard.reserve = Mock(return_value=Mock(today="2026-07-12", estimate_eur=0.01))
+        mock_usage_tracker = Mock()
+        mock_usage_tracker.record = Mock(return_value=0.0)
 
         chat_request = ChatRequest(
             question="Question détaillée nécessitant sources",
@@ -806,7 +844,9 @@ class TestChatIntegration:
             llm_service=mock_llm,
             vector_store=mock_vector,
             document_repository=mock_repo,
-            rag_debug=mock_rag_debug
+            rag_debug=mock_rag_debug,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         ))
 
         # Full assertions

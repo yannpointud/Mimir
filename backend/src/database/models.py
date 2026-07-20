@@ -4,7 +4,7 @@ Defines table structure according to LLD specifications
 """
 
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Text, 
+    Column, Integer, String, Boolean, DateTime, Text, Float,
     ForeignKey, CheckConstraint, Index
 )
 from sqlalchemy.ext.declarative import declarative_base
@@ -199,6 +199,75 @@ class AuditLog(Base):
     def __repr__(self):
         return (f"<AuditLog(id={self.id}, user_type='{self.user_type}', "
                 f"action='{self.action}', created_at='{self.created_at}')>")
+
+
+class LlmUsage(Base):
+    """
+    Per-call LLM usage log table
+    One row per Mistral API call (chat or embedding), used for cost accounting
+    """
+    __tablename__ = 'llm_usage'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    call_type = Column(String(20), nullable=False)
+    model = Column(String(100), nullable=False)
+    prompt_tokens = Column(Integer, nullable=False)
+    completion_tokens = Column(Integer, nullable=False)
+    total_tokens = Column(Integer, nullable=False)
+    cost_eur = Column(Float, nullable=False)
+    estimated = Column(Boolean, default=False, nullable=False)
+    session_id = Column(String(255), nullable=True)
+
+    # Constraint on valid call types
+    __table_args__ = (
+        CheckConstraint(
+            "call_type IN ('chat', 'embedding')",
+            name='check_call_type'
+        ),
+        Index('idx_usage_created_model', 'created_at', 'model'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the model to a dictionary for serialization"""
+        return {
+            'id': self.id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'call_type': self.call_type,
+            'model': self.model,
+            'prompt_tokens': self.prompt_tokens,
+            'completion_tokens': self.completion_tokens,
+            'total_tokens': self.total_tokens,
+            'cost_eur': self.cost_eur,
+            'estimated': self.estimated,
+            'session_id': self.session_id
+        }
+
+    def __repr__(self):
+        return (f"<LlmUsage(id={self.id}, call_type='{self.call_type}', "
+                f"model='{self.model}', cost_eur={self.cost_eur})>")
+
+
+class LlmBudgetLedger(Base):
+    """
+    Daily budget ledger table
+    One row per day (primary key = date), tracks cumulative spend for the
+    atomic reservation pattern (anti-TOCTOU conditional UPDATE)
+    """
+    __tablename__ = 'llm_budget_ledger'
+
+    date = Column(String(10), primary_key=True)  # YYYY-MM-DD
+    spent_eur = Column(Float, nullable=False, default=0.0)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the model to a dictionary"""
+        return {
+            'date': self.date,
+            'spent_eur': self.spent_eur
+        }
+
+    def __repr__(self):
+        return f"<LlmBudgetLedger(date='{self.date}', spent_eur={self.spent_eur})>"
 
 
 # Utility functions for models

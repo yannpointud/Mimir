@@ -80,6 +80,10 @@ def mocked_rag():
             usage_tokens=1,
         )
     )
+    # model_name is read directly by the streaming RAG pipeline (03-05) to
+    # record the chat usage row; a bare Mock() would return an unset child
+    # Mock (not a str), which SQLAlchemy cannot bind as the `model` column.
+    mock_llm.model_name = "mock-chat"
 
     async def fake_generate_stream(*args, **kwargs):
         yield "mocked answer"

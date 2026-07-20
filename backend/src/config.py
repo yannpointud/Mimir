@@ -5,7 +5,7 @@ Uses Pydantic for validation and type safety
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Dict
 import os
 from pathlib import Path
 
@@ -234,6 +234,31 @@ class Settings(BaseSettings):
     request_timeout: int = Field(
         default=30,
         description="Timeout des requêtes en secondes"
+    )
+
+    # Cost/Budget Configuration
+    # Values below are LOW-MEDIUM confidence defaults (see 03-RESEARCH.md Assumptions
+    # Log A1): they are operator-configurable via .env and never hardcoded elsewhere
+    # in business logic. The fail-closed reservation mechanism does not depend on
+    # these exact values being correct.
+    daily_budget_eur: float = Field(
+        default=20.0,
+        description="Plafond quotidien de dépense IA en euros"
+    )
+    llm_price_table: Dict[str, Dict[str, float]] = Field(
+        default={
+            "mistral-small-latest": {"input": 0.10, "output": 0.30},
+            "mistral-embed": {"input": 0.10, "output": 0.0},
+        },
+        description="Grille de prix en euros par million de tokens, par modèle (input/output)"
+    )
+    budget_reservation_chat_eur: float = Field(
+        default=0.01,
+        description="Estimation forfaitaire de réservation budgétaire pour un appel chat"
+    )
+    budget_reservation_embedding_eur: float = Field(
+        default=0.001,
+        description="Estimation forfaitaire de réservation budgétaire pour un appel embedding"
     )
 
     # RAG Debug Configuration

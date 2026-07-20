@@ -246,9 +246,11 @@ class MistralAPIService(AbstractLLMService):
             content = choice["message"]["content"]
             finish_reason = choice.get("finish_reason", "unknown")
 
-            # Usage information
+            # Usage information (split for per-model input/output cost accounting)
             usage = response.get("usage", {})
             usage_tokens = usage.get("total_tokens", 0)
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -278,7 +280,9 @@ class MistralAPIService(AbstractLLMService):
                 content=content,
                 model=self._model,
                 usage_tokens=usage_tokens,
-                finish_reason=finish_reason
+                finish_reason=finish_reason,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens
             )
 
         except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
@@ -296,6 +300,7 @@ class MistralAPIService(AbstractLLMService):
                              temperature: float = 0.1,
                              session_id: Optional[str] = None,
                              rag_debug = None,
+                             usage_out: Optional[Dict[str, Any]] = None,
                              **kwargs):
         """
         Generate text using Mistral API with streaming support.
@@ -308,6 +313,14 @@ class MistralAPIService(AbstractLLMService):
             temperature: Sampling temperature (0.0 to 1.0)
             session_id: Optional session ID for logging
             rag_debug: Optional RAG debug service
+            usage_out: Optional mutable dict populated with real token usage
+                (prompt_tokens, completion_tokens, total_tokens) once the
+                final SSE chunk is received. A generator cannot return a
+                value directly, so this sink is the only channel by which a
+                streaming caller learns real usage after the async-for
+                completes. Left untouched (empty) if the final usage chunk
+                never arrives (schema drift / disconnect), enabling the
+                caller to fall back to estimated usage.
             **kwargs: Additional model parameters
 
         Yields:
@@ -328,6 +341,8 @@ class MistralAPIService(AbstractLLMService):
             "messages": messages,
             "temperature": temperature,
             "stream": True,
+            # Without this, Mistral never sends a usage object in the stream at all.
+            "stream_options": {"include_usage": True},
             **kwargs
         }
 
@@ -387,6 +402,15 @@ class MistralAPIService(AbstractLLMService):
                                 if choice.get("finish_reason"):
                                     finish_reason = choice["finish_reason"]
 
+                            # The final chunk carries usage with an empty choices
+                            # list (already tolerated by the guard above, which
+                            # only requires len(choices) > 0 to read content).
+                            usage_data = chunk_data.get("usage")
+                            if usage_data is not None and usage_out is not None:
+                                usage_out["prompt_tokens"] = usage_data.get("prompt_tokens", 0)
+                                usage_out["completion_tokens"] = usage_data.get("completion_tokens", 0)
+                                usage_out["total_tokens"] = usage_data.get("total_tokens", 0)
+
                         except json.JSONDecodeError:
                             logger.warning(f"Failed to parse streaming chunk: {json_str}")
                             continue
@@ -434,6 +458,7 @@ class MistralAPIService(AbstractLLMService):
         start_time = time.time()
         all_embeddings = []
         total_usage_tokens = 0
+        total_prompt_tokens = 0
 
         # If the number of texts is less than or equal to batch size, no batching needed
         if len(texts) <= batch_size:
@@ -459,6 +484,7 @@ class MistralAPIService(AbstractLLMService):
                 batch_response = await self._embed_batch(batch_texts, session_id=session_id, rag_debug=rag_debug)
                 all_embeddings.extend(batch_response.embeddings)
                 total_usage_tokens += batch_response.usage_tokens
+                total_prompt_tokens += batch_response.prompt_tokens
 
                 logger.debug(f"Batch {batch_num} completed: {len(batch_response.embeddings)} embeddings, {batch_response.usage_tokens} tokens")
 
@@ -485,7 +511,9 @@ class MistralAPIService(AbstractLLMService):
         return EmbeddingResponse(
             embeddings=all_embeddings,
             model=self._embedding_model,
-            usage_tokens=total_usage_tokens
+            usage_tokens=total_usage_tokens,
+            prompt_tokens=total_prompt_tokens,
+            completion_tokens=0
         )
 
     async def _embed_batch(self, texts: List[str], start_time: float = None, session_id: Optional[str] = None, rag_debug = None) -> EmbeddingResponse:
@@ -515,9 +543,10 @@ class MistralAPIService(AbstractLLMService):
             embeddings_data = response["data"]
             embeddings = [item["embedding"] for item in embeddings_data]
 
-            # Usage information
+            # Usage information (embeddings have no completion tokens, per RESEARCH A3)
             usage = response.get("usage", {})
             usage_tokens = usage.get("total_tokens", 0)
+            prompt_tokens = usage.get("prompt_tokens", 0)
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -538,7 +567,9 @@ class MistralAPIService(AbstractLLMService):
             return EmbeddingResponse(
                 embeddings=embeddings,
                 model=self._embedding_model,
-                usage_tokens=usage_tokens
+                usage_tokens=usage_tokens,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=0
             )
 
         except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):

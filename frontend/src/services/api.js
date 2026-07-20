@@ -353,6 +353,14 @@ export const adminAPI = {
   },
 };
 
+// Usage/cost API service (COST-02 admin dashboard)
+export const usageAPI = {
+  getUsage: async (daysBack = 30) => {
+    const response = await api.get(`/admin/usage?days_back=${daysBack}`);
+    return response.data;
+  },
+};
+
 // Health checks API service
 export const healthAPI = {
   getHealthStatus: async () => {

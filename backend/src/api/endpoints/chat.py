@@ -7,7 +7,8 @@ and responses based on document context.
 
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 from datetime import datetime
 import asyncio
@@ -20,12 +21,14 @@ from src.auth.middleware import get_optional_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import ChatCacheService
 from src.email_service.smtp_client import EmailService
-from src.api.dependencies import get_chat_cache_service, get_email_service, get_llm_service, get_vector_store, get_document_repository, get_rag_debug_service
+from src.api.dependencies import get_chat_cache_service, get_email_service, get_llm_service, get_vector_store, get_document_repository, get_rag_debug_service, get_budget_guard, get_usage_tracker
 from src.database.repository import DocumentRepository
 from src.shared.models import BaseResponse
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.monitoring.rag_debug_logger import RagDebugService
+from src.cost.budget_guard import BudgetGuard, BudgetReservation
+from src.cost.usage_tracker import UsageTracker
 from src.config import settings
 import re
 from rapidfuzz import fuzz
@@ -103,6 +106,11 @@ class EscalationResponse(BaseModel):
 
 
 @router.post("/", response_model=ChatResponse)
+# Rate limit parity with chat_stream (CR-01 deferred gap, closed here): the
+# non-stream route runs the same costly RAG pipeline and was the only chat
+# route without a rate limit until now.
+@limiter.limit(lambda: f"{settings.rate_limit_chat_per_minute}/minute",
+               key_func=get_client_identifier)
 async def chat(
     request: Request,
     chat_request: ChatRequest,
@@ -111,7 +119,9 @@ async def chat(
     llm_service: MistralAPIService = Depends(get_llm_service),
     vector_store: FaissVectorStore = Depends(get_vector_store),
     document_repository: DocumentRepository = Depends(get_document_repository),
-    rag_debug: RagDebugService = Depends(get_rag_debug_service)
+    rag_debug: RagDebugService = Depends(get_rag_debug_service),
+    budget_guard: BudgetGuard = Depends(get_budget_guard),
+    usage_tracker: UsageTracker = Depends(get_usage_tracker)
 ) -> ChatResponse:
     """
     Process user question and return RAG-based response.
@@ -130,6 +140,45 @@ async def chat(
 
     # Chat endpoint logging
     logger.info(f"Chat endpoint started - Session: {chat_request.session_id}, Question: {chat_request.question[:50]}..., IP: {client_ip}")
+
+    # Budget gate BEFORE the try block: the try/except below deliberately
+    # catches every Exception to always return a friendly ChatResponse (never
+    # propagate a raw error to the client), so raising here would be
+    # swallowed into a 200 response. Reserving before any embed/generate call
+    # and before the cache check guarantees a real HTTP 429.
+    #
+    # Returning a JSONResponse directly (NOT `raise HTTPException`) is
+    # deliberate: main.py registers a global `@app.exception_handler(HTTPException)`
+    # that intercepts EVERY HTTPException regardless of where it is raised
+    # and rewrites the body to `{"error_code": f"HTTP_{status_code}", ...}`
+    # with `error_message` typed as `str` -- a dict `detail` would either be
+    # flattened into the exact same "HTTP_429" shape as the slowapi
+    # rate-limit response (defeating the whole point of this distinct
+    # error_code) or crash the handler outright (ErrorResponse.error_message
+    # rejects a dict). Returning a Response instance bypasses FastAPI's
+    # exception-handler and response_model machinery entirely, exactly like
+    # the existing slowapi 429 handler in rate_limit.py already does for the
+    # identical reason (see its docstring).
+    #
+    # asyncio.to_thread: reserve() is a blocking SQLite write (WAL
+    # serializes writers, busy_timeout applies) -- run it off the event loop
+    # so a contended ledger write never stalls other in-flight requests.
+    reservation: Optional[BudgetReservation] = await asyncio.to_thread(
+        budget_guard.reserve, "chat"
+    )
+    if reservation is None:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error_code": "budget_exceeded",
+                "error_message": "Plafond quotidien de dépense IA atteint."
+            }
+        )
+
+    # Tracks whether the reservation has already been released/finalized, so
+    # the except block below never double-settles it (both the cache-hit
+    # branch and _process_question_with_rag settle it internally).
+    reservation_settled = False
 
     try:
         # Generate session ID if not provided
@@ -160,6 +209,13 @@ async def chat(
         if cached_response:
             logger.debug(f"Cache hit for question: {chat_request.question[:50]}...")
 
+            # No LLM call happens on a cache hit: release the reservation so
+            # the daily ledger is not charged for work that never occurred.
+            # Mark settled BEFORE releasing so the finally below can never
+            # double-settle even if release itself raises.
+            reservation_settled = True
+            await asyncio.to_thread(budget_guard.release, reservation)
+
             # 6. Log final response for RAG debug (cached response)
             rag_debug.log_final_response(
                 session_id=session_id,
@@ -177,7 +233,10 @@ async def chat(
 
             return ChatResponse(**cached_response)
 
-        # Process question with RAG pipeline
+        # Process question with RAG pipeline. _process_question_with_rag
+        # always settles the reservation internally (finalize on success or
+        # partial usage, release if no LLM call was made) before returning.
+        reservation_settled = True
         response = await _process_question_with_rag(
             question=chat_request.question,
             context_limit=chat_request.context_limit,
@@ -186,7 +245,10 @@ async def chat(
             llm_service=llm_service,
             vector_store=vector_store,
             document_repository=document_repository,
-            rag_debug=rag_debug
+            rag_debug=rag_debug,
+            budget_guard=budget_guard,
+            usage_tracker=usage_tracker,
+            reservation=reservation
         )
 
         # Calculate response time
@@ -194,13 +256,22 @@ async def chat(
         response_time_ms = int((end_time - start_time).total_seconds() * 1000)
         response["response_time_ms"] = response_time_ms
 
-        # Cache the response
-        chat_cache.set_chat_response(
-            question=chat_request.question,
-            response=response,
-            context_hash="",
-            ttl=1800  # 30 minutes
-        )
+        # Pop the internal error marker set by the pipeline's fallback path
+        # (never sent to the client -- ChatResponse has no such field).
+        is_error_response = response.pop("error", False)
+
+        # Cache the response -- but NEVER cache the pipeline's error
+        # fallback: a transient failure (Mistral 500, network blip) must be
+        # retried on the next identical question, not replayed from cache
+        # for 30 minutes (each cache hit would also release its reservation,
+        # serving errors for free instead of retrying).
+        if not is_error_response:
+            chat_cache.set_chat_response(
+                question=chat_request.question,
+                response=response,
+                context_hash="",
+                ttl=1800  # 30 minutes
+            )
 
         logger.info(f"Chat response generated - session: {session_id}, time: {response_time_ms}ms")
 
@@ -234,6 +305,19 @@ async def chat(
 
         return ChatResponse(**error_response)
 
+    finally:
+        # Settle-once guard in a finally so it also covers
+        # asyncio.CancelledError (a BaseException in Python 3.11 that the
+        # `except Exception` above does NOT catch): an exception or a
+        # cancellation before the cache check / RAG pipeline call would
+        # otherwise leave the reservation dangling until the next daily
+        # reset. Once _process_question_with_rag has been entered it settles
+        # the reservation internally (reservation_settled is set just before
+        # the call), so this release only fires for the pre-pipeline window.
+        if not reservation_settled:
+            reservation_settled = True
+            await asyncio.to_thread(budget_guard.release, reservation)
+
 
 @router.post("/stream")
 # Rate limit per JWT user with IP fallback (SEC-03): behind the phase-5 nginx
@@ -252,12 +336,59 @@ async def chat_stream(
     llm_service: MistralAPIService = Depends(get_llm_service),
     vector_store: FaissVectorStore = Depends(get_vector_store),
     document_repository: DocumentRepository = Depends(get_document_repository),
-    rag_debug: RagDebugService = Depends(get_rag_debug_service)
+    rag_debug: RagDebugService = Depends(get_rag_debug_service),
+    budget_guard: BudgetGuard = Depends(get_budget_guard),
+    usage_tracker: UsageTracker = Depends(get_usage_tracker)
 ):
     """
     Process user question with streaming response.
     Returns Server-Sent Events (SSE) stream.
     """
+
+    # Budget gate in the SYNCHRONOUS body, BEFORE StreamingResponse is
+    # constructed/returned (Pitfall 3): once StreamingResponse is returned
+    # the client already has an implicit 200, so a real 429 is only possible
+    # here. Do NOT move this check inside generate_sse -- that would yield a
+    # 200 with an SSE error event instead of a genuine HTTP 429.
+    #
+    # JSONResponse (not `raise HTTPException`) for the same reason as in
+    # chat(): main.py's global HTTPException handler would flatten/crash on
+    # a dict detail -- see the comment there for the full explanation.
+    #
+    # asyncio.to_thread: blocking SQLite write off the event loop (see chat()).
+    reservation: Optional[BudgetReservation] = await asyncio.to_thread(
+        budget_guard.reserve, "chat"
+    )
+    if reservation is None:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error_code": "budget_exceeded",
+                "error_message": "Plafond quotidien de dépense IA atteint."
+            }
+        )
+
+    # Idempotent settle guard shared between generate_sse() below and the
+    # StreamingResponse background task. An async generator that is never
+    # iterated -- client disconnected before Starlette starts streaming, or
+    # the initial response send failed -- never executes its body nor its
+    # finally blocks, so settlement logic living only inside generate_sse()
+    # cannot cover that case: the reservation would stay charged until the
+    # next daily reset.
+    settle_state = {"settled": False}
+
+    def _release_if_unsettled():
+        """Release the reservation exactly once if no other path settled it.
+
+        Runs as the StreamingResponse background task (after the response
+        completes or the client disconnects) and as generate_sse's own
+        finally fallback; the shared flag makes both call sites idempotent.
+        Sync on purpose: Starlette runs sync background tasks in a
+        threadpool, so the blocking SQLite write never blocks the loop.
+        """
+        if not settle_state["settled"]:
+            settle_state["settled"] = True
+            budget_guard.release(reservation)
 
     def convert_numpy_types(obj):
         """Recursively convert numpy types to native Python types."""
@@ -304,11 +435,21 @@ async def chat_stream(
             )
 
             if cached_response:
+                # No LLM call happens on a cache hit: release the reservation
+                # so the daily ledger is not charged for work never done.
+                # Mark settled BEFORE releasing so no other path can
+                # double-settle even if release itself raises.
+                settle_state["settled"] = True
+                await asyncio.to_thread(budget_guard.release, reservation)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': cached_response['answer']})}\n\n"
                 yield f"data: {json.dumps({'type': 'done', 'sources': cached_response.get('sources', []), 'confidence_score': cached_response.get('confidence_score', 0.0), 'cached': True})}\n\n"
                 return
 
-            # Stream RAG pipeline
+            # Stream RAG pipeline. _process_question_with_rag_stream always
+            # settles the reservation internally (finalize on success/partial
+            # usage, release if no LLM call was made) before the generator
+            # finishes, including on a mid-stream disconnect.
+            settle_state["settled"] = True
             async for event in _process_question_with_rag_stream(
                 question=chat_request.question,
                 context_limit=chat_request.context_limit,
@@ -317,7 +458,10 @@ async def chat_stream(
                 llm_service=llm_service,
                 vector_store=vector_store,
                 document_repository=document_repository,
-                rag_debug=rag_debug
+                rag_debug=rag_debug,
+                budget_guard=budget_guard,
+                usage_tracker=usage_tracker,
+                reservation=reservation
             ):
                 # Convert all numpy types before serialization
                 event = convert_numpy_types(event)
@@ -333,6 +477,24 @@ async def chat_stream(
             # the full error is kept in the server logs above.
             yield f"data: {json.dumps({'type': 'error', 'message': 'Une erreur interne est survenue.'})}\n\n"
 
+        finally:
+            # Settle-once fallback: covers GeneratorExit (client disconnect
+            # at a yield point) and asyncio.CancelledError, neither of which
+            # the `except Exception` above catches. No-op when the cache-hit
+            # branch or the RAG stream pipeline already settled the
+            # reservation. Awaiting (no yield) inside an async generator's
+            # finally is legal during aclose(); asyncio.to_thread keeps the
+            # blocking SQLite write off the event loop.
+            if not settle_state["settled"]:
+                settle_state["settled"] = True
+                await asyncio.to_thread(budget_guard.release, reservation)
+
+    # background=BackgroundTask(...) is the never-iterated-generator guard:
+    # if the client disconnects before Starlette pulls the first SSE byte
+    # (or the initial response send fails), generate_sse()'s body/finally
+    # never run -- Starlette still runs the background task after the
+    # response terminates, which then releases the orphaned reservation.
+    # The shared settled flag keeps it a no-op in every normal case.
     return StreamingResponse(
         generate_sse(),
         media_type="text/event-stream",
@@ -340,7 +502,8 @@ async def chat_stream(
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive"
-        }
+        },
+        background=BackgroundTask(_release_if_unsettled)
     )
 
 
@@ -702,7 +865,10 @@ async def _process_question_with_rag(
     llm_service: MistralAPIService,
     vector_store: FaissVectorStore,
     document_repository: DocumentRepository,
-    rag_debug: RagDebugService
+    rag_debug: RagDebugService,
+    budget_guard: Optional["BudgetGuard"] = None,
+    usage_tracker: Optional["UsageTracker"] = None,
+    reservation: Optional["BudgetReservation"] = None
 ) -> Dict[str, Any]:
     """
     Process question using RAG pipeline.
@@ -721,10 +887,22 @@ async def _process_question_with_rag(
         session_id: Session identifier
         llm_service: LLM service for embeddings and generation
         vector_store: Vector store for similarity search
+        budget_guard: Optional BudgetGuard used to finalize/release the
+            caller's reservation once the real cost is known
+        usage_tracker: Optional UsageTracker used to price and persist the
+            embedding and generation usage rows
+        reservation: The BudgetReservation captured by the caller before
+            this pipeline started; settled (finalize or release) internally
+            so the caller never has to reason about partial-failure cost
 
     Returns:
         dict: Response data
     """
+    # Accumulates the real euro cost of every LLM call actually made, so the
+    # reservation can be finalized with the true total instead of released
+    # outright once at least one paid call has happened.
+    total_cost_eur = 0.0
+    llm_call_made = False
     try:
         # Step 1: Generate embeddings for the question
         logger.info(f"Generating embeddings for question: {question[:50]}...")
@@ -732,6 +910,19 @@ async def _process_question_with_rag(
         embedding_response = await llm_service.embed([question], session_id=session_id, rag_debug=rag_debug)
         embedding_time = (datetime.utcnow() - start_embedding).total_seconds() * 1000
         question_embedding = np.array(embedding_response.embeddings[0], dtype=np.float32)
+
+        llm_call_made = True
+        if usage_tracker is not None:
+            # asyncio.to_thread: record() is a blocking SQLite write.
+            total_cost_eur += await asyncio.to_thread(
+                usage_tracker.record,
+                "embedding",
+                embedding_response.model,
+                embedding_response.prompt_tokens,
+                embedding_response.completion_tokens,
+                estimated=False,
+                session_id=session_id
+            )
 
         # Step 1.5: Filename pre-inclusion (fuzzy matching)
         pre_included_chunks = []
@@ -869,6 +1060,18 @@ Restez professionnel et utile."""
         )
         llm_time = (datetime.utcnow() - start_llm).total_seconds() * 1000
 
+        if usage_tracker is not None:
+            # asyncio.to_thread: record() is a blocking SQLite write.
+            total_cost_eur += await asyncio.to_thread(
+                usage_tracker.record,
+                "chat",
+                generation_response.model,
+                generation_response.prompt_tokens,
+                generation_response.completion_tokens,
+                estimated=False,
+                session_id=session_id
+            )
+
         answer = generation_response.content
 
 
@@ -902,15 +1105,36 @@ Restez professionnel et utile."""
             stage="rag_pipeline"
         )
 
-        # Fallback response in case of error
+        # Fallback response in case of error. The "error" marker is consumed
+        # (popped) by the caller so it never reaches the client: it tells
+        # chat() to SKIP caching -- otherwise a transient failure (Mistral
+        # 500, network blip) would be served from cache for 30 minutes to
+        # every identical question instead of being retried.
         return {
             "answer": "Je suis désolé, une erreur technique s'est produite lors du traitement de votre question. L'équipe technique a été notifiée. Veuillez réessayer dans quelques instants ou contacter le support si le problème persiste.",
             "sources": [],
             "confidence_score": 0.0,
             "session_id": session_id,
             "cached": False,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.utcnow(),
+            "error": True
         }
+
+    finally:
+        # Settle the reservation exactly once, in a finally so it also runs
+        # on asyncio.CancelledError (a BaseException in Python 3.11 that the
+        # `except Exception` above does NOT catch -- e.g. server shutdown or
+        # task cancellation during an awaited embed/generate call). Finalize
+        # with whatever real cost was already incurred (e.g. embedding
+        # succeeded but generation failed/was cancelled) or release outright
+        # if no LLM call happened at all -- symmetric with the stream
+        # variant's outer finally. asyncio.to_thread keeps the blocking
+        # SQLite ledger write off the event loop.
+        if budget_guard is not None and reservation is not None:
+            if llm_call_made:
+                await asyncio.to_thread(budget_guard.finalize, reservation, total_cost_eur)
+            else:
+                await asyncio.to_thread(budget_guard.release, reservation)
 
 
 def _get_client_ip(request: Request) -> str:
@@ -968,18 +1192,44 @@ async def _process_question_with_rag_stream(
     llm_service: MistralAPIService,
     vector_store: FaissVectorStore,
     document_repository: DocumentRepository,
-    rag_debug: RagDebugService
+    rag_debug: RagDebugService,
+    budget_guard: Optional["BudgetGuard"] = None,
+    usage_tracker: Optional["UsageTracker"] = None,
+    reservation: Optional["BudgetReservation"] = None
 ):
     """
     Process question using RAG pipeline with streaming.
     Yields SSE events as processing progresses.
+
+    budget_guard/usage_tracker/reservation mirror _process_question_with_rag,
+    but the reservation is settled in an OUTER finally block here (see below)
+    because a mid-stream client disconnect throws GeneratorExit -- a
+    BaseException, not caught by `except Exception` -- straight through this
+    generator; only a finally at the outermost scope is guaranteed to run in
+    every case (normal completion, error, or disconnect).
     """
+    # Accumulates the real euro cost of every LLM call actually made.
+    total_cost_eur = 0.0
+    llm_call_made = False
     try:
         # Step 1: Generate embeddings
         logger.info(f"Generating embeddings for streaming question")
         start_embedding = datetime.utcnow()
         embedding_response = await llm_service.embed([question], session_id=session_id, rag_debug=rag_debug)
         question_embedding = np.array(embedding_response.embeddings[0], dtype=np.float32)
+
+        llm_call_made = True
+        if usage_tracker is not None:
+            # asyncio.to_thread: record() is a blocking SQLite write.
+            total_cost_eur += await asyncio.to_thread(
+                usage_tracker.record,
+                "embedding",
+                embedding_response.model,
+                embedding_response.prompt_tokens,
+                embedding_response.completion_tokens,
+                estimated=False,
+                session_id=session_id
+            )
 
         # Step 1.5: Filename pre-inclusion
         pre_included_chunks = []
@@ -1077,17 +1327,62 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
         # Step 5: Stream LLM generation
         logger.info("Starting streaming LLM generation...")
         full_answer = ""
+        usage_out: Dict[str, Any] = {}
+        chat_usage_recorded = False
 
-        async for chunk in llm_service.generate_stream(
-            prompt=question,
-            system_prompt=full_prompt,
-            max_tokens=800,
-            temperature=0.1,
-            session_id=session_id,
-            rag_debug=rag_debug
-        ):
-            full_answer += chunk
-            yield {"type": "chunk", "content": chunk}
+        try:
+            async for chunk in llm_service.generate_stream(
+                prompt=question,
+                system_prompt=full_prompt,
+                max_tokens=800,
+                temperature=0.1,
+                session_id=session_id,
+                rag_debug=rag_debug,
+                usage_out=usage_out
+            ):
+                full_answer += chunk
+                yield {"type": "chunk", "content": chunk}
+
+            # Stream completed and the final SSE chunk carried real usage.
+            if usage_tracker is not None and usage_out:
+                # asyncio.to_thread: record() is a blocking SQLite write.
+                total_cost_eur += await asyncio.to_thread(
+                    usage_tracker.record,
+                    "chat",
+                    llm_service.model_name,
+                    usage_out.get("prompt_tokens", 0),
+                    usage_out.get("completion_tokens", 0),
+                    estimated=False,
+                    session_id=session_id
+                )
+                chat_usage_recorded = True
+        finally:
+            # Guarantee exactly one chat usage row per request (T-03-12): if
+            # the async-for loop ended -- normal completion without a final
+            # usage chunk, an exception, or a mid-stream client disconnect
+            # (GeneratorExit) -- without recording real usage above, estimate
+            # tokens from the text lengths instead. The prompt side MUST be
+            # estimated too: Mistral bills the full prompt (system prompt +
+            # entire document context) even for an interrupted stream, and
+            # in this RAG pipeline the prompt is usually the dominant share
+            # of billed tokens -- recording prompt_tokens=0 would make the
+            # ledger drift below the real Mistral spend on every disconnect.
+            # asyncio.to_thread: awaiting (no yield) in an async generator's
+            # finally is legal during aclose(); keeps the blocking SQLite
+            # write off the event loop.
+            if usage_tracker is not None and not chat_usage_recorded:
+                estimated_prompt_tokens = max(1, (len(full_prompt) + len(question)) // 4)
+                estimated_completion_tokens = max(1, len(full_answer) // 4)
+                total_cost_eur += await asyncio.to_thread(
+                    usage_tracker.record,
+                    "chat",
+                    llm_service.model_name,
+                    estimated_prompt_tokens,
+                    estimated_completion_tokens,
+                    estimated=True,
+                    session_id=session_id
+                )
+                chat_usage_recorded = True
 
         # Calculate confidence
         confidence_score = _calculate_weighted_confidence(search_results, settings.confidence_algorithm)
@@ -1112,3 +1407,17 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
         )
         # Generic client-facing message; details stay in logs/rag_debug only
         yield {"type": "error", "message": "Une erreur interne est survenue."}
+
+    finally:
+        # Settle the reservation exactly once, regardless of normal
+        # completion, an exception caught above, or a mid-stream client
+        # disconnect (GeneratorExit propagates straight through the except
+        # clause -- which only catches Exception -- but always runs this
+        # finally before the generator closes). asyncio.to_thread keeps the
+        # blocking SQLite ledger write off the event loop; awaiting (no
+        # yield) in a finally is legal during aclose().
+        if budget_guard is not None and reservation is not None:
+            if llm_call_made:
+                await asyncio.to_thread(budget_guard.finalize, reservation, total_cost_eur)
+            else:
+                await asyncio.to_thread(budget_guard.release, reservation)

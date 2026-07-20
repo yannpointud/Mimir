@@ -15,6 +15,11 @@ class GenerationResponse:
     model: str
     usage_tokens: int
     finish_reason: str
+    # Split token counts, needed to bill input/output separately (cost accounting).
+    # Defaulted so existing callers/tests constructing GenerationResponse without
+    # these fields keep working.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 @dataclass
 class EmbeddingResponse:
@@ -22,6 +27,10 @@ class EmbeddingResponse:
     embeddings: List[List[float]]
     model: str
     usage_tokens: int
+    # Split token counts for cost accounting. Embeddings have no completion
+    # tokens, so completion_tokens stays 0 for this response type.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 class LLMException(Exception):
     """Base exception for LLM operations"""

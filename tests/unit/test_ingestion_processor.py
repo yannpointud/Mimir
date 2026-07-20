@@ -15,6 +15,7 @@ from src.ingestion.queue_manager import IngestionTask, TaskPriority
 from src.ingestion.chunking import ChunkingConfig
 from src.llm_interface.interfaces import GenerationResponse, EmbeddingResponse, LLMException
 from src.rag_core.interfaces import Chunk
+from src.cost.budget_guard import BudgetReservation
 
 
 class TestIngestionProcessor:
@@ -56,7 +57,27 @@ class TestIngestionProcessor:
         return mock_repo
 
     @pytest.fixture
-    def processor(self, mock_llm_service, mock_vector_store, mock_document_repository):
+    def mock_budget_guard(self):
+        """Budget guard mocké -- accepte toujours la reservation, pour garder
+        ces tests hermetiques (aucune ecriture dans la vraie DB de cout via
+        le singleton reel, 03-06)"""
+        mock_guard = Mock()
+        mock_guard.reserve.return_value = BudgetReservation(today="2024-01-01", estimate_eur=0.001)
+        mock_guard.finalize.return_value = None
+        mock_guard.release.return_value = None
+        return mock_guard
+
+    @pytest.fixture
+    def mock_usage_tracker(self):
+        """Usage tracker mocké -- evite d'ecrire des lignes llm_usage reelles
+        pendant les tests unitaires du pipeline d'ingestion (03-06)"""
+        mock_tracker = Mock()
+        mock_tracker.record.return_value = 0.001
+        return mock_tracker
+
+    @pytest.fixture
+    def processor(self, mock_llm_service, mock_vector_store, mock_document_repository,
+                  mock_budget_guard, mock_usage_tracker):
         """Processeur d'ingestion pour les tests"""
         config = ChunkingConfig(chunk_size=100, overlap=20)
         return IngestionProcessor(
@@ -65,7 +86,9 @@ class TestIngestionProcessor:
             document_repository=mock_document_repository,
             chunking_config=config,
             max_file_size_mb=1,
-            max_chunks_per_doc=100
+            max_chunks_per_doc=100,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         )
 
     @pytest.fixture
@@ -208,10 +231,11 @@ class TestIngestionProcessor:
             {"text": "Second chunk"}
         ]
 
-        embeddings = await processor._generate_embeddings(chunks_data)
+        response = await processor._generate_embeddings(chunks_data)
 
-        assert len(embeddings) == 2
-        assert len(embeddings[0]) == 3  # Dimension de l'embedding mocké
+        assert isinstance(response, EmbeddingResponse)
+        assert len(response.embeddings) == 2
+        assert len(response.embeddings[0]) == 3  # Dimension de l'embedding mocké
         processor.llm_service.embed.assert_called_once_with(["First chunk", "Second chunk"])
 
     @pytest.mark.asyncio
@@ -549,6 +573,25 @@ class TestIngestionProcessorIntegration:
         return mock_repo
 
     @pytest.fixture
+    def mock_budget_guard(self):
+        """Budget guard mocké -- accepte toujours la reservation, pour garder
+        ces tests hermetiques (aucune ecriture dans la vraie DB de cout via
+        le singleton reel, 03-06)"""
+        mock_guard = Mock()
+        mock_guard.reserve.return_value = BudgetReservation(today="2024-01-01", estimate_eur=0.001)
+        mock_guard.finalize.return_value = None
+        mock_guard.release.return_value = None
+        return mock_guard
+
+    @pytest.fixture
+    def mock_usage_tracker(self):
+        """Usage tracker mocké -- evite d'ecrire des lignes llm_usage reelles
+        pendant les tests d'integration du pipeline d'ingestion (03-06)"""
+        mock_tracker = Mock()
+        mock_tracker.record.return_value = 0.001
+        return mock_tracker
+
+    @pytest.fixture
     def real_files(self, temp_dir):
         """Vrais fichiers de test"""
         files = {}
@@ -582,7 +625,8 @@ Even more detailed content here.
         return files
 
     @pytest.mark.asyncio
-    async def test_end_to_end_processing(self, real_files, mock_llm_service, mock_vector_store, mock_document_repository):
+    async def test_end_to_end_processing(self, real_files, mock_llm_service, mock_vector_store,
+                                          mock_document_repository, mock_budget_guard, mock_usage_tracker):
         """Test de traitement bout en bout"""
         # Configurer les mocks pour un comportement réaliste - adapter selon le nombre de chunks réel
         mock_llm_service.embed.return_value = EmbeddingResponse(
@@ -596,7 +640,9 @@ Even more detailed content here.
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
             max_file_size_mb=10,
-            max_chunks_per_doc=50
+            max_chunks_per_doc=50,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         )
 
         # Traitement d'un fichier texte
@@ -625,7 +671,8 @@ Even more detailed content here.
         assert all(len(chunk.text.strip()) > 0 for chunk in chunks)
 
     @pytest.mark.asyncio
-    async def test_markdown_processing(self, real_files, mock_llm_service, mock_vector_store, mock_document_repository):
+    async def test_markdown_processing(self, real_files, mock_llm_service, mock_vector_store,
+                                        mock_document_repository, mock_budget_guard, mock_usage_tracker):
         """Test de traitement de fichier Markdown"""
         # Configurer le mock pour le fichier markdown (probablement 1 chunk)
         mock_llm_service.embed.return_value = EmbeddingResponse(
@@ -637,7 +684,9 @@ Even more detailed content here.
         processor = IngestionProcessor(
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
-            document_repository=mock_document_repository
+            document_repository=mock_document_repository,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         )
 
         task = IngestionTask(
@@ -660,7 +709,8 @@ Even more detailed content here.
         assert "Section 2" in all_text
 
     @pytest.mark.asyncio
-    async def test_concurrent_processing_simulation(self, real_files, mock_llm_service, mock_vector_store, mock_document_repository):
+    async def test_concurrent_processing_simulation(self, real_files, mock_llm_service, mock_vector_store,
+                                                     mock_document_repository, mock_budget_guard, mock_usage_tracker):
         """Test de simulation de traitement concurrent"""
         # Configurer le mock pour les multiples fichiers (probablement 1 chunk chacun)
         mock_llm_service.embed.return_value = EmbeddingResponse(
@@ -674,7 +724,9 @@ Even more detailed content here.
         processor = IngestionProcessor(
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
-            document_repository=mock_document_repository
+            document_repository=mock_document_repository,
+            budget_guard=mock_budget_guard,
+            usage_tracker=mock_usage_tracker
         )
 
         processed_docs = []

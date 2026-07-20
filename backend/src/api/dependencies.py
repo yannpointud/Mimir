@@ -10,10 +10,12 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from src.database.connection import get_db_session
-from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository
+from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository, UsageRepository
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
 from src.auth.jwt_handler import jwt_handler
+from src.cost.budget_guard import budget_guard, BudgetGuard
+from src.cost.usage_tracker import usage_tracker, UsageTracker
 from src.config import settings
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 from src.rag_core.implementations.faiss_store import FaissVectorStore
@@ -35,6 +37,11 @@ def get_audit_log_repository(db: Session = Depends(get_db_session)) -> AuditLogR
     return AuditLogRepository(db)
 
 
+def get_usage_repository(db: Session = Depends(get_db_session)) -> UsageRepository:
+    """Get usage repository instance."""
+    return UsageRepository(db)
+
+
 def get_cache_service():
     """Get cache service instance."""
     return cache_service
@@ -53,6 +60,16 @@ def get_email_service():
 def get_jwt_handler():
     """Get JWT handler instance."""
     return jwt_handler
+
+
+def get_budget_guard() -> BudgetGuard:
+    """Get budget guard instance (singleton)."""
+    return budget_guard
+
+
+def get_usage_tracker() -> UsageTracker:
+    """Get usage tracker instance (singleton)."""
+    return usage_tracker
 
 
 # Global service instances (singleton pattern)

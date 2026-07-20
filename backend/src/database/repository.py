@@ -6,11 +6,12 @@ Implements CRUD operations with robust error handling
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import and_, or_, desc, asc
+from sqlalchemy import and_, or_, desc, asc, func, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from datetime import datetime, timedelta
 import logging
 
-from .models import Document, Configuration, AuditLog
+from .models import Document, Configuration, AuditLog, LlmUsage, LlmBudgetLedger
 from ..config import settings
 
 
@@ -420,6 +421,268 @@ class AuditLogRepository(BaseRepository):
             raise
 
 
+class UsageRepository(BaseRepository):
+    """
+    Repository for LLM usage accounting (llm_usage) and the daily budget
+    ledger (llm_budget_ledger).
+
+    Two distinct concerns live here:
+      - CRUD/aggregates for llm_usage (dashboard-facing, cost accounting log)
+      - Atomic reservation primitives for llm_budget_ledger (reserve/finalize/
+        release), which make the daily cap race-free (anti-TOCTOU, COST-01)
+    """
+
+    def create_usage_entry(self, call_type: str, model: str, prompt_tokens: int,
+                            completion_tokens: int, total_tokens: int, cost_eur: float,
+                            estimated: bool = False, session_id: Optional[str] = None) -> LlmUsage:
+        """
+        Create a new per-call usage log entry.
+
+        Args:
+            call_type: 'chat' or 'embedding'
+            model: Model name as billed
+            prompt_tokens: Input tokens
+            completion_tokens: Output tokens
+            total_tokens: Total tokens (prompt + completion)
+            cost_eur: Computed cost in euros
+            estimated: True if tokens/cost are estimated (e.g. stream disconnect)
+            session_id: Optional session or "doc:{id}" identifier for traceability
+
+        Returns:
+            Created LlmUsage row
+        """
+        try:
+            usage_entry = LlmUsage(
+                call_type=call_type,
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                cost_eur=cost_eur,
+                estimated=estimated,
+                session_id=session_id
+            )
+
+            self.session.add(usage_entry)
+            self.session.commit()
+            self.session.refresh(usage_entry)
+
+            return usage_entry
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, f"create usage entry {call_type}/{model}")
+            raise
+
+    def get_today_by_model(self) -> List[Dict[str, Any]]:
+        """
+        Aggregate today's usage by model (dashboard "today by model" table).
+
+        Returns:
+            List of {model, calls, prompt_tokens, completion_tokens, total_tokens, cost_eur}
+        """
+        try:
+            today = datetime.utcnow().strftime('%Y-%m-%d')
+
+            rows = (
+                self.session.query(
+                    LlmUsage.model,
+                    func.count(LlmUsage.id).label('calls'),
+                    func.sum(LlmUsage.prompt_tokens).label('prompt_tokens'),
+                    func.sum(LlmUsage.completion_tokens).label('completion_tokens'),
+                    func.sum(LlmUsage.total_tokens).label('total_tokens'),
+                    func.sum(LlmUsage.cost_eur).label('cost_eur'),
+                )
+                .filter(func.date(LlmUsage.created_at) == today)
+                .group_by(LlmUsage.model)
+                .all()
+            )
+
+            return [
+                {
+                    'model': row.model,
+                    'calls': row.calls,
+                    'prompt_tokens': row.prompt_tokens or 0,
+                    'completion_tokens': row.completion_tokens or 0,
+                    'total_tokens': row.total_tokens or 0,
+                    'cost_eur': row.cost_eur or 0.0,
+                }
+                for row in rows
+            ]
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "get today usage by model")
+            raise
+
+    def get_daily_history(self, days_back: int = 30) -> List[Dict[str, Any]]:
+        """
+        Aggregate usage per day (and model) for the last `days_back` days,
+        ordered by date (dashboard "30 day history" section).
+
+        Args:
+            days_back: Number of days to look back
+
+        Returns:
+            List of {date, model, calls, tokens, cost_eur}
+        """
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            date_col = func.date(LlmUsage.created_at)
+
+            rows = (
+                self.session.query(
+                    date_col.label('date'),
+                    LlmUsage.model,
+                    func.count(LlmUsage.id).label('calls'),
+                    func.sum(LlmUsage.total_tokens).label('tokens'),
+                    func.sum(LlmUsage.cost_eur).label('cost_eur'),
+                )
+                .filter(LlmUsage.created_at >= cutoff_date)
+                .group_by(date_col, LlmUsage.model)
+                .order_by(date_col)
+                .all()
+            )
+
+            return [
+                {
+                    'date': row.date,
+                    'model': row.model,
+                    'calls': row.calls,
+                    'tokens': row.tokens or 0,
+                    'cost_eur': row.cost_eur or 0.0,
+                }
+                for row in rows
+            ]
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "get daily usage history")
+            raise
+
+    def get_today_ledger(self) -> Optional[LlmBudgetLedger]:
+        """Retrieve today's budget ledger row, or None if it does not exist yet."""
+        try:
+            today = datetime.utcnow().strftime('%Y-%m-%d')
+            return self.session.query(LlmBudgetLedger).filter_by(date=today).first()
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "get today budget ledger")
+            raise
+
+    def cleanup_old_usage(self, days_to_keep: int = 90) -> int:
+        """
+        Purge llm_usage rows older than the retention window (aligned with
+        the audit_log retention policy).
+
+        Args:
+            days_to_keep: Number of days to retain
+
+        Returns:
+            Number of deleted rows
+        """
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+
+            deleted_count = self.session.query(LlmUsage).filter(
+                LlmUsage.created_at < cutoff_date
+            ).delete()
+
+            self.session.commit()
+
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} old usage entries")
+
+            return deleted_count
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "cleanup old usage entries")
+            raise
+
+    def reserve(self, today: str, estimate_eur: float, cap_eur: float) -> bool:
+        """
+        Attempt an atomic budget reservation for `today`.
+
+        Ensures today's ledger row exists (idempotent insert-or-ignore), then
+        performs a SINGLE conditional UPDATE incrementing spent_eur by
+        estimate_eur only where spent_eur + estimate_eur <= cap_eur. The
+        WHERE clause IS the anti-TOCTOU guard -- never read-then-decide in
+        Python, the guard must live entirely in the UPDATE statement.
+
+        Args:
+            today: Ledger date key (YYYY-MM-DD)
+            estimate_eur: Flat pre-call cost estimate to reserve
+            cap_eur: Daily budget cap
+
+        Returns:
+            True iff the reservation was accepted (rowcount == 1)
+        """
+        try:
+            # 1. Ensure today's row exists (idempotent, itself atomic)
+            self.session.execute(
+                sqlite_insert(LlmBudgetLedger)
+                .values(date=today, spent_eur=0.0)
+                .on_conflict_do_nothing(index_elements=["date"])
+            )
+
+            # 2. Atomic conditional increment -- the WHERE clause IS the
+            # anti-TOCTOU check. No application lock needed: SQLite WAL
+            # (busy_timeout already configured in connection.py) already
+            # serializes writers at the file level.
+            result = self.session.execute(
+                update(LlmBudgetLedger)
+                .where(LlmBudgetLedger.date == today)
+                .where(LlmBudgetLedger.spent_eur + estimate_eur <= cap_eur)
+                .values(spent_eur=LlmBudgetLedger.spent_eur + estimate_eur)
+            )
+            self.session.commit()
+
+            return result.rowcount == 1
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "reserve budget")
+            raise
+
+    def finalize(self, today: str, delta_eur: float) -> None:
+        """
+        Apply the real-vs-estimate delta to today's ledger, with NO cap
+        condition -- the call already happened, spent_eur may slightly
+        exceed cap_eur (expected).
+
+        Args:
+            today: Ledger date key (YYYY-MM-DD)
+            delta_eur: Real cost minus reserved estimate (may be negative)
+        """
+        try:
+            self.session.execute(
+                update(LlmBudgetLedger)
+                .where(LlmBudgetLedger.date == today)
+                .values(spent_eur=LlmBudgetLedger.spent_eur + delta_eur)
+            )
+            self.session.commit()
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "finalize budget")
+            raise
+
+    def release(self, today: str, estimate_eur: float) -> None:
+        """
+        Roll back a reservation whose call failed, subtracting the reserved
+        estimate from today's ledger.
+
+        Args:
+            today: Ledger date key (YYYY-MM-DD)
+            estimate_eur: The estimate amount previously reserved
+        """
+        try:
+            self.session.execute(
+                update(LlmBudgetLedger)
+                .where(LlmBudgetLedger.date == today)
+                .values(spent_eur=LlmBudgetLedger.spent_eur - estimate_eur)
+            )
+            self.session.commit()
+
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, "release budget")
+            raise
+
+
 # Factory function to create repositories with a session
 
 def create_repositories(session: Session) -> Dict[str, Any]:
@@ -432,5 +695,6 @@ def create_repositories(session: Session) -> Dict[str, Any]:
     return {
         'document': DocumentRepository(session),
         'config': ConfigurationRepository(session),
-        'audit': AuditLogRepository(session)
+        'audit': AuditLogRepository(session),
+        'usage': UsageRepository(session)
     }

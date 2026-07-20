@@ -19,17 +19,69 @@ import {
   Shield,
   AlertTriangle,
   UserCheck,
-  Hash
+  Hash,
+  Euro
 } from 'lucide-react';
 
 import LoadingSpinner from '../Common/LoadingSpinner';
-import { adminAPI } from '../../services/api';
+import { adminAPI, usageAPI } from '../../services/api';
 import { getErrorMessage, formatRelativeDate, safeDisplayValue } from '../../utils/helpers';
+
+// Pure helper: maps spend-vs-cap ratio to a three-state budget status.
+// Defensive on cap <= 0 (returns 'normal' rather than dividing by zero).
+export const getBudgetStatus = (spent, cap) => {
+  if (!cap || cap <= 0) {
+    return 'normal';
+  }
+  const ratio = spent / cap;
+  if (ratio >= 1.0) {
+    return 'exceeded';
+  }
+  if (ratio >= 0.8) {
+    return 'warning';
+  }
+  return 'normal';
+};
+
+// Formats a euro amount with French decimal comma, 2 decimal places.
+const formatEuro = (value) => {
+  const num = typeof value === 'number' ? value : 0;
+  return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Gauge fill width capped at 100%, per the UI-SPEC contract.
+const budgetGaugeWidthPct = (usage) => {
+  if (!usage || !usage.daily_budget_eur || usage.daily_budget_eur <= 0) {
+    return 0;
+  }
+  return Math.min(usage.spent_today_eur / usage.daily_budget_eur, 1) * 100;
+};
+
+// Gauge fill / badge color per budget state (green/yellow/red triptych).
+const budgetGaugeFillClass = (usage) => {
+  const status = getBudgetStatus(usage.spent_today_eur, usage.daily_budget_eur);
+  return { normal: 'bg-green-600', warning: 'bg-yellow-500', exceeded: 'bg-red-600' }[status];
+};
+
+const budgetBadgeTextClass = (usage) => {
+  const status = getBudgetStatus(usage.spent_today_eur, usage.daily_budget_eur);
+  return { normal: 'text-green-600', warning: 'text-yellow-600', exceeded: 'text-red-600' }[status];
+};
+
+const budgetBadgeCopy = (usage) => {
+  const status = getBudgetStatus(usage.spent_today_eur, usage.daily_budget_eur);
+  return {
+    normal: 'Sous contrôle',
+    warning: 'Approche du plafond',
+    exceeded: 'Plafond atteint — nouvelles requêtes bloquées',
+  }[status];
+};
 
 const AnalyticsPanel = () => {
   const { onRefresh, refreshTrigger } = useOutletContext();
   const [analyticsData, setAnalyticsData] = useState(null);
   const [chatMetrics, setChatMetrics] = useState(null);
+  const [usageData, setUsageData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -40,13 +92,15 @@ const AnalyticsPanel = () => {
       setLoading(true);
       setError(null);
 
-      const [analytics, chatData] = await Promise.all([
+      const [analytics, chatData, usage] = await Promise.all([
         adminAPI.getUsageAnalytics(),
-        adminAPI.getChatMetrics()
+        adminAPI.getChatMetrics(),
+        usageAPI.getUsage()
       ]);
 
       setAnalyticsData(analytics);
       setChatMetrics(chatData);
+      setUsageData(usage);
       setLastUpdate(new Date());
 
     } catch (error) {
@@ -417,6 +471,125 @@ const AnalyticsPanel = () => {
         )}
       </div>
 
+      {/* Coûts IA - spend gauge (focal), today by model, 30-day history (COST-02) */}
+      <div className="card p-6 mb-8">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Euro className="h-5 w-5 mr-2 text-primary-600" />
+          Coûts IA
+        </h3>
+
+        {loading && !usageData && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <LoadingSpinner size="md" />
+              <p className="mt-2 text-sm text-gray-600">Chargement des coûts...</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && error && !usageData && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+              <div>
+                <h4 className="text-sm text-red-900">Erreur de chargement des coûts</h4>
+                <p className="text-sm text-red-700 mt-1">
+                  Impossible de charger les données de coûts. Réessayez dans quelques instants.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {usageData && (
+          <>
+            {/* Gauge - focal point: spend vs daily cap */}
+            <div className="mb-6">
+              <p className="text-sm text-gray-600 mb-2">Dépense du jour</p>
+              <div className="flex items-end justify-between mb-2">
+                <p className="text-3xl font-semibold text-primary-600">
+                  {formatEuro(usageData.spent_today_eur)} € / {formatEuro(usageData.daily_budget_eur)} €
+                </p>
+                <span className={`text-xs ${budgetBadgeTextClass(usageData)}`}>
+                  {budgetBadgeCopy(usageData)}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className={`h-3 rounded-full ${budgetGaugeFillClass(usageData)}`}
+                  style={{ width: `${budgetGaugeWidthPct(usageData)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Today by model - secondary, recessive (smaller text, no accent) */}
+            <div className="mb-6">
+              {usageData.today_by_model && usageData.today_by_model.length > 0 ? (
+                <table className="w-full text-sm text-gray-600">
+                  <thead>
+                    <tr className="text-xs text-gray-500 border-b border-gray-200">
+                      <th className="text-left py-2">Modèle</th>
+                      <th className="text-right py-2">Appels</th>
+                      <th className="text-right py-2">Tokens</th>
+                      <th className="text-right py-2">Coût (€)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usageData.today_by_model.map((row) => (
+                      <tr key={row.model} className="border-b border-gray-100">
+                        <td className="py-2">{row.model}</td>
+                        <td className="text-right py-2">{formatNumber(row.calls)}</td>
+                        <td className="text-right py-2">{formatNumber(row.total_tokens)}</td>
+                        <td className="text-right py-2">{formatEuro(row.cost_eur)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-600">Aucune consommation aujourd'hui</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Aucun appel Mistral n'a encore été enregistré pour la journée en cours.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 30-day history - secondary, recessive (smaller text, no accent) */}
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Historique (30 jours)</p>
+              {usageData.history && usageData.history.length > 0 ? (
+                <table className="w-full text-sm text-gray-600">
+                  <thead>
+                    <tr className="text-xs text-gray-500 border-b border-gray-200">
+                      <th className="text-left py-2">Date</th>
+                      <th className="text-left py-2">Modèle</th>
+                      <th className="text-right py-2">Appels</th>
+                      <th className="text-right py-2">Tokens</th>
+                      <th className="text-right py-2">Coût (€)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usageData.history.map((row, idx) => (
+                      <tr key={`${row.date}-${row.model}-${idx}`} className="border-b border-gray-100">
+                        <td className="py-2">{row.date}</td>
+                        <td className="py-2">{row.model}</td>
+                        <td className="text-right py-2">{formatNumber(row.calls)}</td>
+                        <td className="text-right py-2">{formatNumber(row.tokens)}</td>
+                        <td className="text-right py-2">{formatEuro(row.cost_eur)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-gray-600 text-center py-4">
+                  Aucun historique disponible sur les 30 derniers jours.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Automatic update information */}
       <div className="mt-6 bg-gray-50 rounded-lg p-4">

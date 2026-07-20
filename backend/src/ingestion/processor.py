@@ -16,12 +16,14 @@ from .chunking import ChunkingStrategy, ChunkingConfig
 from .async_queue_manager import AsyncQueueManager
 from .queue_manager import IngestionTask, TaskPriority
 
-from ..llm_interface.interfaces import AbstractLLMService, LLMException
+from ..llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
 from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException
 from ..database.repository import DocumentRepository
 from ..database.models import Document
 from ..monitoring.logger import setup_logger
 from ..config import settings
+from ..cost.budget_guard import BudgetExceededError, budget_guard as default_budget_guard
+from ..cost.usage_tracker import usage_tracker as default_usage_tracker
 
 logger = setup_logger(__name__)
 
@@ -41,7 +43,9 @@ class IngestionProcessor:
                  document_repository: DocumentRepository,
                  chunking_config: Optional[ChunkingConfig] = None,
                  max_file_size_mb: int = 100,
-                 max_chunks_per_doc: int = 2000):
+                 max_chunks_per_doc: int = 2000,
+                 budget_guard=None,
+                 usage_tracker=None):
         """
         Initialize ingestion processor
 
@@ -52,12 +56,18 @@ class IngestionProcessor:
             chunking_config: Configuration for text chunking
             max_file_size_mb: Maximum file size in MB
             max_chunks_per_doc: Maximum chunks per document
+            budget_guard: Optional BudgetGuard override (defaults to the
+                module-level singleton); injectable for tests
+            usage_tracker: Optional UsageTracker override (defaults to the
+                module-level singleton); injectable for tests
         """
         self.llm_service = llm_service
         self.vector_store = vector_store
         self.document_repository = document_repository
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
         self.max_chunks_per_doc = max_chunks_per_doc
+        self.budget_guard = budget_guard or default_budget_guard
+        self.usage_tracker = usage_tracker or default_usage_tracker
 
         # Initialize components
         self.extractor_factory = ExtractorFactory()
@@ -217,6 +227,32 @@ class IngestionProcessor:
 
             return success
 
+        except BudgetExceededError:
+            # Fail-closed, non-retriable: budget exhaustion is not a
+            # transient failure and a retry cannot succeed before the next
+            # day's ledger reset (Pitfall 5). Exhaust the task's retry
+            # budget so the async queue worker loop does not re-queue it.
+            logger.warning(
+                f"Ingestion stopped (fail-closed): daily budget exceeded for document {task.document_id}",
+                extra={'extra_fields': {
+                    'document_id': task.document_id,
+                    'file_path': task.file_path,
+                    'type': 'budget_exceeded_ingestion'
+                }}
+            )
+
+            try:
+                self.document_repository.update_status(
+                    int(task.document_id),
+                    'error',
+                    error_message="Daily budget exceeded"
+                )
+            except Exception as db_error:
+                logger.error(f"Failed to update document status: {str(db_error)}")
+
+            task.retry_count = task.max_retries
+            return False
+
         except Exception as e:
             error_msg = f"Task processing failed: {str(e)}"
             logger.error(error_msg)
@@ -274,8 +310,45 @@ class IngestionProcessor:
                 chunks_data = chunks_data[:self.max_chunks_per_doc]
 
             # Step 3: Generate embeddings
+            # Reserve the daily budget BEFORE the paid Mistral embedding call
+            # (fail-closed): None means the effective daily cap is already
+            # exhausted, so raise a non-retriable BudgetExceededError instead
+            # of ever calling embed().
+            #
+            # asyncio.to_thread on every reserve/release/record/finalize call
+            # below: these are blocking SQLite writes (WAL serializes
+            # writers) and must never stall the shared event loop -- same
+            # rationale as the vector_store.upsert/persist wrapping.
+            reservation = await asyncio.to_thread(self.budget_guard.reserve, "embedding")
+            if reservation is None:
+                raise BudgetExceededError("Daily budget exceeded")
+
             logger.debug(f"Generating embeddings for {len(chunks_data)} chunks")
-            embeddings = await self._generate_embeddings(chunks_data)
+            try:
+                embedding_response = await self._generate_embeddings(chunks_data)
+            except Exception:
+                # No embedding call actually succeeded -- refund the
+                # reservation and let the original error propagate to the
+                # outer except blocks below.
+                await asyncio.to_thread(self.budget_guard.release, reservation)
+                raise
+
+            embeddings = embedding_response.embeddings
+
+            # A real embedding call succeeded and was billed by Mistral:
+            # record its usage (keyed by doc:{document_id}, since ingestion
+            # has no user session) and finalize the reservation with the
+            # real cost, regardless of downstream chunk-count validation.
+            actual_cost_eur = await asyncio.to_thread(
+                self.usage_tracker.record,
+                "embedding",
+                embedding_response.model,
+                embedding_response.prompt_tokens,
+                embedding_response.completion_tokens,
+                estimated=False,
+                session_id=f"doc:{task.document_id}"
+            )
+            await asyncio.to_thread(self.budget_guard.finalize, reservation, actual_cost_eur)
 
             if len(embeddings) != len(chunks_data):
                 logger.error(
@@ -329,6 +402,12 @@ class IngestionProcessor:
 
             return True
 
+        except BudgetExceededError:
+            # Non-retriable fail-closed stop: propagate to _process_task's
+            # dedicated except BudgetExceededError branch, bypassing the
+            # retry loop entirely (Pitfall 5).
+            raise
+
         except Exception as e:
             processing_time = time.time() - start_time
             logger.error(
@@ -361,7 +440,7 @@ class IngestionProcessor:
         except (ExtractionError, UnsupportedFormatError) as e:
             raise ProcessingError(f"Text extraction failed: {str(e)}")
 
-    async def _generate_embeddings(self, chunks_data: List[Dict[str, Any]]) -> List[List[float]]:
+    async def _generate_embeddings(self, chunks_data: List[Dict[str, Any]]) -> EmbeddingResponse:
         """
         Generate embeddings for chunks
 
@@ -369,7 +448,9 @@ class IngestionProcessor:
             chunks_data: List of chunk dictionaries
 
         Returns:
-            List of embedding vectors
+            EmbeddingResponse carrying both the embedding vectors and the
+            usage metadata (model, prompt_tokens, completion_tokens) needed
+            for cost accounting
 
         Raises:
             ProcessingError: If embedding generation fails
@@ -378,7 +459,7 @@ class IngestionProcessor:
             texts = [chunk['text'] for chunk in chunks_data]
 
             response = await self.llm_service.embed(texts)
-            return response.embeddings
+            return response
 
         except LLMException as e:
             raise ProcessingError(f"Embedding generation failed: {str(e)}")

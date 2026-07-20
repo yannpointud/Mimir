@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user
-from src.database.repository import ConfigurationRepository, AuditLogRepository
-from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_vector_store, get_ingestion_processor
+from src.database.repository import ConfigurationRepository, AuditLogRepository, UsageRepository
+from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor
 from src.ingestion.queue_manager import TaskPriority
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import cache_service, chat_cache_service
@@ -308,7 +308,11 @@ async def update_configuration(
             "email_escalation_enabled",
             "chat_rate_limit_per_minute",
             "auto_delete_failed_documents",
-            "vector_search_threshold"
+            "vector_search_threshold",
+            # Hot-reloadable daily spend cap (COST-02): BudgetGuard._effective_cap
+            # reads this key from the configuration table before falling back
+            # to settings.daily_budget_eur.
+            "daily_budget_eur"
         }
 
         invalid_keys = set(config_updates.keys()) - allowed_keys
@@ -439,6 +443,61 @@ async def get_audit_log(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve audit log"
+        )
+
+
+@router.get("/usage", response_model=Dict[str, Any])
+async def get_usage(
+    days_back: int = Query(30, ge=1, le=90, description="Number of days of history to return"),
+    current_user: Dict[str, Any] = Depends(require_admin),
+    usage_repo: UsageRepository = Depends(get_usage_repository),
+    config_repo: ConfigurationRepository = Depends(get_configuration_repository)
+) -> Dict[str, Any]:
+    """
+    Get today's per-model LLM spend, the daily history, and today's spend
+    vs the daily budget cap, for the admin cost dashboard (COST-02).
+
+    Internal cost data must never be readable anonymously (explicit guard
+    kept in addition to the router-level default-deny, same convention as
+    get_audit_log).
+
+    Args:
+        days_back: Number of days of history to return (bounded to cap the
+            query window, same convention as get_audit_log)
+        current_user: Current authenticated admin user
+        usage_repo: Usage repository
+
+    Returns:
+        dict: today_by_model aggregates, daily history, today's spend, and
+            the daily budget cap (settings default or hot Admin override)
+    """
+    try:
+        today_by_model = usage_repo.get_today_by_model()
+        history = usage_repo.get_daily_history(days_back)
+        ledger = usage_repo.get_today_ledger()
+
+        # Effective daily cap: mirror BudgetGuard._effective_cap() so the
+        # dashboard gauge always matches the cap the gate actually enforces
+        # (hot Admin override for 'daily_budget_eur' wins over the .env
+        # default). Returning the raw settings value here would show a stale
+        # cap while requests are already being rejected with 429
+        # budget_exceeded against the override.
+        override = config_repo.get("daily_budget_eur")
+        effective_cap = float(override.value) if override is not None else settings.daily_budget_eur
+
+        return {
+            "today_by_model": today_by_model,
+            "history": history,
+            "spent_today_eur": ledger.spent_eur if ledger else 0.0,
+            "daily_budget_eur": effective_cap,
+            "timestamp": datetime.utcnow()
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving usage data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve usage data"
         )
 
 
