@@ -326,6 +326,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Call the function
         with patch('builtins.open', mock_open()) as mock_file_open:
             result = asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
                 priority="normal",
@@ -351,6 +353,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_file,
                 preserve=False,
                 priority="normal",
@@ -373,6 +377,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
                 priority="normal",
@@ -398,6 +404,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
                 priority="normal",
@@ -426,6 +434,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
                 priority="normal",
@@ -455,6 +465,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
                 priority="normal",
@@ -493,6 +505,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
+                request=Mock(),  # required by slowapi decorator (SEC-03)
+                response=Mock(),  # required by slowapi header injection (SEC-03)
                 file=mock_upload_file,
                 preserve=False,
                 priority="normal",
@@ -1005,3 +1019,54 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         # Verify default mime type is used
         call_args = mock_file_response.call_args
         assert call_args[1]['media_type'] == "application/octet-stream"
+
+
+class TestUploadQueueFullCleanup:
+    """WR-03 (it. 2): on queue-full 503, the pending DB record and the stored
+    file must be rolled back, otherwise any retry of the same file hits 409
+    (get_by_hash matches the orphaned pending record) and is never ingested."""
+
+    @patch('backend.src.api.endpoints.documents.settings')
+    def test_upload_queue_full_deletes_record_and_file(self, mock_settings):
+        """queue_document() == False -> 503 + record deleted + file removed."""
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mock_settings.max_file_size_mb = 10
+            mock_settings.supported_file_extensions = {".pdf"}
+            mock_settings.upload_dir = temp_dir
+
+            content = b"queue full test content"
+            file_hash = hashlib.sha256(content).hexdigest()
+            expected_path = Path(temp_dir) / f"{file_hash}_test.pdf"
+
+            mock_file = Mock(spec=UploadFile)
+            mock_file.filename = "test.pdf"
+            mock_file.size = len(content)
+            mock_file.read = AsyncMock(return_value=content)
+
+            mock_doc_repo = Mock()
+            mock_doc_repo.get_by_hash.return_value = None
+            mock_doc_repo.create.return_value = Mock(id=7)
+
+            mock_ingestion = Mock()
+            mock_ingestion.queue_document.return_value = False  # Queue is full
+            mock_ingestion.get_queue_size.return_value = 100
+
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(upload_document(
+                    request=Mock(),  # required by slowapi decorator (SEC-03)
+                    response=Mock(),  # required by slowapi header injection (SEC-03)
+                    file=mock_file,
+                    preserve=False,
+                    priority="normal",
+                    current_user={"sub": "admin", "user_type": "admin"},
+                    doc_repo=mock_doc_repo,
+                    audit_repo=Mock(),
+                    ingestion_processor=mock_ingestion
+                ))
+
+            assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+            mock_doc_repo.delete.assert_called_once_with(7, force=True)
+            assert not expected_path.exists(), \
+                "stored file must be removed on queue-full rejection"

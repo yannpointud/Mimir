@@ -115,6 +115,32 @@ def sample_audit_data():
     }
 
 
+@pytest.fixture(autouse=True)
+def disable_rate_limiter():
+    """
+    Disable the slowapi rate limiter for every test (autouse).
+
+    The limiter uses an in-process memory:// storage shared by the whole
+    pytest run. Without this fixture, existing tests that chain login/chat/
+    upload calls would receive unexpected 429 responses as soon as the
+    per-route decorators are applied, making the suite flaky.
+
+    Tests that specifically exercise the 429 path re-enable the limiter
+    locally (limiter.enabled = True + limiter.reset()) inside their own body.
+    Teardown restores the original enabled flag and resets the in-memory
+    counters so no state leaks between tests.
+    """
+    from src.api.middleware.rate_limit import limiter
+
+    original_enabled = limiter.enabled
+    limiter.enabled = False
+
+    yield
+
+    limiter.enabled = original_enabled
+    limiter.reset()
+
+
 # Fixtures for API tests (future)
 @pytest.fixture
 def test_app():

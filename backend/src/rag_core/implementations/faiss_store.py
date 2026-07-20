@@ -8,9 +8,14 @@ import numpy as np
 import pickle
 import threading
 import time
+import json
+import os
+import tempfile
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+
+from pydantic import BaseModel
 
 from ..interfaces import (
     AbstractVectorStore,
@@ -23,6 +28,27 @@ from ..interfaces import (
 from ...monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+class MetadataPayload(BaseModel):
+    """Versioned JSON payload for FAISS metadata persistence.
+
+    Replaces the previous unvalidated pickle format: JSON deserialization
+    cannot execute arbitrary code, and the pydantic model validates the
+    schema (required fields, types, version) on load.
+
+    Note: schema_version is intentionally required (no default). This is a
+    security-relevant validation control (ASVS V5 Input Validation, threat
+    T-02-01) -- a payload silently defaulting a missing version field would
+    defeat the purpose of schema validation on load(). Callers writing new
+    payloads (persist()) always pass schema_version=1 explicitly.
+    """
+    schema_version: int
+    metadata: list[dict[str, Any]]
+    document_to_chunks: dict[str, list[int]]
+    stats: dict[str, Any]
+    saved_at: str
+
 
 class FaissVectorStore(AbstractVectorStore):
     """
@@ -47,7 +73,15 @@ class FaissVectorStore(AbstractVectorStore):
         """
         self.dimension = dimension
         self.index_path = Path(index_path)
-        self.metadata_path = Path(metadata_path)
+        # Normalize metadata path to JSON (write target), regardless of the
+        # extension passed via config (.pkl or .json); derive the legacy
+        # pickle path as a fallback for transparent migration on load().
+        self.metadata_path = Path(metadata_path).with_suffix('.json')
+        self.legacy_metadata_path = Path(metadata_path).with_suffix('.pkl')
+        # Set to True when load() migrated from the legacy pickle; the next
+        # successful persist() then retires the .pkl (renamed .pkl.migrated)
+        # so the unsafe pickle.load() path can never run again (T-02-01).
+        self._legacy_pickle_pending_retirement = False
         self.similarity_threshold = similarity_threshold
         self.index_type = index_type
 
@@ -81,7 +115,14 @@ class FaissVectorStore(AbstractVectorStore):
     def _initialize_index(self):
         """Initialize or load existing FAISS index"""
         try:
-            if self.index_path.exists() and self.metadata_path.exists():
+            # Recognize both the current JSON metadata format and the legacy
+            # pickle format: without the OR on legacy_metadata_path, a legacy
+            # install (index + .pkl, no .json yet) would fall through to
+            # _create_new_index() and WIPE the existing index (see ROB-02
+            # threat T-02-03).
+            if self.index_path.exists() and (
+                self.metadata_path.exists() or self.legacy_metadata_path.exists()
+            ):
                 # Load existing index
                 logger.info("Loading existing FAISS index...")
                 self.load()
@@ -464,26 +505,99 @@ class FaissVectorStore(AbstractVectorStore):
             logger.error(f"Vector store health check failed: {str(e)}")
             return False
 
+    def _atomic_write(self, target_path: Path, writer) -> None:
+        """Write a file atomically: temp file in the same directory, fsync,
+        then os.replace().
+
+        This guarantees that no reader ever observes a partially-written
+        file: the temp file is fully written and durably flushed to disk
+        BEFORE the atomic rename replaces the target path.
+
+        Args:
+            target_path: Final destination path
+            writer: Callable receiving the temp file path (str) and writing
+                the full content to it (synchronously, closing any handle
+                it opens itself)
+        """
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(dir=str(target_path.parent), suffix='.tmp')
+        os.close(fd)
+        try:
+            writer(tmp_path)
+
+            # Reopen the temp file read-only to fsync its content to disk
+            # BEFORE the rename, guaranteeing durability ahead of os.replace.
+            read_fd = os.open(tmp_path, os.O_RDONLY)
+            try:
+                os.fsync(read_fd)
+            finally:
+                os.close(read_fd)
+
+            os.replace(tmp_path, str(target_path))
+
+            # Make the rename itself durable: fsync the parent directory so
+            # a power loss cannot roll back the rename (or reorder the index
+            # rename after the metadata rename). A kill -9 preserves the page
+            # cache, so only a power cut exercises this path.
+            dir_fd = os.open(str(target_path.parent), os.O_DIRECTORY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
     def persist(self) -> bool:
-        """Persist current state to disk"""
+        """Persist current state to disk atomically.
+
+        Writes the FAISS index FIRST, then the JSON metadata, each via a
+        temp-file-same-dir + fsync + os.replace sequence, inside the same
+        lock. This ordering is crash-safe: an interruption between the two
+        atomic replaces only ever leaves the index ahead of the metadata
+        (harmless orphan vectors), never metadata pointing beyond the index
+        (which would corrupt chunk_id references on the next upsert).
+        """
         try:
             with self._lock:
                 start_time = time.time()
 
-                # Save FAISS index
-                faiss.write_index(self.index, str(self.index_path))
+                # 1. Index FIRST (safe crash window: orphan vectors only)
+                self._atomic_write(
+                    self.index_path,
+                    lambda p: faiss.write_index(self.index, p)
+                )
 
-                # Save metadata
-                persist_data = {
-                    'metadata': self.metadata,
-                    'document_to_chunks': self.document_to_chunks,
-                    'stats': self._stats,
-                    'version': '1.0',
-                    'saved_at': datetime.utcnow().isoformat()
-                }
+                # 2. Metadata SECOND, versioned JSON
+                payload = MetadataPayload(
+                    schema_version=1,
+                    metadata=self.metadata,
+                    document_to_chunks=self.document_to_chunks,
+                    stats=self._stats,
+                    saved_at=datetime.utcnow().isoformat()
+                )
+                self._atomic_write(
+                    self.metadata_path,
+                    lambda p: Path(p).write_bytes(payload.model_dump_json().encode('utf-8'))
+                )
 
-                with open(self.metadata_path, 'wb') as f:
-                    pickle.dump(persist_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                # Retire the legacy pickle after the first successful JSON
+                # persist following a migration: rename it so the unsafe
+                # pickle.load() fallback can never be re-executed (T-02-01).
+                if (self._legacy_pickle_pending_retirement
+                        and self.legacy_metadata_path.exists()):
+                    try:
+                        retired_path = str(self.legacy_metadata_path) + '.migrated'
+                        os.replace(str(self.legacy_metadata_path), retired_path)
+                        self._legacy_pickle_pending_retirement = False
+                        logger.info(f"Legacy pickle metadata retired: {retired_path}")
+                    except OSError as rename_error:
+                        # Non-fatal: persist() itself succeeded; retirement
+                        # will be retried on the next persist() call.
+                        logger.warning(
+                            f"Could not retire legacy pickle metadata: {rename_error}"
+                        )
 
                 duration_ms = (time.time() - start_time) * 1000
 
@@ -504,7 +618,15 @@ class FaissVectorStore(AbstractVectorStore):
             raise VectorStoreConnectionError(error_msg)
 
     def load(self) -> bool:
-        """Load state from disk"""
+        """Load state from disk.
+
+        Reads metadata.json (validated via MetadataPayload) if present;
+        otherwise transparently migrates a legacy metadata.pkl (read once,
+        NOT deleted, NOT rewritten here -- the next successful persist()
+        call writes it out as JSON and renames the .pkl to .pkl.migrated
+        so the pickle.load() path can never run again). Raises if neither
+        file exists.
+        """
         try:
             with self._lock:
                 start_time = time.time()
@@ -512,13 +634,37 @@ class FaissVectorStore(AbstractVectorStore):
                 # Load FAISS index
                 self.index = faiss.read_index(str(self.index_path))
 
-                # Load metadata
-                with open(self.metadata_path, 'rb') as f:
-                    persist_data = pickle.load(f)
+                # Load metadata: JSON-first, legacy pickle fallback
+                if self.metadata_path.exists():
+                    with open(self.metadata_path, 'r', encoding='utf-8') as f:
+                        raw = json.load(f)
+                    payload = MetadataPayload.model_validate(raw)
+                elif self.legacy_metadata_path.exists():
+                    logger.warning(
+                        f"Migrating legacy pickle metadata: {self.legacy_metadata_path} "
+                        f"(will be written as JSON on next persist(), then the .pkl "
+                        f"is renamed to .pkl.migrated)"
+                    )
+                    with open(self.legacy_metadata_path, 'rb') as f:
+                        legacy = pickle.load(f)
+                    # Schedule retirement of the pickle after the next
+                    # successful persist() (see persist()).
+                    self._legacy_pickle_pending_retirement = True
+                    payload = MetadataPayload(
+                        schema_version=1,
+                        metadata=legacy.get('metadata', []),
+                        document_to_chunks=legacy.get('document_to_chunks', {}),
+                        stats=legacy.get('stats', {}),
+                        saved_at=legacy.get('saved_at', datetime.utcnow().isoformat())
+                    )
+                else:
+                    raise VectorStoreConnectionError(
+                        f"No metadata file found at {self.metadata_path} or {self.legacy_metadata_path}"
+                    )
 
-                self.metadata = persist_data.get('metadata', [])
-                self.document_to_chunks = persist_data.get('document_to_chunks', {})
-                self._stats = persist_data.get('stats', {})
+                self.metadata = payload.metadata
+                self.document_to_chunks = payload.document_to_chunks
+                self._stats = payload.stats
 
                 # Update statistics
                 self._update_stats()
@@ -696,13 +842,21 @@ class FaissVectorStore(AbstractVectorStore):
             import shutil
 
             backup_index_path = self.index_path.with_suffix(f".backup_{timestamp}")
-            backup_metadata_path = self.metadata_path.with_suffix(f".backup_{timestamp}")
 
             if self.index_path.exists():
                 shutil.copy2(self.index_path, backup_index_path)
 
+            # Tolerate the migration window: back up metadata.json if it
+            # exists, else fall back to the legacy metadata.pkl. The rotation
+            # glob "metadata*.backup_*" already matches both derived suffixes.
             if self.metadata_path.exists():
+                backup_metadata_path = self.metadata_path.with_suffix(f".backup_{timestamp}")
                 shutil.copy2(self.metadata_path, backup_metadata_path)
+            elif self.legacy_metadata_path.exists():
+                backup_metadata_path = self.legacy_metadata_path.with_suffix(f".backup_{timestamp}")
+                shutil.copy2(self.legacy_metadata_path, backup_metadata_path)
+            else:
+                backup_metadata_path = None
 
             logger.debug(f"Backup created: {backup_index_path}, {backup_metadata_path}")
 

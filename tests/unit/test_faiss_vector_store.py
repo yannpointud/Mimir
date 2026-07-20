@@ -6,15 +6,19 @@ import pytest
 import numpy as np
 import tempfile
 import shutil
+import json
+import os
+import faiss
 from pathlib import Path
 from unittest.mock import Mock, patch
+from pydantic import ValidationError
 
 from backend.src.rag_core.interfaces import (
     AbstractVectorStore, Chunk, SearchResult,
     VectorStoreException, VectorStoreConnectionError,
     VectorStoreOperationError
 )
-from backend.src.rag_core.implementations.faiss_store import FaissVectorStore
+from backend.src.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
 
 
 class TestAbstractVectorStore:
@@ -153,7 +157,11 @@ class TestFaissVectorStore:
 
         assert store.dimension == 128
         assert store.index_path == index_path
-        assert store.metadata_path == metadata_path
+        # metadata_path is normalized to .json regardless of the extension
+        # passed in (write target); legacy_metadata_path keeps the .pkl form
+        # for transparent migration fallback (see faiss_store.py __init__).
+        assert store.metadata_path == metadata_path.with_suffix('.json')
+        assert store.legacy_metadata_path == metadata_path.with_suffix('.pkl')
         assert store.similarity_threshold == 0.7
         assert store.index_type == "FlatL2"
 
@@ -237,6 +245,97 @@ class TestFaissVectorStore:
         # Test de chargement
         success = store.load()
         assert isinstance(success, bool)
+
+    def test_atomic_persist_no_tmp(self, temp_dir, sample_chunks):
+        """persist() writes index then metadata.json atomically, leaving no .tmp files"""
+        index_path = temp_dir / "atomic.index"
+        metadata_path = temp_dir / "atomic.metadata"
+
+        store = FaissVectorStore(
+            dimension=128,
+            index_path=str(index_path),
+            metadata_path=str(metadata_path)
+        )
+        store.upsert(sample_chunks)
+
+        success = store.persist()
+        assert success is True
+
+        # metadata.json exists, parses as JSON, and carries schema_version
+        assert store.metadata_path.exists()
+        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+            raw = json.load(f)
+        assert raw['schema_version'] == 1
+        assert 'metadata' in raw
+        assert 'document_to_chunks' in raw
+        assert 'stats' in raw
+        assert 'saved_at' in raw
+
+        # No residual .tmp files left in the faiss directory
+        assert list(temp_dir.glob('*.tmp')) == []
+
+    def test_atomic_persist_crash_order(self, temp_dir, sample_chunks):
+        """A crash between index replace and metadata replace leaves the index
+        ahead of the metadata, never the reverse (RESEARCH.md Pattern 3 / Pitfall 3)"""
+        index_path = temp_dir / "crash.index"
+        metadata_path = temp_dir / "crash.metadata"
+
+        store = FaissVectorStore(
+            dimension=128,
+            index_path=str(index_path),
+            metadata_path=str(metadata_path)
+        )
+
+        # v1: successful persist with the first chunk only
+        store.upsert(sample_chunks[:1])
+        assert store.persist() is True
+
+        v1_ntotal = store.index.ntotal
+        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+            v1_metadata_raw = json.load(f)
+
+        # v2: add more chunks, then simulate a crash on the SECOND os.replace
+        # call (metadata) while letting the first (index) succeed
+        store.upsert(sample_chunks[1:])
+
+        real_replace = os.replace
+        call_count = {'n': 0}
+
+        def flaky_replace(src, dst):
+            call_count['n'] += 1
+            if call_count['n'] == 2:
+                raise OSError("Simulated crash during metadata replace")
+            return real_replace(src, dst)
+
+        with patch(
+            'backend.src.rag_core.implementations.faiss_store.os.replace',
+            side_effect=flaky_replace
+        ):
+            with pytest.raises(VectorStoreConnectionError):
+                store.persist()
+
+        # Index on disk reflects v2 (already replaced); metadata.json on
+        # disk still reflects v1 (never replaced) -- read directly, not via
+        # the store's own load(), to prove the on-disk pair invariant.
+        reread_index = faiss.read_index(str(store.index_path))
+        assert reread_index.ntotal == store.index.ntotal
+        assert reread_index.ntotal > v1_ntotal
+
+        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+            reread_metadata_raw = json.load(f)
+        assert reread_metadata_raw == v1_metadata_raw
+
+    def test_schema_validation(self):
+        """MetadataPayload rejects a payload missing schema_version"""
+        payload_without_version = {
+            'metadata': [],
+            'document_to_chunks': {},
+            'stats': {},
+            'saved_at': '2026-07-12T00:00:00'
+        }
+
+        with pytest.raises(ValidationError):
+            MetadataPayload.model_validate(payload_without_version)
 
     def test_faiss_store_delete(self, temp_dir, sample_chunks):
         """Test de suppression de documents"""

@@ -4,7 +4,7 @@ RAG chatbot for enterprise documentation. Python/FastAPI backend, React frontend
 
 
 **critical**
-INTERDICTION DE PASSER DES COMMANDES GIT
+INTERDICTION DE PASSER DES PUSH GITHUB On ne travaille qu'en local
 INTERDICTION DE MODIFIER AILLEURS QUE DANS LE DOSSIER PROJET
 Le dossier scripts/ contient les scripts de tests de developpements temporaire
 Tous les commentaires dans le code doivent etres en anglais

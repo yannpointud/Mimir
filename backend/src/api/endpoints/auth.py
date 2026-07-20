@@ -7,18 +7,21 @@ and token management.
 
 from datetime import timedelta
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 import logging
 
 from pathlib import Path
 
+from slowapi.util import get_remote_address
+
 from src.auth.jwt_handler import jwt_handler
 from src.auth.middleware import get_current_user, require_admin
 from src.auth.password_utils import validate_password_strength
 from src.database.repository import AuditLogRepository
 from src.api.dependencies import get_audit_log_repository
+from src.api.middleware.rate_limit import limiter
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -61,8 +64,14 @@ class TokenRefreshResponse(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
+# Rate limit per IP (SEC-03): login is anonymous, IP is the only identity.
+# Callable limit is re-evaluated on every request (configurable via .env,
+# patchable in tests without module reload).
+@limiter.limit(lambda: f"{settings.rate_limit_login_per_minute}/minute",
+               key_func=get_remote_address)
 async def login(
     request: Request,
+    response: Response,
     login_data: LoginRequest,
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> LoginResponse:
@@ -71,6 +80,8 @@ async def login(
 
     Args:
         request: FastAPI request object for IP tracking
+        response: Response object required by slowapi to inject
+            X-RateLimit-* headers on successful (Pydantic) returns
         login_data: Login credentials
         audit_repo: Audit log repository for logging attempts
 

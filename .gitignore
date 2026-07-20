@@ -97,3 +97,6 @@ claudedocs/
 # MCP Caches
 .playwright-mcp/
 
+
+# Planning artifacts, kept local only
+.planning/

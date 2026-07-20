@@ -7,7 +7,7 @@ checking the status of various system components.
 
 from datetime import datetime
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
@@ -29,6 +29,7 @@ router = APIRouter(
 
 @router.get("/", response_model=HealthCheckResponse)
 async def health_check(
+    response: Response,
     db: Session = Depends(get_db_session)
 ) -> HealthCheckResponse:
     """
@@ -82,8 +83,11 @@ async def health_check(
         else:
             logger.warning(f"Health check failed - unhealthy components: {unhealthy_checks}")
 
-        # Return appropriate HTTP status
-        status_code = status.HTTP_200_OK if health_status["status"] == "healthy" else status.HTTP_503_SERVICE_UNAVAILABLE
+        # Propagate an unhealthy state through the HTTP status code so
+        # Docker healthchecks / reverse proxies / load balancers that rely
+        # on the status code (not the body) can detect the failure.
+        if health_status["status"] != "healthy":
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
         return HealthCheckResponse(**health_status)
 
@@ -210,11 +214,22 @@ async def _check_vector_store_health() -> Dict[str, Any]:
     """Check vector store (FAISS) health."""
     try:
         # This would check if FAISS index is accessible
-        # For now, just check if index files exist
+        # For now, just check if index files exist (pure file-existence
+        # check, no FAISS lock acquired -- keeps this coroutine non-blocking)
         import os
 
         index_exists = os.path.exists(settings.faiss_index_path)
-        metadata_exists = os.path.exists(settings.faiss_metadata_path)
+
+        # Tolerate the migration window: metadata is considered present if
+        # EITHER the current JSON file OR the legacy pickle file exists, to
+        # avoid a false "inconsistent" report right after an index exists
+        # but metadata.json has not been written yet (see faiss_store.py
+        # legacy_metadata_path / ROB-02 migration).
+        legacy_metadata_path = os.path.splitext(settings.faiss_metadata_path)[0] + '.pkl'
+        metadata_exists = (
+            os.path.exists(settings.faiss_metadata_path)
+            or os.path.exists(legacy_metadata_path)
+        )
 
         if index_exists and metadata_exists:
             return {

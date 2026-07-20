@@ -6,7 +6,7 @@ import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Response
 from sqlalchemy.orm import Session
 
 from backend.src.api.endpoints.health import router, health_check, database_health, cache_health, disk_usage
@@ -53,10 +53,13 @@ class TestHealthCheckEndpoint:
         mock_email.return_value = {"healthy": True, "configuration": {"configured": True}}
 
         # Appel de la fonction
-        result = asyncio.run(health_check(db=mock_db_session))
+        response = Response()
+        result = asyncio.run(health_check(response=response, db=mock_db_session))
 
         # Vérifications
         assert result.status == "healthy"
+        # Healthy state must keep the default 200 status code
+        assert response.status_code == status.HTTP_200_OK
         assert result.version == "1.0.0"
         assert "database" in result.checks
         assert "vector_store" in result.checks
@@ -87,10 +90,13 @@ class TestHealthCheckEndpoint:
         mock_email.return_value = {"healthy": True, "configuration": {"configured": True}}
 
         # Appel de la fonction
-        result = asyncio.run(health_check(db=mock_db_session))
+        response = Response()
+        result = asyncio.run(health_check(response=response, db=mock_db_session))
 
         # Vérifications
         assert result.status == "unhealthy"
+        # Unhealthy state must be reported through the HTTP status code
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert "database" in result.checks
         assert result.checks["database"]["healthy"] is False
         assert "llm_api" in result.checks
@@ -107,7 +113,7 @@ class TestHealthCheckEndpoint:
 
         # Test que l'exception est gérée
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(health_check(db=mock_db_session))
+            asyncio.run(health_check(response=Response(), db=mock_db_session))
 
         assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
@@ -526,7 +532,7 @@ class TestHealthIntegration:
         mock_db_session = Mock()
 
         # Appel du health check
-        result = asyncio.run(health_check(db=mock_db_session))
+        result = asyncio.run(health_check(response=Response(), db=mock_db_session))
 
         # Vérifications complètes
         assert result.status == "healthy"

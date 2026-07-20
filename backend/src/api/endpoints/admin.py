@@ -6,18 +6,23 @@ configuration management, and monitoring.
 """
 
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request, Response
 from datetime import datetime, timedelta
+import asyncio
 import logging
 import time
 from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user
 from src.database.repository import ConfigurationRepository, AuditLogRepository
-from src.api.dependencies import get_configuration_repository, get_audit_log_repository
+from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_vector_store, get_ingestion_processor
+from src.ingestion.queue_manager import TaskPriority
+from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
+from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.shared.models import BaseResponse, PaginationModel
+from src.shared.constants import MASKED_VALUE, mask_secrets
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,6 +30,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/admin",
     tags=["administration"],
+    # Default-deny guard (same pattern as documents.py): every /admin route
+    # requires an authenticated admin even if an endpoint forgets to declare
+    # its own require_admin dependency.
+    dependencies=[Depends(require_admin)],
     responses={
         401: {"description": "Authentication required"},
         403: {"description": "Admin privileges required"},
@@ -106,9 +115,14 @@ async def get_system_info(
 
 
 @router.get("/cache/stats", response_model=Dict[str, Any])
-async def get_cache_stats() -> Dict[str, Any]:
+async def get_cache_stats(
+    current_user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
     """
     Get cache service statistics.
+
+    Args:
+        current_user: Current authenticated admin user
 
     Returns:
         dict: Cache statistics for all cache services
@@ -212,22 +226,24 @@ async def clear_cache(
 
 @router.get("/configuration", response_model=Dict[str, Any])
 async def get_configuration(
+    current_user: Dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository)
 ) -> Dict[str, Any]:
     """
     Get system configuration settings.
 
     Args:
+        current_user: Current authenticated admin user
         config_repo: Configuration repository
 
     Returns:
-        dict: Current configuration settings
+        dict: Current configuration settings with all secrets masked server-side
     """
     try:
         # Get all configuration from database
         db_config = config_repo.get_all()
 
-        # Combine with application settings (including masked sensitive ones)
+        # Combine with application settings (sensitive values masked below)
         app_config = {
             "api_version": settings.api_version,
             "max_chunk_size": settings.max_chunk_size,
@@ -240,14 +256,15 @@ async def get_configuration(
             "jwt_expiration_hours": settings.jwt_expiration_hours,
             # LLM Configuration (with sensitive data)
             "llm_provider": settings.llm_provider,
-            "mistral_api_key": settings.mistral_api_key,  # Will be masked by frontend
+            "mistral_api_key": settings.mistral_api_key,
             "mistral_model": settings.mistral_model,
             "mistral_embedding_model": settings.mistral_embedding_model,
         }
 
+        # Server-side masking: secrets must never leave the backend in clear text
         return {
-            "database_config": {item.key: item.value for item in db_config},
-            "application_config": app_config,
+            "database_config": mask_secrets({item.key: item.value for item in db_config}),
+            "application_config": mask_secrets(app_config),
             "timestamp": datetime.utcnow()
         }
 
@@ -279,6 +296,10 @@ async def update_configuration(
         BaseResponse: Operation result
     """
     try:
+        # Drop any masked value resubmitted by the frontend: a mask must never
+        # overwrite the real secret nor trigger the allow-list validation (D-03)
+        config_updates = {k: v for k, v in config_updates.items() if v != MASKED_VALUE}
+
         # Validate configuration keys (only allow certain keys to be updated)
         allowed_keys = {
             "maintenance_mode",
@@ -341,10 +362,15 @@ async def get_audit_log(
     user_type_filter: Optional[str] = Query(None, description="Filter by user type"),
     success_filter: Optional[bool] = Query(None, description="Filter by success status"),
     days_back: int = Query(7, ge=1, le=90, description="Number of days to look back"),
+    current_user: Dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> Dict[str, Any]:
     """
     Get audit log entries with filtering.
+
+    The audit log exposes admin usernames, configuration update values and
+    client IPs: it must never be readable anonymously (explicit guard kept
+    in addition to the router-level default-deny).
 
     Args:
         pagination: Pagination parameters
@@ -352,6 +378,7 @@ async def get_audit_log(
         user_type_filter: Optional user type filter
         success_filter: Optional success status filter
         days_back: Number of days to look back
+        current_user: Current authenticated admin user
         audit_repo: Audit log repository
 
     Returns:
@@ -617,16 +644,25 @@ async def admin_document_stats(
 
 
 @router.post("/documents/upload", response_model=Dict[str, Any])
+# Same upload limit as /documents/upload (SEC-03): this duplicated admin
+# route would otherwise be a trivial bypass of the upload rate limit.
+# `request` is required by slowapi (import-time error without it) and
+# `response` is required because the return value is a plain dict.
+@limiter.limit(lambda: f"{settings.rate_limit_upload_per_minute}/minute",
+               key_func=get_client_identifier)
 async def admin_upload_document(
+    request: Request,
+    response: Response,
     file: UploadFile = File(...),
     preserve: bool = Form(False),
-    current_user: Dict[str, Any] = Depends(require_admin)
+    current_user: Dict[str, Any] = Depends(require_admin),
+    ingestion_processor = Depends(get_ingestion_processor)
 ) -> Dict[str, Any]:
     """Upload document via admin interface."""
     from src.database.repository import DocumentRepository
     from src.database.connection import get_db_session
     from src.shared.models import validate_filename, sanitize_filename
-    import shutil
+    import hashlib
 
     if not file.filename:
         raise HTTPException(
@@ -641,6 +677,15 @@ async def admin_upload_document(
             detail="Invalid file type or filename"
         )
 
+    # Check file size before reading the content into memory (parity with
+    # /documents/upload): a single unbounded read() of an arbitrarily large
+    # file could exhaust memory on the deployment target.
+    if file.size and file.size > settings.max_file_size_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large. Maximum size: {settings.max_file_size_mb}MB"
+        )
+
     db = next(get_db_session())
     doc_repo = DocumentRepository(db)
 
@@ -651,16 +696,37 @@ async def admin_upload_document(
 
         # Sanitize the filename
         clean_filename = sanitize_filename(file.filename)
-        file_path = upload_dir / clean_filename
+
+        # Read content once, then hash it. SHA-256 keeps this route
+        # consistent with /documents/upload so get_by_hash deduplication
+        # works across both routes.
+        content = await file.read()
+
+        # Reject empty files (parity with /documents/upload): an empty
+        # document would be persisted and sent to ingestion for nothing.
+        if len(content) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Empty file"
+            )
+
+        file_hash = hashlib.sha256(content).hexdigest()
+
+        # Reject duplicates instead of silently overwriting
+        existing_doc = doc_repo.get_by_hash(file_hash)
+        if existing_doc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"File already exists: {existing_doc.filename}"
+            )
+
+        # Hash-prefixed path (same scheme as /documents/upload) prevents a
+        # silent overwrite when two uploads share the same sanitized name.
+        file_path = upload_dir / f"{file_hash}_{clean_filename}"
 
         # Save the file
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Compute the hash
-        import hashlib
-        with open(file_path, "rb") as f:
-            file_hash = hashlib.md5(f.read()).hexdigest()
+            buffer.write(content)
 
         # Create the database record
         document = doc_repo.create(
@@ -669,6 +735,57 @@ async def admin_upload_document(
             path=str(file_path),
             preserve=preserve
         )
+
+        # Queue the document for ingestion (mirrors /documents/upload):
+        # without this the document would stay 'pending' forever and never
+        # be extracted nor indexed.
+        try:
+            queued = ingestion_processor.queue_document(
+                file_path=file_path,
+                document_id=str(document.id),
+                priority=TaskPriority.NORMAL,
+                preserve=preserve,
+                metadata={"uploaded_by": current_user.get("username", "unknown")}
+            )
+
+            if not queued:
+                # Queue is full - return 503 Service Unavailable
+                logger.warning(
+                    f"Ingestion queue is full, cannot queue document: {clean_filename}",
+                    extra={'extra_fields': {
+                        'document_id': document.id,
+                        'filename': clean_filename,
+                        'queue_size': ingestion_processor.get_queue_size(),
+                        'type': 'queue_full_upload'
+                    }}
+                )
+                # Roll back the pending DB record and the stored file before
+                # returning 503: otherwise any retry of the same file would
+                # hit 409 (get_by_hash matches the orphaned pending record)
+                # and the document would never be ingested.
+                try:
+                    doc_repo.delete(document.id, force=True)
+                    file_path.unlink(missing_ok=True)
+                except Exception as cleanup_error:
+                    logger.warning(
+                        f"Failed to clean up after queue-full rejection "
+                        f"(document_id={document.id}): {cleanup_error}"
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Ingestion queue is full. The system is currently processing many documents. Please try again later."
+                )
+
+            logger.info(f"Document queued for processing: {clean_filename} (ID: {document.id})")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error queuing document for processing: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to queue document for processing"
+            )
 
         return {
             "success": True,
@@ -682,6 +799,9 @@ async def admin_upload_document(
             "timestamp": datetime.utcnow()
         }
 
+    except HTTPException:
+        # Propagate intentional HTTP errors (e.g. 409 duplicate) as-is
+        raise
     except Exception as e:
         logger.error(f"Upload error: {e}")
         # Clean up the file on error
@@ -689,7 +809,7 @@ async def admin_upload_document(
             file_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Upload failed: {str(e)}"
+            detail="Upload failed"
         )
     finally:
         db.close()
@@ -700,20 +820,22 @@ async def admin_upload_document(
 
 @router.get("/config", response_model=Dict[str, Any])
 async def get_config_alias(
+    current_user: Dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository)
 ) -> Dict[str, Any]:
     """Alias for /configuration - for frontend consistency."""
-    return await get_configuration(config_repo)
+    return await get_configuration(current_user, config_repo)
 
 
 @router.put("/config", response_model=BaseResponse)
 async def update_config_alias(
-    config_updates: Dict[str, Any],
+    config_updates: Dict[str, str],
     current_user: Dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
     """Alias for /configuration - for frontend consistency."""
+    return await update_configuration(config_updates, current_user, config_repo, audit_repo)
 
 
 @router.get("/metrics/chat", response_model=Dict[str, Any])
@@ -884,7 +1006,8 @@ async def get_system_logs(
 @router.post("/vector-store/rebuild", response_model=BaseResponse)
 async def rebuild_vector_store(
     current_user: Dict[str, Any] = Depends(require_admin),
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
+    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
+    vector_store: FaissVectorStore = Depends(get_vector_store)
 ) -> BaseResponse:
     """
     Force complete rebuild of the FAISS vector index.
@@ -898,6 +1021,9 @@ async def rebuild_vector_store(
     Args:
         current_user: Current authenticated admin user
         audit_repo: Audit log repository
+        vector_store: Shared FAISS vector store singleton (same instance
+            used by chat/documents endpoints, guarded by its internal
+            threading.RLock)
 
     Returns:
         BaseResponse: Operation result with statistics
@@ -906,33 +1032,17 @@ async def rebuild_vector_store(
         HTTPException: If rebuild fails
     """
     try:
-        # Import dependencies here to avoid circular imports
-        from src.api.dependencies import get_vector_store
-
-        # Get vector store instance (this will be injected manually)
-        from src.database.connection import get_db_session
-        from src.rag_core.implementations.faiss_store import FaissVectorStore
-        from src.config import settings
-
-        # Create vector store instance manually
-        import os
-        data_dir = settings.data_dir
-        vector_store = FaissVectorStore(
-            dimension=settings.embedding_dimension,
-            index_path=os.path.join(data_dir, "faiss", "index.bin"),
-            metadata_path=os.path.join(data_dir, "faiss", "metadata.pkl"),
-            similarity_threshold=settings.similarity_threshold
-        )
-
-        # Get stats before rebuild
-        stats_before = vector_store.get_stats()
+        # Get stats before rebuild (blocking FAISS call offloaded to a worker thread)
+        stats_before = await asyncio.to_thread(vector_store.get_stats)
         start_time = time.time()
 
-        # Force rebuild with orphan cleanup
-        rebuild_result = vector_store.rebuild_vector_store(force_rebuild=True, cleanup_orphans=True)
+        # Force rebuild with orphan cleanup (blocking FAISS call offloaded to a worker thread)
+        rebuild_result = await asyncio.to_thread(
+            vector_store.rebuild_vector_store, force_rebuild=True, cleanup_orphans=True
+        )
 
-        # Get stats after rebuild
-        stats_after = vector_store.get_stats()
+        # Get stats after rebuild (blocking FAISS call offloaded to a worker thread)
+        stats_after = await asyncio.to_thread(vector_store.get_stats)
         duration_ms = rebuild_result.get('duration_ms', (time.time() - start_time) * 1000)
 
         # Clear related caches to ensure fresh data
@@ -985,8 +1095,10 @@ async def rebuild_vector_store(
         )
 
     except Exception as e:
-        error_msg = f"Failed to rebuild vector index: {str(e)}"
-        logger.error(error_msg)
+        # Full detail goes to the logs only; the client gets a generic
+        # message (same convention as every other endpoint: exception text
+        # may contain file paths or FAISS internals).
+        logger.error(f"Failed to rebuild vector index: {str(e)}")
 
         # Log failed rebuild attempt
         try:
@@ -1001,10 +1113,12 @@ async def rebuild_vector_store(
                     "admin_user": current_user["sub"]
                 }
             )
-        except:
-            pass  # Don't fail on audit log error
+        except Exception as audit_error:
+            # Do not fail the request on audit log error, but never
+            # silence it either (admin traceability requirement).
+            logger.warning(f"Failed to write audit log for rebuild failure: {audit_error}")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=error_msg
+            detail="Vector index rebuild failed"
         )

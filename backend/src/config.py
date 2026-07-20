@@ -51,7 +51,7 @@ class Settings(BaseSettings):
         description="Chemin vers l'index FAISS"
     )
     faiss_metadata_path: str = Field(
-        default="./data/faiss/metadata.pkl",
+        default="./data/faiss/metadata.json",
         description="Chemin vers les métadonnées FAISS"
     )
     faiss_max_backups: int = Field(
@@ -204,7 +204,19 @@ class Settings(BaseSettings):
         default=20,
         description="Nombre maximum de requêtes par minute par IP"
     )
-    
+    rate_limit_login_per_minute: int = Field(
+        default=5,
+        description="Nombre maximum de tentatives de connexion par minute et par client"
+    )
+    rate_limit_chat_per_minute: int = Field(
+        default=20,
+        description="Nombre maximum de requêtes chat par minute et par client"
+    )
+    rate_limit_upload_per_minute: int = Field(
+        default=10,
+        description="Nombre maximum d'uploads de documents par minute et par client"
+    )
+
     # Monitoring Configuration
     environment: str = Field(default="development", description="Environnement d'exécution")
     log_level: str = Field(default="INFO", description="Niveau de log")
@@ -276,11 +288,23 @@ class Settings(BaseSettings):
         return self.environment.lower() == "production"
 
 
-# Global singleton configuration instance
-# Loaded only if variables are available
+# Global singleton configuration instance.
+# Fail fast on configuration errors: a malformed .env or out-of-range value
+# must abort startup loudly instead of surfacing much later as an unrelated
+# AttributeError on a None settings object.
 try:
     settings = Settings()
-except Exception:
-    # On error (especially in tests), create an empty instance
-    # that will be overridden by test fixtures
-    settings = None
+except Exception as config_error:
+    import sys
+
+    if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
+        # Under pytest, keep the historical behavior: test fixtures
+        # override settings, so a load failure must not break collection.
+        settings = None
+    else:
+        import logging
+
+        logging.getLogger(__name__).critical(
+            f"Failed to load configuration: {config_error}"
+        )
+        raise

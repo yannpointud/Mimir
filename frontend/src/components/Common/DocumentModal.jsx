@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, FileText, Search, Download, ExternalLink } from 'lucide-react';
 import { documentsAPI } from '../../services/api';
-import { getErrorMessage } from '../../utils/helpers';
+import { getErrorMessage, escapeHtml } from '../../utils/helpers';
 import { openDocumentInBrowser, validateChunkIndexes } from '../../utils/documentUtils';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -70,12 +70,22 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     }
   };
 
-  // Highlight searched text in content
+  // Highlight searched text in content (escape-then-highlight, SEC-04).
+  // The document text is ALWAYS HTML-escaped before insertion so malicious
+  // content renders as inert literal text; the query is escaped the same way
+  // so matches still line up with the escaped text. Only <mark> tags may
+  // exist in the final injected HTML.
   const highlightTextInContent = (text, query) => {
-    if (!query || !text) return text;
+    if (!text) return text;
 
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
+    const escapedText = escapeHtml(text);
+    if (!query) return escapedText;
+
+    // Escape the query as HTML first (to match escaped entities), then escape
+    // regex metacharacters so a crafted query cannot break the highlighting
+    const escapedQuery = escapeHtml(query);
+    const regex = new RegExp(`(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return escapedText.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
   };
 
   // Close the modal

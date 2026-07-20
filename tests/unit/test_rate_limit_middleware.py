@@ -1,23 +1,16 @@
 """
-Tests for the rate limiting middleware.
+Tests for the rate limiting module (SEC-03).
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from fastapi import Request
-from slowapi.errors import RateLimitExceeded
+from unittest.mock import Mock, patch
+from fastapi import FastAPI, Request, Response
+from fastapi.testclient import TestClient
 
 from src.api.middleware.rate_limit import (
     get_client_identifier,
-    chat_rate_limit,
-    admin_rate_limit,
-    upload_rate_limit,
-    auth_rate_limit,
-    health_rate_limit,
-    user_type_rate_limit,
-    is_exempt_endpoint,
-    ConditionalRateLimiter,
-    conditional_limiter
+    configure_rate_limiting,
+    limiter,
 )
 
 
@@ -91,255 +84,84 @@ class TestGetClientIdentifier:
         assert result == "172.16.0.1"
 
 
-class TestRateLimitDecorators:
-    """Tests for rate limit decorators."""
-
-    @patch('src.api.middleware.rate_limit.settings')
-    def test_chat_rate_limit_default(self, mock_settings):
-        """Test default rate limit for chat."""
-        # Simulate missing setting
-        mock_settings.chat_rate_limit_per_minute = 20
-
-        decorator = chat_rate_limit()
-
-        # Verify it is a limiter decorator
-        assert hasattr(decorator, '__call__')
-
-    @patch('src.api.middleware.rate_limit.settings')
-    def test_admin_rate_limit_default(self, mock_settings):
-        """Test default rate limit for admin."""
-        mock_settings.admin_rate_limit_per_minute = 100
-
-        decorator = admin_rate_limit()
-
-        assert hasattr(decorator, '__call__')
-
-    @patch('src.api.middleware.rate_limit.settings')
-    def test_upload_rate_limit_default(self, mock_settings):
-        """Test default rate limit for upload."""
-        mock_settings.upload_rate_limit_per_hour = 50
-
-        decorator = upload_rate_limit()
-
-        assert hasattr(decorator, '__call__')
-
-    @patch('src.api.middleware.rate_limit.settings')
-    def test_auth_rate_limit_default(self, mock_settings):
-        """Test default rate limit for auth."""
-        mock_settings.auth_rate_limit_per_minute = 5
-
-        decorator = auth_rate_limit()
-
-        assert hasattr(decorator, '__call__')
-
-    def test_health_rate_limit(self):
-        """Test rate limit for health check."""
-        decorator = health_rate_limit()
-
-        assert hasattr(decorator, '__call__')
-
-    @patch('src.api.middleware.rate_limit.settings')
-    def test_chat_rate_limit_custom_setting(self, mock_settings):
-        """Test custom rate limit for chat."""
-        mock_settings.chat_rate_limit_per_minute = 30
-
-        # The decorator uses getattr with a default value
-        with patch('src.api.middleware.rate_limit.getattr') as mock_getattr:
-            mock_getattr.return_value = 30
-            decorator = chat_rate_limit()
-
-        mock_getattr.assert_called_once_with(mock_settings, 'chat_rate_limit_per_minute', 20)
-
-    @patch('src.api.middleware.rate_limit.settings')
-    def test_admin_rate_limit_missing_setting(self, mock_settings):
-        """Test admin rate limit with missing setting."""
-        # Simulate a missing setting
-        with patch('src.api.middleware.rate_limit.getattr') as mock_getattr:
-            mock_getattr.return_value = 100  # Default value
-            decorator = admin_rate_limit()
-
-        mock_getattr.assert_called_once_with(mock_settings, 'admin_rate_limit_per_minute', 100)
-
-
-class TestUserTypeRateLimit:
-    """Tests for the user_type_rate_limit function."""
-
-    def test_admin_user_rate(self):
-        """Test rate limit for admin user."""
-        request = Mock(spec=Request)
-        request.state = Mock()
-        request.state.jwt_payload = {
-            'user_type': 'admin'
-        }
-
-        result = user_type_rate_limit(request)
-
-        assert result == "200/minute"
-
-    def test_regular_user_rate(self):
-        """Test rate limit for regular user."""
-        request = Mock(spec=Request)
-        request.state = Mock()
-        request.state.jwt_payload = {
-            'user_type': 'user'
-        }
-
-        result = user_type_rate_limit(request)
-
-        assert result == "50/minute"
-
-    def test_unknown_user_type(self):
-        """Test rate limit for unknown user type."""
-        request = Mock(spec=Request)
-        request.state = Mock()
-        request.state.jwt_payload = {
-            'user_type': 'unknown_type'
-        }
-
-        result = user_type_rate_limit(request)
-
-        assert result == "20/minute"  # Anonymous by default
-
-    def test_anonymous_user_rate(self):
-        """Test rate limit for anonymous user."""
-        request = Mock(spec=Request)
-        request.state = Mock()
-        request.state.jwt_payload = None
-
-        result = user_type_rate_limit(request)
-
-        assert result == "20/minute"
-
-    def test_no_jwt_payload_user_rate(self):
-        """Test rate limit for request with empty state."""
-        # Create a mock with empty state (more realistic for FastAPI)
-        request = Mock()
-        request.state = Mock()
-        request.state.jwt_payload = None
-
-        result = user_type_rate_limit(request)
-
-        assert result == "20/minute"
-
-
-class TestIsExemptEndpoint:
-    """Tests for the is_exempt_endpoint function."""
-
-    def test_health_endpoint_exempt(self):
-        """Test exemption for health endpoint."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/health"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is True
-
-    def test_api_health_endpoint_exempt(self):
-        """Test exemption for API health endpoint."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/api/v1/health/status"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is True
-
-    def test_docs_endpoint_exempt(self):
-        """Test exemption for documentation."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/docs"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is True
-
-    def test_openapi_endpoint_exempt(self):
-        """Test exemption for OpenAPI JSON."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/openapi.json"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is True
-
-    def test_redoc_endpoint_exempt(self):
-        """Test exemption for ReDoc."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/redoc"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is True
-
-    def test_non_exempt_endpoint(self):
-        """Test non-exempt endpoint."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/api/v1/chat"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is False
-
-    def test_partial_match_non_exempt(self):
-        """Test that only exact prefixes are exempt."""
-        request = Mock(spec=Request)
-        request.url = Mock()
-        request.url.path = "/api/healthcheck"  # Does not start with "/health"
-
-        result = is_exempt_endpoint(request)
-
-        assert result is False
-
-
-class TestConditionalRateLimiter:
-    """Tests for the ConditionalRateLimiter class."""
-
-    def test_default_limit_initialization(self):
-        """Test initialization with default limit."""
-        limiter = ConditionalRateLimiter()
-
-        assert limiter.default_limit == "60/minute"
-
-    def test_custom_default_limit(self):
-        """Test initialization with custom limit."""
-        limiter = ConditionalRateLimiter(default_limit="100/hour")
-
-        assert limiter.default_limit == "100/hour"
-
-    @patch('src.api.middleware.rate_limit.is_exempt_endpoint')
-    def test_exempt_endpoint_high_limit(self, mock_is_exempt):
-        """Test high limit for exempt endpoint."""
-        mock_is_exempt.return_value = True
-
-        limiter = ConditionalRateLimiter()
-        request = Mock(spec=Request)
-
-        result = limiter(request)
-
-        assert result == "1000/minute"
-
-    @patch('src.api.middleware.rate_limit.is_exempt_endpoint')
-    @patch('src.api.middleware.rate_limit.user_type_rate_limit')
-    def test_non_exempt_endpoint_user_type_limit(self, mock_user_type, mock_is_exempt):
-        """Test user type limit usage for non-exempt endpoint."""
-        mock_is_exempt.return_value = False
-        mock_user_type.return_value = "50/minute"
-
-        limiter = ConditionalRateLimiter()
-        request = Mock(spec=Request)
-
-        result = limiter(request)
-
-        assert result == "50/minute"
-        mock_user_type.assert_called_once_with(request)
-
-    def test_global_conditional_limiter_instance(self):
-        """Test global conditional limiter instance."""
-        assert conditional_limiter is not None
-        assert isinstance(conditional_limiter, ConditionalRateLimiter)
-        assert conditional_limiter.default_limit == "60/minute"
+class TestConfigureRateLimiting:
+    """Tests for the configure_rate_limiting setup function."""
+
+    def test_no_asgi_middleware_registered(self):
+        """configure_rate_limiting must NOT register any ASGI middleware (D-10)."""
+        app = FastAPI()
+        middleware_count_before = len(app.user_middleware)
+
+        configure_rate_limiting(app)
+
+        assert len(app.user_middleware) == middleware_count_before
+
+    def test_limiter_attached_to_app_state(self):
+        """The shared limiter singleton is attached to app.state."""
+        app = FastAPI()
+
+        configure_rate_limiting(app)
+
+        assert app.state.limiter is limiter
+
+    def test_limiter_constructor_configuration(self):
+        """The limiter has headers injection enabled (required for Retry-After)."""
+        assert limiter._headers_enabled is True
+
+
+class TestRateLimitHandler:
+    """Functional tests for the 429 exception handler."""
+
+    def _build_app(self) -> FastAPI:
+        """Build a minimal app with a tightly limited route."""
+        app = FastAPI()
+        configure_rate_limiting(app)
+
+        # With headers_enabled=True, slowapi requires a `response` parameter
+        # on decorated routes that do not return a Response object themselves
+        @app.get("/limited")
+        @limiter.limit("1/minute")
+        async def limited(request: Request, response: Response):
+            return {"ok": True}
+
+        return app
+
+    def test_429_returns_error_response_with_retry_after(self):
+        """Exceeding the limit returns the project ErrorResponse JSON + Retry-After."""
+        app = self._build_app()
+
+        # Re-enable the limiter locally (the autouse conftest fixture disabled it)
+        limiter.enabled = True
+        limiter.reset()
+        try:
+            client = TestClient(app)
+
+            first = client.get("/limited")
+            assert first.status_code == 200
+
+            second = client.get("/limited")
+            assert second.status_code == 429
+
+            body = second.json()
+            assert body["success"] is False
+            assert body["error_code"] == "HTTP_429"
+            assert "1 per 1 minute" in body["error_message"]
+            assert body["details"]["path"] == "/limited"
+            assert "timestamp" in body
+
+            # Retry-After is injected by the limiter (headers_enabled=True)
+            assert "Retry-After" in second.headers
+            assert int(second.headers["Retry-After"]) >= 0
+        finally:
+            limiter.enabled = False
+            limiter.reset()
+
+    def test_disabled_limiter_never_blocks(self):
+        """With the limiter disabled (kill-switch), repeated calls all pass."""
+        app = self._build_app()
+        client = TestClient(app)
+
+        # The autouse fixture keeps limiter.enabled = False here
+        for _ in range(3):
+            response = client.get("/limited")
+            assert response.status_code == 200

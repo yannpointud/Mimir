@@ -321,9 +321,10 @@ class TestJalon2AcceptanceCriteria:
         persist_success = store.persist()
         assert persist_success is True
 
-        # Vérifier que les fichiers ont été créés
+        # Vérifier que les fichiers ont été créés (metadata_path est normalisé
+        # en .json par le store, quelle que soit l'extension passée en config)
         assert index_path.exists()
-        assert metadata_path.exists()
+        assert store.metadata_path.exists()
 
         # Test de chargement dans un nouveau store
         new_store = FaissVectorStore(
@@ -450,7 +451,8 @@ class TestJalon2AcceptanceCriteria:
         # 7. Persistance et récupération
         store.persist()
         assert index_path.exists()
-        assert metadata_path.exists()
+        # metadata_path est normalisé en .json par le store (voir __init__)
+        assert store.metadata_path.exists()
 
         # Test de récupération complète
         new_store = FaissVectorStore(

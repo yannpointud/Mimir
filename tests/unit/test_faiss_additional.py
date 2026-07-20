@@ -6,7 +6,10 @@ Focus sur l'amélioration de la couverture
 import pytest
 import numpy as np
 import faiss
+import json
+import pickle
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
@@ -490,3 +493,166 @@ class TestBackupRotation:
         with patch("backend.src.config.settings", None):
             # settings=None triggers AttributeError, should not propagate
             store._rotate_backups()
+
+
+class TestMetadataMigration:
+    """Tests for transparent pickle -> JSON metadata migration on load()"""
+
+    def test_migration_pickle_to_json(self):
+        """A legacy metadata.pkl (no metadata.json yet) loads without data
+        loss, and the .pkl file is NOT deleted after the migration."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            index_path = Path(temp_dir) / "index.bin"
+            legacy_pkl_path = Path(temp_dir) / "metadata.pkl"
+
+            # Write a minimal real FAISS index directly (no store yet)
+            index = faiss.IndexFlatL2(128)
+            vector = np.random.rand(128).astype(np.float32).reshape(1, -1)
+            index.add(vector)
+            faiss.write_index(index, str(index_path))
+
+            # Hand-write a legacy pickle metadata file, matching the old
+            # persist() format (metadata/document_to_chunks/stats/version/saved_at)
+            legacy_payload = {
+                'metadata': [{
+                    'document_id': 'doc_legacy',
+                    'text': 'Legacy chunk text',
+                    'source': 'legacy.txt',
+                    'chunk_index': 0,
+                    'total_chunks': 1,
+                    'preserve': False,
+                    'indexed_at': '2026-07-01T00:00:00',
+                    'metadata': {},
+                    'chunk_id': 0
+                }],
+                'document_to_chunks': {'doc_legacy': [0]},
+                'stats': {
+                    'total_vectors': 1,
+                    'total_documents': 1,
+                    'last_updated': '2026-07-01T00:00:00'
+                },
+                'version': '1.0',
+                'saved_at': '2026-07-01T00:00:00'
+            }
+            with open(legacy_pkl_path, 'wb') as f:
+                pickle.dump(legacy_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # Instantiate the store pointing at these legacy files (passing
+            # the .pkl path as metadata_path, as an old config.json would)
+            store = FaissVectorStore(
+                dimension=128,
+                index_path=str(index_path),
+                metadata_path=str(legacy_pkl_path)
+            )
+
+            # Data loaded without loss from the legacy pickle
+            assert len(store.metadata) == 1
+            assert store.metadata[0]['document_id'] == 'doc_legacy'
+            assert store.document_to_chunks == {'doc_legacy': [0]}
+
+            # The .pkl file was NOT deleted/rewritten by the migration
+            assert legacy_pkl_path.exists()
+            # No metadata.json was written by load() itself (only the next
+            # persist() call would write it)
+            assert not store.metadata_path.exists()
+
+    def test_pickle_retired_after_first_persist(self):
+        """After a pickle migration, the first successful persist() renames
+        the legacy .pkl to .pkl.migrated so the unsafe pickle.load() path
+        can never be re-executed (WR-02 / T-02-01)."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            index_path = Path(temp_dir) / "index.bin"
+            legacy_pkl_path = Path(temp_dir) / "metadata.pkl"
+
+            index = faiss.IndexFlatL2(128)
+            vector = np.random.rand(128).astype(np.float32).reshape(1, -1)
+            index.add(vector)
+            faiss.write_index(index, str(index_path))
+
+            legacy_payload = {
+                'metadata': [{
+                    'document_id': 'doc_legacy',
+                    'text': 'Legacy chunk text',
+                    'source': 'legacy.txt',
+                    'chunk_index': 0,
+                    'total_chunks': 1,
+                    'preserve': False,
+                    'indexed_at': '2026-07-01T00:00:00',
+                    'metadata': {},
+                    'chunk_id': 0
+                }],
+                'document_to_chunks': {'doc_legacy': [0]},
+                'stats': {
+                    'total_vectors': 1,
+                    'total_documents': 1,
+                    'last_updated': '2026-07-01T00:00:00'
+                },
+                'version': '1.0',
+                'saved_at': '2026-07-01T00:00:00'
+            }
+            with open(legacy_pkl_path, 'wb') as f:
+                pickle.dump(legacy_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+            store = FaissVectorStore(
+                dimension=128,
+                index_path=str(index_path),
+                metadata_path=str(legacy_pkl_path)
+            )
+
+            # Migration happened, pickle still in place before persist()
+            assert legacy_pkl_path.exists()
+
+            assert store.persist() is True
+
+            # JSON metadata written; legacy pickle retired (renamed)
+            assert store.metadata_path.exists()
+            assert not legacy_pkl_path.exists()
+            assert Path(str(legacy_pkl_path) + '.migrated').exists()
+
+            # A new store on the same paths loads from JSON without the
+            # pickle fallback ever being reachable again
+            new_store = FaissVectorStore(
+                dimension=128,
+                index_path=str(index_path),
+                metadata_path=str(legacy_pkl_path)
+            )
+            assert new_store.document_to_chunks == {'doc_legacy': [0]}
+
+    def test_round_trip_json(self):
+        """A fresh store persists to JSON; a new instance on the same paths
+        loads metadata/document_to_chunks identically, with no .pkl present."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            index_path = Path(temp_dir) / "index.bin"
+            metadata_path = Path(temp_dir) / "metadata.json"
+
+            store = FaissVectorStore(
+                dimension=128,
+                index_path=str(index_path),
+                metadata_path=str(metadata_path)
+            )
+
+            chunk = Chunk(
+                text="Round trip chunk",
+                embedding=np.random.rand(128).astype(np.float32),
+                document_id="doc_roundtrip",
+                chunk_index=0,
+                total_chunks=1,
+                source="roundtrip.txt",
+                metadata={"k": "v"}
+            )
+            store.upsert([chunk])
+            assert store.persist() is True
+
+            # No legacy pickle file exists at all
+            assert not store.legacy_metadata_path.exists()
+            assert store.metadata_path.exists()
+
+            new_store = FaissVectorStore(
+                dimension=128,
+                index_path=str(index_path),
+                metadata_path=str(metadata_path)
+            )
+
+            assert new_store.document_to_chunks == store.document_to_chunks
+            assert len(new_store.metadata) == len(store.metadata)
+            assert new_store.metadata[0]['document_id'] == 'doc_roundtrip'

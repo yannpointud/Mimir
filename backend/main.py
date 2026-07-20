@@ -3,7 +3,7 @@ Main FastAPI application for Mimir
 Application entry point with full configuration - Milestone 3: API & Services
 """
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 
 from src.config import settings
 from src.database.connection import init_database, db_manager
+from src.security.startup_validation import validate_production_secrets
 from src.shared.models import ErrorResponse, HealthCheckResponse
 
 # Import API endpoints
@@ -72,6 +73,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Mimir application - Jalon 3: API & Services...")
 
     try:
+        # SEC-02: fail fast on default secrets before any service initialization
+        validate_production_secrets(settings)
+
         # Database initialization
         init_database()
         logger.info("Database initialized successfully")
@@ -312,7 +316,7 @@ app.include_router(logs.router, prefix="/api/v1")
 
 # Compatibility route for root health check
 @app.get("/health", response_model=HealthCheckResponse)
-async def root_health_check():
+async def root_health_check(response: Response):
     """
     Root health check for compatibility
     Delegates to the full Milestone 3 health check
@@ -322,9 +326,10 @@ async def root_health_check():
         from src.api.endpoints.health import health_check
         from src.database.connection import get_db_session
 
-        # Create a session for the health check
+        # Create a session for the health check; pass this route's Response
+        # through so an unhealthy state is reported as HTTP 503 here too.
         with db_manager.get_session_context() as session:
-            return await health_check(db=session)
+            return await health_check(response=response, db=session)
 
     except Exception as e:
         logger.error(f"Root health check failed: {e}")

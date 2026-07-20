@@ -294,7 +294,7 @@ class IngestionProcessor:
 
             # Step 5: Index in vector store
             logger.debug(f"Indexing {len(chunks)} chunks in vector store")
-            index_success = self.vector_store.upsert(chunks)
+            index_success = await asyncio.to_thread(self.vector_store.upsert, chunks)
 
             if not index_success:
                 logger.error("Failed to index chunks in vector store")
@@ -308,7 +308,7 @@ class IngestionProcessor:
             )
 
             # Step 7: Persist vector store
-            persist_success = self.vector_store.persist()
+            persist_success = await asyncio.to_thread(self.vector_store.persist)
             if not persist_success:
                 logger.warning("Failed to persist vector store - continuing anyway")
 

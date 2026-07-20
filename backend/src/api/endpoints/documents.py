@@ -6,10 +6,11 @@ documents in the RAG system.
 """
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime
+import asyncio
 import logging
 import os
 import hashlib
@@ -17,6 +18,7 @@ import urllib.parse
 from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user
+from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.database.connection import get_db_session
 from src.database.repository import DocumentRepository, AuditLogRepository
 from src.api.dependencies import get_document_repository, get_audit_log_repository, get_ingestion_processor, get_vector_store
@@ -158,7 +160,7 @@ async def get_document_with_chunks(
     try:
         # Retrieve all chunks for this document from the vector store
         # The vector store stores chunks with document_id as metadata
-        all_chunks = vector_store.get_document_chunks(str(document_id))
+        all_chunks = await asyncio.to_thread(vector_store.get_document_chunks, str(document_id))
 
         # Convert to ChunkResponse - use the original chunk_index for consistency
         chunk_indexes = []
@@ -293,7 +295,13 @@ async def download_document(
 
 
 @router.post("/upload", response_model=DocumentResponse)
+# Rate limit per JWT user with IP fallback (SEC-03). The `request` parameter
+# is REQUIRED by slowapi: without it the decorator raises at import time.
+@limiter.limit(lambda: f"{settings.rate_limit_upload_per_minute}/minute",
+               key_func=get_client_identifier)
 async def upload_document(
+    request: Request,
+    response: Response,
     file: UploadFile = File(...),
     preserve: bool = Form(False, description="Protect document from automatic deletion"),
     priority: str = Form("normal", description="Processing priority (urgent, high, normal, low)"),
@@ -306,6 +314,9 @@ async def upload_document(
     Upload a new document for processing.
 
     Args:
+        request: FastAPI request object required by the rate limiter
+        response: Response object required by slowapi to inject
+            X-RateLimit-* headers on successful (Pydantic) returns
         file: Uploaded file
         preserve: Whether to protect from deletion
         priority: Processing priority
@@ -433,6 +444,18 @@ async def upload_document(
                         'type': 'queue_full_upload'
                     }}
                 )
+                # Roll back the pending DB record and the stored file before
+                # returning 503: otherwise any retry of the same file would
+                # hit 409 (get_by_hash matches the orphaned pending record)
+                # and the document would never be ingested.
+                try:
+                    doc_repo.delete(document.id, force=True)
+                    file_path.unlink(missing_ok=True)
+                except Exception as cleanup_error:
+                    logger.warning(
+                        f"Failed to clean up after queue-full rejection "
+                        f"(document_id={document.id}): {cleanup_error}"
+                    )
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="Ingestion queue is full. The system is currently processing many documents. Please try again later."
@@ -524,20 +547,22 @@ async def delete_document(
 
         # Remove from vector store
         try:
-            vector_deleted = vector_store.delete(str(document_id))
+            vector_deleted = await asyncio.to_thread(vector_store.delete, str(document_id))
             if vector_deleted:
                 logger.info(f"Document chunks removed from vector store: {filename} (ID: {document_id})")
-                
+
                 # Trigger orphan cleanup if necessary
                 # (after multiple deletions, inconsistencies may occur)
                 try:
-                    stats = vector_store.get_stats()
+                    # Offload to a worker thread: get_stats() acquires the
+                    # FAISS RLock and must never block the event loop (ROB-01)
+                    stats = await asyncio.to_thread(vector_store.get_stats)
                     deleted_ratio = stats.get('deleted_vectors', 0) / max(stats.get('total_vectors', 1), 1)
-                    
+
                     # If more than 20% of chunks are deleted, trigger preventive cleanup
                     if deleted_ratio > 0.20:
                         logger.info(f"Triggering orphan cleanup after deletion (deleted ratio: {deleted_ratio:.2%})")
-                        cleanup_result = vector_store.clean_orphans(create_backup=False)
+                        cleanup_result = await asyncio.to_thread(vector_store.clean_orphans, create_backup=False)
                         logger.info(f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed")
                 except Exception as cleanup_error:
                     logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
@@ -773,8 +798,11 @@ async def get_document_stats(
         # Database statistics
         db_stats = doc_repo.get_statistics()
         
-        # Vector store statistics
-        vector_stats = vector_store.get_stats()
+        # Vector store statistics -- both get_stats() and health_check()
+        # acquire the FAISS RLock, so they are offloaded to a worker thread
+        # to keep the event loop responsive (ROB-01)
+        vector_stats = await asyncio.to_thread(vector_store.get_stats)
+        health_status = await asyncio.to_thread(vector_store.health_check)
 
         return {
             "total_documents": db_stats.get("total_documents", 0),
@@ -792,7 +820,7 @@ async def get_document_stats(
                 "deleted_vectors": vector_stats.get("deleted_vectors", 0),
                 "total_documents": vector_stats.get("total_documents", 0),
                 "memory_usage_mb": vector_stats.get("memory_usage_mb", 0),
-                "health_status": vector_store.health_check()
+                "health_status": health_status
             },
             "storage_info": {
                 "upload_directory": settings.upload_dir,
@@ -833,13 +861,13 @@ async def cleanup_orphan_chunks(
         logger.info(f"Manual orphan cleanup initiated by {current_user.get('username', 'unknown')}")
         
         # Execute orphan cleanup
-        cleanup_result = vector_store.clean_orphans(create_backup=True)
-        
+        cleanup_result = await asyncio.to_thread(vector_store.clean_orphans, create_backup=True)
+
         # Forced rebuild if requested
         rebuild_result = None
         if force_rebuild:
-            rebuild_result = vector_store.rebuild_vector_store(
-                force_rebuild=True, 
+            rebuild_result = await asyncio.to_thread(vector_store.rebuild_vector_store,
+                force_rebuild=True,
                 cleanup_orphans=False  # Already done
             )
         
@@ -893,7 +921,7 @@ async def cleanup_orphan_chunks(
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Orphan cleanup failed: {str(e)}"
+            detail="Orphan cleanup failed"
         )
 
 
@@ -922,7 +950,7 @@ async def rebuild_vector_store(
         logger.info(f"Manual vector store rebuild initiated by {current_user.get('username', 'unknown')}")
         
         # Execute the rebuild
-        rebuild_result = vector_store.rebuild_vector_store(
+        rebuild_result = await asyncio.to_thread(vector_store.rebuild_vector_store,
             force_rebuild=force_rebuild,
             cleanup_orphans=cleanup_orphans
         )
@@ -975,7 +1003,7 @@ async def rebuild_vector_store(
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Vector store rebuild failed: {str(e)}"
+            detail="Vector store rebuild failed"
         )
 
 
@@ -1098,5 +1126,5 @@ async def validate_vector_store_consistency(
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Consistency validation failed: {str(e)}"
+            detail="Consistency validation failed"
         )

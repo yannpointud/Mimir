@@ -5,7 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true, // Expose sur toutes les interfaces pour WSL
+    // Bind the IPv4 wildcard explicitly: with `host: true` node binds only the
+    // IPv6 wildcard ([::]:3000) and the WSL2 NAT localhost relay only forwards
+    // IPv4 listeners to the Windows host, causing ERR_CONNECTION_REFUSED on
+    // http://localhost:3000 from Windows browsers (backend on 0.0.0.0:8000 works).
+    host: '0.0.0.0',
     port: 3000,
     proxy: {
       '/api': {

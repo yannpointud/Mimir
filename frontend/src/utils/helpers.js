@@ -6,6 +6,22 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Escape HTML special characters so a string renders as inert literal text.
+ * The '&' replacement MUST run first, otherwise the entities produced by the
+ * following replacements would be double-escaped.
+ *
+ * @param {*} str - Value to escape (coerced to String)
+ * @returns {string} HTML-escaped string safe for innerHTML insertion
+ */
+export const escapeHtml = (str) =>
+  String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 // Date formatting
 export const formatDate = (dateString) => {
   if (!dateString) return 'N/A';

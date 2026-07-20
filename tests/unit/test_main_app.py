@@ -71,7 +71,9 @@ class TestMainApp:
 
         response = client.get("/health")
 
-        assert response.status_code == 200  # Le endpoint ne lève plus d'exception
+        # Unhealthy state must be visible in the HTTP status code so
+        # Docker healthchecks / load balancers can detect the failure.
+        assert response.status_code == 503
         data = response.json()
 
         assert data["success"] is True  # BaseResponse success est toujours True

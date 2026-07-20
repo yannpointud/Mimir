@@ -10,12 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from datetime import datetime
+import asyncio
 import logging
 import hashlib
 import json
 import numpy as np
 
 from src.auth.middleware import get_optional_user
+from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import ChatCacheService
 from src.email_service.smtp_client import EmailService
 from src.api.dependencies import get_chat_cache_service, get_email_service, get_llm_service, get_vector_store, get_document_repository, get_rag_debug_service
@@ -234,6 +236,14 @@ async def chat(
 
 
 @router.post("/stream")
+# Rate limit per JWT user with IP fallback (SEC-03): behind the phase-5 nginx
+# proxy the source IP will be the proxy's, so the JWT key is the only reliable
+# identity for authenticated routes. The limit check runs BEFORE the endpoint
+# body, so a 429 is raised before any SSE byte is streamed; a stream under the
+# limit passes through untouched (StreamingResponse is a Response subclass,
+# no `response` param needed).
+@limiter.limit(lambda: f"{settings.rate_limit_chat_per_minute}/minute",
+               key_func=get_client_identifier)
 async def chat_stream(
     request: Request,
     chat_request: ChatRequest,
@@ -319,7 +329,9 @@ async def chat_stream(
 
         except Exception as e:
             logger.error(f"Streaming error: {type(e).__name__} - {str(e)}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # Never leak raw exception details to the client (info disclosure);
+            # the full error is kept in the server logs above.
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Une erreur interne est survenue.'})}\n\n"
 
     return StreamingResponse(
         generate_sse(),
@@ -502,7 +514,7 @@ def _find_documents_by_fuzzy_match(question: str, document_repository, threshold
     return matches
 
 
-def _pre_include_document_chunks(
+async def _pre_include_document_chunks(
     document_ids: List[int],
     question_embedding: List[float],
     vector_store,
@@ -534,7 +546,7 @@ def _pre_include_document_chunks(
 
         # Retrieve all chunks for this document from FAISS
         # Perform a search with a very large top_k and filter by document_id
-        all_results = vector_store.query(question_embedding, top_k=1000)
+        all_results = await asyncio.to_thread(vector_store.query, question_embedding, top_k=1000)
 
         # Filter to keep only chunks from this document
         doc_chunks = [r for r in all_results if int(r.document_id) == doc_id]
@@ -737,7 +749,7 @@ async def _process_question_with_rag(
                 document_ids = [doc_id for doc_id, _, _ in matched_docs]
 
                 # Pre-include all chunks from matched documents
-                pre_included_chunks = _pre_include_document_chunks(
+                pre_included_chunks = await _pre_include_document_chunks(
                     document_ids=document_ids,
                     question_embedding=question_embedding,
                     vector_store=vector_store,
@@ -751,7 +763,7 @@ async def _process_question_with_rag(
         # Step 2: Search vector store for relevant documents
         logger.info(f"Searching for relevant context in vector store...")
         start_search = datetime.utcnow()
-        search_results = vector_store.query(
+        search_results = await asyncio.to_thread(vector_store.query,
             vector=question_embedding,
             top_k=settings.max_sources * 2,  # Retrieve more to filter afterwards
             filter_dict=None  # No filter for now
@@ -982,7 +994,7 @@ async def _process_question_with_rag_stream(
                 filename_similarities = {doc_id: score for doc_id, _, score in matched_docs}
                 document_ids = [doc_id for doc_id, _, _ in matched_docs]
 
-                pre_included_chunks = _pre_include_document_chunks(
+                pre_included_chunks = await _pre_include_document_chunks(
                     document_ids=document_ids,
                     question_embedding=question_embedding,
                     vector_store=vector_store,
@@ -993,7 +1005,7 @@ async def _process_question_with_rag_stream(
 
         # Step 2: Vector search
         start_search = datetime.utcnow()
-        search_results = vector_store.query(
+        search_results = await asyncio.to_thread(vector_store.query,
             vector=question_embedding,
             top_k=settings.max_sources * 2,
             filter_dict=None
@@ -1098,4 +1110,5 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
             error_message=str(e),
             stage="streaming_rag_pipeline"
         )
-        yield {"type": "error", "message": str(e)}
+        # Generic client-facing message; details stay in logs/rag_debug only
+        yield {"type": "error", "message": "Une erreur interne est survenue."}
