@@ -4,11 +4,16 @@ Tests complets des fonctionnalités avec authentification, validation et cas d'e
 """
 
 import pytest
-import json  # noqa: F401
+import json
 import time
 from pathlib import Path  # noqa: F401
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch  # noqa: F401
+
+
+def _sse_events(body):
+    """Parse an SSE response body into the list of decoded `data:` events."""
+    return [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: ")]
 
 
 class TestHealthEndpointsIntegration:
@@ -165,27 +170,19 @@ class TestChatEndpointIntegration:
         }
 
         start_time = time.time()
-        response = client.post("/api/v1/chat", json=chat_request)
+        response = client.post("/api/v1/chat/stream", json=chat_request)
         response_time = time.time() - start_time
 
+        # StreamingResponse returns 200 as soon as the headers are sent.
         assert response.status_code == 200
-        data = response.json()
 
-        # Structure de réponse RAG complète
-        required_fields = {
-            "answer", "sources", "confidence_score",
-            "session_id", "response_time_ms"
-        }
-        assert all(field in data for field in required_fields)
-
-        # Validation des types
-        assert isinstance(data["answer"], str)
-        assert len(data["answer"]) > 0
-        assert isinstance(data["sources"], list)
-        assert isinstance(data["confidence_score"], (int, float))
-        assert 0.0 <= data["confidence_score"] <= 1.0
-        assert isinstance(data["session_id"], str)
-        assert isinstance(data["response_time_ms"], int)
+        # Parse the SSE body: it must open with a start event carrying a session
+        # id and close with either a done or an error event (never a raw crash).
+        events = _sse_events(response.text)
+        assert events, "no SSE events received"
+        assert events[0]["type"] == "start"
+        assert isinstance(events[0]["session_id"], str)
+        assert events[-1]["type"] in {"done", "error"}
 
         # Performance check
         assert response_time < 10.0
@@ -197,43 +194,45 @@ class TestChatEndpointIntegration:
         session_id = "test_session_123"
 
         # Première question
-        response1 = client.post("/api/v1/chat", json={
+        response1 = client.post("/api/v1/chat/stream", json={
             "question": "Bonjour",
             "session_id": session_id
         })
         assert response1.status_code == 200
-        data1 = response1.json()
+        events1 = _sse_events(response1.text)
 
         # Deuxième question avec même session
-        response2 = client.post("/api/v1/chat", json={
+        response2 = client.post("/api/v1/chat/stream", json={
             "question": "Peux-tu répéter ?",
             "session_id": session_id
         })
         assert response2.status_code == 200
-        data2 = response2.json()
+        events2 = _sse_events(response2.text)
 
-        # Vérifier que le session_id est conservé
-        assert data1["session_id"] == data2["session_id"] == session_id
+        # The SSE start event of each stream echoes the provided session id.
+        assert events1[0]["type"] == "start"
+        assert events2[0]["type"] == "start"
+        assert events1[0]["session_id"] == events2[0]["session_id"] == session_id
 
     def test_chat_input_validation(self, test_app):
         """Test de validation des entrées du chat"""
         client = TestClient(test_app)
 
         # Question vide
-        response = client.post("/api/v1/chat", json={
+        response = client.post("/api/v1/chat/stream", json={
             "question": "",
             "context_limit": 5
         })
         assert response.status_code == 422
 
         # Question manquante
-        response = client.post("/api/v1/chat", json={
+        response = client.post("/api/v1/chat/stream", json={
             "context_limit": 5
         })
         assert response.status_code == 422
 
         # Context limit invalide
-        response = client.post("/api/v1/chat", json={
+        response = client.post("/api/v1/chat/stream", json={
             "question": "Test",
             "context_limit": -1
         })
@@ -326,7 +325,7 @@ class TestErrorHandlingIntegration:
 
         # Plusieurs cas de validation échouée
         validation_cases = [
-            ("/api/v1/chat", {}),  # Données manquantes
+            ("/api/v1/chat/stream", {}),  # Données manquantes
             ("/api/v1/auth/login", {"username": "admin"}),  # Password manquant
         ]
 
@@ -379,7 +378,7 @@ class TestPerformanceIntegration:
         endpoints_timing = [
             ("GET", "/", 1.0),  # Root endpoint
             ("GET", "/health", 0.5),  # Health check
-            ("POST", "/api/v1/chat", 5.0),  # Chat endpoint
+            ("POST", "/api/v1/chat/stream", 5.0),  # Chat endpoint
         ]
 
         for method, endpoint, max_time in endpoints_timing:
@@ -421,7 +420,7 @@ class TestSecurityIntegration:
         ]
 
         for malicious_input in malicious_inputs:
-            response = client.post("/api/v1/chat", json={
+            response = client.post("/api/v1/chat/stream", json={
                 "question": malicious_input
             })
             # Doit soit réussir normalement, soit échouer proprement

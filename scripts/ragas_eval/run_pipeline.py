@@ -4,8 +4,8 @@
 Why this exists: the RAGAS baseline is measured in two strictly separated
 stages joined by a JSONL boundary file. This script is the MAIN-venv stage: it
 reads the frozen golden set, replays each question through the real
-``RagService.answer()`` pipeline (dense-only by default, off HTTP -- DEBT-01),
-and dumps ``eval_input.jsonl``. The SEPARATE venv (``score_baseline.py``) then
+``RagService.answer_stream()`` pipeline drained to a full answer (dense-only by
+default, off HTTP -- DEBT-01), and dumps ``eval_input.jsonl``. The SEPARATE venv (``score_baseline.py``) then
 reads ONLY that file and computes the ragas metrics -- it imports nothing from
 the Mimir backend.
 
@@ -64,6 +64,68 @@ _DEFAULT_OUT = _SCRIPT_DIR / "eval_input.jsonl"
 AnswerFn = Callable[[str, str], Awaitable[Optional[Dict[str, Any]]]]
 
 
+async def answer_via_stream(
+    rag_service,
+    *,
+    question: str,
+    session_id: str,
+    document_repository,
+    reservation,
+    context_limit: int,
+) -> Dict[str, Any]:
+    """Drain ``RagService.answer_stream()`` into an ``answer()``-shaped result dict.
+
+    The runtime serves answers as SSE events, but the eval harness needs the
+    whole answer at once. This collects the stream into the
+    ``{answer, sources, confidence_score, session_id}`` shape
+    ``_assemble_eval_row`` consumes: ``answer`` is the concatenation of every
+    ``chunk`` event's content, and ``sources`` come from the terminal ``done``
+    event (which carries the same ``chunk_text``-bearing source dicts the old
+    non-stream path returned). An ``error`` event yields an empty answer with no
+    sources -- ``_assemble_eval_row`` tolerates a missing ``sources`` list.
+
+    ``answer_stream()`` settles the reservation internally (finalize/release),
+    exactly as the removed ``answer()`` did, so the caller's budget accounting
+    is unchanged.
+
+    Args:
+        rag_service: The injected ``RagService`` singleton.
+        question: The golden set question to answer.
+        session_id: Per-question session id (distinct per call).
+        document_repository: Script-scoped repository for filename lookups.
+        reservation: The budget reservation captured before the call.
+        context_limit: Maximum number of context documents.
+
+    Returns:
+        A ``RagService.answer()``-shaped result dict.
+    """
+    answer_parts: List[str] = []
+    sources: List[Dict[str, Any]] = []
+    confidence_score = 0.0
+    async for event in rag_service.answer_stream(
+        question=question,
+        context_limit=context_limit,
+        include_sources=True,
+        session_id=session_id,
+        document_repository=document_repository,
+        reservation=reservation,
+    ):
+        event_type = event.get("type")
+        if event_type == "chunk":
+            answer_parts.append(event.get("content", ""))
+        elif event_type == "done":
+            sources = event.get("sources", [])
+            confidence_score = event.get("confidence_score", 0.0)
+        elif event_type == "error":
+            break
+    return {
+        "answer": "".join(answer_parts),
+        "sources": sources,
+        "confidence_score": confidence_score,
+        "session_id": session_id,
+    }
+
+
 def _assemble_eval_row(entry: GoldenSetEntry, result: Dict[str, Any]) -> Dict[str, Any]:
     """Map a golden set entry + a RagService result to a ragas eval row (pure).
 
@@ -79,7 +141,7 @@ def _assemble_eval_row(entry: GoldenSetEntry, result: Dict[str, Any]) -> Dict[st
 
     Args:
         entry: One validated ``GoldenSetEntry`` from the frozen golden set.
-        result: A ``RagService.answer()`` result dict (``answer`` + ``sources``).
+        result: A ``RagService`` result dict (``answer`` + ``sources``).
 
     Returns:
         A JSON-serializable eval row.
@@ -151,7 +213,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     """CLI parser. Kept separate so ``--help`` needs no heavy imports."""
     parser = argparse.ArgumentParser(
         description=(
-            "Rejoue le golden set gelé à travers RagService.answer() (venv "
+            "Rejoue le golden set gelé à travers RagService.answer_stream() (venv "
             "principal) et écrit eval_input.jsonl pour le scoring RAGAS. "
             "Throttle <= 1 appel/s + réserve le budget par appel. "
             "N'affiche jamais MISTRAL_API_KEY."
@@ -238,14 +300,16 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if reservation is None:
                     print("Budget quotidien atteint -- arrêt du pipeline.", file=sys.stderr)
                     return None
-                # answer() settles the reservation internally (finalize/release).
-                return await rag_service.answer(
+                # answer_stream() settles the reservation internally
+                # (finalize/release); answer_via_stream drains it into the
+                # answer()-shaped dict the eval rows consume.
+                return await answer_via_stream(
+                    rag_service,
                     question=question,
-                    context_limit=settings.max_sources,
-                    include_sources=True,
                     session_id=session_id,
                     document_repository=document_repository,
                     reservation=reservation,
+                    context_limit=settings.max_sources,
                 )
 
             return await _collect_eval_rows(

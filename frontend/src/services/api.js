@@ -71,14 +71,6 @@ api.interceptors.response.use(
 
 // Chat API service
 export const chatAPI = {
-  sendMessage: async (question, sessionId = null) => {
-    const response = await api.post('/chat/', {
-      question,
-      session_id: sessionId,
-    });
-    return response.data;
-  },
-
   sendMessageStream: (question, sessionId = null, callbacks = {}) => {
     return new Promise((resolve, reject) => {
       const url = `${API_BASE_URL}/chat/stream`;

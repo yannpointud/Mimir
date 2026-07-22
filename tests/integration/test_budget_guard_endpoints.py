@@ -2,9 +2,9 @@
 Integration tests for budget-gated chat endpoints (COST-01, plan 03-05).
 
 Covers the two must-have truths for this plan:
-  - Budget-exhausted /chat/ and /chat/stream both return a real HTTP 429
-    with a body distinguishable from the slowapi rate-limit 429 (error_code
-    "budget_exceeded" vs "HTTP_429"), BEFORE any LLM call or SSE byte.
+  - A budget-exhausted /chat/stream returns a real HTTP 429 with a body
+    distinguishable from the slowapi rate-limit 429 (error_code
+    "budget_exceeded" vs "HTTP_429"), BEFORE any SSE byte.
   - Every completed chat records the embedding usage and the generation
     usage as llm_usage rows; a mid-stream disconnect (no final usage chunk)
     records the generation with estimated=True.
@@ -31,7 +31,6 @@ from src.database.models import Base, LlmUsage
 from src.llm_interface.interfaces import EmbeddingResponse, GenerationResponse
 
 
-CHAT_ROUTE = "/api/v1/chat/"
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
 
 
@@ -356,8 +355,8 @@ class TestStreamCacheErrorNeverCached:
 
 
 class TestBudgetExceededGate:
-    """Budget-exhausted /chat/ and /chat/stream both return a distinct 429
-    (error_code budget_exceeded) BEFORE any LLM call or SSE byte (T-03-01)."""
+    """A budget-exhausted /chat/stream returns a distinct 429
+    (error_code budget_exceeded) BEFORE any SSE byte (T-03-01)."""
 
     @pytest.fixture(autouse=True)
     def _reject_every_reservation(self, isolated_db_manager):
@@ -377,13 +376,6 @@ class TestBudgetExceededGate:
 
         app.dependency_overrides.pop(get_budget_guard, None)
 
-    def test_chat_non_stream_returns_429_budget_exceeded(self, client):
-        response = client.post(CHAT_ROUTE, json={"question": "test question"})
-
-        assert response.status_code == 429
-        body = response.json()
-        assert body["error_code"] == "budget_exceeded"
-
     def test_chat_stream_returns_429_budget_exceeded_before_any_sse_byte(self, client):
         response = client.post(CHAT_STREAM_ROUTE, json={"question": "test question"})
 
@@ -396,7 +388,7 @@ class TestBudgetExceededGate:
         """The budget 429 body (top-level error_code "budget_exceeded") must
         differ from the slowapi rate-limit 429 body (top-level error_code
         "HTTP_429", see rate_limit.py's custom_rate_limit_handler)."""
-        response = client.post(CHAT_ROUTE, json={"question": "test question"})
+        response = client.post(CHAT_STREAM_ROUTE, json={"question": "test question"})
 
         assert response.status_code == 429
         body = response.json()
@@ -404,22 +396,31 @@ class TestBudgetExceededGate:
         assert body["error_code"] != "HTTP_429"
 
 
-class TestNonStreamUsageRecording:
-    """A normal (non-cache-hit) /chat/ call records exactly two llm_usage
-    rows -- embedding + chat -- both estimated=False, and finalizes the
-    reservation instead of leaking it (T-03-12 for the non-stream path)."""
+class TestNormalStreamUsageRecording:
+    """A normal (non-cache-hit) /chat/stream call whose final SSE chunk carries
+    real usage records exactly two llm_usage rows -- embedding + chat -- both
+    estimated=False, and finalizes the reservation instead of leaking it
+    (T-03-12 happy path)."""
 
-    def test_normal_chat_call_records_embedding_and_chat_rows(
+    def test_normal_stream_call_records_embedding_and_chat_rows(
         self, client, apply_mocked_llm
     ):
-        apply_mocked_llm(_mock_llm())
+        # stream_usage set so the final SSE chunk carries real usage: the chat
+        # row is priced from real tokens (estimated=False), not the finally
+        # fallback estimate.
+        apply_mocked_llm(_mock_llm(
+            stream_usage={"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
+        ))
 
-        response = client.post(
-            CHAT_ROUTE,
-            json={"question": "unique-non-stream-question", "include_sources": True},
-        )
+        with client.stream(
+            "POST",
+            CHAT_STREAM_ROUTE,
+            json={"question": "unique-stream-usage-question", "include_sources": True},
+        ) as response:
+            assert response.status_code == 200
+            body = "".join(chunk for chunk in response.iter_text())
 
-        assert response.status_code == 200
+        assert '"type": "done"' in body
 
         rows = _usage_rows()
         assert len(rows) == 2

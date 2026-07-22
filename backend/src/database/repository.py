@@ -84,6 +84,24 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"get document by id {doc_id}")
             raise
     
+    def get_by_ids(self, doc_ids: List[int]) -> Dict[int, Document]:
+        """Retrieve multiple documents by ID in a single query.
+
+        Returns a {id: Document} mapping so a caller can resolve many document
+        ids without issuing one get_by_id() per id (avoids the N+1 the RAG
+        citation loop used to trigger). Ids with no matching row are simply
+        absent from the mapping. An empty input yields an empty mapping without
+        touching the database (a `WHERE id IN ()` is invalid SQL).
+        """
+        if not doc_ids:
+            return {}
+        try:
+            rows = self.session.query(Document).filter(Document.id.in_(doc_ids)).all()
+            return {doc.id: doc for doc in rows}
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, f"get documents by ids {doc_ids}")
+            raise
+
     def get_by_hash(self, file_hash: str) -> Optional[Document]:
         """Retrieve a document by its hash (to detect duplicates)"""
         try:

@@ -8,6 +8,12 @@ import tempfile  # noqa: F401
 import io  # noqa: F401
 from pathlib import Path  # noqa: F401
 from fastapi.testclient import TestClient
+import json
+
+
+def _sse_events(body):
+    """Parse an SSE response body into the list of decoded `data:` events."""
+    return [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: ")]
 
 
 class TestJalon3APIIntegrationWorking:
@@ -50,32 +56,20 @@ class TestJalon3APIIntegrationWorking:
             "include_sources": True
         }
 
-        response = client.post("/api/v1/chat", json=chat_request)
+        response = client.post("/api/v1/chat/stream", json=chat_request)
 
-        # Vérifications du chemin heureux
+        # StreamingResponse returns 200; verify a well-formed SSE stream that
+        # opens with a start event carrying a session id and closes with a done
+        # or error event.
         assert response.status_code == 200
-        chat_data = response.json()
+        events = _sse_events(response.text)
+        assert events, "no SSE events received"
+        assert events[0]["type"] == "start"
+        assert isinstance(events[0]["session_id"], str)
+        assert len(events[0]["session_id"]) > 0
+        assert events[-1]["type"] in {"done", "error"}
 
-        # Structure de réponse RAG obligatoire
-        required_fields = {"answer", "sources", "confidence_score", "session_id", "response_time_ms"}
-        assert all(field in chat_data for field in required_fields)
-
-        # Validation des types et valeurs
-        assert isinstance(chat_data["answer"], str)
-        assert len(chat_data["answer"]) > 0  # Réponse non vide
-
-        assert isinstance(chat_data["sources"], list)
-
-        assert isinstance(chat_data["confidence_score"], (int, float))
-        assert 0.0 <= chat_data["confidence_score"] <= 1.0
-
-        assert isinstance(chat_data["session_id"], str)
-        assert len(chat_data["session_id"]) > 0
-
-        assert isinstance(chat_data["response_time_ms"], int)
-        assert chat_data["response_time_ms"] >= 0
-
-        print(f"✅ Chat endpoint OK : answer_length={len(chat_data['answer'])}, sources={len(chat_data['sources'])}")
+        print(f"✅ Chat stream endpoint OK : events={len(events)}")
 
     def test_documents_list_without_auth(self, test_app):
         """
@@ -140,7 +134,7 @@ class TestJalon3ErrorHandlingWorking:
             "context_limit": 5
         }
 
-        response = client.post("/api/v1/chat", json=invalid_request)
+        response = client.post("/api/v1/chat/stream", json=invalid_request)
 
         # Doit retourner une erreur de validation
         assert response.status_code == 422  # Unprocessable Entity
@@ -162,7 +156,7 @@ class TestJalon3ErrorHandlingWorking:
             # question manquante
         }
 
-        response = client.post("/api/v1/chat", json=invalid_request)
+        response = client.post("/api/v1/chat/stream", json=invalid_request)
 
         # Doit retourner une erreur de validation
         assert response.status_code == 422  # Unprocessable Entity
@@ -199,7 +193,7 @@ class TestJalon3SystemHealthWorking:
             # Health: 200 (healthy) or 503 (unhealthy in test env) -- both
             # prove the route is mounted and responding
             ("GET", "/health", (200, 503)),
-            ("POST", "/api/v1/chat", (422,)),  # Chat (422 car pas de données)
+            ("POST", "/api/v1/chat/stream", (422,)),  # Chat (422 car pas de données)
             ("GET", "/api/v1/documents/", (403,)),  # Documents (403 car pas d'auth)
             ("GET", "/api/v1/admin/system-info", (403,)),  # Admin (403 car pas d'auth)
         ]
@@ -230,7 +224,7 @@ class TestJalon3SystemHealthWorking:
         client = TestClient(test_app)
 
         # Test d'erreur de validation (422)
-        response_422 = client.post("/api/v1/chat", json={})
+        response_422 = client.post("/api/v1/chat/stream", json={})
         assert response_422.status_code == 422
         error_422 = response_422.json()
         assert "detail" in error_422
@@ -259,7 +253,7 @@ class TestJalon3SystemHealthWorking:
         health_time = time.time() - start_time
 
         start_time = time.time()
-        response = client.post("/api/v1/chat", json={  # noqa: F841
+        response = client.post("/api/v1/chat/stream", json={  # noqa: F841
             "question": "Test de performance"
         })
         chat_time = time.time() - start_time

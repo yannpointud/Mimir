@@ -45,7 +45,7 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
         if timestamp_str.endswith('Z'):
             timestamp_str = timestamp_str[:-1] + '+00:00'
         return datetime.fromisoformat(timestamp_str)
-    except:
+    except (ValueError, TypeError):
         # Fallback to current time if parsing fails
         return datetime.utcnow()
 
@@ -175,7 +175,7 @@ def _apply_filters(logs: List[LogEntry],
             since_dt = _parse_timestamp(since)
             filtered_logs = [log for log in filtered_logs
                            if _parse_timestamp(log.timestamp) >= since_dt]
-        except:
+        except (TypeError, ValueError):
             logger.warning(f"Invalid since timestamp: {since}")
 
     return filtered_logs

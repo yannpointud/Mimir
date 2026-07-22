@@ -488,11 +488,12 @@ def _count_requests_in_period(period: timedelta) -> int:
                             cutoff_time = now - period
                         if timestamp >= cutoff_time:
                             count += 1
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         return count
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0
 
 
@@ -518,11 +519,12 @@ def _count_requests_in_timeframe(start_time: datetime, end_time: datetime) -> in
 
                         if start_tz <= timestamp <= end_tz:
                             count += 1
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         return count
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0
 
 
@@ -532,7 +534,8 @@ def _get_avg_daily_requests(period: timedelta) -> float:
         total_requests = _count_requests_in_period(period)
         days = period.days or 1
         return round(total_requests / days, 1)
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0.0
 
 
@@ -590,7 +593,7 @@ def _get_hourly_distribution() -> Dict[str, int]:
                         if timestamp >= seven_days_ago.replace(tzinfo=timestamp.tzinfo):
                             hour_key = f"{timestamp.hour:02d}:00"
                             distribution[hour_key] += 1
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         return distribution
@@ -627,7 +630,7 @@ def _get_daily_distribution() -> Dict[str, int]:
                             day_index = timestamp.weekday()
                             day_name = days_fr[day_index]
                             distribution[day_name] += 1
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         return distribution
@@ -656,13 +659,14 @@ def _get_avg_response_time_period(period: timedelta) -> float:
                             duration_ms = log_entry.get('duration_ms', 0)
                             if duration_ms > 0:
                                 response_times.append(duration_ms)
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         if response_times:
             return round(sum(response_times) / len(response_times), 1)
         return 0.0
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0.0
 
 
@@ -671,7 +675,8 @@ def _get_success_rate_period(period: timedelta) -> float:
     try:
         # Simulation based on the observation that the system is stable
         return 97.8
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 100.0
 
 
@@ -679,7 +684,8 @@ def _get_peak_usage_time() -> str:
     """Get the peak usage time of day."""
     try:
         return "14:00-15:00"  # Based on typical observation
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return "N/A"
 
 
@@ -704,11 +710,12 @@ def _get_total_tokens_period(period: timedelta) -> int:
                             if output_tokens > 0:
                                 # Total = output tokens + estimated input tokens (37)
                                 total_tokens += output_tokens + 37
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         return total_tokens
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0
 
 
@@ -718,7 +725,8 @@ def _get_avg_tokens_per_day(period: timedelta) -> int:
         total_tokens = _get_total_tokens_period(period)
         days = period.days or 1
         return int(total_tokens / days)
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0
 
 
@@ -727,7 +735,8 @@ def _estimate_monthly_tokens() -> int:
     try:
         daily_avg = _get_avg_tokens_per_day(timedelta(days=7))
         return daily_avg * 30
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0
 
 
@@ -753,11 +762,12 @@ def _get_log_file_sizes() -> Dict[str, str]:
                         sizes[name] = f"{size_bytes / (1024 * 1024):.1f} MB"
                 else:
                     sizes[name] = "N/A"
-            except:
+            except OSError:
                 sizes[name] = "N/A"
 
         return sizes
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return {}
 
 
@@ -785,11 +795,12 @@ def _estimate_system_uptime() -> str:
                             return f"{days}j {hours}h {minutes}m"
                         else:
                             return f"{hours}h {minutes}m"
-                except:
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     continue
 
         return "N/A"
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return "N/A"
 
 
@@ -803,7 +814,8 @@ def _get_error_rate_period(period: timedelta) -> float:
         # Errors are rare in this system
         error_count = max(0, total_requests // 50)  # ~2% error rate
         return round((error_count / total_requests) * 100, 2)
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 0.0
 
 
@@ -828,5 +840,6 @@ def _calculate_health_score() -> int:
             base_score -= 5
 
         return max(70, min(100, base_score))
-    except:
+    except Exception as e:
+        logger.debug(f"log metric parsing failed: {e}")
         return 85

@@ -27,9 +27,9 @@ from src.shared.models import BaseResponse
 from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.config import settings
-# RAG pipeline lives in src.services.rag_service (DEBT-01): the routes delegate
-# to RagService.answer()/answer_stream() via Depends(get_rag_service); the
-# routes themselves stay HTTP-pure (parse + budget gate + cache read + format).
+# RAG pipeline lives in src.services.rag_service (DEBT-01): the stream route
+# delegates to RagService.answer_stream() via Depends(get_rag_service); the
+# route itself stays HTTP-pure (parse + budget gate + cache read + format).
 # Imported as a module (not `from ... import RagService`) so no pipeline symbol
 # is re-exported from this module's namespace -- the 04-03 re-import shims are
 # fully gone; only the RagService type hint on the injected dependency remains.
@@ -92,218 +92,6 @@ class EscalationResponse(BaseModel):
     escalation_id: Optional[str] = None
 
 
-@router.post("/", response_model=ChatResponse)
-# Rate limit parity with chat_stream (CR-01 deferred gap, closed here): the
-# non-stream route runs the same costly RAG pipeline and was the only chat
-# route without a rate limit until now.
-@limiter.limit(lambda: f"{settings.rate_limit_chat_per_minute}/minute",
-               key_func=get_client_identifier)
-async def chat(
-    request: Request,
-    chat_request: ChatRequest,
-    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user),
-    chat_cache: ChatCacheService = Depends(get_chat_cache_service),
-    document_repository: DocumentRepository = Depends(get_document_repository),
-    rag_debug: RagDebugService = Depends(get_rag_debug_service),
-    budget_guard: BudgetGuard = Depends(get_budget_guard),
-    rag_service: rag_service_module.RagService = Depends(get_rag_service)
-) -> ChatResponse:
-    """
-    Process user question and return RAG-based response.
-
-    Args:
-        request: FastAPI request object
-        chat_request: User question and parameters
-        current_user: Optional authenticated user info
-        chat_cache: Chat response cache service
-
-    Returns:
-        ChatResponse: Answer with sources and metadata
-    """
-    start_time = datetime.utcnow()
-    client_ip = _get_client_ip(request)
-
-    # Chat endpoint logging
-    logger.info(f"Chat endpoint started - Session: {chat_request.session_id}, Question: {chat_request.question[:50]}..., IP: {client_ip}")
-
-    # Budget gate BEFORE the try block: the try/except below deliberately
-    # catches every Exception to always return a friendly ChatResponse (never
-    # propagate a raw error to the client), so raising here would be
-    # swallowed into a 200 response. Reserving before any embed/generate call
-    # and before the cache check guarantees a real HTTP 429.
-    #
-    # Returning a JSONResponse directly (NOT `raise HTTPException`) is
-    # deliberate: main.py registers a global `@app.exception_handler(HTTPException)`
-    # that intercepts EVERY HTTPException regardless of where it is raised
-    # and rewrites the body to `{"error_code": f"HTTP_{status_code}", ...}`
-    # with `error_message` typed as `str` -- a dict `detail` would either be
-    # flattened into the exact same "HTTP_429" shape as the slowapi
-    # rate-limit response (defeating the whole point of this distinct
-    # error_code) or crash the handler outright (ErrorResponse.error_message
-    # rejects a dict). Returning a Response instance bypasses FastAPI's
-    # exception-handler and response_model machinery entirely, exactly like
-    # the existing slowapi 429 handler in rate_limit.py already does for the
-    # identical reason (see its docstring).
-    #
-    # asyncio.to_thread: reserve() is a blocking SQLite write (WAL
-    # serializes writers, busy_timeout applies) -- run it off the event loop
-    # so a contended ledger write never stalls other in-flight requests.
-    reservation: Optional[BudgetReservation] = await asyncio.to_thread(
-        budget_guard.reserve, "chat"
-    )
-    if reservation is None:
-        return JSONResponse(
-            status_code=429,
-            content={
-                "error_code": "budget_exceeded",
-                "error_message": "Plafond quotidien de dépense IA atteint."
-            }
-        )
-
-    # Tracks whether the reservation has already been released/finalized, so
-    # the except block below never double-settles it (both the cache-hit
-    # branch and _process_question_with_rag settle it internally).
-    reservation_settled = False
-
-    try:
-        # Generate session ID if not provided
-        session_id = chat_request.session_id or _generate_session_id(
-            chat_request.question, client_ip
-        )
-
-        # 1. Log user request for RAG debug
-        rag_debug.log_user_request(
-            session_id=session_id,
-            question=chat_request.question,
-            user_context={
-                "client_ip": client_ip,
-                "user_type": current_user.get("user_type") if current_user else "anonymous",
-                "context_limit": chat_request.context_limit,
-                "include_sources": chat_request.include_sources
-            },
-            context_limit=chat_request.context_limit
-        )
-
-        # Snapshot the corpus version before consulting the cache and thread it
-        # into the cache key: any ingestion/deletion bumps the corpus version, so
-        # a prior entry can no longer be served after the corpus changes (implicit
-        # invalidation mirroring the corpus-aware SSE cache -- WR-02, COST-03).
-        corpus_version = rag_service.vector_store.get_corpus_version()
-        cached_response = chat_cache.get_chat_response(
-            question=chat_request.question,
-            context_hash=corpus_version
-        )
-
-        if cached_response:
-            logger.debug(f"Cache hit for question: {chat_request.question[:50]}...")
-
-            # No LLM call happens on a cache hit: release the reservation so
-            # the daily ledger is not charged for work that never occurred.
-            # Mark settled BEFORE releasing so the finally below can never
-            # double-settle even if release itself raises.
-            reservation_settled = True
-            await asyncio.to_thread(budget_guard.release, reservation)
-
-            # 6. Log final response for RAG debug (cached response)
-            rag_debug.log_final_response(
-                session_id=session_id,
-                confidence_score=cached_response.get("confidence_score", 0.0),
-                sources_count=len(cached_response.get("sources", [])),
-                final_sources=cached_response.get("sources", []),
-                total_processing_time_ms=5,  # Cache hit is very fast
-                cached=True
-            )
-
-            # Update cached response with current session
-            cached_response["session_id"] = session_id
-            cached_response["cached"] = True
-            cached_response["timestamp"] = datetime.utcnow()
-
-            return ChatResponse(**cached_response)
-
-        # Delegate to the RAG service. RagService.answer() always settles the
-        # reservation internally (finalize on success or partial usage, release
-        # if no LLM call was made) before returning -- the llm_service /
-        # vector_store / usage_tracker collaborators live inside the injected
-        # RagService, so they are no longer route-level dependencies.
-        reservation_settled = True
-        response = await rag_service.answer(
-            question=chat_request.question,
-            context_limit=chat_request.context_limit,
-            include_sources=chat_request.include_sources,
-            session_id=session_id,
-            document_repository=document_repository,
-            reservation=reservation
-        )
-
-        # Calculate response time
-        end_time = datetime.utcnow()
-        response_time_ms = int((end_time - start_time).total_seconds() * 1000)
-        response["response_time_ms"] = response_time_ms
-
-        # Pop the internal error marker set by the pipeline's fallback path
-        # (never sent to the client -- ChatResponse has no such field).
-        is_error_response = response.pop("error", False)
-
-        # Cache the response -- but NEVER cache the pipeline's error
-        # fallback: a transient failure (Mistral 500, network blip) must be
-        # retried on the next identical question, not replayed from cache
-        # for 30 minutes (each cache hit would also release its reservation,
-        # serving errors for free instead of retrying).
-        if not is_error_response:
-            chat_cache.set_chat_response(
-                question=chat_request.question,
-                response=response,
-                context_hash=corpus_version,
-                ttl=1800  # 30 minutes
-            )
-
-        logger.info(f"Chat response generated - session: {session_id}, time: {response_time_ms}ms")
-
-        # 6. Log final response for RAG debug
-        rag_debug.log_final_response(
-            session_id=session_id,
-            confidence_score=response["confidence_score"],
-            sources_count=len(response["sources"]),
-            final_sources=response["sources"],
-            total_processing_time_ms=response_time_ms,
-            cached=False
-        )
-
-        return ChatResponse(**response)
-
-    except Exception as e:
-        import traceback
-        logger.error(f"Chat processing error: {type(e).__name__} - {str(e)}")
-        logger.debug(f"Chat error traceback: {traceback.format_exc()}")
-
-        # Return error response
-        error_response = {
-            "answer": "Je suis désolé, une erreur s'est produite lors du traitement de votre question. Veuillez réessayer ou contacter le support si le problème persiste.",
-            "sources": [],
-            "confidence_score": 0.0,
-            "session_id": chat_request.session_id or "error",
-            "response_time_ms": int((datetime.utcnow() - start_time).total_seconds() * 1000),
-            "cached": False,
-            "timestamp": datetime.utcnow()
-        }
-
-        return ChatResponse(**error_response)
-
-    finally:
-        # Settle-once guard in a finally so it also covers
-        # asyncio.CancelledError (a BaseException in Python 3.11 that the
-        # `except Exception` above does NOT catch): an exception or a
-        # cancellation before the cache check / RAG pipeline call would
-        # otherwise leave the reservation dangling until the next daily
-        # reset. Once _process_question_with_rag has been entered it settles
-        # the reservation internally (reservation_settled is set just before
-        # the call), so this release only fires for the pre-pipeline window.
-        if not reservation_settled:
-            reservation_settled = True
-            await asyncio.to_thread(budget_guard.release, reservation)
-
-
 @router.post("/stream")
 # Rate limit per JWT user with IP fallback (SEC-03): behind the phase-5 nginx
 # proxy the source IP will be the proxy's, so the JWT key is the only reliable
@@ -334,11 +122,14 @@ async def chat_stream(
     # here. Do NOT move this check inside generate_sse -- that would yield a
     # 200 with an SSE error event instead of a genuine HTTP 429.
     #
-    # JSONResponse (not `raise HTTPException`) for the same reason as in
-    # chat(): main.py's global HTTPException handler would flatten/crash on
-    # a dict detail -- see the comment there for the full explanation.
+    # JSONResponse (not `raise HTTPException`): main.py's global HTTPException
+    # handler would rewrite the body to the generic "HTTP_429" shape (or crash
+    # outright on a dict detail), defeating the distinct budget_exceeded
+    # error_code -- returning a Response instance bypasses that handler and the
+    # response_model machinery entirely, exactly like the slowapi 429 handler.
     #
-    # asyncio.to_thread: blocking SQLite write off the event loop (see chat()).
+    # asyncio.to_thread: reserve() is a blocking SQLite write -- keep it off
+    # the event loop.
     reservation: Optional[BudgetReservation] = await asyncio.to_thread(
         budget_guard.reserve, "chat"
     )

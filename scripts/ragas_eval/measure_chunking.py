@@ -286,6 +286,7 @@ async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
         _assemble_eval_row,
         _collect_eval_rows,
         _write_eval_rows,
+        answer_via_stream,
     )
     from scripts.ragas_eval.golden_set_schema import load_golden_set
     from src.api.dependencies import get_budget_guard, get_rag_service, get_vector_store
@@ -313,13 +314,15 @@ async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
             if reservation is None:
                 print("Daily budget reached -- stopping.", file=sys.stderr)
                 return None
-            return await rag_service.answer(
+            # answer_stream() settles the reservation internally; answer_via_stream
+            # drains it into the answer()-shaped dict the eval rows consume.
+            return await answer_via_stream(
+                rag_service,
                 question=question,
-                context_limit=settings.max_sources,
-                include_sources=True,
                 session_id=session_id,
                 document_repository=document_repository,
                 reservation=reservation,
+                context_limit=settings.max_sources,
             )
 
         # _collect_eval_rows uses _assemble_eval_row internally; imported above

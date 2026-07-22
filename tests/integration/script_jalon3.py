@@ -5,7 +5,7 @@ Tests des fonctionnalités API & Services
 """
 
 import requests
-import json  # noqa: F401
+import json
 import sys
 import time
 from pathlib import Path  # noqa: F401
@@ -100,17 +100,30 @@ def test_chat_endpoint():
             "question": "Bonjour, pouvez-vous m'aider ?",
             "session_id": "test-session-123"
         }
+        # The chat endpoint is streaming-only (SSE): read the event stream and
+        # reassemble the answer from the chunk events.
         response = requests.post(
-            f"{BASE_URL}/api/v1/chat/",
+            f"{BASE_URL}/api/v1/chat/stream",
             json=chat_data,
-            timeout=10
+            timeout=30,
+            stream=True,
         )
 
         if response.status_code == 200:
-            data = response.json()
-            if "answer" in data:
+            answer = ""
+            for line in response.iter_lines(decode_unicode=True):
+                if line and line.startswith("data: "):
+                    try:
+                        event = json.loads(line[6:])
+                    except json.JSONDecodeError:
+                        continue
+                    if event.get("type") == "chunk":
+                        answer += event.get("content", "")
+                    elif event.get("type") == "done":
+                        break
+            if answer:
                 print("✅ Endpoint de chat: OK")
-                print(f"   Réponse: {data['answer'][:100]}...")
+                print(f"   Réponse: {answer[:100]}...")
                 return True
 
         print(f"❌ Endpoint de chat failed: {response.status_code}")

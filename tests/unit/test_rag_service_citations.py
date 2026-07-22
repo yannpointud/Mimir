@@ -2,15 +2,15 @@
 
 Three concerns are proven here:
 
-1. Numbered context: the LLM prompt built by BOTH pipeline functions numbers the
+1. Numbered context: the LLM prompt built by the streaming pipeline numbers the
    retrieved sources as [1]..[N] (replacing the old `[Source: {path}]` prefix), so
    the model can cite [N] tied to the exact context order (RESEARCH Pattern 2).
 
 2. Citation-map parity: a citations dict {"1".."N"} is derived from the SAME
    enumerate() pass that builds the context, so citations[str(i+1)]["document_id"]
-   equals sources[i]["document_id"] for both answer() (non-stream) and
-   answer_stream() (RESEARCH Pitfall 1 — never build the map from a divergent
-   ordering). Distinct document_ids per source make a mis-ordering detectable.
+   equals sources[i]["document_id"] in answer_stream() (RESEARCH Pitfall 1 — never
+   build the map from a divergent ordering). Distinct document_ids per source make
+   a mis-ordering detectable.
 
 3. SSE citation event: answer_stream() emits exactly one {"type": "citation", ...}
    event strictly BEFORE the unchanged {"type": "done", ...} event, and a
@@ -23,10 +23,7 @@ import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
 from backend.src.rag_core.interfaces import SearchResult
-from src.services.rag_service import (
-    _process_question_with_rag,
-    _process_question_with_rag_stream,
-)
+from src.services.rag_service import _process_question_with_rag_stream
 
 
 def _sr(chunk_id, document_id, text, source, score):
@@ -52,7 +49,7 @@ def _base_mocks():
     # No fuzzy filename pre-inclusion matches (keeps the pipeline on the pure
     # dense retrieval path).
     mock_document_repository.get_all.return_value = []
-    mock_document_repository.get_by_id.return_value = Mock(filename="doc.pdf")
+    mock_document_repository.get_by_ids.side_effect = lambda ids: {i: Mock(filename="doc.pdf") for i in ids}
 
     mock_llm_service.embed.return_value = AsyncMock(
         embeddings=[[0.1] * 1024], usage_tokens=10,
@@ -85,69 +82,6 @@ def _two_source_pool():
         _sr(1, "10", "premier extrait pertinent", "a.txt", 0.80),
         _sr(2, "11", "second extrait pertinent", "b.txt", 0.75),
     ]
-
-
-class TestNonStreamCitations:
-    """_process_question_with_rag (answer()) — numbering + citation map."""
-
-    def test_context_is_numbered_and_map_has_document_id_parity(self):
-        llm, vs, docs, dbg = _base_mocks()
-        vs.query.return_value = _two_source_pool()
-
-        with patch("src.services.rag_service.settings") as mock_settings:
-            _dense_settings(mock_settings)
-            result = asyncio.run(_process_question_with_rag(
-                question="question test",
-                context_limit=5,
-                include_sources=True,
-                session_id="cit_ns_1",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-            ))
-
-        # The non-stream return now exposes the derived citation map.
-        assert "citations" in result
-        citations = result["citations"]
-        sources = result["sources"]
-        assert len(sources) == 2
-        assert set(citations.keys()) == {"1", "2"}
-
-        # Parity: citations[str(i+1)] and sources[i] are the SAME source object
-        # (identical document_id), proving both come from one enumerate() pass.
-        for i in range(len(sources)):
-            assert citations[str(i + 1)]["document_id"] == sources[i]["document_id"]
-
-        # The prompt fed to the LLM is numbered [1]..[N], not the old [Source: ...].
-        _, gen_kwargs = llm.generate.call_args
-        prompt = gen_kwargs["system_prompt"]
-        assert "[1]" in prompt
-        assert "[2]" in prompt
-        assert "[Source:" not in prompt
-
-    def test_zero_source_yields_empty_citation_map(self):
-        llm, vs, docs, dbg = _base_mocks()
-        vs.query.return_value = []
-
-        with patch("src.services.rag_service.settings") as mock_settings:
-            _dense_settings(mock_settings)
-            result = asyncio.run(_process_question_with_rag(
-                question="aucune source",
-                context_limit=5,
-                include_sources=True,
-                session_id="cit_ns_0",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-            ))
-
-        assert result["sources"] == []
-        assert result["citations"] == {}
-        # No numbered markers when there is no context.
-        _, gen_kwargs = llm.generate.call_args
-        assert "[1]" not in gen_kwargs["system_prompt"]
 
 
 def _make_generate_stream(captured, chunks=("Réponse ", "[1].")):

@@ -64,7 +64,30 @@ class TestDocumentRepository:
         
         # Test avec ID inexistant
         assert repo.get_by_id(99999) is None
-    
+
+    def test_get_by_ids_batches_and_maps(self, test_repositories, sample_document_data):
+        """Batch retrieval returns an {id: Document} mapping for existing ids."""
+        repo = test_repositories['document']
+
+        doc_a = repo.create(filename="a.pdf", file_hash="a" * 64)
+        doc_b = repo.create(filename="b.pdf", file_hash="b" * 64)
+        doc_c = repo.create(filename="c.pdf", file_hash="c" * 64)
+
+        # Request two of the three ids plus one that does not exist.
+        result = repo.get_by_ids([doc_a.id, doc_c.id, 99999])
+
+        assert set(result.keys()) == {doc_a.id, doc_c.id}
+        assert result[doc_a.id].filename == "a.pdf"
+        assert result[doc_c.id].filename == "c.pdf"
+        # A document not requested is absent; a missing id is not an error.
+        assert doc_b.id not in result
+        assert 99999 not in result
+
+    def test_get_by_ids_empty_input(self, test_repositories):
+        """An empty id list yields an empty mapping without querying."""
+        repo = test_repositories['document']
+        assert repo.get_by_ids([]) == {}
+
     def test_get_by_hash(self, test_repositories, sample_document_data):
         """Test de récupération par hash"""
         repo = test_repositories['document']

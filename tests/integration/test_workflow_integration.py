@@ -6,10 +6,15 @@ Tests for complete ingestion, search and response flows
 import pytest
 import tempfile
 import asyncio  # noqa: F401
-import json  # noqa: F401
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock  # noqa: F401
 from fastapi.testclient import TestClient
+
+
+def _sse_events(body):
+    """Parse an SSE response body into the list of decoded `data:` events."""
+    return [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: ")]
 
 
 class TestDocumentIngestionWorkflow:
@@ -173,20 +178,15 @@ class TestChatWorkflowIntegration:
                     "include_sources": True
                 }
 
-                response = client.post("/api/v1/chat", json=chat_request)
+                response = client.post("/api/v1/chat/stream", json=chat_request)
 
-                if response.status_code == 200:
-                    data = response.json()
-
-                    # Verify the response structure
-                    assert "answer" in data
-                    assert "sources" in data
-                    assert "confidence_score" in data
-                    assert "session_id" in data
-                    assert "response_time_ms" in data
-
-                    assert isinstance(data["sources"], list)
-                    assert isinstance(data["confidence_score"], (int, float))
+                # StreamingResponse returns 200; verify a well-formed SSE stream
+                # that opens with start and closes with done or error.
+                assert response.status_code == 200
+                events = _sse_events(response.text)
+                assert events
+                assert events[0]["type"] == "start"
+                assert events[-1]["type"] in {"done", "error"}
 
     def test_chat_session_management(self, test_app):
         """Test chat session management"""
@@ -201,20 +201,21 @@ class TestChatWorkflowIntegration:
             "Comment configurer le système ?"
         ]
 
-        responses = []
+        start_events = []
         for question in questions:
-            response = client.post("/api/v1/chat", json={
+            response = client.post("/api/v1/chat/stream", json={
                 "question": question,
                 "session_id": session_id
             })
 
-            if response.status_code == 200:
-                responses.append(response.json())
+            assert response.status_code == 200
+            events = _sse_events(response.text)
+            start_events.append(events[0])
 
-        # Verify session consistency
-        if responses:
-            for response_data in responses:
-                assert response_data["session_id"] == session_id
+        # Every stream's start event echoes the same provided session id.
+        for start in start_events:
+            assert start["type"] == "start"
+            assert start["session_id"] == session_id
 
     def test_chat_escalation_workflow(self, test_app):
         """Test escalation workflow to human support"""
@@ -290,7 +291,7 @@ class TestErrorRecoveryWorkflow:
         client = TestClient(test_app)
 
         # The system must handle LLM unavailability gracefully
-        response = client.post("/api/v1/chat", json={
+        response = client.post("/api/v1/chat/stream", json={
             "question": "Test question"
         })
 
@@ -307,7 +308,7 @@ class TestErrorRecoveryWorkflow:
             mock_instance = mock_vector.return_value
             mock_instance.query.side_effect = Exception("Vector store indisponible")
 
-            response = client.post("/api/v1/chat", json={
+            response = client.post("/api/v1/chat/stream", json={
                 "question": "Test avec vector store en erreur"
             })
 
@@ -329,7 +330,7 @@ class TestConcurrencyWorkflow:
         def chat_worker(worker_id):
             """Worker performing a chat request"""
             start_time = time.time()
-            response = client.post("/api/v1/chat", json={
+            response = client.post("/api/v1/chat/stream", json={
                 "question": f"Question du worker {worker_id}",
                 "session_id": f"concurrent_session_{worker_id}"
             })

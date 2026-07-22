@@ -502,314 +502,6 @@ async def _hybrid_retrieve(
     return search_results
 
 
-async def _process_question_with_rag(
-    question: str,
-    context_limit: int,
-    include_sources: bool,
-    session_id: str,
-    llm_service: MistralAPIService,
-    vector_store: FaissVectorStore,
-    document_repository: DocumentRepository,
-    rag_debug: RagDebugService,
-    budget_guard: Optional["BudgetGuard"] = None,
-    usage_tracker: Optional["UsageTracker"] = None,
-    reservation: Optional["BudgetReservation"] = None,
-    bm25_store: Optional[Any] = None
-) -> Dict[str, Any]:
-    """
-    Process question using RAG pipeline.
-
-    Full RAG system implementation:
-    1. Generate embeddings for the question
-    2. Search vector store for relevant documents
-    3. Build context from retrieved documents
-    4. Generate response using LLM
-    5. Format response with sources
-
-    Args:
-        question: User question
-        context_limit: Maximum number of context documents
-        include_sources: Whether to include source references
-        session_id: Session identifier
-        llm_service: LLM service for embeddings and generation
-        vector_store: Vector store for similarity search
-        budget_guard: Optional BudgetGuard used to finalize/release the
-            caller's reservation once the real cost is known
-        usage_tracker: Optional UsageTracker used to price and persist the
-            embedding and generation usage rows
-        reservation: The BudgetReservation captured by the caller before
-            this pipeline started; settled (finalize or release) internally
-            so the caller never has to reason about partial-failure cost
-
-    Returns:
-        dict: Response data
-    """
-    # Accumulates the real euro cost of every LLM call actually made, so the
-    # reservation can be finalized with the true total instead of released
-    # outright once at least one paid call has happened.
-    total_cost_eur = 0.0
-    llm_call_made = False
-    try:
-        # Step 1: Generate embeddings for the question
-        logger.info(f"Generating embeddings for question: {question[:50]}...")
-        start_embedding = datetime.utcnow()
-        embedding_response = await llm_service.embed([question], session_id=session_id, rag_debug=rag_debug)
-        embedding_time = (datetime.utcnow() - start_embedding).total_seconds() * 1000  # noqa: F841
-        question_embedding = np.array(embedding_response.embeddings[0], dtype=np.float32)
-
-        llm_call_made = True
-        if usage_tracker is not None:
-            # asyncio.to_thread: record() is a blocking SQLite write.
-            total_cost_eur += await asyncio.to_thread(
-                usage_tracker.record,
-                "embedding",
-                embedding_response.model,
-                embedding_response.prompt_tokens,
-                embedding_response.completion_tokens,
-                estimated=False,
-                session_id=session_id
-            )
-
-        # Step 1.5: Filename pre-inclusion (fuzzy matching)
-        pre_included_chunks = []
-        if settings.filename_pre_inclusion:
-            logger.info(f"Checking for filename fuzzy matches...")  # noqa: F541
-            matched_docs = _find_documents_by_fuzzy_match(
-                question,
-                document_repository,
-                threshold=settings.filename_fuzzy_threshold
-            )
-
-            if matched_docs:
-                # Prepare the similarities dictionary
-                filename_similarities = {doc_id: score for doc_id, _, score in matched_docs}
-                document_ids = [doc_id for doc_id, _, _ in matched_docs]
-
-                # Pre-include all chunks from matched documents
-                pre_included_chunks = await _pre_include_document_chunks(
-                    document_ids=document_ids,
-                    question_embedding=question_embedding,
-                    vector_store=vector_store,
-                    document_repository=document_repository,
-                    boost_factor=settings.filename_boost,
-                    filename_similarities=filename_similarities
-                )
-
-                logger.info(f"Pre-inclusion: {len(pre_included_chunks)} chunks from {len(matched_docs)} matched document(s)")
-
-        # Step 2: Search vector store for relevant documents
-        hybrid_active = settings.hybrid_search_enabled and bm25_store is not None
-        retrieval_mode = "hybrid" if hybrid_active else "dense"
-        if hybrid_active:
-            # Hybrid branch: raw dense pool (similarity_floor=0.0) + BM25 pool,
-            # fused via RRF. Kept entirely separate from the dense-only code so
-            # the latter stays byte-identical (Option A).
-            search_results = await _hybrid_retrieve(
-                question=question,
-                question_embedding=question_embedding,
-                vector_store=vector_store,
-                bm25_store=bm25_store,
-                pre_included_chunks=pre_included_chunks,
-                rag_debug=rag_debug,
-                session_id=session_id,
-                embedding_tokens=embedding_response.usage_tokens,
-            )
-        else:
-            logger.info(f"Searching for relevant context in vector store...")  # noqa: F541
-            start_search = datetime.utcnow()
-            dense_top_k = settings.max_sources * 2
-            search_results = await asyncio.to_thread(vector_store.query,
-                vector=question_embedding,
-                top_k=dense_top_k,  # Retrieve more to filter afterwards
-                filter_dict=None  # No filter for now
-            )
-            search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
-
-            # 2. Log vector search results for RAG debug
-            rag_debug.log_vector_search(
-                session_id=session_id,
-                search_results=search_results,
-                embedding_tokens=embedding_response.usage_tokens,
-                search_time_ms=search_time
-            )
-
-            # Step 2.1: Merge pre-included chunks with vector search results
-            if pre_included_chunks:
-                # Create a set of pre-included chunk_ids to avoid duplicates
-                pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
-
-                # Filter vector results to remove duplicates
-                unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
-
-                # Merge: pre-included first, then vector results
-                search_results = pre_included_chunks + unique_vector_results
-
-                # Sort by descending score
-                search_results.sort(key=lambda x: x.similarity_score, reverse=True)
-
-                logger.info(f"Merge: {len(pre_included_chunks)} pre-included + {len(unique_vector_results)} vector = {len(search_results)} total")
-
-        # Step 2.5: Apply dynamic source filtering.
-        if search_results:
-            search_results = _filter_dynamic_sources(search_results, settings, question, mode=retrieval_mode)
-
-        # Step 3: Build context from retrieved documents
-        context_parts = []
-        sources = []
-
-        if search_results:
-            logger.info(f"Found {len(search_results)} relevant chunks")
-
-            # Single enumerate() pass builds the numbered context AND the sources
-            # list from the identical ordering, so the [N] markers fed to the LLM
-            # map one-to-one onto sources[N-1] (RAG-04, RESEARCH Pitfall 1). Do NOT
-            # re-sort or filter `sources` after this loop.
-            for i, result in enumerate(search_results, start=1):
-                context_parts.append(f"[{i}] {result.text}")
-
-                if include_sources:
-                    # Retrieve the original document name
-                    try:
-                        document = document_repository.get_by_id(int(result.document_id))
-                        filename = document.filename if document else str(result.source)
-                    except Exception:
-                        # Fallback if retrieval error
-                        filename = str(result.source)
-
-                    sources.append({
-                        "document_id": int(result.document_id),
-                        "filename": filename,
-                        "chunk_text": result.text,
-                        "similarity_score": float(round(result.similarity_score, 3)),
-                        "chunk_index": int(result.chunk_index),
-                        "total_chunks": int(result.total_chunks)
-                    })
-
-        # Derive the [N] -> source citation map from the SAME numbering used in the
-        # prompt above: citations[str(i+1)] is exactly sources[i] (RAG-04).
-        citations = {str(i + 1): sources[i] for i in range(len(sources))}
-
-        # Step 4: Build prompt for LLM
-        if context_parts:
-            context_text = "\n\n".join(context_parts)
-            system_prompt = MIMIR_SYSTEM_PROMPT
-            full_prompt = system_prompt.format(context=context_text)
-        else:
-            # No context found
-            logger.warning("No relevant context found in vector store")
-            context_text = ""
-            system_prompt = """Vous êtes Mimir, un assistant documentaire intelligent.
-L'utilisateur vous pose une question mais aucun contexte pertinent n'a été trouvé dans la documentation.
-
-Informez poliment l'utilisateur que vous ne trouvez pas d'information pertinente dans la documentation disponible pour répondre à sa question, et suggérez-lui de:
-1. Reformuler sa question avec d'autres mots-clés
-2. Contacter le support humain si nécessaire
-
-Restez professionnel et utile."""
-            full_prompt = system_prompt
-
-        # 3. Log context building for RAG debug
-        rag_debug.log_context_building(
-            session_id=session_id,
-            system_prompt=system_prompt,
-            context_text=context_text,
-            context_chunks=len(context_parts),
-            filtered_sources=sources
-        )
-
-        # Step 5: Generate response using LLM
-        logger.info("Generating response with LLM...")
-        start_llm = datetime.utcnow()
-        generation_response = await llm_service.generate(
-            prompt=question,
-            system_prompt=full_prompt,
-            max_tokens=800,
-            temperature=0.1,
-            session_id=session_id,  # Pass session_id for LLM logging
-            rag_debug=rag_debug  # Pass debug service for LLM logging
-        )
-        llm_time = (datetime.utcnow() - start_llm).total_seconds() * 1000  # noqa: F841
-
-        if usage_tracker is not None:
-            # asyncio.to_thread: record() is a blocking SQLite write.
-            total_cost_eur += await asyncio.to_thread(
-                usage_tracker.record,
-                "chat",
-                generation_response.model,
-                generation_response.prompt_tokens,
-                generation_response.completion_tokens,
-                estimated=False,
-                session_id=session_id
-            )
-
-        answer = generation_response.content
-
-
-        # Calculate confidence score using the configured algorithm
-        confidence_score = _calculate_weighted_confidence(
-            search_results, settings.confidence_algorithm,
-            mode=retrieval_mode, rrf_k=settings.rrf_k
-        )
-
-        logger.info(
-            f"RAG response generated successfully - confidence: {confidence_score:.2f} "
-            f"(algorithm: {settings.confidence_algorithm}, mode: {retrieval_mode})"
-        )
-
-        return {
-            "answer": answer,
-            "sources": sources,
-            "citations": citations,
-            "confidence_score": round(confidence_score, 2),
-            "session_id": session_id,
-            "cached": False,
-            "timestamp": datetime.utcnow()
-        }
-
-    except Exception as e:
-        logger.error(f"RAG pipeline failed: {str(e)}", exc_info=True)
-
-        # Log error to RAG debug as well
-        rag_debug.log_error(
-            session_id=session_id,
-            error_type=type(e).__name__,
-            error_message=str(e),
-            stage="rag_pipeline"
-        )
-
-        # Fallback response in case of error. The "error" marker is consumed
-        # (popped) by the caller so it never reaches the client: it tells
-        # chat() to SKIP caching -- otherwise a transient failure (Mistral
-        # 500, network blip) would be served from cache for 30 minutes to
-        # every identical question instead of being retried.
-        return {
-            "answer": "Je suis désolé, une erreur technique s'est produite lors du traitement de votre question. L'équipe technique a été notifiée. Veuillez réessayer dans quelques instants ou contacter le support si le problème persiste.",
-            "sources": [],
-            "citations": {},
-            "confidence_score": 0.0,
-            "session_id": session_id,
-            "cached": False,
-            "timestamp": datetime.utcnow(),
-            "error": True
-        }
-
-    finally:
-        # Settle the reservation exactly once, in a finally so it also runs
-        # on asyncio.CancelledError (a BaseException in Python 3.11 that the
-        # `except Exception` above does NOT catch -- e.g. server shutdown or
-        # task cancellation during an awaited embed/generate call). Finalize
-        # with whatever real cost was already incurred (e.g. embedding
-        # succeeded but generation failed/was cancelled) or release outright
-        # if no LLM call happened at all -- symmetric with the stream
-        # variant's outer finally. asyncio.to_thread keeps the blocking
-        # SQLite ledger write off the event loop.
-        if budget_guard is not None and reservation is not None:
-            if llm_call_made:
-                await asyncio.to_thread(budget_guard.finalize, reservation, total_cost_eur)
-            else:
-                await asyncio.to_thread(budget_guard.release, reservation)
-
-
 async def _process_question_with_rag_stream(
     question: str,
     context_limit: int,
@@ -830,9 +522,9 @@ async def _process_question_with_rag_stream(
     Process question using RAG pipeline with streaming.
     Yields SSE events as processing progresses.
 
-    budget_guard/usage_tracker/reservation mirror _process_question_with_rag,
-    but the reservation is settled in an OUTER finally block here (see below)
-    because a mid-stream client disconnect throws GeneratorExit -- a
+    budget_guard/usage_tracker/reservation are settled in an OUTER finally
+    block here (see below) rather than an inner one because a mid-stream
+    client disconnect throws GeneratorExit -- a
     BaseException, not caught by `except Exception` -- straight through this
     generator; only a finally at the outermost scope is guaranteed to run in
     every case (normal completion, error, or disconnect).
@@ -929,18 +621,29 @@ async def _process_question_with_rag_stream(
         sources = []
 
         if search_results:
-            # Same single enumerate() pass as the non-stream path: numbered [N]
-            # context + sources built from one ordering so the derived citation
-            # map cannot drift from the prompt (RAG-04, RESEARCH Pitfall 1).
+            # Batch-load every distinct source document in ONE query instead of a
+            # get_by_id() per chunk (the N+1 this loop used to issue): chunks
+            # frequently share a document, so this de-duplicates the lookups too.
+            # Any DB error degrades to per-source names, matching the previous
+            # per-chunk fallback.
+            documents_by_id = {}
+            if include_sources:
+                try:
+                    documents_by_id = document_repository.get_by_ids(
+                        list({int(r.document_id) for r in search_results})
+                    )
+                except Exception:
+                    documents_by_id = {}
+
+            # Single enumerate() pass: numbered [N] context + sources built from
+            # one ordering so the derived citation map cannot drift from the
+            # prompt (RAG-04, RESEARCH Pitfall 1).
             for i, result in enumerate(search_results, start=1):
                 context_parts.append(f"[{i}] {result.text}")
 
                 if include_sources:
-                    try:
-                        document = document_repository.get_by_id(int(result.document_id))
-                        filename = document.filename if document else str(result.source)
-                    except Exception:
-                        filename = str(result.source)
+                    document = documents_by_id.get(int(result.document_id))
+                    filename = document.filename if document else str(result.source)
 
                     sources.append({
                         "document_id": int(result.document_id),
@@ -1107,16 +810,16 @@ class RagService:
     """
     Framework-agnostic RAG pipeline service.
 
-    Wraps the module-level pipeline functions above so the full pipeline can
-    be constructed once via dependency injection (see
+    Wraps the module-level streaming pipeline function above so the full
+    pipeline can be constructed once via dependency injection (see
     backend/src/api/dependencies.py::get_rag_service) and reused outside an
     HTTP request context -- notably by the Phase 6 RAGAS evaluation harness,
-    which will call answer()/answer_stream() directly.
+    which drains answer_stream() into a result dict.
 
     document_repository is intentionally NOT stored as an instance
     attribute: it wraps a request-scoped SQLAlchemy session (FastAPI
     Depends(get_document_repository)), so it must be passed as a per-call
-    argument to answer()/answer_stream() to avoid leaking a session across
+    argument to answer_stream() to avoid leaking a session across
     requests.
     """
 
@@ -1139,38 +842,6 @@ class RagService:
         # Optional lexical index for hybrid retrieval; only used when
         # settings.hybrid_search_enabled is True (dense-only ignores it).
         self.bm25_store = bm25_store
-
-    async def answer(
-        self,
-        question: str,
-        context_limit: int,
-        include_sources: bool,
-        session_id: str,
-        document_repository: DocumentRepository,
-        reservation: Optional[BudgetReservation] = None,
-    ) -> Dict[str, Any]:
-        """
-        Run the non-streaming RAG pipeline for a single question.
-
-        Settles `reservation` (finalize or release) internally via its own
-        inner `finally`, exactly as the moved `_process_question_with_rag`
-        did in chat.py -- callers never need to settle it themselves once
-        this method has been entered.
-        """
-        return await _process_question_with_rag(
-            question=question,
-            context_limit=context_limit,
-            include_sources=include_sources,
-            session_id=session_id,
-            llm_service=self.llm_service,
-            vector_store=self.vector_store,
-            document_repository=document_repository,
-            rag_debug=self.rag_debug,
-            budget_guard=self.budget_guard,
-            usage_tracker=self.usage_tracker,
-            reservation=reservation,
-            bm25_store=self.bm25_store,
-        )
 
     async def answer_stream(
         self,

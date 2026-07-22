@@ -12,7 +12,7 @@ by tests rather than discovered at run time.
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -22,6 +22,7 @@ from scripts.ragas_eval.run_pipeline import (
     _assemble_eval_row,
     _collect_eval_rows,
     _write_eval_rows,
+    answer_via_stream,
 )
 
 
@@ -201,3 +202,59 @@ class TestCollectEvalRows:
         )
 
         assert len(rows) == 2
+
+
+class TestAnswerViaStream:
+    """The stream->dict adapter that feeds the eval harness from answer_stream()."""
+
+    def test_reassembles_answer_and_sources_from_events(self):
+        # A fake RagService whose answer_stream yields chunk*, citation, done --
+        # the exact event sequence the live streaming pipeline emits.
+        events = [
+            {"type": "chunk", "content": "La réponse "},
+            {"type": "chunk", "content": "est 1,2 M€."},
+            {"type": "citation", "citations": {"1": {"document_id": 1}}},
+            {"type": "done",
+             "sources": [{"document_id": 1, "filename": "f.pdf", "chunk_text": "ctx A"}],
+             "confidence_score": 0.83, "cached": False},
+        ]
+
+        class _FakeRagService:
+            async def answer_stream(self, **kwargs):
+                for event in events:
+                    yield event
+
+        result = asyncio.run(answer_via_stream(
+            _FakeRagService(),
+            question="Quel est le coût ?",
+            session_id="s0",
+            document_repository=Mock(),
+            reservation=Mock(),
+            context_limit=5,
+        ))
+
+        # answer = concatenated chunk contents; sources + confidence from done.
+        assert result["answer"] == "La réponse est 1,2 M€."
+        assert result["sources"][0]["chunk_text"] == "ctx A"
+        assert result["confidence_score"] == 0.83
+        assert result["session_id"] == "s0"
+
+    def test_error_event_yields_empty_answer_and_no_sources(self):
+        # An error stream must degrade to an empty answer with no sources so
+        # _assemble_eval_row still produces a valid (empty-context) row.
+        class _FakeRagService:
+            async def answer_stream(self, **kwargs):
+                yield {"type": "error", "message": "boom"}
+
+        result = asyncio.run(answer_via_stream(
+            _FakeRagService(),
+            question="q",
+            session_id="s1",
+            document_repository=Mock(),
+            reservation=Mock(),
+            context_limit=5,
+        ))
+
+        assert result["answer"] == ""
+        assert result["sources"] == []
+        assert result["session_id"] == "s1"

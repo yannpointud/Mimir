@@ -11,8 +11,7 @@ Two concerns are proven here:
    dense + BM25 pools are fused via RRF and filtered with the DEDICATED
    rrf_score_threshold -- never the cosine 0.5 floor -- so a hybrid answer never
    returns zero sources as a pure threshold artifact (RESEARCH Pitfall #2). With
-   the flag OFF the dense-only path stays byte-identical (test_rag_service.py,
-   left untouched, is the isofunctional proof).
+   the flag OFF the pipeline stays on the dense-only path.
 
 Mock/synthetic only: no real Mistral call, no real embeddings.
 """
@@ -25,7 +24,7 @@ import numpy as np
 
 from backend.src.rag_core.interfaces import Chunk, SearchResult
 from backend.src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.services.rag_service import _process_question_with_rag
+from src.services.rag_service import _process_question_with_rag_stream
 
 
 def _unit(angle_cos: float) -> np.ndarray:
@@ -119,8 +118,17 @@ def _sr(chunk_id, document_id, text, source, score):
     )
 
 
+def _fake_generate_stream(*chunks):
+    """Return an async-generator function standing in for llm.generate_stream."""
+    async def _gen(*args, **kwargs):
+        for c in chunks:
+            yield c
+
+    return _gen
+
+
 def _base_mocks():
-    """Common mock harness mirroring test_rag_service.py's style."""
+    """Common mock harness for the streaming pipeline tests."""
     mock_llm_service = AsyncMock()
     mock_vector_store = Mock()
     mock_document_repository = Mock()
@@ -134,21 +142,36 @@ def _base_mocks():
     # No fuzzy filename pre-inclusion matches (keeps the pipeline on the pure
     # dense/hybrid retrieval path).
     mock_document_repository.get_all.return_value = []
-    mock_document_repository.get_by_id.return_value = Mock(filename="doc.pdf")
+    mock_document_repository.get_by_ids.side_effect = lambda ids: {i: Mock(filename="doc.pdf") for i in ids}
 
     mock_llm_service.embed.return_value = AsyncMock(
         embeddings=[[0.1] * 1024], usage_tokens=10,
         model="mistral-embed", prompt_tokens=10, completion_tokens=0,
     )
-    mock_llm_service.generate.return_value = AsyncMock(
-        content="Réponse synthétique.", model="mistral",
-        usage_tokens=100, prompt_tokens=80, completion_tokens=20, finish_reason="stop",
-    )
+    mock_llm_service.generate_stream = _fake_generate_stream("Réponse ", "synthétique.")
     return mock_llm_service, mock_vector_store, mock_document_repository, mock_rag_debug
 
 
+async def _drain_result(**kwargs):
+    """Drain the streaming pipeline into an answer()-shaped result dict.
+
+    Mirrors the RAGAS adapter: answer = concatenated chunk events, sources +
+    confidence_score come from the terminal done event.
+    """
+    answer_parts, sources, confidence = [], [], 0.0
+    async for event in _process_question_with_rag_stream(**kwargs):
+        etype = event.get("type")
+        if etype == "chunk":
+            answer_parts.append(event.get("content", ""))
+        elif etype == "done":
+            sources = event.get("sources", [])
+            confidence = event.get("confidence_score", 0.0)
+    return {"answer": "".join(answer_parts), "sources": sources,
+            "confidence_score": confidence}
+
+
 class TestHybridBranch:
-    """Hybrid retrieval branch of _process_question_with_rag (RAG-02)."""
+    """Hybrid retrieval branch of _process_question_with_rag_stream (RAG-02)."""
 
     def test_hybrid_returns_non_empty_fused_sources(self):
         """RRF fusion of dense+BM25 pools must yield sources filtered on the RRF
@@ -187,7 +210,7 @@ class TestHybridBranch:
             mock_settings.confidence_algorithm = "weighted"
             mock_settings.filename_pre_inclusion = False
 
-            result = asyncio.run(_process_question_with_rag(
+            result = asyncio.run(_drain_result(
                 question="terme exact JIRA-4521",
                 context_limit=5,
                 include_sources=True,
@@ -228,7 +251,7 @@ class TestHybridBranch:
             mock_settings.confidence_algorithm = "weighted"
             mock_settings.filename_pre_inclusion = False
 
-            result = asyncio.run(_process_question_with_rag(
+            result = asyncio.run(_drain_result(
                 question="question dense",
                 context_limit=5,
                 include_sources=True,
@@ -280,7 +303,7 @@ class TestHybridBranch:
             mock_settings.confidence_algorithm = "weighted"
             mock_settings.filename_pre_inclusion = False
 
-            result = asyncio.run(_process_question_with_rag(
+            result = asyncio.run(_drain_result(
                 question="question hybride sans index bm25",
                 context_limit=5,
                 include_sources=True,

@@ -224,7 +224,7 @@ async def _embed_question(
 def _dense_document_ids(question: str, embedding, vector_store, settings) -> List[int]:
     """Retrieve document_ids in DENSE mode, reusing the production filter.
 
-    Mirrors the dense branch of ``_process_question_with_rag`` (top_k = max
+    Mirrors the dense branch of ``_process_question_with_rag_stream`` (top_k = max
     sources x2, then ``_filter_dynamic_sources(mode="dense")``) so the collected
     document_ids match what the live dense pipeline would surface.
     """
