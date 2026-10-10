@@ -329,6 +329,7 @@ class Settings(BaseSettings):
     llm_price_table: Dict[str, Dict[str, float]] = Field(
         default={
             "mistral-small-latest": {"input": 0.10, "output": 0.30},
+            "ministral-14b-latest": {"input": 0.20, "output": 0.20},
             "mistral-embed": {"input": 0.10, "output": 0.0},
         },
         description="Grille de prix en euros par million de tokens, par modèle (input/output)"
