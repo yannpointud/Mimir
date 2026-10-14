@@ -35,10 +35,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/documents",
     tags=["documents"],
-    dependencies=[Depends(require_admin)],  # All document endpoints require admin
+    dependencies=[Depends(require_admin)],  # Default deny: management routes require admin
     responses={
         401: {"description": "Authentication required"},
         403: {"description": "Admin privileges required"},
+        404: {"description": "Document not found"},
+    }
+)
+
+# Read-only routes open to every chat user: the passages cited in an answer and
+# the original file must be viewable without an admin account. Listing,
+# statistics and every mutation stay on the admin router above.
+reader_router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    responses={
         404: {"description": "Document not found"},
     }
 )
@@ -129,7 +140,7 @@ async def get_document(
     return DocumentResponse.from_orm(document)
 
 
-@router.get("/{document_id}/full", response_model=DocumentWithChunksResponse)
+@reader_router.get("/{document_id}/full", response_model=DocumentWithChunksResponse)
 async def get_document_with_chunks(
     document_id: int,
     doc_repo: DocumentRepository = Depends(get_document_repository),
@@ -236,7 +247,7 @@ async def get_document_with_chunks(
     )
 
 
-@router.get("/{document_id}/download")
+@reader_router.get("/{document_id}/download")
 async def download_document(
     document_id: int,
     doc_repo: DocumentRepository = Depends(get_document_repository)

@@ -9,7 +9,10 @@ const LoadingSpinner = ({ size = 'md', className = '' }) => {
   };
 
   return (
-    <div className={cn('animate-spin rounded-full border-2 border-gray-200 border-t-primary-600', sizeClasses[size], className)}>
+    <div
+      role="status"
+      className={cn('shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-accent', sizeClasses[size], className)}
+    >
       <span className="sr-only">Chargement...</span>
     </div>
   );

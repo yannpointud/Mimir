@@ -17,6 +17,7 @@ vi.mock('lucide-react', () => {
     ExternalLink: Icon,
     ChevronDown: Icon,
     ChevronUp: Icon,
+    Mail: Icon,
   };
 });
 

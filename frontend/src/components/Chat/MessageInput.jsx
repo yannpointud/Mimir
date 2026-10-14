@@ -1,19 +1,32 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip } from 'lucide-react';
+import { cn } from '../../utils/helpers';
 
-const MessageInput = ({ onSendMessage, disabled = false }) => {
+const MAX_LENGTH = 2000;
+
+/**
+ * Question composer.
+ *
+ * @param {Object} props
+ * @param {Function} props.onSendMessage - Called with the trimmed question.
+ * @param {boolean} [props.disabled] - Locks the field while an answer streams.
+ * @param {'docked'|'hero'} [props.variant] - Docked under the thread, or large on the home screen.
+ */
+const MessageInput = ({ onSendMessage, disabled = false, variant = 'docked' }) => {
   const [message, setMessage] = useState('');
   const [isComposing, setIsComposing] = useState(false);
   const textareaRef = useRef(null);
+  const isHero = variant === 'hero';
+  const maxHeight = isHero ? 220 : 160;
 
   // Auto-resize the textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
     }
-  }, [message]);
+  }, [message, maxHeight]);
 
   // Auto-focus
   useEffect(() => {
@@ -54,70 +67,80 @@ const MessageInput = ({ onSendMessage, disabled = false }) => {
   const canSend = message.trim() && !disabled && !isComposing;
 
   return (
-    <div className="bg-white border-t border-gray-200 px-4 py-4">
-      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-        <div className="relative">
-          {/* Input area */}
-          <div className="flex items-end space-x-3">
+    <div className={cn(!isHero && 'shrink-0 bg-gradient-to-t from-canvas from-60% to-canvas/0 pb-4 pt-2 sm:pb-5')}>
+      <form onSubmit={handleSubmit} className={cn(!isHero && 'mx-auto max-w-3xl px-4 sm:px-6')}>
+        <div
+          className={cn(
+            'relative rounded-2xl border border-line bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-accent/60 focus-within:shadow-focus',
+            isHero ? 'shadow-raised' : 'shadow-card',
+            disabled && 'bg-sunken'
+          )}
+        >
+          <label htmlFor={`question-${variant}`} className="sr-only">Votre question</label>
+          <textarea
+            id={`question-${variant}`}
+            ref={textareaRef}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            placeholder={disabled ? 'Veuillez patienter...' : (isHero ? 'Tapez votre question ici… par exemple sur une procédure, un accord ou une règle interne' : 'Tapez votre question ici…')}
+            className={cn(
+              'block w-full resize-none bg-transparent px-4 text-ink focus:outline-none disabled:cursor-not-allowed',
+              isHero ? 'min-h-[88px] pt-4 text-base' : 'pt-3.5 text-[15px]'
+            )}
+            rows={isHero ? 3 : 1}
+            disabled={disabled}
+            maxLength={MAX_LENGTH}
+          />
+
+          <div className="flex items-center gap-2 px-2.5 pb-2.5 pt-1">
             {/* Attachment button (placeholder for future features) */}
             <button
               type="button"
-              className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-ghost btn-icon h-8 w-8 text-ink-faint"
               disabled={disabled}
               title="Joindre un fichier (bientôt disponible)"
             >
-              <Paperclip className="h-5 w-5" />
+              <Paperclip className="h-4 w-4" aria-hidden="true" />
             </button>
 
-            {/* Textarea */}
-            <div className="flex-1 relative">
-              <textarea
-                ref={textareaRef}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-                placeholder={disabled ? "Veuillez patienter..." : "Tapez votre question ici... (Entrée pour envoyer, Shift+Entrée pour une nouvelle ligne)"}
-                className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                rows={1}
-                disabled={disabled}
-                maxLength={2000}
-              />
+            <p className="hidden min-w-0 flex-1 truncate text-xs text-ink-muted sm:block">
+              {disabled ? (
+                'Mimir rédige sa réponse…'
+              ) : (
+                <>
+                  <kbd className="kbd">Entrée</kbd> pour envoyer · <kbd className="kbd">Maj</kbd> + <kbd className="kbd">Entrée</kbd> pour un retour à la ligne
+                </>
+              )}
+            </p>
 
-              {/* Character counter */}
-              <div className="absolute bottom-1 right-1 text-xs text-gray-400">
-                {message.length}/2000
-              </div>
-            </div>
+            <span
+              className={cn(
+                'ml-auto tabular text-xs sm:ml-0',
+                message.length > MAX_LENGTH * 0.9 ? 'text-warning' : 'text-ink-faint'
+              )}
+            >
+              {message.length > 0 && `${message.length}/${MAX_LENGTH}`}
+            </span>
 
             {/* Send button */}
             <button
               type="submit"
               disabled={!canSend}
-              className={`flex-shrink-0 p-3 rounded-lg transition-colors duration-200 ${
+              className={cn(
+                'flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition-colors duration-150',
                 canSend
-                  ? 'bg-primary-600 hover:bg-primary-700 text-white'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+                  ? 'bg-accent text-accent-on shadow-xs hover:bg-accent-hover'
+                  : 'cursor-not-allowed bg-line-soft text-ink-faint'
+              )}
               title="Envoyer le message"
+              aria-label="Envoyer le message"
             >
-              <Send className="h-5 w-5" />
+              <span className={cn(!isHero && 'sr-only')}>Envoyer</span>
+              <Send className="h-4 w-4" aria-hidden="true" />
             </button>
-          </div>
-
-          {/* Status indicators */}
-          <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-            <div className="flex items-center space-x-4">
-              <span>
-                💡 Astuce: Utilisez Shift+Entrée pour une nouvelle ligne
-              </span>
-            </div>
-            {disabled && (
-              <span className="text-orange-600">
-                Traitement en cours...
-              </span>
-            )}
           </div>
         </div>
       </form>

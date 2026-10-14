@@ -107,7 +107,7 @@ describe('SourcesList', () => {
     const { container } = render(<SourcesList sources={mockSources} />);
     expand();
 
-    const progressBars = container.querySelectorAll('.bg-primary-600');
+    const progressBars = container.querySelectorAll('.bg-accent');
     expect(progressBars).toHaveLength(3);
 
     // documentItems are sorted by descending maxScore: 91%, 85%, 72%
@@ -130,7 +130,7 @@ describe('SourcesList', () => {
 
     // Click the modal action icon of the first (most relevant) document row.
     const firstExternalIcon = screen.getAllByTestId('external-icon')[0];
-    fireEvent.click(firstExternalIcon.closest('div[title]'));
+    fireEvent.click(firstExternalIcon.closest('button'));
 
     const modal = screen.getByTestId('document-modal');
     // Most relevant document is manual.txt (91%) → doc-3
@@ -191,10 +191,10 @@ describe('SourcesList', () => {
     expand();
 
     // The document row carries the item-level hover classes.
-    const itemRow = container.querySelector('.hover\\:bg-gray-50');
+    const itemRow = container.querySelector('li');
     expect(itemRow).not.toBeNull();
     expect(itemRow).toHaveClass('transition-colors', 'duration-200');
-    expect(itemRow).toHaveClass('hover:border-gray-300');
+    expect(itemRow).toHaveClass('hover:border-line', 'hover:bg-sunken/60');
   });
 
   it('respecte la limite de caractères pour la troncature', () => {

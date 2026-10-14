@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Activity,
   Search,
-  Filter,
   Download,
   Clock,
   Server,
@@ -11,15 +10,14 @@ import {
   AlertCircle,
   Info,
   AlertTriangle,
-  Bug,
-  CheckCircle
+  Bug
 } from 'lucide-react';
 
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { adminAPI } from '../../services/api';
-import { getErrorMessage, formatRelativeDate, safeDisplayValue } from '../../utils/helpers';
+import { getErrorMessage, formatRelativeDate, cn } from '../../utils/helpers';
 
-const LogViewer = ({ onRefresh }) => {
+const LogViewer = () => {
   const { refreshTrigger } = useOutletContext();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,11 +39,8 @@ const LogViewer = ({ onRefresh }) => {
   // Separate state for search input to enable debouncing
   const [searchInput, setSearchInput] = useState(filters.search);
 
-  // Flag to avoid triggering filter effect on initial load
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Load logs with current filters
-  const loadLogs = async () => {
+  // Load logs with current filters (new identity whenever a filter changes)
+  const loadLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -61,19 +56,12 @@ const LogViewer = ({ onRefresh }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  // Initial load
+  // Load on mount, on every filter change and on each global refresh
   useEffect(() => {
     loadLogs();
-  }, []);
-
-  // Listen to parent refreshTrigger for global refresh
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      loadLogs();
-    }
-  }, [refreshTrigger]);
+  }, [loadLogs, refreshTrigger]);
 
   // Debounced search effect
   useEffect(() => {
@@ -85,16 +73,6 @@ const LogViewer = ({ onRefresh }) => {
 
     return () => clearTimeout(timer);
   }, [searchInput, filters.search]);
-
-  // Automatic filter application (excluding initial load)
-  useEffect(() => {
-    if (!isInitialized) {
-      setIsInitialized(true);
-      return;
-    }
-
-    loadLogs();
-  }, [filters.level, filters.source, filters.limit, filters.search]);
 
   // Handle filter changes for dropdowns (immediate)
   const handleFilterChange = (newFilters) => {
@@ -110,15 +88,15 @@ const LogViewer = ({ onRefresh }) => {
   // Get level icon and color
   const getLevelDisplay = (level) => {
     const levelMap = {
-      'DEBUG': { icon: Bug, color: 'text-gray-600', bg: 'bg-gray-100' },
-      'INFO': { icon: Info, color: 'text-blue-600', bg: 'bg-blue-100' },
-      'WARN': { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-      'WARNING': { icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-      'ERROR': { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100' },
-      'CRITICAL': { icon: AlertCircle, color: 'text-red-700', bg: 'bg-red-200' }
+      'DEBUG': { icon: Bug, className: 'badge-neutral' },
+      'INFO': { icon: Info, className: 'badge-accent' },
+      'WARN': { icon: AlertTriangle, className: 'badge-warning' },
+      'WARNING': { icon: AlertTriangle, className: 'badge-warning' },
+      'ERROR': { icon: AlertCircle, className: 'badge-danger' },
+      'CRITICAL': { icon: AlertCircle, className: 'badge-danger font-semibold' }
     };
 
-    return levelMap[level] || { icon: Info, color: 'text-gray-600', bg: 'bg-gray-100' };
+    return levelMap[level] || { icon: Info, className: 'badge-neutral' };
   };
 
   // Get source icon
@@ -130,7 +108,7 @@ const LogViewer = ({ onRefresh }) => {
   const formatTimestamp = (timestamp) => {
     try {
       const date = new Date(timestamp);
-      return date.toLocaleString();
+      return date.toLocaleString('fr-FR');
     } catch {
       return timestamp;
     }
@@ -154,57 +132,53 @@ const LogViewer = ({ onRefresh }) => {
 
   if (loading && !logs.length) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Chargement des logs système...</p>
-        </div>
+      <div className="card flex flex-col items-center justify-center gap-4 py-16">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-ink-muted">Chargement des logs système...</p>
       </div>
     );
   }
 
   return (
-    <div className="card p-6">
-      {/* Header with filters */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <Activity className="h-5 w-5 text-gray-600 mr-2" />
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Logs Système</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Logs backend et frontend en temps réel
-            </p>
-          </div>
+    <section className="card overflow-hidden">
+      {/* Header */}
+      <div className="card-header flex-wrap">
+        <div>
+          <h2 className="card-title">
+            <Activity className="h-4 w-4 text-accent" aria-hidden="true" />
+            Logs système
+          </h2>
+          <p className="mt-0.5 text-[13px] text-ink-muted">Logs backend et frontend en temps réel</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-3">
           {lastUpdate && (
-            <span className="text-xs text-gray-500">
-              Dernière maj : {formatRelativeDate(lastUpdate.toISOString())}
+            <span className="text-xs text-ink-muted">
+              Mis à jour {formatRelativeDate(lastUpdate.toISOString()).toLowerCase()}
             </span>
           )}
           <button
+            type="button"
             onClick={exportLogs}
             disabled={!logs.length}
-            className="btn-secondary text-sm"
+            className="btn-secondary btn-sm"
             title="Exporter les logs"
           >
-            <Download className="h-4 w-4 mr-1" />
-            Export
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            Exporter
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 gap-3 border-b border-line-soft bg-sunken/50 px-5 py-4 lg:grid-cols-[1fr_1fr_2fr_1fr]">
         {/* Level */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Niveau
-          </label>
+          <label htmlFor="logs-level" className="field-label text-xs">Niveau</label>
           <select
+            id="logs-level"
             value={filters.level}
             onChange={(e) => handleFilterChange({ level: e.target.value })}
-            className="input text-sm"
+            className="select h-9"
           >
             <option value="ALL">Tous</option>
             <option value="DEBUG">DEBUG</option>
@@ -216,13 +190,12 @@ const LogViewer = ({ onRefresh }) => {
 
         {/* Source */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Source
-          </label>
+          <label htmlFor="logs-source" className="field-label text-xs">Source</label>
           <select
+            id="logs-source"
             value={filters.source}
             onChange={(e) => handleFilterChange({ source: e.target.value })}
-            className="input text-sm"
+            className="select h-9"
           >
             <option value="ALL">Toutes</option>
             <option value="backend">Backend</option>
@@ -231,31 +204,29 @@ const LogViewer = ({ onRefresh }) => {
         </div>
 
         {/* Search */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Recherche
-          </label>
+        <div className="col-span-2 lg:col-span-1">
+          <label htmlFor="logs-search" className="field-label text-xs">Recherche</label>
           <div className="relative">
-            <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
             <input
-              type="text"
-              placeholder="Rechercher..."
+              id="logs-search"
+              type="search"
+              placeholder="Rechercher dans les messages..."
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="input text-sm pl-10"
+              className="input-field h-9 pl-9"
             />
           </div>
         </div>
 
         {/* Limit */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Limite
-          </label>
+        <div className="col-span-2 lg:col-span-1">
+          <label htmlFor="logs-limit" className="field-label text-xs">Limite</label>
           <select
+            id="logs-limit"
             value={filters.limit}
             onChange={(e) => handleFilterChange({ limit: parseInt(e.target.value) })}
-            className="input text-sm"
+            className="select h-9"
           >
             <option value={25}>25</option>
             <option value={50}>50</option>
@@ -265,30 +236,25 @@ const LogViewer = ({ onRefresh }) => {
         </div>
       </div>
 
-
       {/* Summary */}
       {summary && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>
-              {summary.total_logs_count} logs disponibles
-              ({summary.backend_logs_count} backend, {summary.frontend_logs_count} frontend)
-            </span>
-            <span>
-              {logs.length} logs affichés
-            </span>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-5 py-2.5 text-xs text-ink-muted tabular">
+          <span>
+            {summary.total_logs_count} logs disponibles
+            ({summary.backend_logs_count} backend, {summary.frontend_logs_count} frontend)
+          </span>
+          <span>{logs.length} logs affichés</span>
         </div>
       )}
 
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+        <div className="px-5 pt-4">
+          <div role="alert" className="alert-danger">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <div>
-              <h3 className="text-sm font-medium text-red-900">Erreur de chargement</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <p className="font-semibold">Erreur de chargement</p>
+              <p className="mt-0.5">{error}</p>
             </div>
           </div>
         </div>
@@ -296,68 +262,52 @@ const LogViewer = ({ onRefresh }) => {
 
       {/* Logs list */}
       {logs.length === 0 ? (
-        <div className="p-8 text-center">
-          <Activity className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-600">Aucun log trouvé avec les filtres actuels</p>
+        <div className="flex flex-col items-center px-6 py-14 text-center">
+          <Activity className="h-8 w-8 text-ink-faint" aria-hidden="true" />
+          <p className="mt-3 text-sm text-ink-muted">Aucun log trouvé avec les filtres actuels</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-200">
+        <ul className={cn('max-h-[620px] divide-y divide-line-soft overflow-y-auto transition-opacity', loading && 'opacity-60')}>
           {logs.map((log, index) => {
             const levelDisplay = getLevelDisplay(log.level);
             const SourceIcon = getSourceIcon(log.source);
             const LevelIcon = levelDisplay.icon;
 
             return (
-              <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-start space-x-3">
-                  {/* Level badge */}
-                  <div className={`flex items-center px-2 py-1 rounded-full ${levelDisplay.bg} ${levelDisplay.color}`}>
-                    <LevelIcon className="h-3 w-3 mr-1" />
-                    <span className="text-xs font-medium">{log.level}</span>
-                  </div>
-
-                  {/* Source icon */}
-                  <div className="flex items-center">
-                    <SourceIcon className={`h-4 w-4 ${log.source === 'backend' ? 'text-green-600' : 'text-blue-600'}`} />
-                  </div>
-
-                  {/* Log content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-900">
-                          {log.module}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {log.source}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatTimestamp(log.timestamp)}
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-700 mt-1">
-                      {log.message}
-                    </p>
-                    {log.details && Object.keys(log.details).length > 0 && (
-                      <details className="mt-2">
-                        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                          Détails...
-                        </summary>
-                        <pre className="text-xs text-gray-600 mt-1 bg-gray-100 p-2 rounded overflow-x-auto">
-                          {JSON.stringify(log.details, null, 2)}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
+              <li key={index} className="px-5 py-3 transition-colors hover:bg-sunken/60">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className={cn('w-[84px] justify-center', levelDisplay.className)}>
+                    <LevelIcon className="h-3 w-3" aria-hidden="true" />
+                    {log.level}
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs font-medium text-ink">
+                    <SourceIcon className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-label={log.source} />
+                    <span className="truncate">{log.module}</span>
+                  </span>
+                  <span className="ml-auto flex items-center gap-1 font-mono text-2xs text-ink-muted tabular">
+                    <Clock className="h-3 w-3" aria-hidden="true" />
+                    {formatTimestamp(log.timestamp)}
+                  </span>
                 </div>
-              </div>
+                <p className="mt-1.5 break-words text-[13px] leading-relaxed text-ink sm:pl-[96px]">
+                  {log.message}
+                </p>
+                {log.details && Object.keys(log.details).length > 0 && (
+                  <details className="group mt-1.5 sm:pl-[96px]">
+                    <summary className="cursor-pointer select-none text-xs font-medium text-accent-ink hover:underline">
+                      Détails
+                    </summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-line-soft bg-sunken p-3 font-mono text-xs leading-relaxed text-ink-muted">
+                      {JSON.stringify(log.details, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
-    </div>
+    </section>
   );
 };
 

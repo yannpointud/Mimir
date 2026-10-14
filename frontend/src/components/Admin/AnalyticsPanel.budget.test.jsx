@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getBudgetStatus } from './AnalyticsPanel';
+import { getBudgetStatus } from '../../utils/budget';
 
 // Pure helper coverage for the Coûts IA gauge three-state mapping (COST-02).
 describe('getBudgetStatus', () => {

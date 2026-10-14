@@ -8,7 +8,8 @@ import {
   getFileExtension,
   isSupportedFileType,
   translateDocumentStatus,
-  getStatusColor
+  getStatusColor,
+  getErrorMessage
 } from '../../utils/helpers';
 
 describe('helpers utilities', () => {
@@ -26,6 +27,10 @@ describe('helpers utilities', () => {
 
     it('retourne "Date invalide" pour une date invalide', () => {
       expect(formatDate('invalid-date')).toBe('Date invalide');
+    });
+
+    it('lit une date serveur sans fuseau comme UTC', () => {
+      expect(formatDate('2026-10-13T13:36:00.123456')).toBe(formatDate('2026-10-13T13:36:00.123Z'));
     });
   });
 
@@ -115,14 +120,25 @@ describe('helpers utilities', () => {
 
   describe('getStatusColor', () => {
     it('retourne les bonnes classes CSS', () => {
-      expect(getStatusColor('pending')).toContain('bg-yellow-100');
-      expect(getStatusColor('indexing')).toContain('bg-blue-100');
-      expect(getStatusColor('indexed')).toContain('bg-green-100');
-      expect(getStatusColor('error')).toContain('bg-red-100');
+      expect(getStatusColor('pending')).toBe('badge-neutral');
+      expect(getStatusColor('indexing')).toBe('badge-accent');
+      expect(getStatusColor('indexed')).toBe('badge-success');
+      expect(getStatusColor('error')).toBe('badge-danger');
     });
 
     it('retourne la couleur par défaut pour un statut inconnu', () => {
-      expect(getStatusColor('unknown')).toContain('bg-gray-100');
+      expect(getStatusColor('unknown')).toBe('badge-neutral');
+    });
+  });
+
+  describe('getErrorMessage', () => {
+    it('lit le message du format ErrorResponse du backend', () => {
+      const error = { message: 'Request failed with status code 500', response: { data: { error_code: 'HTTP_500', error_message: 'Erreur lors de la modification' } } };
+      expect(getErrorMessage(error)).toBe('Erreur lors de la modification');
+    });
+
+    it('retombe sur le message de la requête sans corps exploitable', () => {
+      expect(getErrorMessage({ message: 'Network Error' })).toBe('Network Error');
     });
   });
 });

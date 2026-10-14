@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Clock,
   Database,
   Cpu,
   HardDrive,
@@ -22,7 +21,36 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 import LogViewer from './LogViewer';
 
 import { healthAPI, adminAPI } from '../../services/api';
-import { getErrorMessage, formatRelativeDate, safeDisplayValue } from '../../utils/helpers';
+import { getErrorMessage, formatRelativeDate, safeDisplayValue, cn } from '../../utils/helpers';
+
+const CacheGauge = ({ title, stats, onClear, disabled }) => (
+  <div>
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium text-ink">{title}</span>
+      <button
+        type="button"
+        onClick={onClear}
+        disabled={disabled}
+        className="text-xs font-medium text-danger underline-offset-2 hover:underline disabled:opacity-50"
+      >
+        Vider
+      </button>
+    </div>
+    <div className="mt-2 flex items-center justify-between text-xs text-ink-muted tabular">
+      <span>Utilisation</span>
+      <span>
+        {safeDisplayValue(stats.size, 0)}/{safeDisplayValue(stats.max_size, 0)}
+        {' '}({Math.round(safeDisplayValue(stats.utilization, 0))}%)
+      </span>
+    </div>
+    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-line-soft" aria-hidden="true">
+      <div
+        className="h-full rounded-full bg-accent"
+        style={{ width: `${safeDisplayValue(stats.utilization, 0)}%` }}
+      />
+    </div>
+  </div>
+);
 
 const StatusBar = () => {
   const { onRefresh, refreshTrigger } = useOutletContext();
@@ -104,288 +132,215 @@ const StatusBar = () => {
     }
   };
 
-  // Get the status icon
-  const getStatusIcon = (status) => {
-    // Handle objects with healthy property (boolean)
+  // Normalize the different status shapes (object with `healthy`, boolean, string)
+  const isServiceHealthy = (status) => {
     if (typeof status === 'object' && status !== null && 'healthy' in status) {
-      return status.healthy ?
-        <CheckCircle className="h-5 w-5 text-green-600" /> :
-        <XCircle className="h-5 w-5 text-red-600" />;
+      return status.healthy;
     }
-
-    // Handle direct booleans
     if (typeof status === 'boolean') {
-      return status ?
-        <CheckCircle className="h-5 w-5 text-green-600" /> :
-        <XCircle className="h-5 w-5 text-red-600" />;
+      return status;
     }
-
-    // Handle strings (existing format)
-    switch (status) {
-      case 'healthy':
-      case 'ok':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
-      case 'error':
-      case 'unhealthy':
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return <Clock className="h-5 w-5 text-gray-600" />;
-    }
+    return status === 'healthy' || status === 'ok';
   };
 
-  // Get background color for status
-  const getStatusBgColor = (status) => {
-    switch (status) {
-      case 'healthy':
-      case 'ok':
-        return 'bg-green-50 border-green-200';
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200';
-      case 'error':
-      case 'unhealthy':
-        return 'bg-red-50 border-red-200';
-      default:
-        return 'bg-gray-50 border-gray-200';
+  const getStatusLabel = (status) => {
+    if (typeof status === 'object' && status !== null && 'healthy' in status) {
+      return status.healthy ? 'OK' : 'Erreur';
     }
+    if (typeof status === 'boolean') {
+      return status ? 'OK' : 'Erreur';
+    }
+    return typeof status === 'object' ? status.status : status;
+  };
+
+  const SERVICE_META = {
+    database: { label: 'Base de données', icon: Database },
+    faiss: { label: 'Index vectoriel', icon: BarChart3 },
+    vector_store: { label: 'Index vectoriel', icon: Search },
+    llm: { label: 'Service LLM', icon: Wifi },
+    llm_api: { label: 'Service LLM', icon: Wifi },
+    cache: { label: 'Cache', icon: HardDrive },
+    email_service: { label: 'Service e-mail', icon: Mail },
+  };
+
+  // Short factual detail shown under each service name, from the health payload
+  const getServiceDetail = (service, status) => {
+    if (typeof status !== 'object' || status === null) return null;
+    if (service === 'database' && status.document_count != null) return `${status.document_count} documents`;
+    if ((service === 'llm_api' || service === 'llm') && status.model) return `${status.provider || ''} · ${status.model}`;
+    if (status.vectors) return `${status.vectors} vecteurs`;
+    return null;
   };
 
   if (loading && !healthData) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Chargement du monitoring...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-4 py-24">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-ink-muted">Chargement du monitoring...</p>
       </div>
     );
   }
 
-  return (
-    <div className="p-4 max-w-7xl h-full">
+  const isHealthy = healthData?.status === 'healthy';
 
+  return (
+    <div className="space-y-6">
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <div className="flex">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-            <div>
-              <h3 className="text-sm font-medium text-red-900">Erreur de monitoring</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
+        <div role="alert" className="alert-danger">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Erreur de monitoring</p>
+            <p className="mt-0.5">{error}</p>
           </div>
         </div>
       )}
 
       {/* Global status */}
       {healthData && (
-        <div className={`border rounded-lg p-6 mb-6 ${getStatusBgColor(healthData.status)}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              {getStatusIcon(healthData.status)}
-              <div className="ml-3">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Statut Global : {healthData.status === 'healthy' ? 'Système Opérationnel' : 'Problème Détecté'}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Dernière vérification : {formatRelativeDate(healthData.timestamp)}
-                </p>
-              </div>
-            </div>
+        <div
+          className={cn(
+            'flex items-center gap-4 rounded-xl border px-5 py-4',
+            isHealthy ? 'border-success/25 bg-success-soft' : 'border-danger/25 bg-danger-soft'
+          )}
+        >
+          <span
+            className={cn(
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+              isHealthy ? 'bg-success text-white' : 'bg-danger text-white'
+            )}
+          >
+            {isHealthy ? <CheckCircle className="h-5 w-5" aria-hidden="true" /> : <XCircle className="h-5 w-5" aria-hidden="true" />}
+          </span>
+          <div className="min-w-0">
+            <h2 className={cn('font-semibold', isHealthy ? 'text-success-ink' : 'text-danger-ink')}>
+              {isHealthy ? 'Système opérationnel' : 'Problème détecté'}
+            </h2>
+            <p className={cn('text-sm', isHealthy ? 'text-success-ink/80' : 'text-danger-ink/80')}>
+              Dernière vérification : {formatRelativeDate(healthData.timestamp)}
+            </p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* System services */}
         {healthData?.checks && (
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Cpu className="h-5 w-5 mr-2" />
-              Services Système
-            </h3>
-
-            <div className="space-y-3">
-              {Object.entries(healthData.checks).map(([service, status]) => (
-                <div key={service} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
-                  <div className="flex items-center">
-                    {service === 'database' && <Database className="h-4 w-4 mr-2 text-gray-500" />}
-                    {service === 'faiss' && <BarChart3 className="h-4 w-4 mr-2 text-gray-500" />}
-                    {service === 'vector_store' && <Search className="h-4 w-4 mr-2 text-gray-500" />}
-                    {service === 'llm' && <Wifi className="h-4 w-4 mr-2 text-gray-500" />}
-                    {service === 'llm_api' && <Wifi className="h-4 w-4 mr-2 text-gray-500" />}
-                    {service === 'cache' && <HardDrive className="h-4 w-4 mr-2 text-gray-500" />}
-                    {service === 'email_service' && <Mail className="h-4 w-4 mr-2 text-gray-500" />}
-                    <span className="text-sm font-medium text-gray-900 capitalize">
-                      {service === 'faiss' ? 'Index Vectoriel' :
-                       service === 'vector_store' ? 'Index Vectoriel' :
-                       service === 'llm' ? 'Service LLM' :
-                       service === 'llm_api' ? 'Service LLM' :
-                       service === 'database' ? 'Base de Données' :
-                       service === 'cache' ? 'Cache' :
-                       service === 'email_service' ? 'Service Email' : service}
-                    </span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="mr-2 text-sm text-gray-600">
-                      {typeof status === 'object' && status !== null && 'healthy' in status
-                        ? (status.healthy ? 'OK' : 'Erreur')
-                        : (typeof status === 'boolean'
-                          ? (status ? 'OK' : 'Erreur')
-                          : (typeof status === 'object' ? status.status : status))}
-                    </span>
-                    {typeof status === 'object' && status.vectors && (
-                      <span className="mr-2 text-xs text-gray-500">
-                        ({status.vectors} vecteurs)
-                      </span>
-                    )}
-                    {getStatusIcon(status)}
-                  </div>
-                </div>
-              ))}
+          <section className="card">
+            <div className="card-header">
+              <h2 className="card-title">
+                <Cpu className="h-4 w-4 text-accent" aria-hidden="true" />
+                Services système
+              </h2>
             </div>
-          </div>
+
+            <ul className="divide-y divide-line-soft">
+              {Object.entries(healthData.checks).map(([service, status]) => {
+                const meta = SERVICE_META[service] || { label: service, icon: Activity };
+                const Icon = meta.icon;
+                const healthy = isServiceHealthy(status);
+                const detail = getServiceDetail(service, status);
+                return (
+                  <li key={service} className="flex items-center gap-3 px-5 py-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sunken text-ink-muted">
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-ink">{meta.label}</p>
+                      {detail && <p className="truncate text-xs text-ink-muted">{detail}</p>}
+                    </div>
+                    <span className={cn('badge-dot', healthy ? 'badge-success' : 'badge-danger')}>
+                      {getStatusLabel(status)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         )}
 
         {/* Cache statistics */}
         {cacheStats && (
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <HardDrive className="h-5 w-5 mr-2" />
-                Cache Système
-              </h3>
+          <section className="card">
+            <div className="card-header">
+              <h2 className="card-title">
+                <HardDrive className="h-4 w-4 text-accent" aria-hidden="true" />
+                Cache système
+              </h2>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => clearCache('all')}
                   disabled={clearingCache || rebuildingIndex}
-                  className="btn-danger text-sm"
+                  className="btn-danger-ghost btn-sm"
                   title="Vider tout le cache"
                 >
                   {clearingCache ? (
-                    <LoadingSpinner size="sm" className="mr-2" />
+                    <LoadingSpinner size="sm" className="h-3.5 w-3.5 text-current" />
                   ) : (
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   )}
                   Vider
                 </button>
                 <button
+                  type="button"
                   onClick={rebuildVectorIndex}
                   disabled={rebuildingIndex || clearingCache}
-                  className="btn-secondary text-sm"
+                  className="btn-secondary btn-sm"
                   title="Reconstruire l'index vectoriel FAISS"
                 >
                   {rebuildingIndex ? (
-                    <LoadingSpinner size="sm" className="mr-2" />
+                    <LoadingSpinner size="sm" className="h-3.5 w-3.5" />
                   ) : (
-                    <Wrench className="h-4 w-4 mr-2" />
+                    <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
                   )}
-                  Rebuild Index
+                  Reconstruire l&apos;index
                 </button>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="card-body space-y-5">
               {/* Main cache */}
               {cacheStats.main_cache && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Cache Principal</span>
-                    <button
-                      onClick={() => clearCache('main')}
-                      disabled={clearingCache}
-                      className="text-xs text-red-600 hover:text-red-700"
-                    >
-                      Vider
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Utilisation</span>
-                      <span className="text-gray-900">
-                        {safeDisplayValue(cacheStats.main_cache.size, 0)}/{safeDisplayValue(cacheStats.main_cache.max_size, 0)}
-                        ({Math.round(safeDisplayValue(cacheStats.main_cache.utilization, 0))}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${safeDisplayValue(cacheStats.main_cache.utilization, 0)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <CacheGauge title="Cache principal" stats={cacheStats.main_cache} onClear={() => clearCache('main')} disabled={clearingCache} />
               )}
 
               {/* Chat cache */}
               {cacheStats.chat_cache && (
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Cache Chat</span>
-                    <button
-                      onClick={() => clearCache('chat')}
-                      disabled={clearingCache}
-                      className="text-xs text-red-600 hover:text-red-700"
-                    >
-                      Vider
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Utilisation</span>
-                      <span className="text-gray-900">
-                        {safeDisplayValue(cacheStats.chat_cache.size, 0)}/{safeDisplayValue(cacheStats.chat_cache.max_size, 0)}
-                        ({Math.round(safeDisplayValue(cacheStats.chat_cache.utilization, 0))}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-green-600 h-2 rounded-full"
-                        style={{ width: `${safeDisplayValue(cacheStats.chat_cache.utilization, 0)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <CacheGauge title="Cache chat" stats={cacheStats.chat_cache} onClear={() => clearCache('chat')} disabled={clearingCache} />
               )}
 
               {/* Global statistics */}
               {cacheStats.global_stats && (
-                <div className="pt-3 border-t border-gray-200">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-green-600">
-                        {Math.round(safeDisplayValue(cacheStats.global_stats.hit_ratio, 0) * 100)}%
-                      </div>
-                      <div className="text-gray-600">Taux de réussite</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-blue-600">
-                        {safeDisplayValue(cacheStats.global_stats.total_requests, 0)}
-                      </div>
-                      <div className="text-gray-600">Requêtes totales</div>
-                    </div>
+                <div className="grid grid-cols-2 gap-3 border-t border-line-soft pt-4">
+                  <div className="rounded-lg bg-sunken px-4 py-3">
+                    <p className="text-xs text-ink-muted">Taux de réussite</p>
+                    <p className="mt-0.5 font-serif text-2xl font-semibold text-ink tabular">
+                      {Math.round(safeDisplayValue(cacheStats.global_stats.hit_ratio, 0) * 100)}%
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-sunken px-4 py-3">
+                    <p className="text-xs text-ink-muted">Requêtes totales</p>
+                    <p className="mt-0.5 font-serif text-2xl font-semibold text-ink tabular">
+                      {safeDisplayValue(cacheStats.global_stats.total_requests, 0)}
+                    </p>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
       </div>
 
       {/* System logs - Full width */}
-      <LogViewer onRefresh={onRefresh} />
+      <LogViewer />
 
       {/* Automatic update information */}
-      <div className="mt-6 bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center text-sm text-gray-600">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          <span>
-            Cette page se met à jour automatiquement toutes les 60 secondes.
-            Dernière actualisation : {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Jamais'}
-          </span>
-        </div>
-      </div>
+      <p className="flex items-center gap-2 text-xs text-ink-muted">
+        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+        Cette page se met à jour automatiquement toutes les 60 secondes.
+        Dernière actualisation : {lastUpdate ? lastUpdate.toLocaleTimeString('fr-FR') : 'Jamais'}
+      </p>
     </div>
   );
 };

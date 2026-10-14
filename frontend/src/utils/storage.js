@@ -105,7 +105,12 @@ export const chatHistoryStorage = {
       if (!msg.sources || msg.sources.length === 0) return msg;
       return {
         ...msg,
-        sources: msg.sources.map(({ chunk_text, text, ...rest }) => rest)
+        sources: msg.sources.map((source) => {
+          const lightSource = { ...source };
+          delete lightSource.chunk_text;
+          delete lightSource.text;
+          return lightSource;
+        })
       };
     });
 

@@ -1,13 +1,37 @@
 import { useState, useRef, useEffect } from 'react';
-import { AlertCircle, Mail } from 'lucide-react';
+import { AlertCircle, Mail, Plus, X } from 'lucide-react';
 
 import ChatWindow from './ChatWindow';
+import ChatHome from './ChatHome';
+import ChatAside from './ChatAside';
 import MessageInput from './MessageInput';
 import EscalationDialog from './EscalationDialog';
+import { TopbarActions } from '../Common/Layout';
 
 import { chatAPI } from '../../services/api';
-import { getErrorMessage, generateSessionId, safeDisplayValue } from '../../utils/helpers';
+import { getErrorMessage, generateSessionId } from '../../utils/helpers';
 import { chatHistoryStorage, chatSessionStorage } from '../../utils/storage';
+
+// Welcome messages seed every session; they render as the home screen, not as bubbles.
+const isWelcomeMessage = (message) => String(message.id).startsWith('welcome');
+
+// Turns raw transport errors from the stream client into an actionable sentence.
+// A 429 covers both the per-minute rate limit and the daily AI budget cap.
+const describeChatError = (message) => {
+  if (message.startsWith('HTTP 429')) {
+    return 'Mimir ne peut pas répondre pour le moment (limite de requêtes ou plafond de dépense quotidien atteint). Réessayez plus tard.';
+  }
+  if (message.startsWith('HTTP 5')) {
+    return `Le serveur a rencontré un problème (${message}). Réessayez dans quelques instants.`;
+  }
+  if (message === 'Failed to fetch') {
+    return 'Impossible de joindre le serveur. Vérifiez votre connexion.';
+  }
+  if (message === 'Stream closed before completion') {
+    return 'La réponse a été interrompue avant la fin. Réessayez.';
+  }
+  return message;
+};
 
 const ChatPage = () => {
   const [sessionId] = useState(() => {
@@ -28,7 +52,6 @@ const ChatPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showEscalation, setShowEscalation] = useState(false);
-  const [streamingMessageId, setStreamingMessageId] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Save history on every message change
@@ -97,7 +120,10 @@ const ChatPage = () => {
     };
 
     setMessages(prev => [...prev, assistantMessage]);
-    setStreamingMessageId(assistantMessageId);
+
+    // Set once the failure is shown inside the thread, so the global banner
+    // does not repeat it (the stream client calls onError, then rejects).
+    let reportedInThread = false;
 
     try {
       await chatAPI.sendMessageStream(content.trim(), sessionId, {
@@ -134,35 +160,34 @@ const ChatPage = () => {
               : msg
           ));
 
-          setStreamingMessageId(null);
           setIsLoading(false);
         },
 
         onError: (errorMessage) => {
           console.error('Stream error:', errorMessage);
-
-          setError(errorMessage);
+          const readableError = describeChatError(errorMessage);
+          reportedInThread = true;
 
           setMessages(prev => prev.map(msg =>
             msg.id === assistantMessageId
               ? {
                   ...msg,
-                  content: `Désolé, une erreur s'est produite: ${errorMessage}`,
+                  content: `Désolé, une erreur s'est produite : ${readableError}`,
                   isStreaming: false,
                   type: 'error'
                 }
               : msg
           ));
 
-          setStreamingMessageId(null);
           setIsLoading(false);
         }
       });
 
     } catch (error) {
       console.error('=== ERREUR STREAMING ===', error);
-      setError(getErrorMessage(error));
-      setStreamingMessageId(null);
+      if (!reportedInThread) {
+        setError(describeChatError(getErrorMessage(error)));
+      }
       setIsLoading(false);
     }
   };
@@ -204,69 +229,83 @@ const ChatPage = () => {
     setError(null);
   };
 
+  const openEscalation = () => setShowEscalation(true);
+  const welcomeMessage = messages.find(isWelcomeMessage);
+  const conversation = messages.filter(message => !isWelcomeMessage(message));
+  const isHome = conversation.length === 0;
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">
-              Assistant Documentaire Mimir
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Posez vos questions sur la documentation de l&apos;entreprise
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowEscalation(true)}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              title="Contacter un humain"
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Contacter un humain</span>
-            </button>
-            <button
-              onClick={handleNewConversation}
-              className="btn-secondary text-sm"
-            >
-              Nouvelle conversation
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="flex min-h-0 flex-1">
+      <TopbarActions>
+        <button
+          type="button"
+          onClick={openEscalation}
+          className="btn-nav"
+          title="Contacter un humain"
+        >
+          <Mail className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only">Contacter un humain</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleNewConversation}
+          className="btn-nav-primary"
+          title="Nouvelle conversation"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only">Nouvelle conversation</span>
+        </button>
+      </TopbarActions>
 
-      {/* Global error message */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+      <section aria-label="Conversation" className="flex min-w-0 flex-1 flex-col">
+        {/* Global error message */}
+        {error && (
+          <div className="px-4 pt-4 sm:px-6">
+            <div role="alert" className="alert-danger mx-auto max-w-3xl animate-slide-up">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p className="flex-1">{error}</p>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="-my-1 -mr-2 flex h-7 w-7 items-center justify-center rounded-md hover:bg-danger/10"
+                aria-label="Fermer le message d'erreur"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
             </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-600"
-            >
-              ×
-            </button>
           </div>
-        </div>
+        )}
+
+        {isHome ? (
+          <ChatHome
+            welcomeText={welcomeMessage?.content}
+            onSendMessage={handleSendMessage}
+            onContactHuman={openEscalation}
+            disabled={isLoading}
+          />
+        ) : (
+          <>
+            <ChatWindow
+              messages={conversation}
+              isLoading={isLoading}
+              messagesEndRef={messagesEndRef}
+              onEscalate={openEscalation}
+            />
+
+            <MessageInput
+              onSendMessage={handleSendMessage}
+              disabled={isLoading}
+            />
+          </>
+        )}
+      </section>
+
+      {!isHome && (
+        <ChatAside
+          messages={conversation}
+          onContactHuman={openEscalation}
+        />
       )}
-
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <ChatWindow
-          messages={messages}
-          isLoading={isLoading}
-          messagesEndRef={messagesEndRef}
-        />
-
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          disabled={isLoading}
-        />
-      </div>
 
       {/* Escalation dialog */}
       <EscalationDialog

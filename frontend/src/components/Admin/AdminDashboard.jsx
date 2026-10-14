@@ -1,14 +1,75 @@
-import { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { documentsAPI, healthAPI } from '../../services/api';
-import { getErrorMessage, safeFormatNumber, safeGetProperty } from '../../utils/helpers';
+import { getErrorMessage, safeFormatNumber, safeGetProperty, cn } from '../../utils/helpers';
 import {
   FileText,
-  BarChart3,
+  Upload,
+  Settings,
+  Activity,
+  TrendingUp,
   RefreshCw,
   AlertCircle,
-  Activity
+  X
 } from 'lucide-react';
+
+const SECTIONS = [
+  {
+    href: '/admin/documents',
+    name: 'Documents',
+    icon: FileText,
+    title: 'Documents',
+    description: 'Index et statut des documents de la base documentaire'
+  },
+  {
+    href: '/admin/upload',
+    name: 'Importer',
+    icon: Upload,
+    title: 'Importer des documents',
+    description: 'Ajoutez de nouveaux fichiers à la base documentaire'
+  },
+  {
+    href: '/admin/config',
+    name: 'Configuration',
+    icon: Settings,
+    title: 'Configuration',
+    description: 'Paramètres système en lecture seule et sécurité du compte'
+  },
+  {
+    href: '/admin/monitoring',
+    name: 'Monitoring',
+    icon: Activity,
+    title: 'Monitoring',
+    description: 'État de santé des services et journaux en temps réel'
+  },
+  {
+    href: '/admin/analytics',
+    name: 'Analytics',
+    icon: TrendingUp,
+    title: 'Analytics',
+    description: 'Utilisation, performances et coûts IA'
+  }
+];
+
+const StatTile = ({ label, value, tone = 'neutral' }) => {
+  const dot = {
+    neutral: 'bg-ink-faint',
+    accent: 'bg-accent',
+    success: 'bg-success',
+    warning: 'bg-warning',
+    danger: 'bg-danger',
+  }[tone];
+
+  return (
+    <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-xs">
+      <p className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+        <span className={cn('h-1.5 w-1.5 rounded-full', dot)} aria-hidden="true" />
+        {label}
+      </p>
+      <p className="mt-1 font-serif text-[26px] font-semibold leading-tight text-ink tabular">{value}</p>
+    </div>
+  );
+};
 
 const AdminDashboard = () => {
   const location = useLocation();
@@ -18,39 +79,14 @@ const AdminDashboard = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Page header configuration
-  const pageInfo = {
-    '/admin/documents': {
-      title: 'Gestion des Documents',
-      description: 'Index et statut des documents du système'
-    },
-    '/admin/upload': {
-      title: 'Upload de Documents',
-      description: 'Ajouter de nouveaux documents au système'
-    },
-    '/admin/config': {
-      title: 'Configuration Système',
-      description: 'Consultation en lecture seule des paramètres système'
-    },
-    '/admin/monitoring': {
-      title: 'Monitoring Système',
-      description: 'État de santé et performance en temps réel'
-    },
-    '/admin/analytics': {
-      title: 'Analytics & Usage',
-      description: 'Analyse des performances et de l\'utilisation'
-    }
-  };
-
   // Get current page information
-  const currentPageInfo = pageInfo[location.pathname] || {
-    title: 'Panneau d\'Administration',
+  const currentSection = SECTIONS.find(section => section.href === location.pathname) || {
+    title: 'Panneau d\'administration',
     description: 'Gestion du système documentaire Mimir'
   };
 
-
-  // Load system statistics
-  const loadSystemStats = async () => {
+  // Load system statistics (stable identity: only uses state setters)
+  const loadSystemStats = useCallback(async () => {
     try {
       setLoading(true);
       const [docsStats, healthStatus] = await Promise.all([
@@ -71,12 +107,18 @@ const AdminDashboard = () => {
       setLoading(false);
       setLastRefresh(new Date());
     }
-  };
+  }, []);
+
+  // Manual refresh: reload the stats and signal the child pages
+  const handleRefresh = useCallback(() => {
+    loadSystemStats();
+    setRefreshTrigger(prev => prev + 1);
+  }, [loadSystemStats]);
 
   // Load data on mount
   useEffect(() => {
     loadSystemStats();
-  }, []);
+  }, [loadSystemStats]);
 
   // Optimized automatic refresh
   useEffect(() => {
@@ -87,7 +129,7 @@ const AdminDashboard = () => {
       interval = setInterval(() => {
         // Only if the page is visible
         if (!document.hidden) {
-          handleRefresh(); // Utilise handleRefresh pour déclencher aussi les enfants
+          handleRefresh(); // Also triggers the child pages
         }
       }, 60000); // 60 seconds
     };
@@ -105,7 +147,7 @@ const AdminDashboard = () => {
         }
       } else {
         // Page visible, restart polling and refresh immediately
-        handleRefresh(); // Utilise handleRefresh pour déclencher aussi les enfants
+        handleRefresh(); // Also triggers the child pages
         if (!interval) {
           startPolling();
         }
@@ -118,146 +160,137 @@ const AdminDashboard = () => {
       if (interval) clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [handleRefresh]);
 
-  // Manual refresh
-  const handleRefresh = () => {
-    loadSystemStats();
-    setRefreshTrigger(prev => prev + 1);
-  };
+  const isHealthy = safeGetProperty(systemStats, 'health.status') === 'healthy';
+  const inProgress = safeGetProperty(systemStats, 'documents.by_status.pending', 0) + safeGetProperty(systemStats, 'documents.by_status.indexing', 0);
+  const errorCount = safeGetProperty(systemStats, 'documents.by_status.error', 0);
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6">
-        <div className="max-w-7xl flex items-center justify-between">
+    <div className="admin-scroll relative min-h-0 flex-1 overflow-y-auto">
+      {/* Section tabs */}
+      <div className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
+        <nav
+          aria-label="Administration"
+          className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden"
+        >
+          {SECTIONS.map((section) => {
+            const Icon = section.icon;
+            const isCurrent = location.pathname === section.href;
+            return (
+              <Link
+                key={section.href}
+                to={section.href}
+                aria-current={isCurrent ? 'page' : undefined}
+                className={cn(
+                  'relative flex h-12 shrink-0 items-center gap-2 px-3 text-sm font-medium transition-colors',
+                  isCurrent ? 'text-ink' : 'text-ink-muted hover:text-ink'
+                )}
+              >
+                <Icon className={cn('h-4 w-4', isCurrent ? 'text-accent' : 'text-ink-faint')} aria-hidden="true" />
+                {section.name}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'absolute inset-x-2 bottom-0 h-0.5 rounded-full transition-colors',
+                    isCurrent ? 'bg-accent' : 'bg-transparent'
+                  )}
+                />
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-7 sm:px-6 lg:pt-9">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {currentPageInfo.title}
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {currentPageInfo.description}
-            </p>
+            <h1 className="page-title">{currentSection.title}</h1>
+            <p className="mt-1.5 text-sm text-ink-muted">{currentSection.description}</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <span className="text-xs text-gray-500">
-              Dernière mise à jour : {lastRefresh.toLocaleTimeString()}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-ink-muted tabular">
+              Mis à jour à {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
             </span>
             <button
+              type="button"
               onClick={handleRefresh}
               disabled={loading}
-              className="btn-secondary text-sm"
+              className="btn-secondary btn-sm"
               title="Actualiser les données"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} aria-hidden="true" />
               Actualiser
             </button>
           </div>
         </div>
 
-        {/* Quick statistics */}
-        {systemStats && (
-          <div className="max-w-7xl mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {/* Total documents */}
-            <div className="bg-blue-50 rounded-md p-2">
-              <div className="flex items-center">
-                <FileText className="h-4 w-4 text-blue-600" />
-                <span className="ml-1.5 text-xs font-medium text-blue-900">Documents</span>
-              </div>
-              <p className="text-lg font-bold text-blue-900 mt-0.5">
-                {safeFormatNumber(safeGetProperty(systemStats, 'documents.total_documents', 0))}
-              </p>
-            </div>
-
-            {/* Indexed documents */}
-            <div className="bg-green-50 rounded-md p-2">
-              <div className="flex items-center">
-                <BarChart3 className="h-4 w-4 text-green-600" />
-                <span className="ml-1.5 text-xs font-medium text-green-900">Indexés</span>
-              </div>
-              <p className="text-lg font-bold text-green-900 mt-0.5">
-                {safeFormatNumber(safeGetProperty(systemStats, 'documents.indexed', 0))}
-              </p>
-            </div>
-
-            {/* Processing */}
-            <div className="bg-yellow-50 rounded-md p-2">
-              <div className="flex items-center">
-                <RefreshCw className="h-4 w-4 text-yellow-600" />
-                <span className="ml-1.5 text-xs font-medium text-yellow-900">En cours</span>
-              </div>
-              <p className="text-lg font-bold text-yellow-900 mt-0.5">
-                {safeFormatNumber(
-                  safeGetProperty(systemStats, 'documents.pending', 0) +
-                  safeGetProperty(systemStats, 'documents.indexing', 0)
-                )}
-              </p>
-            </div>
-
-            {/* Documents with errors */}
-            <div className="bg-red-50 rounded-md p-2">
-              <div className="flex items-center">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <span className="ml-1.5 text-xs font-medium text-red-900">Erreurs</span>
-              </div>
-              <p className="text-lg font-bold text-red-900 mt-0.5">
-                {safeFormatNumber(safeGetProperty(systemStats, 'documents.error', 0))}
-              </p>
-            </div>
-
-            {/* System status */}
-            <div className={`rounded-md p-2 ${
-              safeGetProperty(systemStats, 'health.status') === 'healthy'
-                ? 'bg-green-50'
-                : 'bg-red-50'
-            }`}>
-              <div className="flex items-center">
-                <Activity className={`h-4 w-4 ${
-                  safeGetProperty(systemStats, 'health.status') === 'healthy'
-                    ? 'text-green-600'
-                    : 'text-red-600'
-                }`} />
-                <span className={`ml-1.5 text-xs font-medium ${
-                  safeGetProperty(systemStats, 'health.status') === 'healthy'
-                    ? 'text-green-900'
-                    : 'text-red-900'
-                }`}>
-                  Système
-                </span>
-              </div>
-              <p className={`text-lg font-bold mt-0.5 ${
-                safeGetProperty(systemStats, 'health.status') === 'healthy'
-                  ? 'text-green-900'
-                  : 'text-red-900'
-              }`}>
-                {safeGetProperty(systemStats, 'health.status') === 'healthy' ? 'OK' : 'Erreur'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Global error message */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4 max-w-7xl">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-600"
+        {/* Quick statistics: tiles render immediately (dash until loaded) so the page never shifts */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-busy={!systemStats}>
+          <StatTile
+            label="Documents"
+            value={systemStats ? safeFormatNumber(safeGetProperty(systemStats, 'documents.total_documents', 0)) : '—'}
+            tone="accent"
+          />
+          <StatTile
+            label="Indexés"
+            value={systemStats ? safeFormatNumber(safeGetProperty(systemStats, 'documents.by_status.indexed', 0)) : '—'}
+            tone="success"
+          />
+          <StatTile
+            label="En cours"
+            value={systemStats ? safeFormatNumber(inProgress) : '—'}
+            tone={inProgress > 0 ? 'warning' : 'neutral'}
+          />
+          <StatTile
+            label="Erreurs"
+            value={systemStats ? safeFormatNumber(errorCount) : '—'}
+            tone={errorCount > 0 ? 'danger' : 'neutral'}
+          />
+          {systemStats ? (
+            <div
+              className={cn(
+                'col-span-2 rounded-xl border px-4 py-3 shadow-xs sm:col-span-1',
+                isHealthy ? 'border-success/25 bg-success-soft' : 'border-danger/25 bg-danger-soft'
+              )}
             >
-              ×
+              <p className={cn('flex items-center gap-2 text-xs font-medium', isHealthy ? 'text-success-ink' : 'text-danger-ink')}>
+                <span className="relative flex h-1.5 w-1.5" aria-hidden="true">
+                  {isHealthy && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />}
+                  <span className={cn('relative inline-flex h-1.5 w-1.5 rounded-full', isHealthy ? 'bg-success' : 'bg-danger')} />
+                </span>
+                Système
+              </p>
+              <p className={cn('mt-1 font-serif text-[26px] font-semibold leading-tight', isHealthy ? 'text-success-ink' : 'text-danger-ink')}>
+                {isHealthy ? 'Opérationnel' : 'Erreur'}
+              </p>
+            </div>
+          ) : (
+            <div className="col-span-2 sm:col-span-1">
+              <StatTile label="Système" value="—" />
+            </div>
+          )}
+        </div>
+
+        {/* Global error message */}
+        {error && (
+          <div role="alert" className="alert-danger mt-6">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <p className="flex-1">{error}</p>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="-my-1 -mr-2 flex h-7 w-7 items-center justify-center rounded-md hover:bg-danger/10"
+              aria-label="Fermer le message d'erreur"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto admin-scroll">
+        {/* Page content */}
+        <div className="mt-8">
           <Outlet context={{ onRefresh: handleRefresh, refreshTrigger, onUploadSuccess: handleRefresh }} />
         </div>
       </div>

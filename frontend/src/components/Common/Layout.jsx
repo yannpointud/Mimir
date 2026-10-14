@@ -1,192 +1,120 @@
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import {
-  MessageSquare,
-  Settings,
-  LogOut,
-  User,
-  Menu,
-  X,
-  Shield,
-  FileText,
-  Upload,
-  Activity,
-  TrendingUp
-} from 'lucide-react';
+import { LogOut, MessageSquare, Shield } from 'lucide-react';
+import BrandMark from './BrandMark';
+import { APP_NAME, COMPANY_NAME } from '../../config/brand';
+import { cn } from '../../utils/helpers';
 
-const Layout = ({ children, isAdmin = false }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+// DOM node in the top bar where the current page can mount its own actions.
+const TopbarSlotContext = createContext(null);
+
+/**
+ * Renders its children inside the top bar action area of the Layout.
+ * Lets a page (e.g. the chat) own its actions while they sit in the global bar.
+ */
+export const TopbarActions = ({ children }) => {
+  const slot = useContext(TopbarSlotContext);
+  return slot ? createPortal(children, slot) : null;
+};
+
+const getInitials = (name) => name.slice(0, 2).toUpperCase();
+
+const Layout = ({ children }) => {
+  const [slot, setSlot] = useState(null);
   const { user, logout, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  const handleLogout = async () => {
-    await logout();
-  };
-
   const isUserAdmin = isAuthenticated && user?.user_type === 'admin';
+  const username = user?.username || 'Administrateur';
 
-  const navigation = isAdmin ? [
-    { name: 'Chat', href: '/', icon: MessageSquare, current: false },
-    { name: 'Documents', href: '/admin/documents', icon: FileText, current: location.pathname === '/admin/documents' },
-    { name: 'Upload', href: '/admin/upload', icon: Upload, current: location.pathname === '/admin/upload' },
-    { name: 'Configuration', href: '/admin/config', icon: Settings, current: location.pathname === '/admin/config' },
-    { name: 'Monitoring', href: '/admin/monitoring', icon: Activity, current: location.pathname === '/admin/monitoring' },
-    { name: 'Analytics', href: '/admin/analytics', icon: TrendingUp, current: location.pathname === '/admin/analytics' },
-  ] : [
-    { name: 'Chat', href: '/', icon: MessageSquare, current: location.pathname === '/' },
-    ...(isUserAdmin ? [{ name: 'Administration', href: '/admin/documents', icon: Shield, current: false }] : []),
+  const navigation = [
+    { name: 'Assistant', href: '/', icon: MessageSquare, current: location.pathname === '/' },
+    ...(isUserAdmin
+      ? [{ name: 'Administration', href: '/admin/documents', icon: Shield, current: location.pathname.startsWith('/admin') }]
+      : []),
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Sidebar mobile */}
-      <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-48 flex-col bg-white shadow-xl">
-          <div className="flex h-16 items-center justify-between px-4">
-            <div className="flex items-center space-x-2">
-              <Shield className="h-8 w-8 text-primary-600" />
-              <span className="text-xl font-bold text-gray-900">Mimir</span>
-              {isAdmin && <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">Admin</span>}
-            </div>
-            <button
-              type="button"
-              className="text-gray-400 hover:text-gray-600"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
-                    item.current
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className="mr-4 h-6 w-6" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
-          {isAuthenticated && (
-            <div className="border-t border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.username || 'Administrateur'}
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    {user?.user_type || 'admin'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="mt-3 w-full flex items-center px-2 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-              >
-                <LogOut className="mr-3 h-4 w-4" />
-                Déconnexion
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+    <TopbarSlotContext.Provider value={slot}>
+      <div className="flex h-dvh flex-col bg-canvas">
+        <a href="#main" className="skip-link">Aller au contenu</a>
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-48 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r border-gray-200 pt-5 pb-4 overflow-y-auto">
-          <div className="flex items-center flex-shrink-0 px-4">
-            <Shield className="h-8 w-8 text-primary-600" />
-            <span className="ml-2 text-xl font-bold text-gray-900">Mimir</span>
-            {isAdmin && (
-              <span className="ml-2 text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">
-                Admin
-              </span>
-            )}
-          </div>
-          <nav className="mt-5 flex-1 space-y-1 px-2">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    item.current
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
-          {isAuthenticated && (
-            <div className="border-t border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.username || 'Administrateur'}
-                  </p>
-                  <p className="text-sm text-gray-500 truncate">
-                    {user?.user_type || 'admin'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="mt-3 w-full flex items-center px-2 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
-              >
-                <LogOut className="mr-3 h-4 w-4" />
-                Déconnexion
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="lg:pl-48 flex flex-col flex-1">
-        {/* Top bar mobile */}
-        <div className="sticky top-0 z-10 lg:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-gray-50">
-          <button
-            type="button"
-            className="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
-            onClick={() => setSidebarOpen(true)}
+        <header className="relative z-30 flex h-14 shrink-0 items-center gap-2 bg-nav px-3 text-nav-ink sm:gap-4 sm:px-5">
+          <Link
+            to="/"
+            className="flex shrink-0 items-center gap-2.5 rounded-md py-1 pr-1 focus-visible:outline-white"
+            aria-label={`${APP_NAME}, ${COMPANY_NAME} : accueil de l'assistant`}
           >
-            <span className="sr-only">Ouvrir la sidebar</span>
-            <Menu className="h-6 w-6" />
-          </button>
-        </div>
+            <BrandMark className="h-7 w-7 text-accent-bright" />
+            <span className="font-serif text-[21px] font-semibold leading-none tracking-[-0.01em]">
+              {APP_NAME}
+            </span>
+          </Link>
 
-        {/* Page content */}
-        <main className="flex-1">
+          <span aria-hidden="true" className="hidden h-6 w-px bg-white/15 sm:block" />
+          <span className="hidden max-w-[16rem] truncate text-[13px] font-medium text-nav-muted sm:block">
+            {COMPANY_NAME}
+          </span>
+
+          {navigation.length > 1 && (
+            <nav aria-label="Navigation principale" className="ml-1 flex items-center gap-1 sm:ml-4">
+              {navigation.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    aria-current={item.current ? 'page' : undefined}
+                    title={item.name}
+                    className={cn(
+                      'relative flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm font-medium transition-colors focus-visible:outline-white md:px-3',
+                      item.current
+                        ? 'bg-nav-raised text-nav-ink'
+                        : 'text-nav-muted hover:bg-white/5 hover:text-nav-ink'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                    <span className="sr-only md:not-sr-only">{item.name}</span>
+                    {item.current && (
+                      <span aria-hidden="true" className="absolute inset-x-2.5 -bottom-[10px] h-0.5 rounded-full bg-accent-bright" />
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          )}
+
+          <div ref={setSlot} className="ml-auto flex items-center gap-2" />
+
+          {isAuthenticated && (
+            <div className="flex items-center gap-1 border-l border-white/10 pl-2 sm:gap-2 sm:pl-4">
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-bright/15 text-xs font-semibold text-accent-bright ring-1 ring-inset ring-accent-bright/30"
+              >
+                {getInitials(username)}
+              </span>
+              <span className="hidden text-sm font-medium text-nav-ink lg:block">{username}</span>
+              <button
+                type="button"
+                onClick={logout}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-nav-muted transition-colors hover:bg-white/5 hover:text-nav-ink focus-visible:outline-white"
+                aria-label="Déconnexion"
+                title="Déconnexion"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </header>
+
+        <main id="main" tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
           {children}
         </main>
       </div>
-    </div>
+    </TopbarSlotContext.Provider>
   );
 };
 

@@ -2,9 +2,10 @@ import { useState, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { documentsAPI } from '../../services/api';
-import { getErrorMessage, formatFileSize, isSupportedFileType } from '../../utils/helpers';
+import { getErrorMessage, formatFileSize, isSupportedFileType, cn } from '../../utils/helpers';
 import {
   Upload,
+  UploadCloud,
   File,
   X,
   CheckCircle,
@@ -124,252 +125,236 @@ const UploadZone = () => {
   };
 
   const pendingCount = uploads.filter(u => u.status === 'pending').length;
+  const uploadingCount = uploads.filter(u => u.status === 'uploading').length;
   const successCount = uploads.filter(u => u.status === 'success').length;
   const errorCount = uploads.filter(u => u.status === 'error').length;
 
   return (
-    <div className="p-4 max-w-7xl h-full">
-      {/* Drop zone */}
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 ${
-          isDragActive
-            ? 'border-primary-400 bg-primary-50'
-            : 'border-gray-300 hover:border-gray-400'
-        }`}
-      >
-        <input {...getInputProps()} />
-        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        {isDragActive ? (
-          <p className="text-lg text-primary-600">
-            Relâchez pour ajouter les fichiers...
-          </p>
-        ) : (
-          <div>
-            <p className="text-lg text-gray-600 mb-2">
-              Glissez-déposez vos documents ici, ou cliquez pour sélectionner
+    <div className="grid gap-6 lg:grid-cols-3">
+      <div className="space-y-6 lg:col-span-2">
+        {/* Drop zone */}
+        <div
+          {...getRootProps({ role: 'button' })}
+          className={cn(
+            'group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors duration-150',
+            isDragActive
+              ? 'border-accent bg-accent-soft/60'
+              : 'border-line-strong bg-surface hover:border-accent/60 hover:bg-accent-soft/25'
+          )}
+        >
+          <input {...getInputProps({ 'aria-label': 'Sélectionner des documents à importer' })} />
+          <span
+            className={cn(
+              'flex h-14 w-14 items-center justify-center rounded-2xl transition-colors',
+              isDragActive ? 'bg-accent text-accent-on' : 'bg-accent-soft text-accent group-hover:bg-accent group-hover:text-accent-on'
+            )}
+          >
+            <UploadCloud className="h-7 w-7" aria-hidden="true" />
+          </span>
+          {isDragActive ? (
+            <p className="mt-5 text-lg font-semibold text-accent-ink">
+              Relâchez pour ajouter les fichiers...
             </p>
-            <p className="text-sm text-gray-500">
-              Formats supportés : PDF, DOCX, TXT, MD (max 100 MB par fichier)
-            </p>
+          ) : (
+            <>
+              <p className="mt-5 text-lg font-semibold text-ink">
+                Glissez-déposez vos documents ici
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">
+                ou <span className="font-medium text-accent-ink underline decoration-accent/40 underline-offset-2">cliquez pour parcourir</span> vos fichiers
+              </p>
+            </>
+          )}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
+            {['PDF', 'DOCX', 'TXT', 'MD'].map(format => (
+              <span key={format} className="rounded-md border border-line bg-surface px-2 py-0.5 font-mono text-2xs font-medium text-ink-muted">
+                {format}
+              </span>
+            ))}
+            <span className="ml-1 text-xs text-ink-muted">100 Mo max par fichier</span>
+          </div>
+        </div>
+
+        {/* Upload queue */}
+        {uploads.length > 0 && (
+          <div className="card overflow-hidden">
+            <div className="card-header flex-wrap">
+              <div>
+                <h2 className="card-title">Fichiers sélectionnés ({uploads.length})</h2>
+                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-muted tabular">
+                  <span>{pendingCount} en attente</span>
+                  <span>{uploadingCount} en cours</span>
+                  <span className="text-success-ink">{successCount} réussi{successCount > 1 ? 's' : ''}</span>
+                  <span className={cn(errorCount > 0 && 'text-danger')}>{errorCount} erreur{errorCount > 1 ? 's' : ''}</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {(successCount > 0 || errorCount > 0) && (
+                  <button
+                    type="button"
+                    onClick={clearCompleted}
+                    className="btn-ghost btn-sm"
+                  >
+                    Nettoyer la liste
+                  </button>
+                )}
+                {pendingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={uploadAllFiles}
+                    disabled={isUploading}
+                    className="btn-primary btn-sm"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                        Import en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                        Importer tout ({pendingCount})
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <ul className="divide-y divide-line-soft">
+              {uploads.map((upload) => (
+                <UploadItem
+                  key={upload.id}
+                  upload={upload}
+                  onRemove={() => removeUpload(upload.id)}
+                  onTogglePreserve={() => togglePreserve(upload.id)}
+                  onRetry={() => uploadFile(upload)}
+                  disabled={isUploading}
+                />
+              ))}
+            </ul>
           </div>
         )}
       </div>
 
-      {/* Statistics */}
-      {uploads.length > 0 && (
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <File className="h-5 w-5 text-blue-600 mr-2" />
-              <span className="text-sm font-medium text-blue-900">En attente</span>
-            </div>
-            <p className="text-2xl font-bold text-blue-900">{pendingCount}</p>
-          </div>
-
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <Loader className="h-5 w-5 text-yellow-600 mr-2" />
-              <span className="text-sm font-medium text-yellow-900">En cours</span>
-            </div>
-            <p className="text-2xl font-bold text-yellow-900">
-              {uploads.filter(u => u.status === 'uploading').length}
-            </p>
-          </div>
-
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-              <span className="text-sm font-medium text-green-900">Réussis</span>
-            </div>
-            <p className="text-2xl font-bold text-green-900">{successCount}</p>
-          </div>
-
-          <div className="bg-red-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <span className="text-sm font-medium text-red-900">Erreurs</span>
-            </div>
-            <p className="text-2xl font-bold text-red-900">{errorCount}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Global actions */}
-      {uploads.length > 0 && (
-        <div className="mt-6 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {pendingCount > 0 && (
-              <button
-                onClick={uploadAllFiles}
-                disabled={isUploading}
-                className="btn-primary"
-              >
-                {isUploading ? (
-                  <div className="flex items-center">
-                    <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    Upload en cours...
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Uploader tout ({pendingCount})
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-3">
-            {(successCount > 0 || errorCount > 0) && (
-              <button
-                onClick={clearCompleted}
-                className="btn-secondary"
-              >
-                Nettoyer la liste
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* File list */}
-      {uploads.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Fichiers sélectionnés ({uploads.length})
-          </h3>
-
-          <div className="space-y-3">
-            {uploads.map((upload) => (
-              <UploadItem
-                key={upload.id}
-                upload={upload}
-                onRemove={() => removeUpload(upload.id)}
-                onTogglePreserve={() => togglePreserve(upload.id)}
-                onRetry={() => uploadFile(upload)}
-                disabled={isUploading}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Instructions */}
-      <div className="mt-8 bg-gray-50 rounded-lg p-6">
-        <h4 className="text-lg font-medium text-gray-900 mb-3">
-          Instructions d&apos;upload
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h5 className="font-medium text-gray-700 mb-2">Formats supportés :</h5>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• PDF - Documents et manuels</li>
-              <li>• DOCX - Documents Word</li>
-              <li>• TXT - Fichiers texte simple</li>
-              <li>• MD - Documents Markdown</li>
-            </ul>
-          </div>
-          <div>
-            <h5 className="font-medium text-gray-700 mb-2">Protection des documents :</h5>
-            <div className="flex items-start text-sm text-gray-600">
-              <Shield className="h-4 w-4 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-              <span>
-                Activez la protection pour empêcher la suppression accidentelle
-                des documents critiques.
-              </span>
-            </div>
-          </div>
+      <aside className="space-y-4">
+        <div className="card p-5">
+          <h2 className="card-title">Formats supportés</h2>
+          <ul className="mt-3 space-y-2.5 text-sm">
+            {[
+              ['PDF', 'Documents et manuels'],
+              ['DOCX', 'Documents Word'],
+              ['TXT', 'Fichiers texte simple'],
+              ['MD', 'Documents Markdown'],
+            ].map(([format, label]) => (
+              <li key={format} className="flex items-center gap-3">
+                <span className="w-11 shrink-0 rounded-md bg-sunken py-0.5 text-center font-mono text-2xs font-semibold text-ink-muted">
+                  {format}
+                </span>
+                <span className="text-ink-muted">{label}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 border-t border-line-soft pt-3 text-xs leading-relaxed text-ink-muted">
+            Les PDF doivent contenir du texte sélectionnable : un document scanné sans couche texte ne peut pas être indexé.
+          </p>
         </div>
-      </div>
+
+        <div className="card p-5">
+          <h2 className="card-title">
+            <Shield className="h-4 w-4 text-accent" aria-hidden="true" />
+            Protection des documents
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+            Activez la protection pour empêcher la suppression accidentelle
+            des documents critiques.
+          </p>
+        </div>
+      </aside>
     </div>
   );
 };
 
+const UPLOAD_STATUS = {
+  pending: { label: 'En attente', className: 'badge-neutral' },
+  uploading: { label: 'Envoi…', className: 'badge-accent' },
+  success: { label: 'Importé', className: 'badge-success' },
+  error: { label: 'Erreur', className: 'badge-danger' },
+};
+
 // Component for an individual file
 const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) => {
-  const getStatusIcon = () => {
-    switch (upload.status) {
-      case 'pending':
-        return <File className="h-5 w-5 text-gray-400" />;
-      case 'uploading':
-        return <Loader className="h-5 w-5 text-blue-600 animate-spin" />;
-      case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return <File className="h-5 w-5 text-gray-400" />;
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (upload.status) {
-      case 'pending':
-        return 'border-gray-200 bg-white';
-      case 'uploading':
-        return 'border-blue-200 bg-blue-50';
-      case 'success':
-        return 'border-green-200 bg-green-50';
-      case 'error':
-        return 'border-red-200 bg-red-50';
-      default:
-        return 'border-gray-200 bg-white';
-    }
-  };
-
   const isSupported = isSupportedFileType(upload.file.name);
+  const status = UPLOAD_STATUS[upload.status];
 
   return (
-    <div className={`border rounded-lg p-4 ${getStatusColor()}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center flex-1 min-w-0">
-          {getStatusIcon()}
-          <div className="ml-3 flex-1 min-w-0">
-            <div className="flex items-center">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {upload.file.name}
-              </p>
-              {!isSupported && (
-                <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">
-                  Format non supporté
-                </span>
-              )}
-            </div>
-            <div className="flex items-center mt-1 space-x-4">
-              <p className="text-sm text-gray-500">
-                {formatFileSize(upload.file.size)}
-              </p>
-              {upload.status === 'error' && upload.error && (
-                <p className="text-sm text-red-600">{upload.error}</p>
-              )}
-            </div>
+    <li className="relative px-5 py-3.5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sunken text-ink-muted">
+          {upload.status === 'uploading' ? (
+            <Loader className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
+          ) : upload.status === 'success' ? (
+            <CheckCircle className="h-4 w-4 text-success" aria-hidden="true" />
+          ) : upload.status === 'error' ? (
+            <AlertCircle className="h-4 w-4 text-danger" aria-hidden="true" />
+          ) : (
+            <File className="h-4 w-4" aria-hidden="true" />
+          )}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate text-sm font-medium text-ink" title={upload.file.name}>
+              {upload.file.name}
+            </p>
+            {!isSupported && (
+              <span className="badge-danger shrink-0">Format non supporté</span>
+            )}
           </div>
+          <p className="mt-0.5 flex min-w-0 gap-3 text-xs text-ink-muted">
+            <span className="shrink-0 tabular">{formatFileSize(upload.file.size)}</span>
+            {upload.status === 'error' && upload.error && (
+              <span className="truncate text-danger" title={upload.error}>{upload.error}</span>
+            )}
+            {upload.preserve && (
+              <span className="flex shrink-0 items-center gap-1 text-accent-ink">
+                <Shield className="h-3 w-3" aria-hidden="true" /> Protégé
+              </span>
+            )}
+          </p>
         </div>
 
-        <div className="flex items-center space-x-3 ml-4">
+        <span className={cn('hidden sm:inline-flex', status.className)}>{status.label}</span>
+
+        <div className="flex items-center gap-1">
           {/* Preservation option */}
           {upload.status === 'pending' && (
             <button
+              type="button"
               onClick={onTogglePreserve}
               disabled={disabled}
-              className={`p-2 rounded transition-colors duration-200 ${
+              aria-pressed={upload.preserve}
+              className={cn(
+                'btn-icon btn h-8 w-8',
                 upload.preserve
-                  ? 'text-blue-600 bg-blue-100 hover:bg-blue-200'
-                  : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
-              }`}
+                  ? 'bg-accent-soft text-accent-ink hover:bg-accent-soft'
+                  : 'text-ink-faint hover:bg-sunken hover:text-accent'
+              )}
               title={upload.preserve ? 'Retirer la protection' : 'Protéger le document'}
             >
-              <Shield className="h-4 w-4" />
+              <Shield className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
 
           {/* Retry button for errors */}
           {upload.status === 'error' && (
             <button
+              type="button"
               onClick={onRetry}
               disabled={disabled}
-              className="btn-secondary text-sm"
+              className="btn-secondary btn-sm"
             >
               Réessayer
             </button>
@@ -378,29 +363,26 @@ const UploadItem = ({ upload, onRemove, onTogglePreserve, onRetry, disabled }) =
           {/* Delete button */}
           {upload.status !== 'uploading' && (
             <button
+              type="button"
               onClick={onRemove}
               disabled={disabled}
-              className="text-gray-400 hover:text-red-600 transition-colors duration-200"
+              className="btn-ghost btn-icon h-8 w-8 hover:text-danger"
               title="Retirer de la liste"
+              aria-label={`Retirer ${upload.file.name} de la liste`}
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Progress bar */}
+      {/* Indeterminate progress bar while the file is sent */}
       {upload.status === 'uploading' && (
-        <div className="mt-3">
-          <div className="bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${upload.progress}%` }}
-            />
-          </div>
+        <div className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden bg-accent-soft" aria-hidden="true">
+          <div className="h-full w-1/3 animate-indeterminate rounded-full bg-accent" />
         </div>
       )}
-    </div>
+    </li>
   );
 };
 

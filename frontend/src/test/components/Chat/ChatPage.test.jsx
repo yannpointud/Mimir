@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import ChatPage from '../../../components/Chat/ChatPage';
+import Layout from '../../../components/Common/Layout';
 import { AuthProvider } from '../../../hooks/useAuth';
 import * as chatAPI from '../../../services/api';
 
@@ -11,13 +12,20 @@ vi.mock('../../../services/api', () => ({
     sendMessageStream: vi.fn(),
     escalateToHuman: vi.fn(),
   },
+  // The home screen shows the live service status
+  healthAPI: {
+    getHealthStatus: vi.fn(() => Promise.resolve({ status: 'healthy', checks: { database: { document_count: 12 } } })),
+  },
 }));
 
 // Wrapper for tests
+// ChatPage mounts its actions (new conversation, contact) in the Layout top bar.
 const TestWrapper = ({ children }) => (
   <BrowserRouter>
     <AuthProvider>
-      {children}
+      <Layout>
+        {children}
+      </Layout>
     </AuthProvider>
   </BrowserRouter>
 );

@@ -33,7 +33,7 @@ const CitationPill = ({ n, source, onOpenSource }) => {
       onClick={handleClick}
       aria-label={`Voir la source ${n} : ${filename}`}
       title={`Voir la source ${n} : ${filename}`}
-      className="inline-flex items-center justify-center h-5 w-5 mx-0.5 rounded-full border text-xs font-semibold bg-primary-50 border-primary-200 text-primary-700 hover:bg-primary-100 hover:text-primary-800 active:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 cursor-pointer transition-colors duration-200"
+      className="mx-0.5 inline-flex h-[19px] min-w-[19px] -translate-y-px cursor-pointer items-center justify-center rounded-md bg-accent-soft px-1 align-middle font-mono text-[11px] font-medium leading-none text-accent-ink transition-colors duration-150 hover:bg-accent hover:text-accent-on"
     >
       {n}
     </button>

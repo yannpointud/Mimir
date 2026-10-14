@@ -1,29 +1,25 @@
-import { useState, useEffect } from 'react';
-import { X, FileText, Search, Download, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { FileText, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
 import { documentsAPI } from '../../services/api';
-import { getErrorMessage, escapeHtml } from '../../utils/helpers';
+import { getErrorMessage, escapeHtml, cn } from '../../utils/helpers';
 import { openDocumentInBrowser, validateChunkIndexes } from '../../utils/documentUtils';
 import LoadingSpinner from './LoadingSpinner';
+import Modal from './Modal';
 
-const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highlightText = '', relevantChunks = [] }) => {
+const formatScore = (score) => `${Math.round((score || 0) * 100)} %`;
+
+const DocumentModal = ({ isOpen, onClose, documentId, filename, searchQuery = '', highlightText = '', relevantChunks = [] }) => {
   const [documentData, setDocumentData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [openOriginalError, setOpenOriginalError] = useState(null);
   const [selectedChunk, setSelectedChunk] = useState(null);
   const [showAllChunks, setShowAllChunks] = useState(false);
 
-  // Load document when modal opens
-  useEffect(() => {
-    if (isOpen && documentId) {
-      loadDocument();
-    }
-  }, [isOpen, documentId]);
 
   // Auto-select the first relevant chunk when data is loaded
   useEffect(() => {
     if (documentData?.chunks && relevantChunks.length > 0) {
-      console.log(`[DocumentModal] Validation des chunks pour document ${documentId}`);
-
       // Validate chunk_index correspondence
       const validation = validateChunkIndexes(relevantChunks, documentData.chunks);
 
@@ -41,7 +37,6 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
       );
 
       if (firstRelevantChunk) {
-        console.log(`[DocumentModal] Chunk pertinent sélectionné: index ${firstRelevantChunk.chunk_index}`);
         setSelectedChunk(firstRelevantChunk);
       } else if (validation.matchingCount === 0) {
         console.error(`[DocumentModal] Aucun chunk pertinent trouvé - problème de correspondance d'index`);
@@ -53,7 +48,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     }
   }, [documentData, relevantChunks, documentId]);
 
-  const loadDocument = async () => {
+  const loadDocument = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -68,7 +63,14 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     } finally {
       setLoading(false);
     }
-  };
+  }, [documentId]);
+
+  // Load document when modal opens
+  useEffect(() => {
+    if (isOpen && documentId) {
+      loadDocument();
+    }
+  }, [isOpen, documentId, loadDocument]);
 
   // Highlight searched text in content (escape-then-highlight, SEC-04).
   // The document text is ALWAYS HTML-escaped before insertion so malicious
@@ -85,7 +87,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     // regex metacharacters so a crafted query cannot break the highlighting
     const escapedQuery = escapeHtml(query);
     const regex = new RegExp(`(${escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return escapedText.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
+    return escapedText.replace(regex, '<mark class="rounded-sm bg-hl px-0.5 text-ink">$1</mark>');
   };
 
   // Close the modal
@@ -93,337 +95,284 @@ const DocumentModal = ({ isOpen, onClose, documentId, searchQuery = '', highligh
     setDocumentData(null);
     setSelectedChunk(null);
     setError(null);
+    setOpenOriginalError(null);
     onClose();
   };
 
   // Open the original document in the browser
   const handleOpenDocument = async () => {
-    if (!documentId) return;
-
-    await openDocumentInBrowser(documentId, documentData?.filename);
+    setOpenOriginalError(null);
+    try {
+      await openDocumentInBrowser(documentId, documentData?.filename);
+    } catch (openError) {
+      setOpenOriginalError(getErrorMessage(openError));
+    }
   };
 
-  // Keyboard event handling
-  useEffect(() => {
-    const handleEscKey = (event) => {
-      if (event.key === 'Escape') {
-        handleClose();
-      }
-    };
+  const query = highlightText || searchQuery;
 
-    if (isOpen && typeof window !== 'undefined' && window.document) {
-      window.document.addEventListener('keydown', handleEscKey);
-      return () => window.document.removeEventListener('keydown', handleEscKey);
+  const metaParts = documentData ? [
+    documentData.mime_type,
+    `${documentData.chunk_count || documentData.chunks?.length || 0} sections`,
+    documentData.created_at && `ajouté le ${new Date(documentData.created_at).toLocaleDateString('fr-FR')}`,
+  ].filter(Boolean) : [];
+
+  // Sections listed in the left pane: only the relevant ones unless the user asks for all
+  const relevantChunkIndices = new Set(relevantChunks.map(rc => rc.chunk_index));
+  let chunksToDisplay = documentData?.chunks || [];
+  if (relevantChunks.length > 0 && !showAllChunks) {
+    const filtered = chunksToDisplay.filter(chunk => relevantChunkIndices.has(chunk.chunk_index));
+    // If no chunks match, display all chunks
+    if (filtered.length > 0) {
+      chunksToDisplay = filtered;
     }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+  }
+  const sortedChunks = [...chunksToDisplay].sort((a, b) => (a.chunk_index || 0) - (b.chunk_index || 0));
+  const showingRelevantOnly = relevantChunks.length > 0 && !showAllChunks;
+  const selectedRelevance = selectedChunk && relevantChunks.find(rc => rc.chunk_index === selectedChunk.chunk_index);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Overlay */}
-        <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity"
-          onClick={handleClose}
-        />
-
-        {/* Modal */}
-        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <div className="flex items-center">
-              <FileText className="h-6 w-6 text-gray-400 mr-3" />
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">
-                  {documentData?.filename || 'Document'}
-                </h3>
-                {documentData?.path && (
-                  <p className="text-sm text-gray-500">{documentData.path}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {/* Document actions */}
-              {documentData?.path && (
-                <button
-                  onClick={handleOpenDocument}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-                  title="Ouvrir le fichier original dans le navigateur"
-                >
-                  <ExternalLink className="h-5 w-5" />
-                </button>
-              )}
-
-              <button
-                onClick={handleClose}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
-              >
-                <X className="h-6 w-6" />
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      size="xl"
+      icon={FileText}
+      title={documentData?.filename || filename || 'Document'}
+      description={loading ? 'Chargement…' : metaParts.join(' · ')}
+      panelClassName="sm:h-[86dvh]"
+      bodyClassName="flex flex-col overflow-hidden md:flex-row"
+      actions={documentData?.path && (
+        <button
+          type="button"
+          onClick={handleOpenDocument}
+          className="btn-secondary btn-sm mr-1"
+          title="Ouvrir le fichier original dans le navigateur"
+        >
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only">Ouvrir l&apos;original</span>
+        </button>
+      )}
+      footer={
+        <>
+          {openOriginalError && (
+            <p role="alert" className="mr-auto min-w-0 truncate text-sm text-danger">
+              Impossible d&apos;ouvrir le fichier original : {openOriginalError}
+            </p>
+          )}
+          {searchQuery && !openOriginalError && (
+            <p className="mr-auto min-w-0 truncate text-sm text-ink-muted">
+              Recherche : <strong className="font-medium text-ink">{searchQuery}</strong>
+            </p>
+          )}
+          <button type="button" onClick={handleClose} className="btn-secondary">
+            Fermer
+          </button>
+        </>
+      }
+    >
+      {loading ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm text-ink-muted">Chargement du document...</p>
+        </div>
+      ) : error ? (
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="alert-danger max-w-md">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div>
+              <p>{error}</p>
+              <button type="button" onClick={loadDocument} className="btn-secondary btn-sm mt-3">
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                Réessayer
               </button>
             </div>
           </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-hidden flex">
-            {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <LoadingSpinner size="lg" />
-                  <p className="mt-4 text-gray-600">Chargement du document...</p>
-                </div>
+        </div>
+      ) : documentData ? (
+        <>
+          {/* Section navigation */}
+          {sortedChunks.length > 0 && (
+            <nav
+              aria-label="Sections du document"
+              className="max-h-[34%] shrink-0 overflow-y-auto border-b border-line-soft bg-surface md:max-h-none md:w-72 md:border-b-0 md:border-r"
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line-soft bg-surface/95 px-4 py-3 backdrop-blur">
+                <p className="eyebrow">
+                  {showingRelevantOnly ? `Sections pertinentes · ${sortedChunks.length}/${documentData.chunks.length}` : `Sections · ${documentData.chunks.length}`}
+                </p>
+                {relevantChunks.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllChunks(!showAllChunks)}
+                    className="text-xs font-medium text-accent-ink underline-offset-2 hover:underline"
+                    title={showAllChunks ? 'Voir seulement les sections pertinentes' : 'Voir toutes les sections du document'}
+                  >
+                    {showAllChunks ? 'Pertinentes seulement' : 'Voir tout'}
+                  </button>
+                )}
               </div>
-            ) : error ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <p className="text-red-700">{error}</p>
-                    <button
-                      onClick={loadDocument}
-                      className="mt-2 btn-primary text-sm"
-                    >
-                      Réessayer
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : documentData ? (
-              <>
-                {/* Chunk navigation on the left */}
-                {documentData.chunks && documentData.chunks.length > 0 && (() => {
-                  // If we have relevant chunks, only show those
-                  const relevantChunkIndices = new Set(
-                    relevantChunks.map(rc => rc.chunk_index)
-                  );
-
-                  // Filtering with match validation
-                  let chunksToDisplay = documentData.chunks;
-
-                  if (relevantChunks.length > 0 && !showAllChunks) {
-                    chunksToDisplay = documentData.chunks.filter(chunk =>
-                      relevantChunkIndices.has(chunk.chunk_index)
-                    );
-
-                    console.log(`[DocumentModal] Filtrage chunks: ${chunksToDisplay.length}/${documentData.chunks.length} affichés`, {
-                      relevantIndexes: Array.from(relevantChunkIndices).slice(0, 5),
-                      filteredCount: chunksToDisplay.length
-                    });
-
-                    // If no chunks match, display all chunks with a warning
-                    if (chunksToDisplay.length === 0) {
-                      console.warn(`[DocumentModal] Aucun chunk ne correspond aux index pertinents - affichage de tous les chunks`);
-                      chunksToDisplay = documentData.chunks;
-                    }
-                  }
-
-                  // Sort by chunk_index
-                  const sortedChunks = [...chunksToDisplay].sort((a, b) =>
-                    (a.chunk_index || 0) - (b.chunk_index || 0)
-                  );
+              <ul className="space-y-1.5 p-2.5">
+                {sortedChunks.map((chunk) => {
+                  const relevantChunk = relevantChunks.find(rc => rc.chunk_index === chunk.chunk_index);
+                  const isSelected = selectedChunk?.id === chunk.id;
+                  const matchesQuery = highlightText && chunk.text?.toLowerCase().includes(highlightText.toLowerCase());
 
                   return (
-                    <div className="w-80 border-r border-gray-200 overflow-y-auto">
-                      <div className="p-4 border-b border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium text-gray-900 flex items-center">
-                            <Search className="h-4 w-4 mr-2" />
-                            {relevantChunks.length > 0 && !showAllChunks ? (
-                              <>
-                                Sections pertinentes ({chunksToDisplay.length})
-                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                  sur {documentData.chunks.length} total
-                                </span>
-                              </>
-                            ) : (
-                              `Sections (${documentData.chunks.length})`
-                            )}
-                          </h4>
-
-                          {relevantChunks.length > 0 && (
-                            <button
-                              onClick={() => setShowAllChunks(!showAllChunks)}
-                              className="text-xs text-blue-600 hover:text-blue-800 underline"
-                              title={showAllChunks ? "Voir seulement les sections pertinentes" : "Voir toutes les sections du document"}
-                            >
-                              {showAllChunks ? "Pertinentes seulement" : "Voir tout"}
-                            </button>
+                    <li key={chunk.id || chunk.chunk_index}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedChunk(chunk)}
+                        aria-current={isSelected ? 'true' : undefined}
+                        className={cn(
+                          'w-full rounded-lg border p-3 text-left transition-colors duration-150',
+                          isSelected
+                            ? 'border-accent/50 bg-accent-soft/60'
+                            : 'border-transparent hover:border-line-soft hover:bg-sunken'
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className={cn('text-sm font-semibold', isSelected ? 'text-accent-ink' : 'text-ink')}>
+                            Section {(chunk.chunk_index || 0) + 1}
+                          </span>
+                          {relevantChunk && (
+                            <span className="badge-accent ml-auto px-2 py-0 font-mono text-2xs tabular">
+                              {formatScore(relevantChunk.similarity_score)}
+                            </span>
                           )}
-                        </div>
-                      </div>
-                      <div className="p-2">
-                        {sortedChunks.map((chunk) => {
-                          const relevantChunk = relevantChunks.find(rc => rc.chunk_index === chunk.chunk_index);
-                          const isFromSearch = !!relevantChunk;
-
-                          return (
-                            <button
-                              key={chunk.id || chunk.chunk_index}
-                              onClick={() => setSelectedChunk(chunk)}
-                              className={`w-full text-left p-3 rounded-md mb-2 transition-colors duration-200 ${
-                                selectedChunk?.id === chunk.id
-                                  ? 'bg-primary-50 border border-primary-200'
-                                  : isFromSearch
-                                    ? 'bg-blue-50 hover:bg-blue-100 border border-blue-200'
-                                    : 'hover:bg-gray-50 border border-transparent'
-                              }`}
-                            >
-                              <div className="text-sm text-gray-900 font-medium mb-1 flex items-center">
-                                <span>Section {(chunk.chunk_index || 0) + 1}</span>
-                                {isFromSearch && (
-                                  <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                                    {Math.round((relevantChunk.similarity_score || 0) * 100)}%
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-600 line-clamp-3">
-                                {chunk.text?.substring(0, 120)}...
-                              </div>
-                              {highlightText && chunk.text?.toLowerCase().includes(highlightText.toLowerCase()) && (
-                                <div className="mt-1">
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                    Contient le terme recherché
-                                  </span>
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                        </span>
+                        <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-ink-muted">
+                          {chunk.text?.substring(0, 120)}…
+                        </span>
+                        {matchesQuery && (
+                          <span className="mt-2 inline-flex items-center rounded-full bg-hl-soft px-2 py-0.5 text-2xs font-medium text-ink">
+                            Contient le terme recherché
+                          </span>
+                        )}
+                      </button>
+                    </li>
                   );
-                })()}
+                })}
+              </ul>
+            </nav>
+          )}
 
-                {/* Main content on the right */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="p-6">
-                    {selectedChunk ? (
-                      <div>
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-lg font-medium text-gray-900">
-                              Section sélectionnée
-                            </h4>
-                            <button
-                              onClick={() => setSelectedChunk(null)}
-                              className="text-sm text-gray-500 hover:text-gray-700"
-                            >
-                              Voir tout le document
-                            </button>
-                          </div>
-                        </div>
-                        <div
-                          className="prose max-w-none text-gray-700 whitespace-pre-wrap"
-                          dangerouslySetInnerHTML={{
-                            __html: highlightTextInContent(selectedChunk.text, highlightText || searchQuery)
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="mb-6">
-                          <h4 className="text-lg font-medium text-gray-900 mb-2">
-                            Aperçu du document
-                          </h4>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium text-gray-500">Taille:</span>
-                              <span className="ml-2 text-gray-900">
-                                {documentData.file_size ? `${Math.round(documentData.file_size / 1024)} KB` : 'N/A'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-500">Sections:</span>
-                              <span className="ml-2 text-gray-900">
-                                {documentData.chunk_count || documentData.chunks?.length || 0}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-500">Type:</span>
-                              <span className="ml-2 text-gray-900">
-                                {documentData.mime_type || 'N/A'}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-500">Ajouté:</span>
-                              <span className="ml-2 text-gray-900">
-                                {documentData.created_at ? new Date(documentData.created_at).toLocaleDateString('fr-FR') : 'N/A'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+          {/* Reading pane */}
+          <div className="min-h-0 flex-1 overflow-y-auto bg-canvas/70 p-4 sm:p-6 lg:p-8">
+            <article className="mx-auto max-w-prose rounded-lg border border-line bg-surface px-6 py-7 shadow-card sm:px-10 sm:py-10">
+              {selectedChunk ? (
+                <>
+                  <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-line-soft pb-4">
+                    <div>
+                      <p className="eyebrow">Section sélectionnée</p>
+                      <h3 className="mt-1 font-serif text-xl font-semibold text-ink">
+                        Section {(selectedChunk.chunk_index || 0) + 1}
+                        {selectedRelevance && (
+                          <span className="ml-2 align-middle font-sans text-xs font-medium text-accent-ink">
+                            Pertinence {formatScore(selectedRelevance.similarity_score)}
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedChunk(null)}
+                      className="btn-ghost btn-sm"
+                    >
+                      Voir tout le document
+                    </button>
+                  </div>
+                  <div
+                    className="prose doc-text max-w-none whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{
+                      __html: highlightTextInContent(selectedChunk.text, query)
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="eyebrow">Aperçu du document</p>
+                  <h3 className="mt-1 font-serif text-2xl font-semibold leading-snug text-ink">
+                    {documentData.filename || 'Document'}
+                  </h3>
+                  <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-y border-line-soft py-4 text-sm sm:grid-cols-4">
+                    <div>
+                      <dt className="text-xs text-ink-muted">Taille</dt>
+                      <dd className="mt-0.5 font-medium text-ink tabular">
+                        {documentData.file_size ? `${Math.round(documentData.file_size / 1024)} Ko` : 'N/A'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-ink-muted">Sections</dt>
+                      <dd className="mt-0.5 font-medium text-ink tabular">
+                        {documentData.chunk_count || documentData.chunks?.length || 0}
+                      </dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-xs text-ink-muted">Type</dt>
+                      <dd className="mt-0.5 truncate font-medium text-ink">{documentData.mime_type || 'N/A'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-ink-muted">Ajouté</dt>
+                      <dd className="mt-0.5 font-medium text-ink tabular">
+                        {documentData.created_at ? new Date(documentData.created_at).toLocaleDateString('fr-FR') : 'N/A'}
+                      </dd>
+                    </div>
+                  </dl>
 
-                        {/* Full or excerpt content */}
-                        {documentData.content ? (
-                          <div
-                            className="prose max-w-none text-gray-700 whitespace-pre-wrap"
+                  {/* Full or excerpt content */}
+                  {documentData.content ? (
+                    <div
+                      className="prose doc-text mt-6 max-w-none whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{
+                        __html: highlightTextInContent(documentData.content, query)
+                      }}
+                    />
+                  ) : documentData.chunks && documentData.chunks.length > 0 ? (
+                    <div className="mt-6 space-y-6">
+                      <p className="text-sm text-ink-muted">
+                        Sélectionnez une section pour lire son contenu détaillé, ou parcourez l&apos;aperçu ci-dessous.
+                      </p>
+                      {documentData.chunks.slice(0, 3).map((chunk, index) => (
+                        <button
+                          type="button"
+                          key={chunk.id || index}
+                          onClick={() => setSelectedChunk(chunk)}
+                          className="block w-full border-l-2 border-line pl-4 text-left transition-colors hover:border-accent"
+                        >
+                          <span className="block text-sm font-semibold text-ink">Section {index + 1}</span>
+                          <span
+                            className="doc-text mt-1 line-clamp-4 block text-[15px]"
                             dangerouslySetInnerHTML={{
-                              __html: highlightTextInContent(documentData.content, highlightText || searchQuery)
+                              __html: highlightTextInContent(
+                                chunk.text?.substring(0, 300) + (chunk.text?.length > 300 ? '...' : ''),
+                                query
+                              )
                             }}
                           />
-                        ) : documentData.chunks && documentData.chunks.length > 0 ? (
-                          <div className="space-y-6">
-                            <p className="text-gray-600 text-sm">
-                              Sélectionnez une section à gauche pour voir le contenu détaillé, ou parcourez l'aperçu ci-dessous.
-                            </p>
-                            {documentData.chunks.slice(0, 3).map((chunk, index) => (
-                              <div key={chunk.id || index} className="border-l-4 border-gray-200 pl-4">
-                                <div className="text-sm font-medium text-gray-900 mb-2">
-                                  Section {index + 1}
-                                </div>
-                                <div
-                                  className="text-gray-700 text-sm line-clamp-4"
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlightTextInContent(
-                                      chunk.text?.substring(0, 300) + (chunk.text?.length > 300 ? '...' : ''),
-                                      highlightText || searchQuery
-                                    )
-                                  }}
-                                />
-                              </div>
-                            ))}
-                            {documentData.chunks.length > 3 && (
-                              <p className="text-gray-500 text-sm">
-                                ... et {documentData.chunks.length - 3} autres sections
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8">
-                            <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                            <h3 className="mt-2 text-sm font-medium text-gray-900">
-                              Contenu non disponible
-                            </h3>
-                            <p className="mt-1 text-sm text-gray-500">
-                              Le contenu de ce document n'a pas pu être chargé.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
-            <div className="text-sm text-gray-500">
-              {searchQuery && (
-                <span>Recherche : <strong>{searchQuery}</strong></span>
+                        </button>
+                      ))}
+                      {documentData.chunks.length > 3 && (
+                        <p className="text-sm text-ink-muted">
+                          … et {documentData.chunks.length - 3} autres sections
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-10 text-center">
+                      <FileText className="mx-auto h-10 w-10 text-ink-faint" aria-hidden="true" />
+                      <p className="mt-3 text-sm font-medium text-ink">Contenu non disponible</p>
+                      <p className="mt-1 text-sm text-ink-muted">
+                        Le contenu de ce document n&apos;a pas pu être chargé.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
-            </div>
-            <button
-              onClick={handleClose}
-              className="btn-secondary"
-            >
-              Fermer
-            </button>
+            </article>
           </div>
-        </div>
-      </div>
-    </div>
+        </>
+      ) : null}
+    </Modal>
   );
 };
 

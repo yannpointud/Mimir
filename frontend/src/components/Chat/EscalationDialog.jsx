@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Mail, Send } from 'lucide-react';
-import { isValidEmail, createMailtoLink } from '../../utils/helpers';
+import { Mail, Send, Info } from 'lucide-react';
+import { isValidEmail, createMailtoLink, cn } from '../../utils/helpers';
+import Modal from '../Common/Modal';
+
+const MESSAGE_MAX_LENGTH = 1000;
 
 const EscalationDialog = ({ isOpen, onClose, onEscalate, chatHistory }) => {
   const [userEmail, setUserEmail] = useState('');
@@ -77,131 +80,112 @@ ${userEmail}`;
     return createMailtoLink('support@entreprise.com', subject, body);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Overlay */}
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity" onClick={onClose} />
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      icon={Mail}
+      title="Contacter un humain"
+      description="L'équipe support vous répondra par e-mail."
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-secondary"
+            disabled={isSubmitting}
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            form="escalation-form"
+            className="btn-primary"
+            disabled={isSubmitting || !userEmail || !message.trim() || !!emailError}
+          >
+            {isSubmitting ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+                Envoi...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4" aria-hidden="true" />
+                Envoyer
+              </>
+            )}
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm leading-relaxed text-ink-muted">
+        Si vous n&apos;avez pas trouvé de réponse satisfaisante, décrivez votre besoin :
+        un membre de l&apos;équipe prendra le relais.
+      </p>
 
-        {/* Dialog */}
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <Mail className="h-6 w-6 text-primary-600 mr-2" />
-              <h3 className="text-lg font-medium text-gray-900">
-                Contacter un humain
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Description */}
-          <p className="text-sm text-gray-600 mb-6">
-            Si vous n&apos;avez pas trouvé de réponse satisfaisante, vous pouvez contacter notre équipe de support.
-            Votre conversation sera automatiquement incluse dans la demande.
-          </p>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label htmlFor="userEmail" className="block text-sm font-medium text-gray-700 mb-1">
-                Votre adresse email
-              </label>
-              <input
-                type="email"
-                id="userEmail"
-                value={userEmail}
-                onChange={handleEmailChange}
-                className={`input-field ${emailError ? 'border-red-300 focus:ring-red-500' : ''}`}
-                placeholder="votre.email@entreprise.com"
-                required
-              />
-              {emailError && (
-                <p className="mt-1 text-sm text-red-600">{emailError}</p>
-              )}
-            </div>
-
-            {/* Message */}
-            <div>
-              <label htmlFor="escalationMessage" className="block text-sm font-medium text-gray-700 mb-1">
-                Votre message
-              </label>
-              <textarea
-                id="escalationMessage"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                className="input-field"
-                placeholder="Décrivez votre problème ou votre question..."
-                required
-                maxLength={1000}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                {message.length}/1000 caractères
-              </p>
-            </div>
-
-            {/* History info */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800">
-                💡 L&apos;historique de votre conversation avec Mimir sera automatiquement inclus dans votre demande.
-              </p>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 btn-secondary"
-                disabled={isSubmitting}
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="flex-1 btn-primary"
-                disabled={isSubmitting || !userEmail || !message.trim() || !!emailError}
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                    Envoi...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center">
-                    <Send className="h-4 w-4 mr-2" />
-                    Envoyer
-                  </div>
-                )}
-              </button>
-            </div>
-
-            {/* Fallback link */}
-            <div className="text-center pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-500 mb-2">
-                Problème avec le formulaire ?
-              </p>
-              <a
-                href={createFallbackMailto()}
-                className="text-xs text-primary-600 hover:text-primary-500 underline"
-              >
-                Ouvrir votre client email
-              </a>
-            </div>
-          </form>
+      <form id="escalation-form" onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
+        {/* Email */}
+        <div>
+          <label htmlFor="userEmail" className="field-label">
+            Votre adresse email
+          </label>
+          <input
+            type="email"
+            id="userEmail"
+            value={userEmail}
+            onChange={handleEmailChange}
+            className={cn('input-field', emailError && 'border-danger focus:border-danger')}
+            placeholder="prenom.nom@entreprise.com"
+            autoComplete="email"
+            aria-invalid={!!emailError}
+            aria-describedby={emailError ? 'userEmail-error' : undefined}
+            required
+          />
+          {emailError && (
+            <p id="userEmail-error" className="mt-1.5 text-xs font-medium text-danger">{emailError}</p>
+          )}
         </div>
-      </div>
-    </div>
+
+        {/* Message */}
+        <div>
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="escalationMessage" className="field-label">
+              Votre message
+            </label>
+            <span className="tabular text-xs text-ink-faint">
+              {message.length}/{MESSAGE_MAX_LENGTH}
+            </span>
+          </div>
+          <textarea
+            id="escalationMessage"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            className="input-field resize-y"
+            placeholder="Décrivez votre problème ou votre question..."
+            required
+            maxLength={MESSAGE_MAX_LENGTH}
+          />
+        </div>
+
+        {/* History info */}
+        <div className="alert-info py-2.5">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>L&apos;historique de votre conversation avec Mimir sera automatiquement joint à votre demande.</p>
+        </div>
+
+        {/* Fallback link */}
+        <p className="text-center text-xs text-ink-muted">
+          Problème avec le formulaire ?{' '}
+          <a
+            href={createFallbackMailto()}
+            className="font-medium text-accent-ink underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          >
+            Ouvrir votre client email
+          </a>
+        </p>
+      </form>
+    </Modal>
   );
 };
 

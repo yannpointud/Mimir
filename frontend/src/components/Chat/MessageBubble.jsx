@@ -4,12 +4,75 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import SourcesList from './SourcesList';
 import CitationPill from './CitationPill';
+import { ThinkingDots } from './LoadingIndicator';
 import DocumentModal from '../Common/DocumentModal';
+import BrandMark from '../Common/BrandMark';
 import remarkCitations from '../../utils/remarkCitations';
 import { formatRelativeDate, copyToClipboard } from '../../utils/helpers';
-import { Copy, Check, User, Bot, AlertTriangle, Info } from 'lucide-react';
+import { Copy, Check, User, AlertTriangle, Info, Mail } from 'lucide-react';
 
-const MessageBubble = ({ message }) => {
+const MarkdownContent = ({ message, onOpenSource }) => (
+  <ReactMarkdown
+    remarkPlugins={message.isStreaming ? [] : [[remarkCitations, message.citations || {}]]}
+    components={{
+      'citation-pill': ({ n }) => (
+        <CitationPill
+          n={n}
+          source={message.citations?.[n]}
+          onOpenSource={onOpenSource}
+        />
+      ),
+      code({ inline, className, children, ...props }) {
+        const match = /language-(\w+)/.exec(className || '');
+        return !inline && match ? (
+          <SyntaxHighlighter
+            style={oneLight}
+            language={match[1]}
+            PreTag="div"
+            customStyle={{ margin: 0, background: 'transparent', padding: 0, fontSize: '13px' }}
+            {...props}
+          >
+            {String(children).replace(/\n$/, '')}
+          </SyntaxHighlighter>
+        ) : (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        );
+      },
+    }}
+  >
+    {message.content}
+  </ReactMarkdown>
+);
+
+const UserQuestion = ({ message }) => (
+  <div className="relative flex animate-slide-up items-start gap-3 pt-2">
+    <span
+      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-ink-muted ring-1 ring-line"
+      aria-hidden="true"
+    >
+      <User className="h-4 w-4" />
+    </span>
+    <div className="min-w-0 flex-1">
+      <p className="sr-only">Vous :</p>
+      <p className="whitespace-pre-wrap break-words pt-0.5 font-serif text-[19px] font-semibold leading-snug text-ink">
+        {message.content}
+      </p>
+    </div>
+  </div>
+);
+
+const SystemNotice = ({ message }) => (
+  <div className="flex animate-slide-up justify-center" role="status">
+    <p className="inline-flex max-w-xl items-start gap-2 rounded-xl border border-accent/15 bg-accent-soft px-4 py-2.5 text-sm text-accent-ink">
+      <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{message.content}</span>
+    </p>
+  </div>
+);
+
+const MessageBubble = ({ message, onEscalate }) => {
   const [copied, setCopied] = useState(false);
   // Single shared modal source for ALL citation pills in this message. Lifting
   // this state up (rather than letting each CitationPill own its own modal)
@@ -26,166 +89,93 @@ const MessageBubble = ({ message }) => {
     }
   };
 
-  const getMessageIcon = () => {
-    switch (message.type) {
-      case 'user':
-        return <User className="h-5 w-5" />;
-      case 'assistant':
-        return <Bot className="h-5 w-5" />;
-      case 'error':
-        return <AlertTriangle className="h-5 w-5" />;
-      case 'system':
-        return <Info className="h-5 w-5" />;
-      default:
-        return <Bot className="h-5 w-5" />;
-    }
-  };
+  if (message.type === 'user') {
+    return <UserQuestion message={message} />;
+  }
 
-  const getMessageStyle = () => {
-    switch (message.type) {
-      case 'user':
-        return 'ml-auto max-w-3xl';
-      case 'assistant':
-        return 'mr-auto max-w-4xl';
-      case 'error':
-        return 'mr-auto max-w-4xl';
-      case 'system':
-        return 'mx-auto max-w-2xl';
-      default:
-        return 'mr-auto max-w-4xl';
-    }
-  };
+  if (message.type === 'system') {
+    return <SystemNotice message={message} />;
+  }
 
-  const getBubbleStyle = () => {
-    switch (message.type) {
-      case 'user':
-        return 'message-user';
-      case 'assistant':
-        return 'message-assistant';
-      case 'error':
-        return 'bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-800';
-      case 'system':
-        return 'bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-blue-800';
-      default:
-        return 'message-assistant';
-    }
-  };
+  if (message.type === 'error') {
+    return (
+      <div role="alert" className="alert-danger animate-slide-up px-5 py-4">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <p className="min-w-0 flex-1 break-words">{message.content}</p>
+      </div>
+    );
+  }
 
-  const getIconContainerStyle = () => {
-    switch (message.type) {
-      case 'user':
-        return 'bg-primary-600 text-white';
-      case 'assistant':
-        return 'bg-gray-600 text-white';
-      case 'error':
-        return 'bg-red-600 text-white';
-      case 'system':
-        return 'bg-blue-600 text-white';
-      default:
-        return 'bg-gray-600 text-white';
-    }
-  };
+  const isWaiting = message.isStreaming && !message.content;
+  const hasSources = !message.isStreaming && message.sources && message.sources.length > 0;
 
   return (
     <>
-      <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} ${getMessageStyle()}`}>
-        <div className="flex space-x-3 max-w-full">
-          {/* Avatar (sauf pour les messages utilisateur) */}
-          {message.type !== 'user' && (
-            <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getIconContainerStyle()}`}>
-              {getMessageIcon()}
-            </div>
+      <article className="card animate-slide-up overflow-hidden" aria-label="Réponse de Mimir">
+        <header className="flex items-center gap-2 border-b border-line-soft py-2 pl-5 pr-2.5">
+          <BrandMark className="h-4 w-4 text-accent" />
+          <span className="text-[13px] font-semibold text-ink">Mimir</span>
+          <span className="text-[13px] text-ink-faint" aria-hidden="true">·</span>
+          <time dateTime={message.timestamp} className="text-[13px] text-ink-muted">
+            {formatRelativeDate(message.timestamp)}
+          </time>
+          {!message.isStreaming && message.confidence > 0 && (
+            <span className="badge-neutral ml-1 hidden sm:inline-flex">
+              Confiance {Math.round(message.confidence * 100)} %
+            </span>
           )}
-
-          <div className="flex-1 min-w-0">
-            {/* Bulle de message */}
-            <div className={getBubbleStyle()}>
-              <div className="flex items-start justify-between">
-                {/* Contenu markdown */}
-                <div className="prose prose-sm max-w-none flex-1">
-                  <ReactMarkdown
-                    remarkPlugins={message.isStreaming ? [] : [[remarkCitations, message.citations || {}]]}
-                    components={{
-                      'citation-pill': ({ n }) => (
-                        <CitationPill
-                          n={n}
-                          source={message.citations?.[n]}
-                          onOpenSource={setOpenCitationSource}
-                        />
-                      ),
-                      code({ inline, className, children, ...props }) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        return !inline && match ? (
-                          <SyntaxHighlighter
-                            style={oneLight}
-                            language={match[1]}
-                            PreTag="div"
-                            {...props}
-                          >
-                            {String(children).replace(/\n$/, '')}
-                          </SyntaxHighlighter>
-                        ) : (
-                          <code className={className} {...props}>
-                            {children}
-                          </code>
-                        );
-                      },
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                  {message.isStreaming && (
-                    <span className="inline-block ml-1 w-2 h-4 bg-gray-600 animate-pulse" style={{ animation: 'blink 1s infinite' }}></span>
-                  )}
-                </div>
-
-                {/* Bouton de copie à droite du texte */}
-                {message.type !== 'user' && (
-                  <button
-                    onClick={handleCopy}
-                    className="ml-3 mt-1 text-gray-400 hover:text-gray-600 transition-colors duration-200 flex-shrink-0"
-                    title="Copier le message"
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {/* Score de confiance pour l'assistant - seulement si pas en streaming et confiance > 0 */}
-              {message.type === 'assistant' && !message.isStreaming && message.confidence > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  Confiance: {Math.round(message.confidence * 100)}%
-                </div>
+          {!message.isStreaming && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="btn-ghost btn-sm ml-auto"
+              title="Copier le message"
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
               )}
-            </div>
+              {copied ? 'Copié' : 'Copier'}
+            </button>
+          )}
+        </header>
 
-            {/* Sources (pour les messages de l'assistant) */}
-            {message.type === 'assistant' && message.sources && message.sources.length > 0 && (
-              <div className="mt-2">
-                <SourcesList sources={message.sources} />
-              </div>
-            )}
-
-            {/* Métadonnées */}
-            <div className={`mt-2 ${message.type === 'user' ? 'text-right' : ''}`}>
-              <span className="text-xs text-gray-500">
-                {formatRelativeDate(message.timestamp)}
-              </span>
-            </div>
-          </div>
-
-          {/* Avatar pour les messages utilisateur */}
-          {message.type === 'user' && (
-            <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${getIconContainerStyle()}`}>
-              {getMessageIcon()}
+        <div className="px-5 py-4">
+          {isWaiting ? (
+            <p className="flex items-center gap-3 py-1 text-sm text-ink-muted" role="status">
+              Recherche dans la documentation
+              <ThinkingDots />
+            </p>
+          ) : (
+            <div className="prose max-w-none">
+              <MarkdownContent message={message} onOpenSource={setOpenCitationSource} />
+              {message.isStreaming && (
+                <span
+                  className="ml-0.5 inline-block h-[1.1em] w-[2px] translate-y-[3px] animate-caret bg-accent"
+                  aria-hidden="true"
+                />
+              )}
             </div>
           )}
         </div>
-      </div>
+
+        {hasSources && (
+          <div className="border-t border-line-soft px-5 py-3">
+            <SourcesList sources={message.sources} />
+          </div>
+        )}
+
+        {onEscalate && (
+          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-line-soft bg-sunken/70 px-5 py-2.5">
+            <p className="text-[13px] text-ink-muted">Cette réponse ne vous suffit pas ?</p>
+            <button type="button" onClick={onEscalate} className="btn-ghost btn-sm -mr-2 text-accent-ink hover:text-accent-ink">
+              <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+              Transmettre à un humain
+            </button>
+          </footer>
+        )}
+      </article>
 
       {/* Single shared modal for every citation pill in this message (see
           openCitationSource above) — reuses the existing DocumentModal, never
@@ -194,6 +184,7 @@ const MessageBubble = ({ message }) => {
         isOpen={openCitationSource != null}
         onClose={() => setOpenCitationSource(null)}
         documentId={openCitationSource?.document_id}
+        filename={openCitationSource?.filename || openCitationSource?.document_name}
         relevantChunks={openCitationSource ? [openCitationSource] : []}
       />
     </>

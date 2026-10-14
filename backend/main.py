@@ -354,6 +354,7 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
+app.include_router(documents.reader_router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(logs.router, prefix="/api/v1")
 

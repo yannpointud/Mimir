@@ -1,53 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-  TrendingUp,
-  Users,
-  Activity,
-  Clock,
-  BarChart3,
   AlertCircle,
-  CheckCircle,
-  RefreshCw,
-  Database,
+  BarChart3,
+  ChevronRight,
   Cpu,
+  Euro,
   HardDrive,
-  Zap,
-  Globe,
-  MessageCircle,
-  Timer,
-  Shield,
-  AlertTriangle,
-  UserCheck,
-  Hash,
-  Euro
+  MemoryStick,
+  RefreshCw
 } from 'lucide-react';
 
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { adminAPI, usageAPI } from '../../services/api';
-import { getErrorMessage, formatRelativeDate, safeDisplayValue } from '../../utils/helpers';
+import { getErrorMessage, cn } from '../../utils/helpers';
+import { getBudgetStatus } from '../../utils/budget';
 
-// Pure helper: maps spend-vs-cap ratio to a three-state budget status.
-// Defensive on cap <= 0 (returns 'normal' rather than dividing by zero).
-export const getBudgetStatus = (spent, cap) => {
-  if (!cap || cap <= 0) {
-    return 'normal';
-  }
-  const ratio = spent / cap;
-  if (ratio >= 1.0) {
-    return 'exceeded';
-  }
-  if (ratio >= 0.8) {
-    return 'warning';
-  }
-  return 'normal';
-};
+const CHART_DAYS = 14;
+const CHART_HEIGHT_PX = 112;
 
-// Formats a euro amount with French decimal comma, 2 decimal places.
+// Formats a euro amount with French decimal comma, 2 decimal places. Non-zero
+// spend below one cent (typical for a few questions) reads "< 0,01", not "0,00".
 const formatEuro = (value) => {
   const num = typeof value === 'number' ? value : 0;
+  if (num > 0 && num < 0.01) {
+    return '< 0,01';
+  }
   return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
+
+const formatNumber = (value) => (value || 0).toLocaleString('fr-FR');
 
 // Gauge fill width capped at 100%, per the UI-SPEC contract.
 const budgetGaugeWidthPct = (usage) => {
@@ -60,12 +42,12 @@ const budgetGaugeWidthPct = (usage) => {
 // Gauge fill / badge color per budget state (green/yellow/red triptych).
 const budgetGaugeFillClass = (usage) => {
   const status = getBudgetStatus(usage.spent_today_eur, usage.daily_budget_eur);
-  return { normal: 'bg-green-600', warning: 'bg-yellow-500', exceeded: 'bg-red-600' }[status];
+  return { normal: 'bg-success', warning: 'bg-warning', exceeded: 'bg-danger' }[status];
 };
 
-const budgetBadgeTextClass = (usage) => {
+const budgetBadgeClass = (usage) => {
   const status = getBudgetStatus(usage.spent_today_eur, usage.daily_budget_eur);
-  return { normal: 'text-green-600', warning: 'text-yellow-600', exceeded: 'text-red-600' }[status];
+  return { normal: 'badge-success', warning: 'badge-warning', exceeded: 'badge-danger' }[status];
 };
 
 const budgetBadgeCopy = (usage) => {
@@ -73,534 +55,408 @@ const budgetBadgeCopy = (usage) => {
   return {
     normal: 'Sous contrôle',
     warning: 'Approche du plafond',
-    exceeded: 'Plafond atteint — nouvelles requêtes bloquées',
+    exceeded: 'Plafond atteint : nouvelles requêtes bloquées',
   }[status];
 };
 
+// One answer = one call of the generation model; embedding calls are excluded.
+const isGenerationModel = (model) => !model.includes('embed');
+
+// Ledger dates are UTC calendar days: offset 0 is today.
+const utcDay = (offsetDays) => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - offsetDays);
+  return date.toISOString().slice(0, 10);
+};
+
+const formatDayLabel = (isoDate) =>
+  new Date(`${isoDate}T00:00:00Z`).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+
+/**
+ * Derives activity figures from the AI cost ledger (/admin/usage), the only
+ * source that records every streamed answer.
+ */
+const buildActivity = (usage) => {
+  const perDay = {};
+  usage.history
+    .filter(row => isGenerationModel(row.model))
+    .forEach((row) => {
+      const day = perDay[row.date] || { questions: 0, tokens: 0 };
+      day.questions += row.calls;
+      day.tokens += row.tokens;
+      perDay[row.date] = day;
+    });
+
+  const sumSince = (field, days) => Object.entries(perDay)
+    .filter(([date]) => date >= utcDay(days - 1))
+    .reduce((total, [, day]) => total + day[field], 0);
+
+  const questions30 = sumSince('questions', 30);
+
+  return {
+    today: usage.today_by_model
+      .filter(row => isGenerationModel(row.model))
+      .reduce((total, row) => total + row.calls, 0),
+    week: sumSince('questions', 7),
+    month: questions30,
+    tokensPerQuestion: questions30 > 0 ? Math.round(sumSince('tokens', 30) / questions30) : 0,
+    cost30: usage.history.reduce((total, row) => total + row.cost_eur, 0),
+    days: Array.from({ length: CHART_DAYS }, (_, index) => {
+      const date = utcDay(CHART_DAYS - 1 - index);
+      return { date, questions: perDay[date]?.questions || 0 };
+    }),
+  };
+};
+
+const formatGigabytes = (bytes) => `${(bytes / 1024 ** 3).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
+
+// Resource load colour: calm until 70 %, warning until 90 %, then danger
+const loadTone = (percent) => (percent >= 90 ? 'bg-danger' : percent >= 70 ? 'bg-warning' : 'bg-accent');
+
+const ResourceGauge = ({ icon: Icon, label, percent, detail }) => (
+  <div>
+    <div className="flex items-baseline justify-between gap-3">
+      <p className="flex items-center gap-1.5 text-sm text-ink-muted">
+        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+        {label}
+      </p>
+      <p className="font-serif text-2xl font-semibold text-ink tabular">{Math.round(percent)} %</p>
+    </div>
+    <div
+      className="mt-2 h-2 overflow-hidden rounded-full bg-line-soft"
+      role="meter"
+      aria-label={`${label} utilisé`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(percent)}
+    >
+      <div className={cn('h-full rounded-full', loadTone(percent))} style={{ width: `${percent}%` }} />
+    </div>
+    <p className="mt-1.5 text-xs text-ink-muted tabular">{detail}</p>
+  </div>
+);
+
+const StatTile = ({ label, value, hint }) => (
+  <div className="rounded-xl border border-line-soft bg-sunken/60 px-4 py-3">
+    <p className="text-xs font-medium text-ink-muted">{label}</p>
+    <p className="mt-1 font-serif text-[28px] font-semibold leading-tight text-ink tabular">{value}</p>
+    <p className="mt-0.5 text-xs text-ink-muted">{hint}</p>
+  </div>
+);
+
+const QuestionsChart = ({ days }) => {
+  const max = Math.max(1, ...days.map(day => day.questions));
+  const summary = days.map(day => `${formatDayLabel(day.date)} : ${day.questions}`).join(', ');
+
+  return (
+    <figure>
+      <figcaption className="eyebrow">Questions par jour · {CHART_DAYS} derniers jours</figcaption>
+      <div className="mt-4 flex items-end gap-1.5" role="img" aria-label={`Questions par jour : ${summary}`}>
+        {days.map((day, index) => {
+          const isToday = index === days.length - 1;
+          const height = day.questions > 0 ? Math.max((day.questions / max) * CHART_HEIGHT_PX, 6) : 2;
+          return (
+            <div key={day.date} className="group flex flex-1 flex-col items-center justify-end" style={{ height: CHART_HEIGHT_PX + 18 }}>
+              <span className={cn('mb-1 text-2xs font-medium text-ink-muted tabular', day.questions === 0 && 'invisible')}>
+                {day.questions}
+              </span>
+              <div
+                className={cn(
+                  'w-full max-w-[40px] rounded-t-[5px] transition-colors',
+                  day.questions === 0 ? 'bg-line' : isToday ? 'bg-accent' : 'bg-accent/40 group-hover:bg-accent/70'
+                )}
+                style={{ height }}
+                title={`${formatDayLabel(day.date)} : ${day.questions} question${day.questions > 1 ? 's' : ''}`}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex gap-1.5 border-t border-line-soft pt-2" aria-hidden="true">
+        {days.map((day, index) => {
+          // On narrow screens only every third day (counted back from today) is labelled
+          const labelledOnMobile = (days.length - 1 - index) % 3 === 0;
+          return (
+            <span
+              key={day.date}
+              className={cn(
+                'flex min-w-0 flex-1 justify-center whitespace-nowrap text-2xs text-ink-muted tabular',
+                !labelledOnMobile && 'invisible sm:visible',
+                index === days.length - 1 && 'font-semibold text-ink'
+              )}
+            >
+              {formatDayLabel(day.date)}
+            </span>
+          );
+        })}
+      </div>
+    </figure>
+  );
+};
+
 const AnalyticsPanel = () => {
-  const { onRefresh, refreshTrigger } = useOutletContext();
-  const [analyticsData, setAnalyticsData] = useState(null);
-  const [chatMetrics, setChatMetrics] = useState(null);
+  const { refreshTrigger } = useOutletContext();
   const [usageData, setUsageData] = useState(null);
+  const [systemData, setSystemData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [systemError, setSystemError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
 
-  // Load analytics data
-  const loadAnalyticsData = async () => {
+  // AI cost ledger: fast, and the reference for spend and activity
+  const loadUsage = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      const [analytics, chatData, usage] = await Promise.all([
-        adminAPI.getUsageAnalytics(),
-        adminAPI.getChatMetrics(),
-        usageAPI.getUsage()
-      ]);
-
-      setAnalyticsData(analytics);
-      setChatMetrics(chatData);
-      setUsageData(usage);
+      setUsageData(await usageAPI.getUsage());
       setLastUpdate(new Date());
-
     } catch (error) {
       console.error('Erreur lors du chargement des analytics:', getErrorMessage(error));
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadAnalyticsData();
   }, []);
 
-  // Listen to parent refreshTrigger for global refresh
+  // Live server resources (fast endpoint, read straight from the host)
+  const loadSystem = useCallback(async () => {
+    try {
+      setSystemError(null);
+      setSystemData(await adminAPI.getSystemInfo());
+    } catch (error) {
+      console.error('Erreur lors du chargement des ressources serveur:', getErrorMessage(error));
+      setSystemError(getErrorMessage(error));
+    }
+  }, []);
+
+  // Load on mount and on each global refresh
   useEffect(() => {
-    if (refreshTrigger > 0) {
-      loadAnalyticsData();
-    }
-  }, [refreshTrigger]);
+    loadUsage();
+    loadSystem();
+  }, [loadUsage, loadSystem, refreshTrigger]);
 
-  // Get the status icon
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'healthy':
-      case 'ok':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'warning':
-        return <AlertCircle className="h-5 w-5 text-yellow-600" />;
-      case 'error':
-      case 'unhealthy':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return <Clock className="h-5 w-5 text-gray-600" />;
-    }
-  };
-
-  // Format percentages
-  const formatPercentage = (value) => {
-    return value ? `${Math.round(value)}%` : '0%';
-  };
-
-  // Format numbers
-  const formatNumber = (value) => {
-    return value ? value.toLocaleString() : '0';
-  };
-
-  if (loading && !analyticsData) {
+  if (loading && !usageData) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Chargement des analytics...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-4 py-24">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-ink-muted">Chargement des analytics...</p>
       </div>
     );
   }
 
-  return (
-    <div className="p-4 max-w-7xl h-full">
+  const activity = usageData && buildActivity(usageData);
 
+  return (
+    <div className="space-y-6">
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-            <div>
-              <h3 className="text-sm font-medium text-red-900">Erreur d'analytics</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
+        <div role="alert" className="alert-danger">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold">Erreur de chargement des coûts</p>
+            <p className="mt-0.5">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Main metrics - Row 1 */}
-      {(chatMetrics || analyticsData?.overview) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Requests per hour */}
-          {chatMetrics && (
-            <div className="card p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Requêtes/heure</p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {chatMetrics.requests_last_hour || 0}
-                  </p>
-                </div>
-                <Timer className="h-8 w-8 text-blue-600" />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Dernière heure
-              </p>
+      {usageData && (
+        <>
+          {/* Coûts IA - spend gauge (focal), today by model, 30-day history (COST-02) */}
+          <section className="card overflow-hidden">
+            <div className="card-header">
+              <h2 className="card-title">
+                <Euro className="h-4 w-4 text-accent" aria-hidden="true" />
+                Coûts IA
+              </h2>
+              <span className={cn('badge-dot', budgetBadgeClass(usageData))}>
+                {budgetBadgeCopy(usageData)}
+              </span>
             </div>
-          )}
 
-          {/* Requests 24h */}
-          {analyticsData?.overview && (
-            <div className="card p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Requêtes 24h</p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {formatNumber(analyticsData.overview.total_requests_24h)}
-                  </p>
-                </div>
-                <MessageCircle className="h-8 w-8 text-blue-600" />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Dernières 24 heures
-              </p>
-            </div>
-          )}
-
-          {/* Requests 7 days */}
-          {analyticsData?.overview && (
-            <div className="card p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Requêtes 7j</p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {formatNumber(analyticsData.overview.total_requests_7d)}
-                  </p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-blue-600" />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                7 derniers jours
-              </p>
-            </div>
-          )}
-
-          {/* Response time */}
-          {chatMetrics && (
-            <div className="card p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Temps réponse</p>
-                  <p className="text-3xl font-bold text-purple-600">
-                    {chatMetrics.avg_response_time_ms || 0}s
-                  </p>
-                </div>
-                <Clock className="h-8 w-8 text-purple-600" />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Moyenne actuelle
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Secondary metrics - Row 2 */}
-      {chatMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Success rate */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Taux succès</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {chatMetrics.success_rate || 0}%
+            <div className="grid lg:grid-cols-5">
+              {/* Gauge - focal point: spend vs daily cap */}
+              <div className="border-b border-line-soft p-5 lg:col-span-2 lg:border-b-0 lg:border-r">
+                <p className="text-sm text-ink-muted">Dépense du jour</p>
+                <p className="mt-2 font-serif text-[34px] font-semibold leading-none text-ink tabular">
+                  {formatEuro(usageData.spent_today_eur)} €
+                  <span className="ml-2 font-sans text-base font-normal text-ink-muted">
+                    / {formatEuro(usageData.daily_budget_eur)} €
+                  </span>
                 </p>
-              </div>
-              <Shield className="h-8 w-8 text-green-600" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Fiabilité système
-            </p>
-          </div>
-
-          {/* Errors per hour */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Erreurs/heure</p>
-                <p className="text-3xl font-bold text-red-600">
-                  {chatMetrics.errors_last_hour || 0}
-                </p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-600" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Incidents récents
-            </p>
-          </div>
-
-          {/* Active sessions */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Sessions actives</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {chatMetrics.active_sessions || 0}
-                </p>
-              </div>
-              <UserCheck className="h-8 w-8 text-purple-600" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Utilisateurs connectés
-            </p>
-          </div>
-
-          {/* Tokens per request */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Tokens/requête</p>
-                <p className="text-3xl font-bold text-purple-600">
-                  {chatMetrics.avg_tokens_per_request || 0}
-                </p>
-              </div>
-              <Hash className="h-8 w-8 text-purple-600" />
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Consommation moyenne
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Trends and Performance */}
-      {(analyticsData?.trends || analyticsData?.performance) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Growth trends */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <TrendingUp className="h-5 w-5 mr-2" />
-              Tendances de croissance
-            </h3>
-            <div className="space-y-4">
-              {analyticsData.trends && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Croissance 24h</span>
-                    <span className="font-medium text-green-600">
-                      {formatPercentage(analyticsData.trends.requests_growth_24h)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Croissance 7j</span>
-                    <span className="font-medium text-green-600">
-                      {formatPercentage(analyticsData.trends.requests_growth_7d)}
-                    </span>
-                  </div>
-                </>
-              )}
-              {analyticsData.performance && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Temps réponse 24h</span>
-                    <span className="font-medium">{safeDisplayValue(analyticsData.performance.avg_response_time_24h, 0)}s</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Temps réponse 7j</span>
-                    <span className="font-medium">{safeDisplayValue(analyticsData.performance.avg_response_time_7d, 0)}s</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Performance and success rate */}
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <BarChart3 className="h-5 w-5 mr-2" />
-              Performance et fiabilité
-            </h3>
-            <div className="space-y-4">
-              {analyticsData.performance && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Taux succès 24h</span>
-                    <span className="font-medium text-green-600">
-                      {formatPercentage(analyticsData.performance.success_rate_24h)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Taux succès 7j</span>
-                    <span className="font-medium text-green-600">
-                      {formatPercentage(analyticsData.performance.success_rate_7d)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Pic d'usage</span>
-                    <span className="font-medium">{analyticsData.performance.peak_usage_time}</span>
-                  </div>
-                </>
-              )}
-              {analyticsData.system && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Score santé</span>
-                  <span className="font-medium text-blue-600">{analyticsData.system.health_score}%</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resources and tokens */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Token consumption */}
-        {analyticsData?.resources && (
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Zap className="h-5 w-5 mr-2" />
-              Consommation tokens
-            </h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Tokens 24h</span>
-                <span className="font-medium">{formatNumber(analyticsData.resources.total_tokens_24h)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Tokens 7j</span>
-                <span className="font-medium">{formatNumber(analyticsData.resources.total_tokens_7d)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Moyenne/jour</span>
-                <span className="font-medium">{formatNumber(analyticsData.resources.avg_tokens_per_day)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Estimation mensuelle</span>
-                <span className="font-medium text-orange-600">{formatNumber(analyticsData.resources.estimated_monthly_tokens)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* System status */}
-        {analyticsData?.system && (
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Cpu className="h-5 w-5 mr-2" />
-              État système
-            </h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 flex items-center">
-                  <Activity className="h-4 w-4 mr-1" />
-                  Uptime estimé
-                </span>
-                <span className="font-medium text-green-600">{analyticsData.system.uptime_estimate}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-1" />
-                  Taux erreur 24h
-                </span>
-                <span className="font-medium text-red-600">{formatPercentage(analyticsData.system.error_rate_24h)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Score santé
-                </span>
-                <span className="font-medium text-blue-600">{analyticsData.system.health_score}%</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 flex items-center">
-                  <HardDrive className="h-4 w-4 mr-1" />
-                  Taille logs
-                </span>
-                <span className="font-medium">{analyticsData.system.log_file_sizes ? Object.keys(analyticsData.system.log_file_sizes).length : 0} fichiers</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Coûts IA - spend gauge (focal), today by model, 30-day history (COST-02) */}
-      <div className="card p-6 mb-8">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Euro className="h-5 w-5 mr-2 text-primary-600" />
-          Coûts IA
-        </h3>
-
-        {loading && !usageData && (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-center">
-              <LoadingSpinner size="md" />
-              <p className="mt-2 text-sm text-gray-600">Chargement des coûts...</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && error && !usageData && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <div>
-                <h4 className="text-sm text-red-900">Erreur de chargement des coûts</h4>
-                <p className="text-sm text-red-700 mt-1">
-                  Impossible de charger les données de coûts. Réessayez dans quelques instants.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {usageData && (
-          <>
-            {/* Gauge - focal point: spend vs daily cap */}
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-2">Dépense du jour</p>
-              <div className="flex items-end justify-between mb-2">
-                <p className="text-3xl font-semibold text-primary-600">
-                  {formatEuro(usageData.spent_today_eur)} € / {formatEuro(usageData.daily_budget_eur)} €
-                </p>
-                <span className={`text-xs ${budgetBadgeTextClass(usageData)}`}>
-                  {budgetBadgeCopy(usageData)}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
-                  className={`h-3 rounded-full ${budgetGaugeFillClass(usageData)}`}
-                  style={{ width: `${budgetGaugeWidthPct(usageData)}%` }}
-                />
+                  className="mt-5 h-2.5 w-full overflow-hidden rounded-full bg-line-soft"
+                  role="meter"
+                  aria-label="Part du plafond quotidien consommée"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(budgetGaugeWidthPct(usageData))}
+                >
+                  <div
+                    className={cn('h-full rounded-full', budgetGaugeFillClass(usageData))}
+                    style={{ width: `${budgetGaugeWidthPct(usageData)}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-ink-muted tabular">
+                  {Math.round(budgetGaugeWidthPct(usageData))} % du plafond quotidien consommé
+                </p>
+                <p className="mt-5 flex items-baseline justify-between border-t border-line-soft pt-4 text-sm">
+                  <span className="text-ink-muted">Dépense sur 30 jours</span>
+                  <span className="font-semibold text-ink tabular">{formatEuro(activity.cost30)} €</span>
+                </p>
+              </div>
+
+              {/* Today by model and 30-day history */}
+              <div className="space-y-5 p-5 lg:col-span-3">
+                <div>
+                  <p className="eyebrow mb-2">Aujourd&apos;hui par modèle</p>
+                  {usageData.today_by_model.length > 0 ? (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-line text-xs text-ink-muted">
+                          <th className="py-2 text-left font-medium">Modèle</th>
+                          <th className="py-2 text-right font-medium">Appels</th>
+                          <th className="py-2 text-right font-medium">Tokens</th>
+                          <th className="py-2 text-right font-medium">Coût (€)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="tabular">
+                        {usageData.today_by_model.map((row) => (
+                          <tr key={row.model} className="border-b border-line-soft last:border-0">
+                            <td className="py-2 font-mono text-xs text-ink">{row.model}</td>
+                            <td className="py-2 text-right text-ink-muted">{formatNumber(row.calls)}</td>
+                            <td className="py-2 text-right text-ink-muted">{formatNumber(row.total_tokens)}</td>
+                            <td className="py-2 text-right font-medium text-ink">{formatEuro(row.cost_eur)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="rounded-lg bg-sunken px-4 py-3">
+                      <p className="text-sm font-medium text-ink">Aucune consommation aujourd&apos;hui</p>
+                      <p className="mt-0.5 text-xs text-ink-muted">
+                        Aucun appel Mistral n&apos;a encore été enregistré pour la journée en cours.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <details className="group">
+                  <summary className="eyebrow flex cursor-pointer select-none items-center gap-1.5 hover:text-ink">
+                    <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden="true" />
+                    Historique (30 jours)
+                    <span className="font-normal normal-case tracking-normal">· {usageData.history.length} lignes</span>
+                  </summary>
+                  {usageData.history.length > 0 ? (
+                    <div className="mt-2 max-h-72 overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-surface">
+                          <tr className="border-b border-line text-xs text-ink-muted">
+                            <th className="py-2 text-left font-medium">Date</th>
+                            <th className="py-2 text-left font-medium">Modèle</th>
+                            <th className="py-2 text-right font-medium">Appels</th>
+                            <th className="py-2 text-right font-medium">Tokens</th>
+                            <th className="py-2 text-right font-medium">Coût (€)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="tabular">
+                          {usageData.history.map((row, idx) => (
+                            <tr key={`${row.date}-${row.model}-${idx}`} className="border-b border-line-soft last:border-0">
+                              <td className="py-2 text-ink-muted">{row.date}</td>
+                              <td className="py-2 font-mono text-xs text-ink">{row.model}</td>
+                              <td className="py-2 text-right text-ink-muted">{formatNumber(row.calls)}</td>
+                              <td className="py-2 text-right text-ink-muted">{formatNumber(row.tokens)}</td>
+                              <td className="py-2 text-right font-medium text-ink">{formatEuro(row.cost_eur)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-ink-muted">
+                      Aucun historique disponible sur les 30 derniers jours.
+                    </p>
+                  )}
+                </details>
               </div>
             </div>
+          </section>
 
-            {/* Today by model - secondary, recessive (smaller text, no accent) */}
-            <div className="mb-6">
-              {usageData.today_by_model && usageData.today_by_model.length > 0 ? (
-                <table className="w-full text-sm text-gray-600">
-                  <thead>
-                    <tr className="text-xs text-gray-500 border-b border-gray-200">
-                      <th className="text-left py-2">Modèle</th>
-                      <th className="text-right py-2">Appels</th>
-                      <th className="text-right py-2">Tokens</th>
-                      <th className="text-right py-2">Coût (€)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usageData.today_by_model.map((row) => (
-                      <tr key={row.model} className="border-b border-gray-100">
-                        <td className="py-2">{row.model}</td>
-                        <td className="text-right py-2">{formatNumber(row.calls)}</td>
-                        <td className="text-right py-2">{formatNumber(row.total_tokens)}</td>
-                        <td className="text-right py-2">{formatEuro(row.cost_eur)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-600">Aucune consommation aujourd'hui</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Aucun appel Mistral n'a encore été enregistré pour la journée en cours.
-                  </p>
-                </div>
-              )}
+          {/* Activity from the ledger */}
+          <section className="card">
+            <div className="card-header flex-wrap">
+              <h2 className="card-title">
+                <BarChart3 className="h-4 w-4 text-accent" aria-hidden="true" />
+                Activité
+              </h2>
+              <span className="text-xs text-ink-muted">Une question = une réponse générée par le modèle</span>
             </div>
-
-            {/* 30-day history - secondary, recessive (smaller text, no accent) */}
-            <div>
-              <p className="text-xs text-gray-500 mb-2">Historique (30 jours)</p>
-              {usageData.history && usageData.history.length > 0 ? (
-                <table className="w-full text-sm text-gray-600">
-                  <thead>
-                    <tr className="text-xs text-gray-500 border-b border-gray-200">
-                      <th className="text-left py-2">Date</th>
-                      <th className="text-left py-2">Modèle</th>
-                      <th className="text-right py-2">Appels</th>
-                      <th className="text-right py-2">Tokens</th>
-                      <th className="text-right py-2">Coût (€)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usageData.history.map((row, idx) => (
-                      <tr key={`${row.date}-${row.model}-${idx}`} className="border-b border-gray-100">
-                        <td className="py-2">{row.date}</td>
-                        <td className="py-2">{row.model}</td>
-                        <td className="text-right py-2">{formatNumber(row.calls)}</td>
-                        <td className="text-right py-2">{formatNumber(row.tokens)}</td>
-                        <td className="text-right py-2">{formatEuro(row.cost_eur)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-gray-600 text-center py-4">
-                  Aucun historique disponible sur les 30 derniers jours.
-                </p>
-              )}
+            <div className="card-body space-y-6">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile label="Questions aujourd'hui" value={formatNumber(activity.today)} hint="Depuis minuit (UTC)" />
+                <StatTile label="Questions sur 7 jours" value={formatNumber(activity.week)} hint="Semaine glissante" />
+                <StatTile label="Questions sur 30 jours" value={formatNumber(activity.month)} hint="Mois glissant" />
+                <StatTile label="Tokens par question" value={formatNumber(activity.tokensPerQuestion)} hint="Moyenne sur 30 jours" />
+              </div>
+              <QuestionsChart days={activity.days} />
             </div>
-          </>
-        )}
-      </div>
+          </section>
+        </>
+      )}
 
-      {/* Automatic update information */}
-      <div className="mt-6 bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center text-sm text-gray-600">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          <span>
-            Cette page se met à jour automatiquement toutes les 30 secondes.
-            Dernière actualisation : {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Jamais'}
-          </span>
+      {/* Live server resources */}
+      <section className="card">
+        <div className="card-header">
+          <h2 className="card-title">
+            <Cpu className="h-4 w-4 text-accent" aria-hidden="true" />
+            Ressources du serveur
+          </h2>
+          {systemData && (
+            <span className="text-xs text-ink-muted">
+              {systemData.platform.system} {systemData.platform.machine} · {systemData.application.environment}
+            </span>
+          )}
         </div>
-      </div>
+        {systemError ? (
+          <div className="p-5">
+            <div className="alert-danger">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p>{systemError}</p>
+            </div>
+          </div>
+        ) : !systemData ? (
+          <div className="flex items-center gap-3 px-5 py-6 text-sm text-ink-muted">
+            <LoadingSpinner size="sm" />
+            Lecture des ressources…
+          </div>
+        ) : (
+          <div className="grid gap-5 p-5 sm:grid-cols-3">
+            <ResourceGauge
+              icon={Cpu}
+              label="Processeur"
+              percent={systemData.hardware.cpu_percent}
+              detail={`${systemData.hardware.cpu_count} cœurs`}
+            />
+            <ResourceGauge
+              icon={MemoryStick}
+              label="Mémoire"
+              percent={systemData.hardware.memory.percent}
+              detail={`${formatGigabytes(systemData.hardware.memory.used)} / ${formatGigabytes(systemData.hardware.memory.total)}`}
+            />
+            <ResourceGauge
+              icon={HardDrive}
+              label="Disque"
+              percent={systemData.hardware.disk.percent}
+              detail={`${formatGigabytes(systemData.hardware.disk.free)} libres`}
+            />
+          </div>
+        )}
+      </section>
+
+      {/* Last refresh */}
+      <p className="flex items-center gap-2 text-xs text-ink-muted">
+        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+        Dernière actualisation : {lastUpdate ? lastUpdate.toLocaleTimeString('fr-FR') : 'Jamais'}
+      </p>
     </div>
   );
 };

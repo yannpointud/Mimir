@@ -22,11 +22,18 @@ export const escapeHtml = (str) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+// The backend serializes naive UTC datetimes (datetime.utcnow().isoformat(),
+// no offset): read those as UTC instead of local time.
+const NAIVE_ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+const parseServerDate = (dateString) =>
+  new Date(NAIVE_ISO_DATETIME.test(dateString) ? `${dateString}Z` : dateString);
+
 // Date formatting
 export const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
 
-  const date = new Date(dateString);
+  const date = parseServerDate(dateString);
   if (isNaN(date.getTime())) return 'Date invalide';
 
   return new Intl.DateTimeFormat('fr-FR', {
@@ -42,7 +49,7 @@ export const formatDate = (dateString) => {
 export const formatRelativeDate = (dateString) => {
   if (!dateString) return 'N/A';
 
-  const date = new Date(dateString);
+  const date = parseServerDate(dateString);
   if (isNaN(date.getTime())) return 'Date invalide';
 
   const now = new Date();
@@ -176,6 +183,10 @@ export const getErrorMessage = (error) => {
   if (error.response?.data?.detail) {
     return error.response.data.detail;
   }
+  // Backend ErrorResponse shape: { error_code, error_message } (main.py handlers)
+  if (typeof error.response?.data?.error_message === 'string') {
+    return error.response.data.error_message;
+  }
   if (error.response?.data?.message) {
     return error.response.data.message;
   }
@@ -199,12 +210,12 @@ export const translateDocumentStatus = (status) => {
 // Status colors
 export const getStatusColor = (status) => {
   const colors = {
-    'pending': 'bg-yellow-100 text-yellow-800',
-    'indexing': 'bg-blue-100 text-blue-800',
-    'indexed': 'bg-green-100 text-green-800',
-    'error': 'bg-red-100 text-red-800'
+    'pending': 'badge-neutral',
+    'indexing': 'badge-accent',
+    'indexed': 'badge-success',
+    'error': 'badge-danger'
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+  return colors[status] || 'badge-neutral';
 };
 
 // Robust handling of null/undefined values for display

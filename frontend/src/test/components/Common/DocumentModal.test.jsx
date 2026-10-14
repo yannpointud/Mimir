@@ -35,7 +35,7 @@ describe('DocumentModal — SEC-04 escape-then-highlight', () => {
   });
 
   it('renders a malicious chunk as inert literal text (no script/img element in DOM)', async () => {
-    const { container } = renderModalWithChunk(XSS_PAYLOAD);
+    const { baseElement: container } = renderModalWithChunk(XSS_PAYLOAD);
 
     // Wait for the selected chunk content panel to appear
     await waitFor(() => {
@@ -54,10 +54,10 @@ describe('DocumentModal — SEC-04 escape-then-highlight', () => {
   });
 
   it('preserves search highlighting on escaped text (mark survives escaping)', async () => {
-    const { container } = renderModalWithChunk(XSS_PAYLOAD, { searchQuery: 'alert' });
+    const { baseElement: container } = renderModalWithChunk(XSS_PAYLOAD, { searchQuery: 'alert' });
 
     await waitFor(() => {
-      const marks = container.querySelectorAll('mark.bg-yellow-200');
+      const marks = container.querySelectorAll('mark.bg-hl');
       expect(marks.length).toBeGreaterThan(0);
       expect(marks[0].textContent).toBe('alert');
     });
@@ -67,13 +67,13 @@ describe('DocumentModal — SEC-04 escape-then-highlight', () => {
     expect(container.querySelector('img')).toBeNull();
 
     // Highlight appearance unchanged (exact classes, UI-SPEC invariant 4)
-    const mark = container.querySelector('mark.bg-yellow-200');
-    expect(mark.className).toBe('bg-yellow-200 px-1 rounded');
+    const mark = container.querySelector('mark.bg-hl');
+    expect(mark.className).toBe('rounded-sm bg-hl px-0.5 text-ink');
   });
 
   it('renders a plain-text chunk identically (zero regression, no mark without query)', async () => {
     const plainText = 'Ceci est un document ordinaire sans balise HTML.';
-    const { container } = renderModalWithChunk(plainText);
+    const { baseElement: container } = renderModalWithChunk(plainText);
 
     await waitFor(() => {
       expect(container.querySelector('.prose')).not.toBeNull();
@@ -89,7 +89,7 @@ describe('DocumentModal — SEC-04 escape-then-highlight', () => {
 
   it('displays &, <, > literally even WITHOUT a query (guard bug fixed)', async () => {
     const htmlChars = 'Tom & Jerry disent <notes> que 1 > 0';
-    const { container } = renderModalWithChunk(htmlChars);
+    const { baseElement: container } = renderModalWithChunk(htmlChars);
 
     await waitFor(() => {
       expect(container.querySelector('.prose')).not.toBeNull();

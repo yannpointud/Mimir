@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import MessageList from './MessageList';
 import LoadingIndicator from './LoadingIndicator';
 
-const ChatWindow = ({ messages, isLoading, messagesEndRef }) => {
+const ChatWindow = ({ messages, isLoading, messagesEndRef, onEscalate }) => {
   const scrollAreaRef = useRef(null);
 
   // Check if a message is currently streaming
@@ -24,32 +24,13 @@ const ChatWindow = ({ messages, isLoading, messagesEndRef }) => {
   }, [messages, messagesEndRef]);
 
   return (
-    <div className="flex-1 overflow-hidden bg-gray-50">
-      <div
-        ref={scrollAreaRef}
-        className="h-full overflow-y-auto px-4 py-6 space-y-6"
-      >
-        {/* Empty messages */}
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center max-w-md">
-              <div className="mx-auto h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center mb-4">
-                <svg className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Commencez une conversation
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Posez une question sur la documentation de votre entreprise pour commencer.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Messages list */}
-        <MessageList messages={messages} />
+    <div
+      ref={scrollAreaRef}
+      className="relative min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
+    >
+      <div className="mx-auto w-full max-w-3xl px-4 pb-6 pt-8 sm:px-6">
+        <h1 className="sr-only">Conversation avec Mimir</h1>
+        <MessageList messages={messages} onEscalate={onEscalate} />
 
         {/* Loading indicator - only if not streaming */}
         {isLoading && !hasStreamingMessage && <LoadingIndicator />}

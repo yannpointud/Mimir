@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { documentsAPI } from '../../services/api';
-import { getErrorMessage, formatDate, translateDocumentStatus, getStatusColor, validateDocumentData, safeDisplayValue } from '../../utils/helpers';
+import { getErrorMessage, formatDate, translateDocumentStatus, getStatusColor, validateDocumentData, safeDisplayValue, getFileExtension, cn } from '../../utils/helpers';
 import {
   Search,
   Filter,
@@ -13,9 +14,12 @@ import {
   FileText,
   AlertTriangle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Upload,
+  X
 } from 'lucide-react';
 import LoadingSpinner from '../Common/LoadingSpinner';
+import Modal from '../Common/Modal';
 
 const DocumentsList = () => {
   const { onRefresh, refreshTrigger } = useOutletContext();
@@ -219,151 +223,132 @@ const DocumentsList = () => {
     }
   };
 
+  const firstShown = Math.min((currentPage - 1) * itemsPerPage + 1, totalDocuments);
+  const lastShown = Math.min(currentPage * itemsPerPage, totalDocuments);
+
   return (
-    <div className="flex flex-col h-full max-w-7xl p-4">
-      <div className="card p-0 flex flex-col h-full">
-        {/* Header with filters */}
-        <div className="bg-white border-b border-gray-200 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-          {/* Search */}
-          <div className="flex-1 max-w-lg">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher un document..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 input-field"
-              />
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="pl-10 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Tous les statuts</option>
-                <option value="pending">En attente</option>
-                <option value="indexing">Indexation en cours</option>
-                <option value="indexed">Indexé</option>
-                <option value="error">Erreur</option>
-              </select>
-            </div>
-
-            {/* Refresh button removed - used from main dashboard */}
-          </div>
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+          <label htmlFor="documents-search" className="sr-only">Rechercher un document</label>
+          <input
+            id="documents-search"
+            type="search"
+            placeholder="Rechercher un document..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field pl-9"
+          />
         </div>
 
-        {/* Summary */}
-        <div className="mt-3 text-sm text-gray-600">
-          {totalDocuments > 0 ? (
-            <>
-              Affichage de {Math.min((currentPage - 1) * itemsPerPage + 1, totalDocuments)} à{' '}
-              {Math.min(currentPage * itemsPerPage, totalDocuments)} sur {totalDocuments} documents
-            </>
-          ) : (
-            'Aucun document trouvé'
-          )}
+        <div className="relative sm:w-56">
+          <Filter className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+          <label htmlFor="documents-status" className="sr-only">Filtrer par statut</label>
+          <select
+            id="documents-status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="select pl-9"
+          >
+            <option value="">Tous les statuts</option>
+            <option value="pending">En attente</option>
+            <option value="indexing">Indexation en cours</option>
+            <option value="indexed">Indexé</option>
+            <option value="error">Erreur</option>
+          </select>
         </div>
+
+        <p className="text-sm text-ink-muted sm:ml-auto tabular" aria-live="polite">
+          {totalDocuments > 0
+            ? <>Affichage de {firstShown} à {lastShown} sur <span className="font-medium text-ink">{totalDocuments}</span> documents</>
+            : 'Aucun document trouvé'}
+        </p>
       </div>
 
       {/* Error message */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 m-4">
-          <div className="flex">
-            <AlertTriangle className="h-5 w-5 text-red-400" />
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-400 hover:text-red-600"
-            >
-              ×
-            </button>
-          </div>
+        <div role="alert" className="alert-danger">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p className="flex-1">{error}</p>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="-my-1 -mr-2 flex h-7 w-7 items-center justify-center rounded-md hover:bg-danger/10"
+            aria-label="Fermer le message d'erreur"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
       )}
 
       {/* Failed-ingestion banner: offer to retry all documents in error */}
       {errorCount > 0 && (
-        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 m-4">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-            <p className="ml-3 text-sm text-amber-800">
-              {errorCount} document{errorCount > 1 ? 's' : ''} en erreur d&apos;indexation.
-            </p>
-            <button
-              onClick={handleRetryAllErrors}
-              disabled={retryingAll || actionLoading}
-              className="ml-auto btn-secondary text-sm flex items-center"
-            >
-              {retryingAll ? (
-                <>
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Relance en cours...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Réessayer tout ({errorCount})
-                </>
-              )}
-            </button>
-          </div>
+        <div className="alert-warning items-center">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <p className="flex-1">
+            <span className="font-semibold">{errorCount} document{errorCount > 1 ? 's' : ''} en erreur d&apos;indexation.</span>
+          </p>
+          <button
+            type="button"
+            onClick={handleRetryAllErrors}
+            disabled={retryingAll || actionLoading}
+            className="btn-secondary btn-sm"
+          >
+            {retryingAll ? (
+              <>
+                <LoadingSpinner size="sm" className="h-3.5 w-3.5" />
+                Relance en cours...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                Réessayer tout ({errorCount})
+              </>
+            )}
+          </button>
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto admin-scroll">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <LoadingSpinner size="lg" />
-              <p className="mt-4 text-gray-600">Chargement des documents...</p>
-            </div>
+      {/* Documents table */}
+      <div className="card overflow-hidden">
+        {loading && documents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 py-24">
+            <LoadingSpinner size="lg" />
+            <p className="text-sm text-ink-muted">Chargement des documents...</p>
           </div>
         ) : documents.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun document</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {searchTerm || statusFilter
-                  ? 'Aucun document ne correspond à vos critères de recherche'
-                  : 'Commencez par uploader vos premiers documents'}
-              </p>
-            </div>
+          <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-sunken text-ink-faint">
+              <FileText className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <h2 className="mt-4 font-medium text-ink">Aucun document</h2>
+            <p className="mt-1 max-w-sm text-sm text-ink-muted">
+              {searchTerm || statusFilter
+                ? 'Aucun document ne correspond à vos critères de recherche'
+                : 'Commencez par importer vos premiers documents'}
+            </p>
+            {!searchTerm && !statusFilter && (
+              <Link to="/admin/upload" className="btn-primary mt-5">
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                Importer des documents
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="overflow-auto h-full">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
+          <div className={cn('overflow-x-auto transition-opacity', loading && 'opacity-60')}>
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-line bg-sunken/70">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Document
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date d&apos;ajout
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Chunks
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th scope="col" className="eyebrow py-2.5 pl-3 pr-2 sm:pl-5">Document</th>
+                  <th scope="col" className="eyebrow px-2 py-2.5 sm:px-5">Statut</th>
+                  <th scope="col" className="eyebrow hidden px-5 py-2.5 md:table-cell">Date d&apos;ajout</th>
+                  <th scope="col" className="eyebrow hidden px-5 py-2.5 text-right md:table-cell">Sections</th>
+                  <th scope="col" className="py-2.5 pl-1 pr-2 sm:px-3"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-line-soft">
                 {documents.map((document) => (
                   <DocumentRow
                     key={document.id}
@@ -381,53 +366,37 @@ const DocumentsList = () => {
             </table>
           </div>
         )}
-      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
-              className="btn-secondary"
-            >
-              Précédent
-            </button>
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-              className="btn-secondary"
-            >
-              Suivant
-            </button>
-          </div>
-          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Page <span className="font-medium">{currentPage}</span> sur{' '}
-                <span className="font-medium">{totalPages}</span>
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-3 border-t border-line-soft px-5 py-3">
+            <p className="text-sm text-ink-muted tabular">
+              Page <span className="font-medium text-ink">{currentPage}</span> sur{' '}
+              <span className="font-medium text-ink">{totalPages}</span>
+            </p>
+            <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
-                className="btn-secondary"
+                className="btn-secondary btn-sm"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">Précédent</span>
               </button>
               <button
+                type="button"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
-                className="btn-secondary"
+                className="btn-secondary btn-sm"
               >
-                <ChevronRight className="h-4 w-4" />
+                <span className="sr-only sm:not-sr-only">Suivant</span>
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Delete confirmation dialog */}
       <DeleteConfirmDialog
@@ -440,113 +409,191 @@ const DocumentsList = () => {
         }}
         loading={actionLoading}
       />
-      </div>
     </div>
   );
 };
 
+const FILE_TYPE_TONES = {
+  pdf: 'bg-danger-soft text-danger-ink',
+  docx: 'bg-accent-soft text-accent-ink',
+  md: 'bg-success-soft text-success-ink',
+  txt: 'bg-sunken text-ink-muted',
+};
+
+const FileTypeTile = ({ filename }) => {
+  const extension = getFileExtension(filename);
+  return (
+    <span
+      className={cn(
+        'flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-mono text-[9px] font-semibold uppercase',
+        FILE_TYPE_TONES[extension] || 'bg-sunken text-ink-muted'
+      )}
+      aria-hidden="true"
+    >
+      {extension.slice(0, 4) || 'doc'}
+    </span>
+  );
+};
+
 // Component for a document row
+const MENU_HEIGHT = 150;
+
 const DocumentRow = ({ document, onDelete, onTogglePreservation, onReprocess, actionLoading }) => {
-  const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const showMenu = menuPosition !== null;
+
+  // The menu is portaled with fixed coordinates so the table card cannot clip it
+  const toggleMenu = () => {
+    if (showMenu) {
+      setMenuPosition(null);
+      return;
+    }
+    const rect = triggerRef.current.getBoundingClientRect();
+    const opensUpward = rect.bottom + MENU_HEIGHT > window.innerHeight;
+    setMenuPosition({
+      right: window.innerWidth - rect.right,
+      ...(opensUpward ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+    });
+  };
+
+  const closeMenu = () => setMenuPosition(null);
+
+  // Close the actions menu on outside click, Escape, scroll or resize
+  useEffect(() => {
+    if (!showMenu) return undefined;
+    const handlePointerDown = (event) => {
+      if (!menuRef.current.contains(event.target) && !triggerRef.current.contains(event.target)) closeMenu();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+    window.document.addEventListener('mousedown', handlePointerDown);
+    window.document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('resize', closeMenu);
+    return () => {
+      window.document.removeEventListener('mousedown', handlePointerDown);
+      window.document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', closeMenu, true);
+      window.removeEventListener('resize', closeMenu);
+    };
+  }, [showMenu]);
 
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <FileText className="h-5 w-5 text-gray-400 mr-3" />
-          <div>
-            <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
+    <tr className="group transition-colors hover:bg-sunken/60">
+      <td className="w-full max-w-0 py-2.5 pl-3 pr-2 sm:pl-5 md:w-1/2">
+        <div className="flex min-w-0 items-center gap-3">
+          <FileTypeTile filename={document.filename} />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-ink" title={document.filename}>
               {document.filename}
-            </div>
-            {document.path && (
-              <div className="text-sm text-gray-500 truncate max-w-xs">
-                {document.path}
-              </div>
+            </p>
+            {document.status === 'error' && document.error_message ? (
+              <p className="truncate text-xs text-danger" title={document.error_message}>{document.error_message}</p>
+            ) : (
+              <p className="truncate text-xs text-ink-muted md:hidden">{formatDate(document.created_at)}</p>
             )}
           </div>
         </div>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(document.status)}`}>
-          {translateDocumentStatus(document.status)}
+      <td className="whitespace-nowrap px-2 py-2.5 sm:px-5">
+        <span className="flex items-center gap-2">
+          <span className={cn('badge-dot', getStatusColor(document.status))}>
+            {translateDocumentStatus(document.status)}
+          </span>
+          {document.preserve && (
+            <span className="text-accent" title="Document protégé">
+              <Shield className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only">Document protégé</span>
+            </span>
+          )}
         </span>
-        {document.preserve && (
-          <Shield className="inline h-4 w-4 text-blue-600 ml-2" title="Document protégé" />
-        )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td className="hidden whitespace-nowrap px-5 py-2.5 text-ink-muted md:table-cell">
         {formatDate(document.created_at)}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td className="hidden whitespace-nowrap px-5 py-2.5 text-right text-ink-muted tabular md:table-cell">
         {safeDisplayValue(document.chunk_count, 0)}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="text-gray-400 hover:text-gray-600"
-            disabled={actionLoading}
+      <td className="whitespace-nowrap py-2.5 pl-1 pr-2 text-right sm:px-3">
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={toggleMenu}
+          className="btn-ghost btn-icon h-8 w-8"
+          disabled={actionLoading}
+          aria-haspopup="menu"
+          aria-expanded={showMenu}
+          aria-label={`Actions pour ${document.filename}`}
+        >
+          <MoreVertical className="h-4 w-4" aria-hidden="true" />
+        </button>
+
+        {showMenu && createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={menuPosition}
+            className="fixed z-50 w-56 animate-pop-in overflow-hidden rounded-xl border border-line bg-surface py-1 text-left shadow-raised"
           >
-            <MoreVertical className="h-5 w-5" />
-          </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onTogglePreservation();
+                closeMenu();
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-ink hover:bg-sunken"
+            >
+              {document.preserve ? (
+                <>
+                  <ShieldOff className="h-4 w-4 text-ink-muted" aria-hidden="true" />
+                  Retirer la protection
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 text-ink-muted" aria-hidden="true" />
+                  Protéger le document
+                </>
+              )}
+            </button>
 
-          {showMenu && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-              <div className="py-1">
-                <button
-                  onClick={() => {
-                    onTogglePreservation();
-                    setShowMenu(false);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <div className="flex items-center">
-                    {document.preserve ? (
-                      <>
-                        <ShieldOff className="h-4 w-4 mr-2" />
-                        Retirer la protection
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="h-4 w-4 mr-2" />
-                        Protéger le document
-                      </>
-                    )}
-                  </div>
-                </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onReprocess();
+                closeMenu();
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-ink hover:bg-sunken"
+            >
+              <RefreshCw className="h-4 w-4 text-ink-muted" aria-hidden="true" />
+              {document.status === 'pending' ? 'Relancer le traitement' :
+               document.status === 'error' ? 'Retraiter le document' :
+               'Réindexer le document'}
+            </button>
 
-                <button
-                  onClick={() => {
-                    onReprocess();
-                    setShowMenu(false);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <div className="flex items-center">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {document.status === 'pending' ? 'Relancer le traitement' :
-                     document.status === 'error' ? 'Retraiter le document' :
-                     'Réindexer le document'}
-                  </div>
-                </button>
+            <div className="my-1 border-t border-line-soft" />
 
-                <button
-                  onClick={() => {
-                    onDelete();
-                    setShowMenu(false);
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50"
-                  disabled={document.preserve}
-                >
-                  <div className="flex items-center">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onDelete();
+                closeMenu();
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+              disabled={document.preserve}
+              title={document.preserve ? 'Retirez la protection pour supprimer ce document' : undefined}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Supprimer
+            </button>
+          </div>,
+          window.document.body
+        )}
       </td>
     </tr>
   );
@@ -554,64 +601,52 @@ const DocumentRow = ({ document, onDelete, onTogglePreservation, onReprocess, ac
 
 // Delete confirmation dialog
 const DeleteConfirmDialog = ({ isOpen, document, onConfirm, onCancel, loading }) => {
-  if (!isOpen || !document) return null;
+  if (!document) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity" onClick={onCancel} />
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-          <div className="flex items-center mb-4">
-            <Trash2 className="h-6 w-6 text-red-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">
-              Supprimer le document
-            </h3>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onCancel}
+      size="sm"
+      icon={Trash2}
+      tone="danger"
+      title="Supprimer le document"
+      description="Cette action est irréversible."
+      footer={
+        <>
+          <button type="button" onClick={onCancel} className="btn-secondary" disabled={loading}>
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(document, document.preserve)}
+            className="btn-danger"
+            disabled={loading || document.preserve}
+          >
+            {loading ? (
+              <>
+                <LoadingSpinner size="sm" className="text-current" />
+                Suppression...
+              </>
+            ) : (
+              'Supprimer'
+            )}
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm leading-relaxed text-ink-muted">
+        Êtes-vous sûr de vouloir supprimer le document <strong className="font-semibold text-ink">{document.filename}</strong> ?
+        Il sera retiré de l&apos;index et ne sera plus utilisé pour répondre aux questions.
+      </p>
 
-          <p className="text-sm text-gray-600 mb-6">
-            Êtes-vous sûr de vouloir supprimer le document <strong>{document.filename}</strong> ?
-            Cette action est irréversible.
-          </p>
-
-          {document.preserve && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-              <div className="flex">
-                <Shield className="h-5 w-5 text-yellow-400" />
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-800">
-                    Ce document est protégé. Vous devez d&apos;abord retirer la protection.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex space-x-3">
-            <button
-              onClick={onCancel}
-              className="flex-1 btn-secondary"
-              disabled={loading}
-            >
-              Annuler
-            </button>
-            <button
-              onClick={() => onConfirm(document, document.preserve)}
-              className="flex-1 btn-danger"
-              disabled={loading || document.preserve}
-            >
-              {loading ? (
-                <div className="flex items-center justify-center">
-                  <LoadingSpinner size="sm" className="mr-2" />
-                  Suppression...
-                </div>
-              ) : (
-                'Supprimer'
-              )}
-            </button>
-          </div>
+      {document.preserve && (
+        <div className="alert-warning mt-4">
+          <Shield className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>Ce document est protégé. Vous devez d&apos;abord retirer la protection.</p>
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 };
 

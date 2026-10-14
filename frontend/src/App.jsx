@@ -15,44 +15,42 @@ import NotFound from './components/Common/NotFound';
 function App() {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Routes>
-          {/* Route publique - Chat */}
-          <Route path="/" element={
+      <Routes>
+        {/* Route publique - Chat */}
+        <Route path="/" element={
+          <Layout>
+            <ChatPage />
+          </Layout>
+        } />
+
+        {/* Route publique - Chat (alias) */}
+        <Route path="/chat" element={<Navigate to="/" replace />} />
+
+        {/* Route de connexion admin */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+
+        {/* Routes protégées admin */}
+        <Route path="/admin" element={
+          <ProtectedRoute>
             <Layout>
-              <ChatPage />
+              <AdminDashboard />
             </Layout>
-          } />
+          </ProtectedRoute>
+        }>
+          <Route index element={<Navigate to="/admin/documents" replace />} />
+          <Route path="documents" element={<DocumentsList />} />
+          <Route path="upload" element={<UploadZone />} />
+          <Route path="config" element={<ConfigPanel />} />
+          <Route path="monitoring" element={<StatusBar />} />
+          <Route path="analytics" element={<AnalyticsPanel />} />
+        </Route>
 
-          {/* Route publique - Chat (alias) */}
-          <Route path="/chat" element={<Navigate to="/" replace />} />
+        {/* Route par défaut pour /admin/* */}
+        <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
 
-          {/* Route de connexion admin */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-
-          {/* Routes protégées admin */}
-          <Route path="/admin" element={
-            <ProtectedRoute>
-              <Layout isAdmin>
-                <AdminDashboard />
-              </Layout>
-            </ProtectedRoute>
-          }>
-            <Route index element={<Navigate to="/admin/documents" replace />} />
-            <Route path="documents" element={<DocumentsList />} />
-            <Route path="upload" element={<UploadZone />} />
-            <Route path="config" element={<ConfigPanel />} />
-            <Route path="monitoring" element={<StatusBar />} />
-            <Route path="analytics" element={<AnalyticsPanel />} />
-          </Route>
-
-          {/* Route par défaut pour /admin/* */}
-          <Route path="/admin/*" element={<Navigate to="/admin" replace />} />
-
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </AuthProvider>
   );
 }

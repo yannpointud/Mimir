@@ -1,67 +1,48 @@
 import { Link } from 'react-router-dom';
-import { Home, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
+import BrandMark from './BrandMark';
+import { APP_NAME, COMPANY_NAME } from '../../config/brand';
 
 const NotFound = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <div className="text-center">
-            {/* Illustration 404 */}
-            <div className="mx-auto h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
-              <span className="text-4xl font-bold text-gray-400">404</span>
-            </div>
+    <div className="flex min-h-dvh flex-col bg-canvas">
+      <header className="flex h-14 items-center gap-2.5 px-5">
+        <BrandMark className="h-7 w-7 text-accent" />
+        <span className="font-serif text-[21px] font-semibold text-ink">{APP_NAME}</span>
+        <span className="text-[13px] text-ink-muted">· {COMPANY_NAME}</span>
+      </header>
 
-            {/* Titre */}
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Page non trouvée
-            </h1>
+      <main className="flex flex-1 items-center justify-center px-4 pb-20">
+        <div className="w-full max-w-md animate-slide-up text-center">
+          <p className="font-serif text-[88px] font-semibold leading-none tracking-tight text-accent/90 tabular">
+            404
+          </p>
+          <h1 className="mt-4 font-serif text-2xl font-semibold text-ink">
+            Page introuvable
+          </h1>
+          <p className="mt-2 text-ink-muted">
+            Désolé, la page que vous recherchez n&apos;existe pas ou a été déplacée.
+          </p>
 
-            {/* Description */}
-            <p className="text-gray-600 mb-8">
-              Désolé, la page que vous recherchez n&apos;existe pas ou a été déplacée.
-            </p>
-
-            {/* Actions */}
-            <div className="space-y-3">
-              <Link
-                to="/"
-                className="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-              >
-                <Home className="h-4 w-4 mr-2" />
-                Retour à l&apos;accueil
-              </Link>
-
-              <button
-                onClick={() => window.history.back()}
-                className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Page précédente
-              </button>
-            </div>
-
-            {/* Liens utiles */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <p className="text-sm text-gray-500 mb-3">Liens utiles :</p>
-              <div className="flex flex-col space-y-2">
-                <Link
-                  to="/"
-                  className="text-sm text-primary-600 hover:text-primary-500"
-                >
-                  Assistant documentaire
-                </Link>
-                <Link
-                  to="/admin"
-                  className="text-sm text-primary-600 hover:text-primary-500"
-                >
-                  Administration
-                </Link>
-              </div>
-            </div>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link to="/" className="btn-primary">
+              <MessageSquare className="h-4 w-4" aria-hidden="true" />
+              Retour à l&apos;assistant
+            </Link>
+            <button type="button" onClick={() => window.history.back()} className="btn-secondary">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Page précédente
+            </button>
           </div>
+
+          <p className="mt-10 text-sm text-ink-muted">
+            Vous êtes administrateur ?{' '}
+            <Link to="/admin" className="font-medium text-accent-ink underline decoration-accent/40 underline-offset-2 hover:decoration-accent">
+              Accéder à l&apos;administration
+            </Link>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

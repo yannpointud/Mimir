@@ -99,7 +99,7 @@ export const chatAPI = {
           let buffer = '';
           let settled = false;
 
-          while (true) {
+          for (;;) {
             const { done, value } = await reader.read();
 
             if (done) break;
@@ -332,16 +332,6 @@ export const adminAPI = {
 
   testEmailService: async (testEmail) => {
     const response = await api.post(`/admin/test-email?test_email=${encodeURIComponent(testEmail)}`);
-    return response.data;
-  },
-
-  getChatMetrics: async () => {
-    const response = await api.get('/admin/metrics/chat');
-    return response.data;
-  },
-
-  getUsageAnalytics: async () => {
-    const response = await api.get('/admin/analytics/usage');
     return response.data;
   },
 

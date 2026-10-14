@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Link, Navigate } from 'react-router-dom';
+import { ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 import LoadingSpinner from '../Common/LoadingSpinner';
+import BrandMark from '../Common/BrandMark';
+import { APP_NAME, COMPANY_NAME } from '../../config/brand';
 
 import { useAuth } from '../../hooks/useAuth';
 
@@ -23,7 +25,7 @@ const AdminLogin = () => {
   // Show loading during initial verification
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex min-h-dvh items-center justify-center bg-canvas">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -54,68 +56,93 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gray-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo and title */}
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 rounded-full bg-primary-600 flex items-center justify-center">
-            <Shield className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Administration Mimir
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Connectez-vous pour accéder au panneau d&apos;administration
+    <div className="grid min-h-dvh bg-canvas lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* Brand panel */}
+      <aside className="relative hidden overflow-hidden bg-nav text-nav-ink lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full border-[56px] border-accent-bright/[0.07]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/30 blur-3xl"
+        />
+
+        <div className="relative flex items-center gap-3">
+          <BrandMark className="h-8 w-8 text-accent-bright" />
+          <span className="font-serif text-2xl font-semibold">{APP_NAME}</span>
+          <span className="h-6 w-px bg-white/15" aria-hidden="true" />
+          <span className="text-sm font-medium text-nav-muted">{COMPANY_NAME}</span>
+        </div>
+
+        <div className="relative max-w-md">
+          <p className="font-serif text-[34px] font-semibold leading-[1.15] tracking-[-0.01em]">
+            Votre documentation, des réponses sourcées.
+          </p>
+          <p className="mt-4 text-[15px] leading-relaxed text-nav-muted">
+            Administrez la base documentaire, suivez la santé du système et maîtrisez les coûts IA.
           </p>
         </div>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <p className="relative text-xs text-nav-muted">
+          Accès réservé aux administrateurs autorisés · Toutes les connexions sont enregistrées
+        </p>
+      </aside>
+
+      {/* Form */}
+      <main className="flex flex-col justify-center px-4 py-12 sm:px-8">
+        <div className="mx-auto w-full max-w-sm animate-slide-up">
+          <div className="flex items-center gap-2.5 lg:hidden">
+            <BrandMark className="h-7 w-7 text-accent" />
+            <span className="font-serif text-xl font-semibold text-ink">{APP_NAME}</span>
+            <span className="text-[13px] text-ink-muted">· {COMPANY_NAME}</span>
+          </div>
+
+          <h1 className="mt-8 font-serif text-[30px] font-semibold leading-tight text-ink lg:mt-0">
+            Administration Mimir
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            Connectez-vous pour accéder au panneau d&apos;administration
+          </p>
+
           {/* Error message */}
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
-              <div className="flex">
-                <AlertCircle className="h-5 w-5 text-red-400" />
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Erreur de connexion
-                  </h3>
-                  <p className="text-sm text-red-700 mt-1">{error}</p>
-                </div>
+            <div role="alert" className="alert-danger mt-6">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="font-semibold">Erreur de connexion</p>
+                <p className="mt-0.5">{error}</p>
               </div>
             </div>
           )}
 
           {/* Login form */}
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             {/* Username */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="username" className="field-label">
                 Nom d&apos;utilisateur
               </label>
-              <div className="mt-1">
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="input-field"
-                  placeholder="Entrez votre nom d'utilisateur"
-                  disabled={isSubmitting}
-                />
-              </div>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="input-field h-11"
+                placeholder="Entrez votre nom d'utilisateur"
+                disabled={isSubmitting}
+              />
             </div>
 
             {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="field-label">
                 Mot de passe
               </label>
-              <div className="mt-1 relative">
+              <div className="relative">
                 <input
                   id="password"
                   name="password"
@@ -124,67 +151,57 @@ const AdminLogin = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pr-10"
+                  className="input-field h-11 pr-11"
                   placeholder="Entrez votre mot de passe"
                   disabled={isSubmitting}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ink-faint hover:bg-sunken hover:text-ink"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isSubmitting}
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
+                    <Eye className="h-4 w-4" aria-hidden="true" />
                   )}
                 </button>
               </div>
             </div>
 
             {/* Login button */}
-            <div>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center">
-                    <LoadingSpinner size="sm" className="mr-2" />
-                    Connexion en cours...
-                  </div>
-                ) : (
-                  'Se connecter'
-                )}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary btn-lg w-full"
+            >
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size="sm" className="text-current" />
+                  Connexion en cours...
+                </>
+              ) : (
+                'Se connecter'
+              )}
+            </button>
           </form>
 
-          {/* Security information */}
-          <div className="mt-6 border-t border-gray-200 pt-6">
-            <div className="text-center">
-              <p className="text-xs text-gray-500">
-                Accès réservé aux administrateurs autorisés
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Toutes les connexions sont enregistrées
-              </p>
-            </div>
-          </div>
+          <p className="mt-6 text-xs text-ink-muted lg:hidden">
+            Accès réservé aux administrateurs autorisés · Toutes les connexions sont enregistrées
+          </p>
 
           {/* Back link */}
-          <div className="mt-4 text-center">
-            <a
-              href="/"
-              className="text-sm text-primary-600 hover:text-primary-500"
-            >
-              ← Retour au chat
-            </a>
-          </div>
+          <Link
+            to="/"
+            className="mt-8 inline-flex items-center gap-1.5 text-sm font-medium text-accent-ink underline-offset-2 hover:underline"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Retour au chat
+          </Link>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

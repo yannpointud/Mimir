@@ -6,6 +6,7 @@ import { openDocumentInBrowser } from '../../utils/documentUtils';
 
 const SourcesList = ({ sources }) => {
   const [selectedDocumentId, setSelectedDocumentId] = useState(null);
+  const [selectedFilename, setSelectedFilename] = useState(null);
   const [selectedChunks, setSelectedChunks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -50,57 +51,58 @@ const SourcesList = ({ sources }) => {
   const handleSourceClick = (documentItem) => {
     // Open modal with document and relevant chunks
     if (documentItem.documentId) {
-      console.log(`[SourcesList] Ouverture modal pour document ${documentItem.documentId}`, {
-        chunksCount: documentItem.chunks?.length || 0,
-        chunkIndexes: documentItem.chunks?.map(c => c.chunk_index).slice(0, 5) || []
-      });
-
       setSelectedDocumentId(documentItem.documentId);
+      setSelectedFilename(documentItem.filename);
       setSelectedChunks(documentItem.chunks);
       setSearchQuery(documentItem.chunks[0]?.text ? documentItem.chunks[0].text.substring(0, 50) : '');
     }
   };
 
+  // When the original file cannot be served (e.g. missing on disk), fall back
+  // to the sections modal, which still shows the indexed text of the document.
   const handleOpenInBrowser = async (documentItem) => {
-    if (!documentItem.documentId) return;
-
-    await openDocumentInBrowser(documentItem.documentId, documentItem.filename);
+    try {
+      await openDocumentInBrowser(documentItem.documentId, documentItem.filename);
+    } catch {
+      handleSourceClick(documentItem);
+    }
   };
 
+  const Chevron = isExpanded ? ChevronUp : ChevronDown;
 
   return (
     <>
-      <div className="bg-gray-50 rounded-lg border border-gray-200">
-        {/* Clickable header */}
-        <div
-          className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+      <div>
+        {/* Toggle header */}
+        <button
+          type="button"
           onClick={() => setIsExpanded(!isExpanded)}
+          aria-expanded={isExpanded}
+          className="group -mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sunken"
         >
-          <div className="flex items-center text-sm font-medium text-gray-700">
-            <FileText className="h-4 w-4 mr-1" />
-            Sources ({sources.length})
-          </div>
-
-          {/* Chevron icon */}
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-gray-500" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+          <FileText className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          <span className="shrink-0 text-[13px] font-semibold text-ink">Sources ({sources.length})</span>
+          {!isExpanded && (
+            <span className="min-w-0 truncate text-[13px] text-ink-muted">
+              {documentItems.map(item => item.filename).join(' · ')}
+            </span>
           )}
-        </div>
+          <Chevron className="ml-auto h-4 w-4 shrink-0 text-ink-faint group-hover:text-ink-muted" aria-hidden="true" />
+        </button>
 
         {/* Expandable content */}
         {isExpanded && (
-          <div className="px-3 pb-3 space-y-2 border-t border-gray-200">
+          <ol className="mt-2 animate-fade-in space-y-2">
             {documentItems.map((documentItem, index) => (
               <DocumentSourceItem
                 key={documentItem.documentId}
+                index={index}
                 documentItem={documentItem}
                 onOpenModal={handleSourceClick}
                 onOpenBrowser={handleOpenInBrowser}
               />
             ))}
-          </div>
+          </ol>
         )}
       </div>
 
@@ -112,6 +114,7 @@ const SourcesList = ({ sources }) => {
           setSelectedChunks([]);
         }}
         documentId={selectedDocumentId}
+        filename={selectedFilename}
         relevantChunks={selectedChunks}
         searchQuery={searchQuery}
         highlightText={searchQuery}
@@ -120,67 +123,66 @@ const SourcesList = ({ sources }) => {
   );
 };
 
-const DocumentSourceItem = ({ documentItem, onOpenModal, onOpenBrowser }) => {
-  const handleOpenBrowser = () => {
-    onOpenBrowser(documentItem);
-  };
-
-  const handleOpenModal = (e) => {
-    e.stopPropagation();
-    onOpenModal(documentItem);
-  };
+const DocumentSourceItem = ({ documentItem, index, onOpenModal, onOpenBrowser }) => {
+  const excerpt = documentItem.chunks[0]?.chunk_text || documentItem.chunks[0]?.text;
 
   return (
-    <div
+    <li
       className={cn(
-        'p-2 rounded border transition-colors duration-200',
-        'bg-white hover:bg-gray-50 border-gray-200 hover:border-gray-300'
+        'flex items-start gap-3 rounded-lg border p-3 transition-colors duration-200',
+        'border-line-soft bg-surface hover:border-line hover:bg-sunken/60'
       )}
     >
-      <div className="flex items-start justify-between">
-        <div
-          className="flex-1 min-w-0 cursor-pointer"
-          onClick={handleOpenBrowser}
+      <span
+        className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft font-mono text-xs font-medium text-accent-ink"
+        aria-hidden="true"
+      >
+        {index + 1}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        {/* Document name with section count */}
+        <button
+          type="button"
+          onClick={() => onOpenBrowser(documentItem)}
+          className="block max-w-full truncate text-left text-sm font-medium text-ink underline-offset-2 hover:text-accent-ink hover:underline"
           title="Ouvrir le document dans le navigateur"
         >
-          {/* Document name with section count */}
-          <p className="text-sm font-medium text-gray-900 truncate">
-            📄 {documentItem.filename} ({documentItem.chunksCount} section{documentItem.chunksCount > 1 ? 's' : ''})
+          {documentItem.filename} <span className="font-normal text-ink-muted">({documentItem.chunksCount} section{documentItem.chunksCount > 1 ? 's' : ''})</span>
+        </button>
+
+        {/* Excerpt from most relevant chunk */}
+        {excerpt && (
+          <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-ink-muted">
+            {truncateText(excerpt, 120)}
           </p>
+        )}
 
-          {/* Excerpt from most relevant chunk */}
-          {(documentItem.chunks[0]?.chunk_text || documentItem.chunks[0]?.text) && (
-            <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-              {truncateText(documentItem.chunks[0]?.chunk_text || documentItem.chunks[0]?.text || '', 120)}
-            </p>
-          )}
-
-          {/* Min-max relevance display */}
-          <div className="flex items-center mt-1">
-            <span className="text-xs text-gray-500">
-              Pertinence: {documentItem.pertinence}
-            </span>
-            <div className="ml-2 flex-1 max-w-16">
-              <div className="bg-gray-200 rounded-full h-1">
-                <div
-                  className="bg-primary-600 h-1 rounded-full"
-                  style={{ width: `${(documentItem.maxScore || 0) * 100}%` }}
-                />
-              </div>
-            </div>
+        {/* Min-max relevance display */}
+        <div className="mt-2 flex items-center gap-2">
+          <span className="tabular text-xs text-ink-muted">
+            Pertinence: {documentItem.pertinence}
+          </span>
+          <div className="h-1 w-16 overflow-hidden rounded-full bg-line-soft" aria-hidden="true">
+            <div
+              className="h-1 rounded-full bg-accent"
+              style={{ width: `${(documentItem.maxScore || 0) * 100}%` }}
+            />
           </div>
         </div>
-
-        {/* Action icon for modal */}
-        <div
-          className="flex-shrink-0 ml-2 cursor-pointer p-1 rounded hover:bg-gray-100"
-          onClick={handleOpenModal}
-          title="Voir les sections pertinentes du document"
-        >
-          <ExternalLink className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-        </div>
       </div>
-    </div>
+
+      {/* Relevant sections preview */}
+      <button
+        type="button"
+        onClick={() => onOpenModal(documentItem)}
+        className="btn-secondary btn-sm shrink-0"
+        title="Voir les sections pertinentes du document"
+      >
+        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="sr-only sm:not-sr-only">Aperçu</span>
+      </button>
+    </li>
   );
 };
 

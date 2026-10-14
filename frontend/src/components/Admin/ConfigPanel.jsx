@@ -15,7 +15,7 @@ import {
 import LoadingSpinner from '../Common/LoadingSpinner';
 
 import { adminAPI, authAPI } from '../../services/api';
-import { getErrorMessage } from '../../utils/helpers';
+import { getErrorMessage, cn } from '../../utils/helpers';
 
 const ConfigPanel = () => {
   const [config, setConfig] = useState(null);
@@ -216,290 +216,206 @@ const ConfigPanel = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Chargement de la configuration...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-4 py-24">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-ink-muted">Chargement de la configuration...</p>
       </div>
     );
   }
 
+  const passwordFields = [
+    { key: 'current', field: 'currentPassword', label: 'Mot de passe actuel', autoComplete: 'current-password' },
+    { key: 'new', field: 'newPassword', label: 'Nouveau mot de passe', autoComplete: 'new-password', minLength: 8 },
+    { key: 'confirm', field: 'confirmPassword', label: 'Confirmer le nouveau mot de passe', autoComplete: 'new-password', minLength: 8 },
+  ];
+
+  const systemRows = systemInfo ? [
+    { label: 'Système', value: `${systemInfo.platform?.system} ${systemInfo.platform?.release}` },
+    { label: 'Architecture', value: systemInfo.platform?.machine },
+    { label: 'Python', value: systemInfo.platform?.python_version },
+    systemInfo.hardware?.memory && {
+      label: 'Mémoire',
+      icon: Cpu,
+      value: `${Math.round(systemInfo.hardware.memory.total / (1024**3))} Go`,
+      extra: systemInfo.hardware.memory.available && `${Math.round(systemInfo.hardware.memory.available / (1024**3))} Go libres`,
+    },
+    systemInfo.hardware?.disk && {
+      label: 'Espace disque',
+      icon: HardDrive,
+      value: `${Math.round(systemInfo.hardware.disk.total / (1024**3))} Go`,
+      extra: systemInfo.hardware.disk.free && `${Math.round(systemInfo.hardware.disk.free / (1024**3))} Go libres`,
+    },
+    systemInfo.application?.version && { label: 'Version Mimir', value: systemInfo.application.version, mono: true },
+  ].filter(Boolean) : [];
+
   return (
-    <div className="p-4 max-w-7xl h-full">
-
-      {/* Password change section */}
-      <div className="card p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Lock className="h-5 w-5 mr-2" />
-          Changer le mot de passe administrateur
-        </h3>
-
-        {passwordSuccess && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center">
-            <Check className="h-5 w-5 text-green-600 mr-2" />
-            <span className="text-sm text-green-800">{passwordSuccess}</span>
-          </div>
-        )}
-
-        {passwordError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-            <span className="text-sm text-red-800">{passwordError}</span>
-          </div>
-        )}
-
-        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-          {/* Current password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Mot de passe actuel
-            </label>
-            <div className="relative">
-              <input
-                type={showPasswords.current ? 'text' : 'password'}
-                value={passwordForm.currentPassword}
-                onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
+    <div className="grid items-start gap-6 lg:grid-cols-3">
+      <div className="space-y-6">
+        {/* Password change section */}
+        <section className="card">
+          <div className="card-header">
+            <h2 className="card-title">
+              <Lock className="h-4 w-4 text-accent" aria-hidden="true" />
+              Mot de passe administrateur
+            </h2>
           </div>
 
-          {/* New password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nouveau mot de passe
-            </label>
-            <div className="relative">
-              <input
-                type={showPasswords.new ? 'text' : 'password'}
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-                required
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Confirm password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirmer le nouveau mot de passe
-            </label>
-            <div className="relative">
-              <input
-                type={showPasswords.confirm ? 'text' : 'password'}
-                value={passwordForm.confirmPassword}
-                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10"
-                required
-                minLength={8}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={passwordChanging}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            {passwordChanging ? (
-              <>
-                <LoadingSpinner size="sm" />
-                <span className="ml-2">Modification en cours...</span>
-              </>
-            ) : (
-              'Changer le mot de passe'
+          <form onSubmit={handlePasswordChange} className="card-body space-y-4">
+            {passwordSuccess && (
+              <div role="status" className="alert-success">
+                <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{passwordSuccess}</span>
+              </div>
             )}
-          </button>
-        </form>
+
+            {passwordError && (
+              <div role="alert" className="alert-danger">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            {passwordFields.map(({ key, field, label, autoComplete, minLength }) => (
+              <div key={key}>
+                <label htmlFor={`password-${key}`} className="field-label">
+                  {label}
+                </label>
+                <div className="relative">
+                  <input
+                    id={`password-${key}`}
+                    type={showPasswords[key] ? 'text' : 'password'}
+                    value={passwordForm[field]}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, [field]: e.target.value }))}
+                    className="input-field pr-10"
+                    autoComplete={autoComplete}
+                    required
+                    minLength={minLength}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(prev => ({ ...prev, [key]: !prev[key] }))}
+                    className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ink-faint hover:bg-sunken hover:text-ink"
+                    aria-label={showPasswords[key] ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showPasswords[key] ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
+                </div>
+                {key === 'new' && <p className="field-hint">8 caractères minimum.</p>}
+              </div>
+            ))}
+
+            <button
+              type="submit"
+              disabled={passwordChanging}
+              className="btn-primary w-full"
+            >
+              {passwordChanging ? (
+                <>
+                  <LoadingSpinner size="sm" className="text-current" />
+                  Modification en cours...
+                </>
+              ) : (
+                'Changer le mot de passe'
+              )}
+            </button>
+          </form>
+        </section>
+
+        {/* System information */}
+        {systemInfo && (
+          <section className="card">
+            <div className="card-header">
+              <h2 className="card-title">
+                <Server className="h-4 w-4 text-accent" aria-hidden="true" />
+                Informations système
+              </h2>
+            </div>
+            <dl className="divide-y divide-line-soft px-5">
+              {systemRows.map(({ label, value, extra, icon: Icon, mono }) => (
+                <div key={label} className="flex items-baseline justify-between gap-4 py-3 text-sm">
+                  <dt className="flex items-center gap-1.5 text-ink-muted">
+                    {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {label}
+                  </dt>
+                  <dd className={cn('text-right font-medium text-ink', mono && 'font-mono text-[13px]')}>
+                    {value}
+                    {extra && <span className="ml-1 font-normal text-ink-muted">({extra})</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
       </div>
 
-      {/* Read-only warning */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex">
-          <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
+      <div className="space-y-6 lg:col-span-2">
+        {/* Read-only warning */}
+        <div className="alert-info">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <div>
-            <h3 className="text-sm font-medium text-blue-900">Mode lecture seule</h3>
-            <p className="text-sm text-blue-700 mt-1">
-              Cette interface affiche la configuration actuelle en lecture seule.
-              Les modifications doivent être effectuées via les variables d&apos;environnement ou le fichier de configuration.
+            <p className="font-semibold">Mode lecture seule</p>
+            <p className="mt-0.5">
+              Cette interface affiche la configuration actuelle. Les modifications se font via les variables
+              d&apos;environnement ou le fichier de configuration. Les valeurs sensibles sont masquées :
+              cliquez sur <Eye className="inline h-3.5 w-3.5 align-[-2px]" aria-label="l'icône œil" /> pour les afficher.
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <div className="flex">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+        {/* Error message */}
+        {error && (
+          <div role="alert" className="alert-danger">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <div>
-              <h3 className="text-sm font-medium text-red-900">Erreur de chargement</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* System information */}
-        {systemInfo && (
-          <div className="card p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <Server className="h-5 w-5 mr-2" />
-              Informations Système
-            </h3>
-
-            <div className="space-y-4">
-              {/* Operating system */}
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm font-medium text-gray-600">Système</span>
-                <span className="text-sm text-gray-900">
-                  {systemInfo.platform?.system} {systemInfo.platform?.release}
-                </span>
-              </div>
-
-              {/* Architecture */}
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm font-medium text-gray-600">Architecture</span>
-                <span className="text-sm text-gray-900">
-                  {systemInfo.platform?.machine}
-                </span>
-              </div>
-
-              {/* Python version */}
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm font-medium text-gray-600">Python</span>
-                <span className="text-sm text-gray-900">
-                  {systemInfo.platform?.python_version}
-                </span>
-              </div>
-
-              {/* Memory */}
-              {systemInfo.hardware?.memory && (
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-600 flex items-center">
-                    <Cpu className="h-4 w-4 mr-1" />
-                    Mémoire
-                  </span>
-                  <span className="text-sm text-gray-900">
-                    {Math.round(systemInfo.hardware.memory.total / (1024**3))} GB
-                    {systemInfo.hardware.memory.available && (
-                      <span className="text-gray-500 ml-1">
-                        ({Math.round(systemInfo.hardware.memory.available / (1024**3))} GB libre)
-                      </span>
-                    )}
-                  </span>
-                </div>
-              )}
-
-              {/* Disk space */}
-              {systemInfo.hardware?.disk && (
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-600 flex items-center">
-                    <HardDrive className="h-4 w-4 mr-1" />
-                    Espace disque
-                  </span>
-                  <span className="text-sm text-gray-900">
-                    {Math.round(systemInfo.hardware.disk.total / (1024**3))} GB
-                    {systemInfo.hardware.disk.free && (
-                      <span className="text-gray-500 ml-1">
-                        ({Math.round(systemInfo.hardware.disk.free / (1024**3))} GB libre)
-                      </span>
-                    )}
-                  </span>
-                </div>
-              )}
-
-              {/* Application version */}
-              {systemInfo.application?.version && (
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm font-medium text-gray-600">Version Mimir</span>
-                  <span className="text-sm text-gray-900 font-mono">
-                    {systemInfo.application.version}
-                  </span>
-                </div>
-              )}
+              <p className="font-semibold">Erreur de chargement</p>
+              <p className="mt-0.5">{error}</p>
             </div>
           </div>
         )}
 
         {/* Configuration by categories */}
-        <div className="space-y-6">
+        <div className="gap-6 xl:columns-2">
           {Object.entries(categorizedConfig).map(([category, configs]) => (
-            <div key={category} className="card p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {category}
-              </h3>
+            <section key={category} className="card mb-6 break-inside-avoid overflow-hidden">
+              <div className="card-header py-3">
+                <h2 className="card-title">
+                  <Settings className="h-4 w-4 text-ink-faint" aria-hidden="true" />
+                  {category}
+                </h2>
+                <span className="badge-neutral tabular">{Object.keys(configs).length}</span>
+              </div>
 
-              <div className="space-y-3">
+              <dl className="divide-y divide-line-soft">
                 {Object.entries(configs).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <span className="text-sm font-medium text-gray-600">
+                  <div key={key} className="flex items-center justify-between gap-4 px-5 py-2.5">
+                    <dt className="min-w-0 truncate font-mono text-xs text-ink-muted" title={key}>
                       {key}
-                    </span>
-                    <div className="flex items-center">
-                      <span className="text-sm text-gray-900 font-mono mr-2">
+                    </dt>
+                    <dd className="flex min-w-0 items-center gap-1">
+                      <span className="truncate font-mono text-[13px] font-medium text-ink" title={isSensitiveKey(key) && !showSensitive[key] ? undefined : String(value)}>
                         {maskValue(key, String(value))}
                       </span>
                       {isSensitiveKey(key) && (
                         <button
+                          type="button"
                           onClick={() => toggleSensitive(key)}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-faint hover:bg-sunken hover:text-ink"
                           title={showSensitive[key] ? 'Masquer' : 'Afficher'}
+                          aria-label={`${showSensitive[key] ? 'Masquer' : 'Afficher'} ${key}`}
                         >
                           {showSensitive[key] ? (
-                            <EyeOff className="h-4 w-4" />
+                            <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
                           ) : (
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                           )}
                         </button>
                       )}
-                    </div>
+                    </dd>
                   </div>
                 ))}
-              </div>
-            </div>
+              </dl>
+            </section>
           ))}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="mt-8 bg-gray-50 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-2">Légende</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-          <div className="flex items-center">
-            <Eye className="h-4 w-4 mr-2" />
-            <span>Cliquez pour afficher/masquer les valeurs sensibles</span>
-          </div>
-          <div className="flex items-center">
-            <Settings className="h-4 w-4 mr-2" />
-            <span>Configuration en lecture seule</span>
-          </div>
         </div>
       </div>
     </div>
