@@ -560,3 +560,250 @@ class TestSectionTitleThreadingIntoMetadata:
         # Existing metadata keys remain intact.
         assert result[0].metadata["start_char"] == 0
         assert result[0].metadata["char_count"] == 11
+
+
+# Exact-output tests below pin the current splitter behaviour (they were
+# written against surviving mutants of chunking.py, see docs/cleanup).
+# Known quirks are pinned as they are, except chunk positions: start_char
+# never advances past the first chunk, so only position invariants are checked.
+
+
+def _texts(chunks):
+    return [chunk["text"] for chunk in chunks]
+
+
+def _assert_positions(chunks):
+    """First chunk starts at 0 and every span is as long as its text."""
+    assert chunks[0]["start_char"] == 0
+    for chunk in chunks:
+        assert chunk["start_char"] >= 0
+        assert chunk["end_char"] - chunk["start_char"] == len(chunk["text"])
+
+
+class TestCleanTextExact:
+    def test_clean_text_exact_output(self):
+        dirty = "  Hello   world  \n\n\n\n  Multiple   spaces   \n\n  End  "
+
+        assert ChunkingStrategy()._clean_text(dirty) == "Hello world\n\nMultiple spaces\n\nEnd"
+
+
+class TestParagraphChunkingExact:
+    PARAGRAPHS = ["Alpha one. Alpha two.", "Beta one. Beta two.", "Gamma one. Gamma two."]
+
+    def _strategy(self, chunk_size, max_chunk_size=200):
+        return ChunkingStrategy(
+            ChunkingConfig(
+                chunk_size=chunk_size,
+                overlap=12,
+                min_chunk_size=5,
+                max_chunk_size=max_chunk_size,
+            )
+        )
+
+    def test_paragraphs_fill_a_chunk_up_to_chunk_size_inclusive(self):
+        # len("Alpha one. Alpha two.\n\nBeta one. Beta two.") == 42 == chunk_size
+        chunks = self._strategy(42).chunk_text("\n\n".join(self.PARAGRAPHS))
+
+        assert _texts(chunks) == [
+            "Alpha one. Alpha two.\n\nBeta one. Beta two.",
+            "Beta two. Gamma one. Gamma two.",
+        ]
+        assert [c["chunk_index"] for c in chunks] == [0, 1]
+        assert all(c["total_chunks"] == 2 for c in chunks)
+        _assert_positions(chunks)
+
+    def test_paragraph_one_char_over_chunk_size_starts_a_new_chunk(self):
+        chunks = self._strategy(41).chunk_text("\n\n".join(self.PARAGRAPHS))
+
+        # Each new chunk starts with the last sentence of the previous one.
+        assert _texts(chunks) == [
+            "Alpha one. Alpha two.",
+            "Alpha two. Beta one. Beta two.",
+            "Beta two. Gamma one. Gamma two.",
+        ]
+        _assert_positions(chunks)
+
+    def test_paragraph_of_exactly_max_chunk_size_is_not_resplit(self):
+        text = "Short one is here. Another short one ok."  # 40 characters
+
+        chunks = self._strategy(20, max_chunk_size=40).chunk_text(text)
+
+        assert _texts(chunks) == [text]
+        _assert_positions(chunks)
+
+
+class TestSentenceChunkingExact:
+    """preserve_paragraphs=False: sentence path (terminators are dropped by the split)."""
+
+    TEXT = "First one here. Second one here. Third one here."
+
+    def _strategy(self, chunk_size, min_chunk_size=5, overlap=12):
+        return ChunkingStrategy(
+            ChunkingConfig(
+                chunk_size=chunk_size,
+                overlap=overlap,
+                min_chunk_size=min_chunk_size,
+                max_chunk_size=2000,
+                preserve_paragraphs=False,
+            )
+        )
+
+    def test_sentences_fill_a_chunk_up_to_chunk_size_inclusive(self):
+        # 14 + 1 + 15 == 30 == chunk_size: the first two sentences share a chunk.
+        chunks = self._strategy(30).chunk_text(self.TEXT)
+
+        assert _texts(chunks) == ["First one here Second one here", "ond one here Third one here."]
+        _assert_positions(chunks)
+
+    def test_chunk_of_exactly_min_size_is_closed_when_next_sentence_overflows(self):
+        chunks = self._strategy(29, min_chunk_size=14).chunk_text(self.TEXT)
+
+        assert _texts(chunks) == [
+            "First one here",
+            "rst one here Second one here",
+            "ond one here Third one here.",
+        ]
+        _assert_positions(chunks)
+
+    def test_chunk_below_min_size_absorbs_the_next_sentence(self):
+        text = "One two three. Four five six. Seven eight nine."
+
+        chunks = self._strategy(20, min_chunk_size=24, overlap=6).chunk_text(text)
+
+        # The 24-character tail equals min_chunk_size, so it is kept.
+        assert _texts(chunks) == ["One two three Four five six", "ve six Seven eight nine."]
+        _assert_positions(chunks)
+
+    def test_zero_min_chunk_size_never_emits_an_empty_chunk(self):
+        chunks = self._strategy(10, min_chunk_size=0, overlap=3).chunk_text(
+            "First one here. Second one here."
+        )
+
+        assert _texts(chunks) == ["First one here", "ere Second one here."]
+        _assert_positions(chunks)
+
+    def test_text_never_reaching_min_size_becomes_a_single_chunk(self):
+        chunks = self._strategy(20, min_chunk_size=1000, overlap=6).chunk_text(self.TEXT)
+
+        assert len(chunks) == 1
+        assert chunks[0]["text"] == self.TEXT
+        assert chunks[0]["start_char"] == 0
+        assert chunks[0]["end_char"] == len(self.TEXT)
+
+    def test_text_of_exactly_chunk_size_is_kept_verbatim(self):
+        text = "First one here. Second one here."  # 32 characters
+
+        chunks = self._strategy(32).chunk_text(text)
+
+        assert _texts(chunks) == [text]
+
+
+class TestSplitSentencesExact:
+    def test_regex_split_is_kept_when_it_finds_several_sentences(self):
+        # Only ". G" is a regex boundary; the fallback would also split at ". e".
+        strategy = ChunkingStrategy(ChunkingConfig(chunk_size=20))
+
+        sentences = strategy._split_sentences("alpha beta. Gamma delta. epsilon zeta.")
+
+        assert sentences == ["alpha beta", "Gamma delta. epsilon zeta."]
+
+    def test_fallback_split_when_a_long_text_has_a_single_regex_sentence(self):
+        strategy = ChunkingStrategy(ChunkingConfig(chunk_size=20))
+
+        sentences = strategy._split_sentences("alpha beta. gamma delta. epsilon zeta.")
+
+        assert sentences == ["alpha beta", "gamma delta", "epsilon zeta."]
+
+    def test_no_fallback_for_a_text_of_exactly_chunk_size(self):
+        strategy = ChunkingStrategy(ChunkingConfig(chunk_size=24))
+
+        sentences = strategy._split_sentences("alpha beta. gamma delta.")  # 24 characters
+
+        assert sentences == ["alpha beta. gamma delta."]
+
+
+class TestOverlapTextExact:
+    def test_no_overlap_for_empty_text(self):
+        assert ChunkingStrategy()._get_overlap_text("", 10) == ""
+
+    def test_no_overlap_for_zero_size(self):
+        assert ChunkingStrategy()._get_overlap_text("One. Two.", 0) == ""
+
+    def test_overlap_starts_after_the_last_sentence_boundary(self):
+        assert ChunkingStrategy()._get_overlap_text("One. Two", 1) == "Two "
+
+    def test_boundary_is_searched_up_to_100_chars_before_the_overlap(self):
+        text = "a" * 198 + ". " + "b" * 100
+
+        assert ChunkingStrategy()._get_overlap_text(text, 20) == "b" * 100 + " "
+
+    def test_boundary_before_the_lookback_window_is_ignored(self):
+        # The window starts at len - size - 100 == 180, one char after the ".".
+        text = "a" * 179 + ". " + "b" * 119
+
+        assert ChunkingStrategy()._get_overlap_text(text, 20) == "b" * 20 + " "
+
+    def test_boundary_at_the_start_of_the_window_is_found(self):
+        assert ChunkingStrategy()._get_overlap_text("! abc", 4) == "abc "
+
+    def test_boundary_at_the_very_end_falls_back_to_characters(self):
+        assert ChunkingStrategy()._get_overlap_text("Hello world. ", 5) == "rld.  "
+
+    def test_overlap_as_long_as_the_text_returns_the_whole_text(self):
+        assert ChunkingStrategy()._get_overlap_text("One. Two", 8) == "One. Two "
+
+    def test_character_overlap_when_sentences_are_not_preserved(self):
+        strategy = ChunkingStrategy(ChunkingConfig(preserve_sentences=False))
+
+        assert strategy._get_overlap_text("One. Two three", 5) == "three "
+
+    def test_overlap_longer_than_the_text_returns_the_whole_text(self):
+        strategy = ChunkingStrategy(ChunkingConfig(preserve_sentences=False))
+
+        assert strategy._get_overlap_text("abc", 10) == "abc "
+
+
+class TestChunkStatisticsExact:
+    def test_statistics_prefer_the_stored_word_count(self):
+        chunks = [{"text": "a b c", "word_count": 10}, {"text": "d e"}]
+
+        stats = ChunkingStrategy().get_chunk_statistics(chunks)
+
+        assert stats["total_chunks"] == 2
+        assert stats["total_characters"] == 8
+        assert stats["total_words"] == 12
+        assert stats["avg_chunk_size"] == 4.0
+        assert stats["min_chunk_size"] == 3
+        assert stats["max_chunk_size"] == 5
+        assert stats["avg_words_per_chunk"] == 6.0
+
+
+class TestSectionTitlesExact:
+    def test_preamble_has_no_section_and_each_heading_tags_its_chunk(self):
+        text = (
+            "An introduction without a heading.\n\n# Alpha\n\nAlpha body.\n\n"
+            "# Beta\n\nBeta body.\n\n# Gamma\n\nGamma body."
+        )
+        config = ChunkingConfig(
+            chunk_size=22,
+            overlap=0,
+            min_chunk_size=5,
+            max_chunk_size=200,
+            section_title_tracking=True,
+        )
+
+        chunks = ChunkingStrategy(config).chunk_text(text)
+
+        assert [(c["text"], c["section_title"]) for c in chunks] == [
+            ("An introduction without a heading.", None),
+            ("# Alpha\n\nAlpha body.", "Alpha"),
+            ("# Beta\n\nBeta body.", "Beta"),
+            ("# Gamma\n\nGamma body.", "Gamma"),
+        ]
+
+    def test_inline_markup_is_stripped_from_heading_titles(self):
+        headings = ChunkingStrategy()._detect_headings(
+            "<h2><em>Intro</em> part</h2>\n\n<h3>Next</h3>"
+        )
+
+        assert [title for _, title in headings] == ["Intro part", "Next"]

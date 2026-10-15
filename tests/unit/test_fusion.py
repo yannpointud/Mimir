@@ -72,3 +72,7 @@ def test_ranked_result_dataclass_shape():
     r = RankedResult(chunk_id=7, score=0.83)
     assert r.chunk_id == 7
     assert r.score == 0.83
+
+
+def test_rrf_default_k_is_60():
+    assert reciprocal_rank_fusion([[1, 2]]) == {1: 1.0 / 61, 2: 1.0 / 62}
