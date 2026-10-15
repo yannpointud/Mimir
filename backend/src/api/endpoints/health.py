@@ -91,7 +91,7 @@ async def health_check(
 
         return HealthCheckResponse(**health_status)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a 503
         logger.error(f"Health check error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -154,12 +154,12 @@ async def disk_usage() -> dict[str, Any]:
                     }
                 else:
                     usage_info[name] = {"path": path, "error": "Directory does not exist"}
-            except Exception as e:  # noqa: BLE001
+            except OSError as e:
                 usage_info[name] = {"path": path, "error": str(e)}
 
         return {"healthy": True, "disk_usage": usage_info, "timestamp": datetime.utcnow()}
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
         logger.error(f"Disk usage check error: {e}")
         return {"healthy": False, "error": str(e), "timestamp": datetime.utcnow()}
 
@@ -172,7 +172,7 @@ async def _check_database_health(db: Session) -> dict[str, Any]:
         test_value = result.scalar()
 
         if test_value != 1:
-            raise Exception("Database query returned unexpected result")
+            raise RuntimeError("Database query returned unexpected result")
 
         # Test document table access
         from src.database.models import Document
@@ -186,7 +186,7 @@ async def _check_database_health(db: Session) -> dict[str, Any]:
             "response_time_ms": 0,  # Could measure actual response time
         }
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
         logger.error(f"Database health check failed: {e}")
         return {"healthy": False, "connection": "failed", "error": str(e)}
 
@@ -229,7 +229,7 @@ async def _check_vector_store_health() -> dict[str, Any]:
                 "error": "Inconsistent vector store state",
             }
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
         logger.error(f"Vector store health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 
@@ -249,7 +249,7 @@ async def _check_llm_health() -> dict[str, Any]:
             "note": "API key configured" if llm_configured else "API key not configured",
         }
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
         logger.error(f"LLM health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 
@@ -267,7 +267,7 @@ async def _check_cache_health() -> dict[str, Any]:
         retrieved_value = cache_service.get(test_key)
 
         if retrieved_value != test_value:
-            raise Exception("Cache test failed - value mismatch")
+            raise RuntimeError("Cache test failed - value mismatch")
 
         # Clean up test key
         cache_service.delete(test_key)
@@ -283,7 +283,7 @@ async def _check_cache_health() -> dict[str, Any]:
             "chat_cache": chat_cache_stats,
         }
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
         logger.error(f"Cache health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 
@@ -303,7 +303,7 @@ async def _check_email_health() -> dict[str, Any]:
             else "Email service not configured",
         }
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
         logger.error(f"Email health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 

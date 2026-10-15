@@ -267,20 +267,18 @@ class TestAuthHelperFunctions:
         mock_audit_repo = Mock()
         mock_audit_repo.create_log.side_effect = Exception("Database error")
 
-        # Test that exception is handled silently
-        try:
-            asyncio.run(
-                _log_auth_event(
-                    audit_repo=mock_audit_repo,
-                    action="login_failed",
-                    username="admin",
-                    ip_address="127.0.0.1",
-                    success=False,
-                    details="Login failed",
-                )
+        # The audit failure is swallowed: no exception reaches the caller
+        asyncio.run(
+            _log_auth_event(
+                audit_repo=mock_audit_repo,
+                action="login_failed",
+                username="admin",
+                ip_address="127.0.0.1",
+                success=False,
+                details="Login failed",
             )
-        except Exception:  # noqa: BLE001
-            pytest.fail("Exception should be handled silently")
+        )
+        mock_audit_repo.create_log.assert_called_once()
 
 
 class TestTokenRefresh:

@@ -19,6 +19,7 @@ from fastapi import (
     Response,
 )
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 import asyncio
 import logging
@@ -49,6 +50,7 @@ from src.shared.models import (
 )
 from src.ingestion.extractors import ExtractorFactory
 from src.config import settings
+from src.shared.errors import RetrievalError
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +123,7 @@ async def list_documents(
             },
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error listing documents: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve documents"
@@ -208,7 +210,7 @@ async def get_document_with_chunks(
             )
         else:
             logger.warning(f"Document {document_id}: No chunks found in vector store")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - best effort: the reader view is served without chunks
         logger.warning(f"Could not retrieve chunks for document {document_id}: {e}")
         # Continue without chunks on error
 
@@ -240,11 +242,11 @@ async def get_document_with_chunks(
                 logger.debug(
                     f"Successfully extracted text from {document.path} ({len(content) if content else 0} characters)"
                 )
-            except Exception as extraction_error:  # noqa: BLE001
+            except Exception as extraction_error:  # noqa: BLE001 - best effort: parsers may fail on any file; served without content
                 logger.warning(f"Could not extract text from {document.path}: {extraction_error}")
                 content = None
 
-        except Exception as e:  # noqa: BLE001
+        except OSError as e:
             logger.warning(f"Could not read file metadata for document {document_id}: {e}")
 
     # Build the response with all details
@@ -457,7 +459,7 @@ async def upload_document(
                 try:
                     doc_repo.delete(document.id, force=True)
                     file_path.unlink(missing_ok=True)
-                except Exception as cleanup_error:  # noqa: BLE001
+                except (SQLAlchemyError, ValueError, OSError) as cleanup_error:
                     logger.warning(
                         f"Failed to clean up after queue-full rejection "
                         f"(document_id={document.id}): {cleanup_error}"
@@ -471,7 +473,7 @@ async def upload_document(
 
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - API boundary: a queueing failure becomes a 500
             logger.error(f"Error queuing document for processing: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -484,7 +486,7 @@ async def upload_document(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Document upload error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Document upload failed"
@@ -549,7 +551,7 @@ async def delete_document(
             try:
                 os.remove(file_path)
                 logger.debug(f"Deleted file: {file_path}")
-            except Exception as e:  # noqa: BLE001
+            except OSError as e:
                 logger.warning(f"Failed to delete file {file_path}: {e}")
                 # Continue - database deletion was successful
 
@@ -582,7 +584,7 @@ async def delete_document(
                         logger.info(
                             f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed"
                         )
-                except Exception as cleanup_error:  # noqa: BLE001
+                except RetrievalError as cleanup_error:
                     logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
                     # Do not fail the deletion if cleanup fails
 
@@ -597,14 +599,14 @@ async def delete_document(
                     # Snapshot active chunks UNDER the FAISS lock.
                     active_chunks = vector_store.snapshot_active_chunks()
                     await asyncio.to_thread(bm25_store.rebuild, active_chunks)
-                except Exception as bm25_error:  # noqa: BLE001
+                except RetrievalError as bm25_error:
                     logger.warning(
                         f"BM25 rebuild after deletion failed - continuing anyway: {bm25_error}"
                     )
 
             else:
                 logger.warning(f"Failed to remove document chunks from vector store: {filename}")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - best effort: the database deletion already succeeded
             logger.error(f"Error removing document from vector store: {e}")
             # Continue with deletion even if vector store removal fails
 
@@ -628,7 +630,7 @@ async def delete_document(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Document deletion error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Document deletion failed"
@@ -687,7 +689,7 @@ async def toggle_document_preservation(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Document preservation toggle error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -761,7 +763,7 @@ async def reprocess_document(
 
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - API boundary: a queueing failure becomes a 500
             logger.error(f"Error queuing document for reprocessing: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -788,7 +790,7 @@ async def reprocess_document(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Document reprocessing error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -847,7 +849,7 @@ async def get_document_stats(
             "timestamp": datetime.utcnow(),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error getting document stats: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -912,7 +914,7 @@ async def validate_vector_store_consistency(
 
                 logger.info(f"Validation report saved to {report_path}")
 
-            except Exception as e:  # noqa: BLE001
+            except (OSError, TypeError, ValueError) as e:
                 logger.warning(f"Failed to save validation report: {e}")
                 # Do not fail the validation if saving the report fails
 
@@ -962,7 +964,7 @@ async def validate_vector_store_consistency(
             "timestamp": datetime.utcnow(),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Consistency validation failed: {e}")
 
         # Log the failure

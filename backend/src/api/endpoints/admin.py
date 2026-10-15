@@ -24,6 +24,8 @@ import logging
 import time
 from pathlib import Path
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from src.auth.middleware import require_admin
 from src.database.repository import (
     ConfigurationRepository,
@@ -131,7 +133,7 @@ async def get_system_info(current_user: dict[str, Any] = Depends(require_admin))
         logger.debug("System information retrieved successfully")
         return system_info
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving system info: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -178,7 +180,7 @@ async def get_cache_stats(current_user: dict[str, Any] = Depends(require_admin))
             "timestamp": datetime.utcnow(),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving cache stats: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -241,7 +243,7 @@ async def clear_cache(
             timestamp=datetime.utcnow(),
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error clearing cache: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to clear cache"
@@ -292,7 +294,7 @@ async def get_configuration(
             "timestamp": datetime.utcnow(),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving configuration: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -372,7 +374,7 @@ async def update_configuration(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error updating configuration: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -462,7 +464,7 @@ async def get_audit_log(
             "timestamp": datetime.utcnow(),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving audit log: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve audit log"
@@ -516,7 +518,7 @@ async def get_usage(
             "timestamp": datetime.utcnow(),
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving usage data: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -577,7 +579,7 @@ async def toggle_maintenance_mode(
             timestamp=datetime.utcnow(),
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error toggling maintenance mode: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -634,7 +636,7 @@ async def test_email_service(
                 timestamp=datetime.utcnow(),
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Email service test error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Email service test failed"
@@ -838,7 +840,7 @@ async def admin_upload_document(
                 try:
                     doc_repo.delete(document.id, force=True)
                     file_path.unlink(missing_ok=True)
-                except Exception as cleanup_error:  # noqa: BLE001
+                except (SQLAlchemyError, ValueError, OSError) as cleanup_error:
                     logger.warning(
                         f"Failed to clean up after queue-full rejection "
                         f"(document_id={document.id}): {cleanup_error}"
@@ -852,7 +854,7 @@ async def admin_upload_document(
 
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - API boundary: a queueing failure becomes a 500
             logger.error(f"Error queuing document for processing: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -874,7 +876,7 @@ async def admin_upload_document(
     except HTTPException:
         # Propagate intentional HTTP errors (e.g. 409 duplicate) as-is
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Upload error: {e}")
         # Clean up the file on error
         if "file_path" in locals() and file_path.exists():
@@ -946,7 +948,7 @@ async def get_chat_metrics(current_user: dict[str, Any] = Depends(require_admin)
         logger.info("Chat metrics retrieved successfully from logs")
         return metrics
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Failed to get chat metrics: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -990,7 +992,7 @@ async def get_usage_analytics(
         logger.info("Usage analytics retrieved successfully from logs and database")
         return analytics
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Failed to get usage analytics: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1062,7 +1064,7 @@ async def get_system_logs(
         )
         return response
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Failed to get system logs: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1118,7 +1120,7 @@ async def rebuild_vector_store(
         # lookup and fallback, as before.
         try:
             existing_document_ids = {str(doc.id) for doc in document_repo.get_all()}
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - best effort: the store falls back to its own document lookup
             logger.error(f"Failed to list documents for orphan cleanup: {str(e)}")
             existing_document_ids = None
 
@@ -1194,7 +1196,7 @@ async def rebuild_vector_store(
             success=True, message=" ".join(message_parts), timestamp=datetime.utcnow()
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         # Full detail goes to the logs only; the client gets a generic
         # message (same convention as every other endpoint: exception text
         # may contain file paths or FAISS internals).
@@ -1210,7 +1212,7 @@ async def rebuild_vector_store(
                 success=False,
                 additional_data={"error": str(e), "admin_user": current_user["sub"]},
             )
-        except Exception as audit_error:  # noqa: BLE001
+        except SQLAlchemyError as audit_error:
             # Do not fail the request on audit log error, but never
             # silence it either (admin traceability requirement).
             logger.warning(f"Failed to write audit log for rebuild failure: {audit_error}")

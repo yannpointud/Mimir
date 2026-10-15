@@ -140,7 +140,7 @@ async def login(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Login error for user {login_data.username}: {e}")
 
         # Log system error
@@ -195,7 +195,7 @@ async def logout(
 
         return {"message": "Successfully logged out"}
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - API boundary: logout always succeeds for the client
         logger.error(f"Logout error: {e}")
         return {"message": "Logged out (with errors)"}
 
@@ -246,7 +246,7 @@ async def refresh_token(
             expires_in=settings.jwt_expiration_hours * 3600,
         )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Token refresh error: {e}")
 
         await _log_auth_event(
@@ -347,7 +347,7 @@ async def change_password(
 
     try:
         _update_env_file("ADMIN_PASSWORD_HASH", new_hash)
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.error(f"Failed to update .env file: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -424,7 +424,7 @@ def _authenticate_admin(username: str, password: str) -> bool:
         # Verify password against hash
         return jwt_handler.verify_password(password, expected_password_hash)
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - fail closed: any error denies authentication
         logger.error(f"Authentication error: {e}")
         return False
 
@@ -480,6 +480,6 @@ async def _log_auth_event(
             success=success,
             additional_data={"username": username, "timestamp": "auto"},
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - best effort: an audit failure must not break authentication
         logger.error(f"Failed to log auth event: {e}")
         # Don't raise exception - logging failures shouldn't break auth flow

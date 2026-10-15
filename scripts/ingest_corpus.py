@@ -138,7 +138,7 @@ async def main() -> int:
         bm_count = getattr(bm25_store, "size", lambda: "?")
         try:
             print(f"BM25 documents: {bm_count() if callable(bm_count) else bm_count}")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - CLI report: the count is informational only
             print(f"BM25 count unavailable: {e}")
     return 0
 

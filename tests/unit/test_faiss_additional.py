@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from backend.src.rag_core.implementations.faiss_store import FaissVectorStore
-from backend.src.rag_core.interfaces import Chunk
+from backend.src.rag_core.interfaces import Chunk, VectorStoreOperationError
 
 
 class TestFaissVectorStoreAdditional:
@@ -81,15 +81,7 @@ class TestFaissVectorStoreAdditional:
             ),
         ]
 
-        # Ajouter les chunks - ne doit pas lever d'exception
-        try:
-            temp_store.upsert(chunks)
-            success = True
-        except Exception as e:  # noqa: BLE001
-            print(f"Error: {e}")
-            success = False
-
-        assert success
+        assert temp_store.upsert(chunks) is True
 
     def test_faiss_store_search_basic(self, temp_store):
         """Test de recherche de base"""
@@ -327,14 +319,8 @@ class TestFaissStoreFunctionality:
                 metadata={"id": "invalid"},
             )
 
-            # Devrait lever une exception ou échouer gracieusement
-            try:
+            with pytest.raises(VectorStoreOperationError, match="Invalid embedding dimension"):
                 store.upsert([invalid_chunk])
-                # Si aucune exception, c'est que le store gère la validation
-                assert True
-            except Exception:  # noqa: BLE001
-                # Exception attendue pour dimension incorrecte
-                assert True
 
     def test_faiss_store_search_top_k_variations(self, populated_store):
         """Test avec différentes valeurs de top_k"""

@@ -537,7 +537,7 @@ class TestFaissIntegration:
                 stats = store.get_stats()
                 health = store.health_check()
                 results.append((stats, health))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 - thread harness: collect any error for the assertion
                 results.append(e)
 
         # Lancer plusieurs threads

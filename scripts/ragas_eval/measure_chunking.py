@@ -152,7 +152,7 @@ def _dry_run() -> int:
             print(f"[ok] flag structure_aware_chunking_enabled default={field.default}")
             if field.default is not False:
                 print("     note: default is not False -- adoption already applied?")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - CLI check: any import failure is reported as missing
         print(f"[MISSING] cannot import Settings: {exc}")
         ok = False
 

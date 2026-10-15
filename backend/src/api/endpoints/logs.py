@@ -105,7 +105,7 @@ async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
 
         return LogResponse(status="success", message="Log entry stored successfully")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         # Log the error to backend logger
         logger.error(f"Failed to process frontend log: {str(e)}")
 
@@ -134,7 +134,8 @@ async def frontend_logging_health() -> dict[str, Any]:
             "timestamp": datetime.utcnow().isoformat() + "Z",
         }
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
+        logger.error(f"Frontend logging health check failed: {e}")
         return {
             "status": "unhealthy",
             "error": str(e),

@@ -253,7 +253,7 @@ class TestCacheServiceAdvanced:
                         contains(cache, key)
                     if i % 20 == 0:
                         cache.get_stats()
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 - thread harness: collect any error for the assertion
                 errors.append(f"Worker {worker_id}: {e}")
 
         # Lancer plusieurs workers

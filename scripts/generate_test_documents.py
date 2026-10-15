@@ -97,7 +97,7 @@ if not MISTRAL_API_KEY:
 
 try:
     client = MistralClient(api_key=MISTRAL_API_KEY)
-except Exception as e:  # noqa: BLE001
+except Exception as e:  # noqa: BLE001 - CLI boundary: report any failure and exit non-zero
     print(f"Error initializing Mistral client. Check your API key. Error: {e}")
     sys.exit(1)
 
@@ -128,7 +128,7 @@ def generate_long_content(doc_type, subject):
             messages=messages,
         )
         return chat_response.choices[0].message.content
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - CLI boundary: skip the document on any API failure
         print(f"  !!! Erreur lors de l'appel à l'API Mistral : {e}")
         return None
 
