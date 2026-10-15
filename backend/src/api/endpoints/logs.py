@@ -109,7 +109,7 @@ async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process log entry"
-        )
+        ) from e
 
 @router.get("/frontend/health")
 async def frontend_logging_health() -> dict[str, Any]:

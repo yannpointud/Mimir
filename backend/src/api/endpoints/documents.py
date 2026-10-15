@@ -111,7 +111,7 @@ async def list_documents(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve documents"
-        )
+        ) from e
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
@@ -467,7 +467,7 @@ async def upload_document(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to queue document for processing"
-            )
+            ) from e
 
         logger.info(f"Document uploaded successfully: {safe_filename} (ID: {document.id})")
 
@@ -480,7 +480,7 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document upload failed"
-        )
+        ) from e
 
 
 @router.delete("/{document_id}", response_model=BaseResponse)
@@ -619,7 +619,7 @@ async def delete_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document deletion failed"
-        )
+        ) from e
 
 
 @router.patch("/{document_id}/preserve", response_model=DocumentResponse)
@@ -679,7 +679,7 @@ async def toggle_document_preservation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update document preservation status"
-        )
+        ) from e
 
 
 @router.post("/{document_id}/reprocess", response_model=BaseResponse)
@@ -749,7 +749,7 @@ async def reprocess_document(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to queue document for reprocessing"
-            )
+            ) from e
 
         # Log reprocessing request
         audit_repo.create_log(
@@ -779,7 +779,7 @@ async def reprocess_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to queue document for reprocessing"
-        )
+        ) from e
 
 
 @router.get("/stats/overview", response_model=dict[str, Any])
@@ -838,7 +838,7 @@ async def get_document_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve document statistics"
-        )
+        ) from e
 
 
 @router.post("/maintenance/validate-consistency", response_model=dict[str, Any])
@@ -961,4 +961,4 @@ async def validate_vector_store_consistency(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Consistency validation failed"
-        )
+        ) from e

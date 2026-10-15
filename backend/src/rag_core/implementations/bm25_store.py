@@ -109,7 +109,7 @@ class Bm25LexicalStore:
             except Exception as e:
                 error_msg = f"Failed to rebuild BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def query(self, question: str, top_k: int = 50) -> list[tuple[int, float]]:
         """Query the lexical index for the most relevant chunks.
@@ -157,7 +157,7 @@ class Bm25LexicalStore:
             except Exception as e:
                 error_msg = f"Failed to query BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def load(self) -> bool:
         """Load the persisted index (and chunk_id mapping) from disk.
@@ -202,7 +202,7 @@ class Bm25LexicalStore:
             except Exception as e:
                 error_msg = f"Failed to load BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreConnectionError(error_msg)
+                raise VectorStoreConnectionError(error_msg) from e
 
     def _resolve_chunk_id(self, doc: Any) -> int:
         """Map a bm25s retrieval result to a real chunk_id.

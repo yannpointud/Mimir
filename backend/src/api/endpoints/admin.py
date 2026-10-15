@@ -111,7 +111,7 @@ async def get_system_info(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve system information"
-        )
+        ) from e
 
 
 @router.get("/cache/stats", response_model=dict[str, Any])
@@ -160,7 +160,7 @@ async def get_cache_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve cache statistics"
-        )
+        ) from e
 
 
 @router.post("/cache/clear", response_model=BaseResponse)
@@ -221,7 +221,7 @@ async def clear_cache(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to clear cache"
-        )
+        ) from e
 
 
 @router.get("/configuration", response_model=dict[str, Any])
@@ -273,7 +273,7 @@ async def get_configuration(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve configuration"
-        )
+        ) from e
 
 
 @router.put("/configuration", response_model=BaseResponse)
@@ -356,7 +356,7 @@ async def update_configuration(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update configuration"
-        )
+        ) from e
 
 
 @router.get("/audit-log", response_model=dict[str, Any])
@@ -446,7 +446,7 @@ async def get_audit_log(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve audit log"
-        )
+        ) from e
 
 
 @router.get("/usage", response_model=dict[str, Any])
@@ -501,7 +501,7 @@ async def get_usage(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve usage data"
-        )
+        ) from e
 
 
 @router.post("/maintenance", response_model=BaseResponse)
@@ -560,7 +560,7 @@ async def toggle_maintenance_mode(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to toggle maintenance mode"
-        )
+        ) from e
 
 
 @router.post("/test-email", response_model=BaseResponse)
@@ -620,7 +620,7 @@ async def test_email_service(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Email service test failed"
-        )
+        ) from e
 
 
 # ============= DOCUMENT MANAGEMENT ENDPOINTS =============
@@ -846,7 +846,7 @@ async def admin_upload_document(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to queue document for processing"
-            )
+            ) from e
 
         return {
             "success": True,
@@ -871,7 +871,7 @@ async def admin_upload_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Upload failed"
-        )
+        ) from e
     finally:
         db.close()
 
@@ -942,7 +942,7 @@ async def get_chat_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve chat metrics"
-        )
+        ) from e
 
 
 @router.get("/analytics/usage", response_model=dict[str, Any])
@@ -986,7 +986,7 @@ async def get_usage_analytics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve usage analytics"
-        )
+        ) from e
 
 
 @router.get("/logs", response_model=dict[str, Any])
@@ -1061,7 +1061,7 @@ async def get_system_logs(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve system logs"
-        )
+        ) from e
 
 
 @router.post("/vector-store/rebuild", response_model=BaseResponse)
@@ -1214,4 +1214,4 @@ async def rebuild_vector_store(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Vector index rebuild failed"
-        )
+        ) from e

@@ -96,7 +96,7 @@ async def health_check(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Health check failed due to internal error"
-        )
+        ) from e
 
 
 @router.get("/database", response_model=dict[str, Any])

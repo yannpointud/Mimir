@@ -162,7 +162,7 @@ class MistralAPIService(AbstractLLMService):
                     await asyncio.sleep(delay)
                     continue
                 else:
-                    raise last_exception
+                    raise last_exception from e
 
             except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
                 # Re-raise LLM-specific exceptions without transformation
@@ -171,7 +171,7 @@ class MistralAPIService(AbstractLLMService):
             except Exception as e:
                 error_msg = f"Unexpected error: {str(e)}"
                 logger.error(error_msg)
-                raise LLMAPIError(error_msg)
+                raise LLMAPIError(error_msg) from e
 
         # Should not reach here
         if last_exception:
@@ -291,7 +291,7 @@ class MistralAPIService(AbstractLLMService):
         except Exception as e:
             error_msg = f"Text generation failed: {str(e)}"
             logger.error(error_msg)
-            raise LLMAPIError(error_msg)
+            raise LLMAPIError(error_msg) from e
 
     async def generate_stream(self,
                              prompt: str,
@@ -437,7 +437,7 @@ class MistralAPIService(AbstractLLMService):
         except Exception as e:
             error_msg = f"Streaming generation failed: {str(e)}"
             logger.error(error_msg)
-            raise LLMAPIError(error_msg)
+            raise LLMAPIError(error_msg) from e
 
     async def embed(self, texts: list[str], session_id: str | None = None, rag_debug = None) -> EmbeddingResponse:
         """
@@ -491,7 +491,7 @@ class MistralAPIService(AbstractLLMService):
             except Exception as e:
                 error_msg = f"Embedding batch {batch_num}/{total_batches} failed: {str(e)}"
                 logger.error(error_msg)
-                raise LLMAPIError(error_msg)
+                raise LLMAPIError(error_msg) from e
 
         duration_ms = (time.time() - start_time) * 1000
 
@@ -578,7 +578,7 @@ class MistralAPIService(AbstractLLMService):
         except Exception as e:
             error_msg = f"Embedding generation failed: {str(e)}"
             logger.error(error_msg)
-            raise LLMAPIError(error_msg)
+            raise LLMAPIError(error_msg) from e
 
     async def health_check(self) -> bool:
         """

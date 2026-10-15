@@ -92,7 +92,7 @@ class VectorStoreValidator:
         except Exception as e:
             error_msg = f"Validation failed: {str(e)}"
             self.logger.error(error_msg)
-            raise Exception(error_msg)
+            raise Exception(error_msg) from e
     
     def _get_database_documents(self) -> dict[str, dict[str, Any]]:
         """Retrieve documents from SQLite."""

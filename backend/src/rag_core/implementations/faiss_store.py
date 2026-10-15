@@ -156,7 +156,7 @@ class FaissVectorStore(AbstractVectorStore):
             except Exception as e:
                 error_msg = f"Failed to create FAISS index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreConnectionError(error_msg)
+                raise VectorStoreConnectionError(error_msg) from e
 
     def upsert(self, chunks: list[Chunk]) -> bool:
         """
@@ -258,7 +258,7 @@ class FaissVectorStore(AbstractVectorStore):
             except Exception as e:
                 error_msg = f"Failed to upsert chunks: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def query(self,
               vector: np.ndarray,
@@ -381,7 +381,7 @@ class FaissVectorStore(AbstractVectorStore):
             except Exception as e:
                 error_msg = f"Failed to query vectors: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def _matches_filter(self, metadata: dict[str, Any], filter_dict: dict[str, Any]) -> bool:
         """Check if metadata matches filter conditions"""
@@ -453,7 +453,7 @@ class FaissVectorStore(AbstractVectorStore):
             except Exception as e:
                 error_msg = f"Failed to delete document {document_id}: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def get_stats(self) -> dict[str, Any]:
         """Get vector store statistics"""
@@ -645,7 +645,7 @@ class FaissVectorStore(AbstractVectorStore):
         except Exception as e:
             error_msg = f"Failed to persist vector store: {str(e)}"
             logger.error(error_msg)
-            raise VectorStoreConnectionError(error_msg)
+            raise VectorStoreConnectionError(error_msg) from e
 
     def load(self) -> bool:
         """Load state from disk.
@@ -716,7 +716,7 @@ class FaissVectorStore(AbstractVectorStore):
         except Exception as e:
             error_msg = f"Failed to load vector store: {str(e)}"
             logger.error(error_msg)
-            raise VectorStoreConnectionError(error_msg)
+            raise VectorStoreConnectionError(error_msg) from e
 
     def _update_stats(self):
         """Update internal statistics"""
@@ -828,7 +828,7 @@ class FaissVectorStore(AbstractVectorStore):
                     logger.info("Orphan cleanup changes persisted successfully")
                 except Exception as e:
                     logger.error(f"Failed to persist cleanup changes: {e}")
-                    raise VectorStoreOperationError(f"Cleanup persistence failed: {e}")
+                    raise VectorStoreOperationError(f"Cleanup persistence failed: {e}") from e
                 
                 # Final statistics
                 final_stats = {
@@ -864,7 +864,7 @@ class FaissVectorStore(AbstractVectorStore):
             except Exception as e:
                 error_msg = f"Orphan cleanup failed: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
     
     def _create_backup(self, timestamp: str):
         """Create a FAISS backup with timestamp and rotate old backups"""
@@ -1033,7 +1033,7 @@ class FaissVectorStore(AbstractVectorStore):
                 )
             except Exception as e:
                 logger.error(f"Failed to save optimized index: {e}")
-                raise VectorStoreOperationError(f"Index optimization save failed: {e}")
+                raise VectorStoreOperationError(f"Index optimization save failed: {e}") from e
 
     def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True,
                              existing_document_ids: set | None = None) -> dict[str, Any]:
@@ -1120,7 +1120,7 @@ class FaissVectorStore(AbstractVectorStore):
             except Exception as e:
                 error_msg = f"Vector store rebuild failed: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def get_document_chunks(self, document_id: str) -> list[Chunk]:
         """

@@ -158,7 +158,7 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication system error"
-        )
+        ) from e
 
 
 @router.post("/logout")
@@ -268,7 +268,7 @@ async def refresh_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Token refresh failed"
-        )
+        ) from e
 
 
 @router.get("/me")
@@ -367,7 +367,7 @@ async def change_password(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erreur lors de la mise à jour du fichier de configuration"
-        )
+        ) from e
 
     await _log_auth_event(
         audit_repo=audit_repo,

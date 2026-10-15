@@ -526,7 +526,7 @@ class IngestionProcessor:
         try:
             return self.extractor_factory.extract_text(file_path)
         except (ExtractionError, UnsupportedFormatError) as e:
-            raise ProcessingError(f"Text extraction failed: {str(e)}")
+            raise ProcessingError(f"Text extraction failed: {str(e)}") from e
 
     async def _generate_embeddings(self, chunks_data: list[dict[str, Any]]) -> EmbeddingResponse:
         """
@@ -550,7 +550,7 @@ class IngestionProcessor:
             return response
 
         except LLMException as e:
-            raise ProcessingError(f"Embedding generation failed: {str(e)}")
+            raise ProcessingError(f"Embedding generation failed: {str(e)}") from e
 
     def _create_chunks(self,
                       chunks_data: list[dict[str, Any]],

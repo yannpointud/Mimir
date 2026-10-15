@@ -115,8 +115,8 @@ class PDFExtractor(TextExtractor):
                     logger.warning(f"PDF is encrypted, attempting to decrypt: {file_path}")
                     try:
                         reader.decrypt('')  # Try empty password
-                    except Exception:
-                        raise ExtractionError(f"Cannot decrypt encrypted PDF: {file_path}")
+                    except Exception as exc:
+                        raise ExtractionError(f"Cannot decrypt encrypted PDF: {file_path}") from exc
 
                 # Extract text from each page
                 for page_num, page in enumerate(reader.pages):
@@ -154,7 +154,7 @@ class PDFExtractor(TextExtractor):
         except Exception as e:
             error_msg = f"Failed to extract text from PDF {file_path}: {str(e)}"
             logger.error(error_msg)
-            raise ExtractionError(error_msg)
+            raise ExtractionError(error_msg) from e
 
 class DOCXExtractor(TextExtractor):
     """Extract text from DOCX files using python-docx"""
@@ -213,7 +213,7 @@ class DOCXExtractor(TextExtractor):
         except Exception as e:
             error_msg = f"Failed to extract text from DOCX {file_path}: {str(e)}"
             logger.error(error_msg)
-            raise ExtractionError(error_msg)
+            raise ExtractionError(error_msg) from e
 
 class TXTExtractor(TextExtractor):
     """Extract text from plain text files"""
@@ -308,7 +308,7 @@ class MarkdownExtractor(TextExtractor):
         except Exception as e:
             error_msg = f"Failed to extract text from Markdown {file_path}: {str(e)}"
             logger.error(error_msg)
-            raise ExtractionError(error_msg)
+            raise ExtractionError(error_msg) from e
 
 class ExtractorFactory:
     """Factory for creating appropriate text extractors"""

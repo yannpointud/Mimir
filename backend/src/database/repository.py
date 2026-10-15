@@ -71,7 +71,7 @@ class DocumentRepository(BaseRepository):
             
         except IntegrityError as e:
             self._handle_db_error(e, f"create document {filename}")
-            raise ValueError(f"Document with hash {file_hash} already exists")
+            raise ValueError(f"Document with hash {file_hash} already exists") from e
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"create document {filename}")
             raise
