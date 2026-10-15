@@ -5,8 +5,8 @@ Hosts the full Retrieval-Augmented Generation pipeline (embed -> vector
 search -> fuzzy filename pre-include -> dynamic source filter -> confidence
 scoring -> LLM generation) as a framework-agnostic RagService class.
 
-Extracted verbatim from backend/src/api/endpoints/chat.py (DEBT-01) so the
-pipeline can be invoked directly -- notably by the Phase 6 RAGAS evaluation
+Extracted verbatim from backend/src/api/endpoints/chat.py so the
+pipeline can be invoked directly -- notably by the RAGAS evaluation
 harness -- without going through HTTP. This module imports NOTHING from
 FastAPI.
 """
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Candidate pool size requested from each retriever in hybrid mode. Deliberately
 # larger than max_sources so RRF has enough ranked candidates to fuse before the
-# dedicated hybrid threshold trims the result (RESEARCH Pattern 2).
+# dedicated hybrid threshold trims the result.
 _HYBRID_POOL_SIZE = 50
 
 # System prompt template for RAG context-based responses (moved from chat.py)
@@ -309,7 +309,7 @@ def _calculate_weighted_confidence(
         # Improved algorithm with degressive weighting
 
         # Position-weighting assumes a descending-score order. Sort defensively so
-        # the metric stays order-agnostic (WR-02): on the retrieval path the list is
+        # the metric stays order-agnostic: on the retrieval path the list is
         # already sorted, so this is a no-op (byte-identical); the sort only guards
         # the scoring against any future caller that would pass an unsorted list. The
         # coherence and quality factors below use max()/std() and are already
@@ -374,7 +374,7 @@ def _filter_dynamic_sources(search_results: List[Any], config: Any, question: st
         question: Question for named entity detection
         mode: "dense" (cosine similarity_threshold floor, unchanged) or "hybrid"
             (RRF rank scores -- use config.rrf_score_threshold, NEVER the cosine
-            0.5 floor which would filter every RRF result to zero, Pitfall #2)
+            0.5 floor: RRF scores are far below it and would all be filtered out)
 
     Returns:
         Filtered list of relevant sources
@@ -438,7 +438,8 @@ async def _hybrid_retrieve(
 ) -> List[Any]:
     """Run the hybrid retrieval branch: dense raw pool + BM25, fused via RRF.
 
-    The dense pool is fetched with similarity_floor=0.0 (raw ranking, Pitfall #1);
+    The dense pool is fetched with similarity_floor=0.0 (raw ranking, so the
+    cosine threshold does not truncate it before fusion);
     the BM25 pool comes from the lexical store. Filename pre-included chunks, when
     present, are folded in as a THIRD ranked retriever so their signal stays on
     the RRF scale (mixing their raw cosine boost scores into RRF scores would
@@ -637,7 +638,7 @@ async def _process_question_with_rag_stream(
 
             # Single enumerate() pass: numbered [N] context + sources built from
             # one ordering so the derived citation map cannot drift from the
-            # prompt (RAG-04, RESEARCH Pitfall 1).
+            # prompt.
             for i, result in enumerate(search_results, start=1):
                 context_parts.append(f"[{i}] {result.text}")
 
@@ -655,7 +656,7 @@ async def _process_question_with_rag_stream(
                     })
 
         # Derive the [N] -> source citation map from the SAME numbering used above,
-        # emitted as its own SSE event before `done` (RAG-04).
+        # emitted as its own SSE event before `done`.
         citations = {str(i + 1): sources[i] for i in range(len(sources))}
 
         # Step 4: Build prompt
@@ -711,7 +712,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                 )
                 chat_usage_recorded = True
         finally:
-            # Guarantee exactly one chat usage row per request (T-03-12): if
+            # Guarantee exactly one chat usage row per request: if
             # the async-for loop ended -- normal completion without a final
             # usage chunk, an exception, or a mid-stream client disconnect
             # (GeneratorExit) -- without recording real usage above, estimate
@@ -745,9 +746,9 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
         )
 
         # Emit the [N] -> source citation map as its own SSE event immediately
-        # before `done` (RAG-04). The `done` event below is left untouched so the
+        # before `done`. The `done` event below is left untouched so the
         # existing frontend contract stays byte-identical; the citation event is
-        # purely additive. Consumed by the 07-04 frontend as event.citations.
+        # purely additive. Consumed by the frontend as event.citations.
         yield {"type": "citation", "citations": citations}
 
         # Send completion event - convert numpy types to Python native
@@ -760,7 +761,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
 
         logger.info(f"Streaming RAG completed - confidence: {confidence_score:.2f}")
 
-        # Anti-partial cache write (COST-03, T-4-05-03 / WR-05): store the
+        # Anti-partial cache write: store the
         # streamed answer ONLY here, on the fully-successful path AFTER the
         # done event was yielded. This is deliberately NOT in the `except`
         # branch (an error response is never cached) and NOT in a `finally`
@@ -813,7 +814,7 @@ class RagService:
     Wraps the module-level streaming pipeline function above so the full
     pipeline can be constructed once via dependency injection (see
     backend/src/api/dependencies.py::get_rag_service) and reused outside an
-    HTTP request context -- notably by the Phase 6 RAGAS evaluation harness,
+    HTTP request context -- notably by the RAGAS evaluation harness,
     which drains answer_stream() into a result dict.
 
     document_repository is intentionally NOT stored as an instance
@@ -863,7 +864,7 @@ class RagService:
 
         When `corpus_version` is supplied and this service was constructed
         with a `chat_cache`, the fully-successful streamed answer is written
-        to the corpus-aware SSE cache after the done event (COST-03); the
+        to the corpus-aware SSE cache after the done event; the
         write is on the success path only, never on error or disconnect.
         """
         async for event in _process_question_with_rag_stream(

@@ -12,11 +12,11 @@ import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWT
 from backend.src.auth.jwt_handler import JWTHandler
 
 
-# --- DEBT-02 backward-compatibility fixtures (frozen BEFORE the PyJWT/pwdlib migration) ---
+# --- Backward-compatibility fixtures (frozen BEFORE the PyJWT/pwdlib migration) ---
 #
 # These constants were generated ONCE against the pre-migration stack (passlib bcrypt +
 # jose.jwt) and are frozen verbatim. They prove that credentials issued by the OLD stack
-# keep working under the NEW stack (T-4-01-03, DEBT-02 success criterion 2).
+# keep working under the NEW stack.
 #
 # Frozen bcrypt hash, generated with:
 #   passlib.context.CryptContext(schemes=["bcrypt"], deprecated="auto").hash(KNOWN_PASSWORD)
@@ -243,7 +243,7 @@ class TestPasswordOperations:
         assert isinstance(hashed, str)
         assert len(hashed) > 0
         assert hashed != password  # Hash must not be the plaintext password
-        assert hashed.startswith("$argon2")  # Argon2 format (DEBT-02 migration, T-4-01-01)
+        assert hashed.startswith("$argon2")  # Argon2 format (PyJWT/pwdlib migration)
 
     def test_hash_password_empty(self, jwt_handler):
         """Test hashing an empty password."""
@@ -305,13 +305,13 @@ class TestPasswordOperations:
 
 
 class TestBackwardCompatibility:
-    """DEBT-02: frozen pre-migration credentials must keep working post-migration.
+    """Frozen pre-migration credentials must keep working post-migration.
 
     These tests are written and committed BEFORE jwt_handler.py is touched (frozen
     constants generated against the OLD passlib/jose stack, see module-level comment).
     They run GREEN against the unmodified code (proving the fixtures are valid) and
-    MUST still run GREEN after the PyJWT/pwdlib migration (Task 3) -- that persistence
-    across the swap is the actual proof required by success criterion 2.
+    MUST still run GREEN after the PyJWT/pwdlib migration -- that persistence
+    across the swap is the actual backward-compatibility proof.
     """
 
     @pytest.fixture
@@ -325,7 +325,7 @@ class TestBackwardCompatibility:
 
     def test_bcrypt_hash_created_before_migration_still_verifies(self, jwt_handler):
         """A bcrypt hash produced by the pre-migration passlib CryptContext must still
-        verify True through the (post-migration) pwdlib-based verify_password (T-4-01-03)."""
+        verify True through the (post-migration) pwdlib-based verify_password."""
         assert jwt_handler.verify_password(
             KNOWN_PASSWORD_FOR_FROZEN_HASH, FROZEN_BCRYPT_HASH
         ) is True
@@ -336,7 +336,7 @@ class TestBackwardCompatibility:
 
     def test_jwt_created_before_migration_still_verifies(self, jwt_handler):
         """A JWT signed by the pre-migration jose.jwt.encode must still decode through
-        the (post-migration) PyJWT-based verify_token (T-4-01-03)."""
+        the (post-migration) PyJWT-based verify_token."""
         payload = jwt_handler.verify_token(FROZEN_JWT)
 
         assert payload is not None
@@ -346,7 +346,7 @@ class TestBackwardCompatibility:
 
     def test_new_hashes_use_argon2_not_bcrypt(self, jwt_handler):
         """After migration, hash_password() must produce Argon2 hashes (no silent
-        downgrade to bcrypt for NEW passwords) -- threat T-4-01-01."""
+        downgrade to bcrypt for NEW passwords)."""
         hashed = jwt_handler.hash_password("some-brand-new-password")
         assert hashed.startswith("$argon2")
 

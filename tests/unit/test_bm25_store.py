@@ -1,5 +1,5 @@
 """
-Unit tests for the BM25 lexical store and the light French tokenizer (RAG-02).
+Unit tests for the BM25 lexical store and the light French tokenizer.
 
 Covers:
 - light_french_tokenizer: accent folding (café == cafe == CAFÉ) and exact
@@ -24,7 +24,7 @@ from backend.src.rag_core.interfaces import VectorStoreOperationError
 
 
 # --------------------------------------------------------------------------- #
-# Light French tokenizer (Task 2)                                             #
+# Light French tokenizer                                                      #
 # --------------------------------------------------------------------------- #
 
 class TestLightFrenchTokenizer:
@@ -60,7 +60,7 @@ class TestLightFrenchTokenizer:
 
 
 # --------------------------------------------------------------------------- #
-# Bm25LexicalStore (Task 3)                                                    #
+# Bm25LexicalStore                                                            #
 # --------------------------------------------------------------------------- #
 
 def _make_chunks():

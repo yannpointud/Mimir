@@ -74,7 +74,7 @@ class TestAuthEndpoints:
         # Call the function
         result = asyncio.run(login(
             request=mock_request,
-            response=Mock(),  # required by slowapi header injection (SEC-03)
+            response=Mock(),  # required by slowapi header injection
             login_data=login_data,
             audit_repo=mock_audit_repo
         ))
@@ -105,7 +105,7 @@ class TestAuthEndpoints:
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(login(
                 request=mock_request,
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                response=Mock(),  # required by slowapi header injection
                 login_data=login_data,
                 audit_repo=mock_audit_repo
             ))
@@ -149,7 +149,7 @@ class TestAuthEndpoints:
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(login(
                 request=mock_request,
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                response=Mock(),  # required by slowapi header injection
                 login_data=login_data,
                 audit_repo=mock_audit_repo
             ))
@@ -414,7 +414,7 @@ class TestAuthIntegration:
         # Test login
         login_result = asyncio.run(login(
             request=mock_request,
-            response=Mock(),  # required by slowapi header injection (SEC-03)
+            response=Mock(),  # required by slowapi header injection
             login_data=login_data,
             audit_repo=mock_audit_repo
         ))

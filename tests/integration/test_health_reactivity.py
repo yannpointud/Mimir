@@ -1,6 +1,6 @@
 """
 Integration test proving the FastAPI event loop stays responsive while a
-heavy FAISS operation runs on a worker thread (ROB-01, phase 02 criterion 4).
+heavy FAISS operation runs on a worker thread.
 
 Approach: monkeypatch the shared FaissVectorStore singleton's `query()` method
 to sleep for 1 second (simulating a slow blocking FAISS call), then invoke it

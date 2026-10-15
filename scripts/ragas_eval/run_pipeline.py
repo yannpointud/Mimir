@@ -1,18 +1,18 @@
 #!/usr/bin/env python
-"""RAGAS pipeline stage 1/2 (RAG-01, venv PRINCIPAL): answers the golden set.
+"""RAGAS pipeline stage 1/2 (venv PRINCIPAL): answers the golden set.
 
 Why this exists: the RAGAS baseline is measured in two strictly separated
 stages joined by a JSONL boundary file. This script is the MAIN-venv stage: it
 reads the frozen golden set, replays each question through the real
 ``RagService.answer_stream()`` pipeline drained to a full answer (dense-only by
-default, off HTTP -- DEBT-01), and dumps ``eval_input.jsonl``. The SEPARATE venv (``score_baseline.py``) then
+default, off HTTP), and dumps ``eval_input.jsonl``. The SEPARATE venv (``score_baseline.py``) then
 reads ONLY that file and computes the ragas metrics -- it imports nothing from
 the Mimir backend.
 
 Design constraints (Mistral free tier = 1 request/second HARD):
   - The answer loop throttles to <= 1 call/sec (``THROTTLE_SECONDS`` >= 1.1) IN
     ADDITION to reserving budget per call, so a real run never trips a 429 and
-    never bypasses the phase-3 daily cap (COST-01 fail-closed).
+    never bypasses the daily budget cap (fail-closed).
   - ``MISTRAL_API_KEY`` transits ONLY via environment (read by settings); it is
     never interpolated into a log line, a print, or the output file.
 
@@ -20,10 +20,10 @@ Retrieval mode:
   - ``--retrieval-mode dense`` (default) measures the frozen dense-only baseline.
   - ``--retrieval-mode hybrid`` sets ``HYBRID_SEARCH_ENABLED`` in the environment
     BEFORE ``src.config`` is imported, so the same harness can later score the
-    hybrid path (06-07) without a code change. The baseline itself is dense.
+    hybrid path without a code change. The baseline itself is dense.
 
 Running the real answering pass consumes Mistral tokens and is a separate,
-human-verified step (plan 06-02 Task 3) -- this module provides the pure,
+human-verified step -- this module provides the pure,
 unit-tested building blocks plus the CLI entry point.
 """
 
@@ -294,7 +294,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             document_repository = DocumentRepository(session)
 
             async def answer_fn(question: str, session_id: str):
-                # Reserve budget BEFORE the call (COST-01 fail-closed): a None
+                # Reserve budget BEFORE the call (fail-closed): a None
                 # reservation means the daily cap is reached -> stop the loop.
                 reservation = budget_guard.reserve("chat")
                 if reservation is None:

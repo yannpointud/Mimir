@@ -1,4 +1,4 @@
-"""Integration tests for the OPS-03 SQLite backup/restore proof.
+"""Integration tests for the SQLite backup/restore proof.
 
 These tests exercise scripts/backup_sqlite.py and scripts/restore_sqlite.py
 end-to-end against a throwaway WAL-mode SQLite database under tmp_path. They

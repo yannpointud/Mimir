@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Restore a SQLite backup and PROVE it is usable (OPS-03 done criterion).
+"""Restore a SQLite backup and PROVE it is usable.
 
 A backup that has never been restored and verified is not proven to work. This
 script restores a backup file via the Online Backup API and asserts two things:

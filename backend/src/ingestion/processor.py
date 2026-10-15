@@ -61,7 +61,7 @@ class IngestionProcessor:
                 module-level singleton); injectable for tests
             usage_tracker: Optional UsageTracker override (defaults to the
                 module-level singleton); injectable for tests
-            bm25_store: Optional BM25 lexical store (RAG-02). When provided, the
+            bm25_store: Optional BM25 lexical store. When provided, the
                 lexical index is rebuilt from the FAISS source of truth after
                 each successful upsert, keeping both indexes synchronized
                 through this single-writer worker. None disables the hybrid
@@ -75,7 +75,7 @@ class IngestionProcessor:
         self.budget_guard = budget_guard or default_budget_guard
         self.usage_tracker = usage_tracker or default_usage_tracker
         self.bm25_store = bm25_store
-        # WR-01: "dirty" signal set on every successful FAISS upsert and cleared
+        # "Dirty" signal set on every successful FAISS upsert and cleared
         # only by a successful BM25 rebuild. Lets the coalesced drain rebuild fire
         # whenever the ingestion queue empties IF any document was upserted since
         # the last rebuild -- even when the LAST document of a batch fails before
@@ -246,7 +246,7 @@ class IngestionProcessor:
         except BudgetExceededError:
             # Fail-closed, non-retriable: budget exhaustion is not a
             # transient failure and a retry cannot succeed before the next
-            # day's ledger reset (Pitfall 5). Exhaust the task's retry
+            # day's ledger reset. Exhaust the task's retry
             # budget so the async queue worker loop does not re-queue it.
             logger.warning(
                 f"Ingestion stopped (fail-closed): daily budget exceeded for document {task.document_id}",
@@ -286,7 +286,7 @@ class IngestionProcessor:
             return False
 
         finally:
-            # WR-01: fire the coalesced BM25 drain rebuild on EVERY terminal path
+            # Fire the coalesced BM25 drain rebuild on EVERY terminal path
             # (success, budget-exceeded, or generic failure). When the last
             # document of a batch fails before Step 8, this rebuilds BM25 for the
             # earlier successfully-upserted documents instead of leaving the
@@ -403,7 +403,7 @@ class IngestionProcessor:
                 logger.error("Failed to index chunks in vector store")
                 return False
 
-            # WR-01: mark BM25 stale vs FAISS as soon as the upsert succeeds, so a
+            # Mark BM25 stale vs FAISS as soon as the upsert succeeds, so a
             # later drain (success OR failure path) knows a coalesced rebuild is
             # owed regardless of which document happens to be last in the batch.
             self._bm25_dirty = True
@@ -421,10 +421,10 @@ class IngestionProcessor:
                 logger.warning("Failed to persist vector store - continuing anyway")
 
             # Step 8: Rebuild the BM25 lexical index from the FAISS source of
-            # truth (RAG-02), coalesced to the queue-drain point (RAG-06). The
+            # truth, coalesced to the queue-drain point. The
             # rebuild itself lives in _maybe_rebuild_bm25_on_drain, which is ALSO
             # called from _process_task's finally block so a batch whose last
-            # document fails still rebuilds for the earlier successful docs (WR-01).
+            # document fails still rebuilds for the earlier successful docs.
             await self._maybe_rebuild_bm25_on_drain()
 
             processing_time = time.time() - start_time
@@ -447,7 +447,7 @@ class IngestionProcessor:
         except BudgetExceededError:
             # Non-retriable fail-closed stop: propagate to _process_task's
             # dedicated except BudgetExceededError branch, bypassing the
-            # retry loop entirely (Pitfall 5).
+            # retry loop entirely (a retry cannot succeed before the next reset).
             raise
 
         except Exception as e:
@@ -466,11 +466,11 @@ class IngestionProcessor:
 
     async def _maybe_rebuild_bm25_on_drain(self) -> None:
         """
-        Rebuild the BM25 lexical index from the FAISS source of truth (RAG-02)
+        Rebuild the BM25 lexical index from the FAISS source of truth
         when the ingestion queue has drained, IF any document was upserted since
         the last rebuild (the _bm25_dirty signal).
 
-        Coalescing (RAG-06): gating on an empty queue means a bulk-load rebuilds
+        Coalescing: gating on an empty queue means a bulk-load rebuilds
         BM25 ONCE at drain instead of once per document (the per-doc rebuild was
         measured quadratic: ~28h for 10k docs). A single-document ingestion still
         rebuilds once (queue empty after its own task is dequeued). During a bulk
@@ -481,7 +481,7 @@ class IngestionProcessor:
         Called from TWO places so the rebuild is owed on every terminal path:
         Step 8 of the success pipeline, and _process_task's finally block. The
         _bm25_dirty guard makes the pair idempotent -- whichever runs first clears
-        the flag and the second is a no-op. This closes WR-01: previously the
+        the flag and the second is a no-op. Previously the
         rebuild was gated only inside the success path, so if the LAST document of
         a multi-doc batch failed before Step 8, the earlier successfully-upserted
         documents never got their coalesced rebuild and stayed absent from BM25
@@ -491,7 +491,7 @@ class IngestionProcessor:
 
         A BM25 failure is non-fatal (FAISS already holds the chunks): log and keep
         _bm25_dirty set so a later drain retries. The blocking rebuild is offloaded
-        via asyncio.to_thread so it never stalls the event loop (ROB-01). Runs in
+        via asyncio.to_thread so it never stalls the event loop. Runs in
         the single-writer ingestion worker, so no second concurrent writer races.
         """
         if self.bm25_store is None or not self._bm25_dirty:
@@ -587,7 +587,7 @@ class IngestionProcessor:
                     'end_char': chunk_data.get('end_char', 0),
                     'word_count': chunk_data.get('word_count', 0),
                     'char_count': chunk_data.get('char_count', 0),
-                    # Structure-aware chunking (RAG-05). `.get()` keeps the
+                    # Structure-aware chunking. `.get()` keeps the
                     # flag-off path safe: no section_title key in the chunk dict
                     # yields None here (open metadata dict, no schema migration).
                     'section_title': chunk_data.get('section_title')

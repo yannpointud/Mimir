@@ -318,7 +318,7 @@ class TestChatHelperFunctions:
     """Tests for chat utility functions.
 
     White-box RAG pipeline tests (direct pipeline calls) were migrated to
-    tests/unit/test_rag_service.py (DEBT-01, plan 04-04); only the HTTP-layer
+    tests/unit/test_rag_service.py; only the HTTP-layer
     helper tests remain here.
     """
 

@@ -1,5 +1,5 @@
 """
-Integration test for the admin "Rebuild Index" BM25 resync (RAG-06, T-06-06-01).
+Integration test for the admin "Rebuild Index" BM25 resync.
 
 Proves that the admin ``POST /admin/vector-store/rebuild`` handler resyncs the
 BM25 lexical index from the freshly-optimized FAISS snapshot, so a manual
@@ -20,7 +20,7 @@ import hashlib
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np  # noqa: F401
 import pytest
@@ -158,7 +158,7 @@ def _docs_from_bm25(vector_store, bm25_store, term):
 async def test_admin_rebuild_resyncs_bm25_and_leaves_no_ghost(
     processor, vector_store, bm25_store, temp_dir
 ):
-    """RAG-06 / T-06-06-01: after a manual admin rebuild, the BM25 lexical index
+    """After a manual admin rebuild, the BM25 lexical index
     reflects the optimized FAISS snapshot exactly, so a ghost chunk (dropped from
     FAISS but not from BM25) no longer resolves."""
     # --- Ingest two documents through the real single-writer pipeline. ---
@@ -172,7 +172,7 @@ async def test_admin_rebuild_resyncs_bm25_and_leaves_no_ghost(
     # --- Manufacture a BM25 ghost: mark document A's chunks deleted in FAISS
     # ONLY (no paired BM25 sync), so the lexical index keeps pointing at chunks
     # FAISS will drop on its next optimize. This is exactly the stale state a
-    # FAISS-only admin rebuild leaves behind (T-06-06-01). We set the flag
+    # FAISS-only admin rebuild leaves behind. We set the flag
     # directly rather than via delete() to avoid delete()'s automatic
     # optimization compacting FAISS immediately (which would resync the mapping
     # and dissolve the ghost before the admin rebuild under test runs). ---
@@ -192,17 +192,27 @@ async def test_admin_rebuild_resyncs_bm25_and_leaves_no_ghost(
     )
 
     # --- Run the real admin rebuild endpoint handler. It must optimize FAISS AND
-    # resync BM25 from the resulting active-chunk snapshot. ---
+    # resync BM25 from the resulting active-chunk snapshot. Both documents still
+    # exist in the database: only the FAISS/BM25 indexes diverged. The orphan
+    # cleanup must take that list from the injected repository, never from the
+    # process-global database, whose content depends on whatever earlier tests
+    # left behind. ---
     audit_repo = Mock()
     audit_repo.create_log.return_value = None
+    document_repo = Mock()
+    document_repo.get_all.return_value = [Mock(id=int(_DOC_A_ID)), Mock(id=int(_DOC_B_ID))]
 
-    response = await rebuild_vector_store(
-        current_user={"sub": "admin"},
-        audit_repo=audit_repo,
-        vector_store=vector_store,
-        bm25_store=bm25_store,
-    )
+    with patch.object(vector_store, "_get_existing_document_ids") as global_db_lookup:
+        response = await rebuild_vector_store(
+            current_user={"sub": "admin"},
+            audit_repo=audit_repo,
+            vector_store=vector_store,
+            bm25_store=bm25_store,
+            document_repo=document_repo,
+        )
     assert response.success is True
+    global_db_lookup.assert_not_called()
+    document_repo.get_all.assert_called_once()
 
     # --- Anti-ghost core: after the rebuild the BM25 corpus matches the
     # optimized FAISS snapshot exactly (structural proof: no extra ghost chunk),

@@ -27,7 +27,7 @@ class JWTHandler:
         self.algorithm = settings.jwt_algorithm
         self.expiration_hours = settings.jwt_expiration_hours
         # Argon2 is FIRST so new hashes are always Argon2; Bcrypt stays only to verify
-        # legacy hashes issued before this migration (no silent downgrade -- T-4-01-01).
+        # legacy hashes issued before this migration (no silent downgrade).
         self.pwd_context = PasswordHash((Argon2Hasher(), BcryptHasher()))
 
         # Validate configuration
@@ -90,7 +90,7 @@ class JWTHandler:
                 # previous jose-based implementation). Disabled to preserve prior
                 # behavior and avoid rejecting legitimate tokens under clock skew
                 # between servers -- exp is still enforced, so this is not a security
-                # regression (Rule 1 fix, DEBT-02 migration).
+                # regression (python-jose -> PyJWT migration).
                 options={"verify_iat": False}
             )
 

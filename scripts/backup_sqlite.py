@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Scheduled SQLite backup via the Online Backup API (OPS-03).
+"""Scheduled SQLite backup via the Online Backup API.
 
 Intended to be invoked by host cron; safe to run while the app is live
 (WAL-mode database, concurrent readers/writers). This script uses

@@ -424,9 +424,9 @@ Once upon a time, in a land far away, there lived a princess who loved to read b
 
 
 class TestStructureAwareChunking:
-    """Structure-aware chunking (RAG-05, 07-06): heading -> section_title metadata.
+    """Structure-aware chunking: heading -> section_title metadata.
 
-    The load-bearing correctness fact (07-RESEARCH Pitfall 3): `.md` is ingested
+    The load-bearing correctness fact: `.md` is ingested
     as HTML via ``MarkdownExtractor(convert_to_html=True)``, so heading detection
     must primarily target ``<h1>-<h6>`` tags. These tests therefore feed the REAL
     extractor output (not hand-written ``#`` strings) for the HTML path, and only
@@ -535,7 +535,7 @@ class TestStructureAwareChunking:
 
 
 class TestSectionTitleThreadingIntoMetadata:
-    """Task 2: section_title flows chunking dict -> Chunk.metadata (no migration)."""
+    """section_title flows chunking dict -> Chunk.metadata (no migration)."""
 
     def _new_processor(self):
         # Bypass __init__ (heavy deps): _create_chunks uses only its arguments.

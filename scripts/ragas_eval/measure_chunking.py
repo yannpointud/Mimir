@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Structure-aware chunking RAGAS delta (RAG-05, 07-06): before/after measurement.
+"""Structure-aware chunking RAGAS delta: before/after measurement.
 
 Why this exists: structure-aware chunking (``section_title`` metadata behind the
 ``structure_aware_chunking_enabled`` flag) is ADOPTED ONLY on a net-positive
-RAGAS delta measured on the FROZEN phase-6 corpus. This script produces that
+RAGAS delta measured on the FROZEN evaluation corpus. This script produces that
 delta by re-ingesting the same corpus twice -- once flag-OFF (baseline) and once
 flag-ON (structure-aware) -- then answering the frozen golden set through the
 real pipeline for each, ready for the SEPARATE-venv ragas scorer.
@@ -18,7 +18,7 @@ Design (mirrors the two-stage / two-venv harness, WITHOUT editing run_pipeline.p
     LIVE production index is NEVER touched and each mode starts from a clean slate
     (no cross-mode contamination, no clearing logic).
   - Re-ingestion RE-EMBEDS the whole corpus and answering re-queries it: both
-    consume Mistral tokens under the phase-3 fail-closed budget cap, serial and
+    consume Mistral tokens under the fail-closed daily budget cap, serial and
     throttled at <= 1 req/s (Mistral free tier). This is the human/operator-gated
     step -- see ``--dry-run`` for a zero-token validation.
   - Scoring is done by the SEPARATE ragas venv (``score_baseline.py``), which

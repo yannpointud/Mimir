@@ -1,5 +1,5 @@
 """
-Integration tests for per-route rate limiting (SEC-03, D-14).
+Integration tests for per-route rate limiting.
 
 Proves that request N+1 beyond the configured limit returns 429 with a
 Retry-After header on login, chat/stream and document upload, that a full
@@ -70,7 +70,7 @@ def mocked_rag():
     pipeline produces a complete, deterministic SSE stream (start -> chunk ->
     done).
 
-    Since plan 04-04 the chat routes reach the pipeline exclusively through
+    The chat routes reach the pipeline exclusively through
     Depends(get_rag_service) (the llm_service/vector_store collaborators live
     inside the injected RagService), so overriding get_llm_service /
     get_vector_store alone no longer reaches the pipeline -- the override must
@@ -93,7 +93,7 @@ def mocked_rag():
             usage_tokens=1,
         )
     )
-    # model_name is read directly by the streaming RAG pipeline (03-05) to
+    # model_name is read directly by the streaming RAG pipeline to
     # record the chat usage row; a bare Mock() would return an unset child
     # Mock (not a str), which SQLAlchemy cannot bind as the `model` column.
     mock_llm.model_name = "mock-chat"
@@ -122,7 +122,7 @@ def mocked_rag():
 
 
 class TestLoginRateLimit:
-    """N+1 -> 429 on POST /auth/login, keyed per IP (D-11, D-12, D-13)."""
+    """N+1 -> 429 on POST /auth/login, keyed per IP, with Retry-After."""
 
     def test_login_n_plus_one_returns_429_with_retry_after(
         self, rate_limited_client, monkeypatch
@@ -138,7 +138,7 @@ class TestLoginRateLimit:
 
         response = rate_limited_client.post(LOGIN_ROUTE, json=BAD_LOGIN_PAYLOAD)
         assert response.status_code == 429
-        # Retry-After header must be present (D-13), case-insensitive check
+        # Retry-After header must be present, case-insensitive check
         assert "retry-after" in {k.lower() for k in response.headers}
 
 

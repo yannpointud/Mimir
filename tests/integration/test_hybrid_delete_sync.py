@@ -1,5 +1,5 @@
 """
-Integration test for two-index synchronization on deletion (RAG-02, criterion 3).
+Integration test for two-index synchronization on deletion.
 
 Proves that a document deletion, routed through the SINGLE-WRITER paths, removes
 the document's chunks from BOTH the dense (FAISS) and the lexical (BM25) index,
@@ -152,7 +152,7 @@ def _docs_from_faiss(vector_store):
 async def test_delete_syncs_both_indexes_and_keeps_exact_term_for_remaining_doc(
     processor, vector_store, bm25_store, document_repository, temp_dir
 ):
-    """RAG-02 criterion 3: deleting a document removes it from BOTH indexes and
+    """Deleting a document removes it from BOTH indexes and
     an exact-term query still finds the correct remaining document."""
     # --- Ingest two documents through the real single-writer pipeline. ---
     await _ingest(processor, temp_dir, _DOC_A_ID, _DOC_A_TEXT)

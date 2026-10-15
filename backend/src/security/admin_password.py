@@ -24,7 +24,7 @@ def resolve_admin_password(settings) -> None:
     """
     Derive settings.admin_password_hash from ADMIN_PASSWORD when it is set.
 
-    Must run before validate_production_secrets so the SEC-02 checks apply to
+    Must run before validate_production_secrets so the default-secret checks apply to
     the hash the application will actually use.
 
     Resolution rules:
@@ -55,7 +55,7 @@ def resolve_admin_password(settings) -> None:
             raise RuntimeError(
                 f"Refusing to start in production: ADMIN_PASSWORD is too weak ({joined_errors})"
             )
-        # Same posture as SEC-02: outside production, warn and continue.
+        # Same posture as the default-secret checks: outside production, warn and continue.
         logger.warning(
             f"ADMIN_PASSWORD does not meet the strength requirements "
             f"(non-production only): {joined_errors}"

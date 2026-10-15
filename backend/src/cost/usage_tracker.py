@@ -61,7 +61,7 @@ class UsageTracker:
             # returning 0 here would net the ledger to zero per call and
             # silently disable the daily cap for an unpriced model). Billing
             # the flat estimate keeps the cap accumulating -- the real
-            # T-03-04 mitigation -- while estimated=True flags the row as
+            # protection against an unpriced-model bypass -- while estimated=True flags the row as
             # non-authoritative until llm_price_table is fixed.
             cost_eur = (
                 settings.budget_reservation_chat_eur

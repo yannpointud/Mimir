@@ -1,10 +1,10 @@
 """
-Integration tests for the ingestion budget fail-closed path (COST-01, plan 03-06).
+Integration tests for the ingestion budget fail-closed path.
 
-Covers the three must-have truths for this plan:
+Covers three guarantees:
   - A budget-exhausted document stops cleanly with status 'error' and message
     "Daily budget exceeded", and is NOT retried (BudgetExceededError is
-    caught before the generic except, non-retriable -- Pitfall 5).
+    caught before the generic except, non-retriable).
   - A budget-blocked ingestion makes no embedding call to Mistral.
   - A successful ingestion records the embedding usage as a llm_usage row
     keyed by session_id doc:{document_id}, and finalizes the reservation.
@@ -13,7 +13,7 @@ All tests are hermetic: the LLM service is fully mocked (zero real Mistral
 API calls); the success-case test uses an isolated temporary SQLite
 db_manager (BudgetGuard/UsageTracker open their own sessions via the real
 db_manager singleton, not the test_session fixture -- mirrors
-tests/integration/test_budget_guard_endpoints.py, 03-05). The fail-closed and
+tests/integration/test_budget_guard_endpoints.py). The fail-closed and
 release-on-failure cases use mocked budget_guard/usage_tracker injected via
 the IngestionProcessor constructor -- no real DB session is ever opened.
 """
@@ -39,7 +39,7 @@ def isolated_db_manager():
     """Redirect the global db_manager singleton to a fresh temporary SQLite
     file for this test's lifetime. BudgetGuard/UsageTracker open their own
     sessions via the real db_manager singleton (own-session-per-operation
-    pattern, 03-04), so the standard test_session fixture would never see
+    pattern), so the standard test_session fixture would never see
     their commits."""
     temp_dir = tempfile.mkdtemp(prefix="ingestion_budget_test_")
     temp_db_path = Path(temp_dir) / "ingestion_budget_test.db"
@@ -82,7 +82,7 @@ def _usage_rows():
 def mock_document_repository():
     """Document repository mocked -- tracks update_status calls without a
     real DB (document status lives in the app's own `documents` table, not
-    exercised by this plan)."""
+    exercised here)."""
     repo = Mock()
     doc = Mock()
     doc.id = 123
@@ -123,7 +123,7 @@ def _patched_pipeline(processor, text="Sample text for budget test"):
 
 class TestBudgetFailClosed:
     """A budget-exhausted document stops cleanly, is NOT retried, and never
-    calls the embedding API (T-03-01, T-03-03)."""
+    calls the embedding API."""
 
     @pytest.mark.asyncio
     async def test_fail_closed_reserve_none_stops_cleanly_non_retriable(
@@ -164,7 +164,7 @@ class TestBudgetFailClosed:
         assert last_call.kwargs.get('error_message') == "Daily budget exceeded"
 
         # Non-retriable: the task's retry budget was exhausted so the async
-        # queue worker loop will not re-queue it (Pitfall 5).
+        # queue worker loop will not re-queue it.
         assert task.can_retry() is False
 
     @pytest.mark.asyncio
@@ -201,7 +201,7 @@ class TestBudgetFailClosed:
 class TestSuccessfulIngestionUsageRecording:
     """A successful ingestion records exactly one llm_usage row keyed by
     session_id doc:{document_id} and finalizes the reservation with the
-    real cost (T-03-09)."""
+    real cost."""
 
     @pytest.mark.asyncio
     async def test_successful_embedding_records_usage_row_keyed_by_document(
@@ -248,7 +248,7 @@ class TestSuccessfulIngestionUsageRecording:
 
 class TestReleaseOnEmbeddingFailure:
     """A reservation accepted before a failing embedding call is released
-    (refunded), not silently leaked (T-03-01 corollary)."""
+    (refunded), not silently leaked."""
 
     @pytest.mark.asyncio
     async def test_embedding_exception_after_reservation_releases_it(

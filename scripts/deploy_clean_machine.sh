@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # deploy_clean_machine.sh — reproducible, replayable clean-machine bring-up of
-# the Mimir production stack + smoke checks (OPS-01 / TEST-02 proof).
+# the Mimir production stack + smoke checks.
 #
 # It starts from an empty named volume, builds and boots the stack, then asserts
 # the deployment invariants: the app is reachable only through nginx :80, the

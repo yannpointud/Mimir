@@ -2,11 +2,14 @@
 # Python 3.11 required
 
 # Core
-fastapi==0.116.1
+fastapi==0.133.0
+# Direct pin: starlette is FastAPI's ASGI core; 1.3.1 is the first release
+# covering all known advisories (FastAPI <0.133 capped starlette below 1.0).
+starlette==1.3.1
 uvicorn[standard]==0.35.0
 pydantic==2.11.8
 pydantic-settings==2.10.1
-python-dotenv==1.1.1
+python-dotenv==1.2.2
 
 # Database
 sqlalchemy==2.0.43
@@ -17,42 +20,45 @@ mistralai==0.4.2
 faiss-cpu==1.12.0
 numpy==2.3.3
 rapidfuzz==3.14.1
-# Lexical BM25 index (hybrid search, RAG-02). Native save/load is JSON+.npy with
+# Lexical BM25 index (hybrid search). Native save/load is JSON+.npy with
 # allow_pickle=False -- no arbitrary-object deserialization (consistent with
-# ROB-02/T-02-01, the pickle vector removed from FaissVectorStore in phase 2).
-# Base package only (numpy dep): the [core] extra pulls in PyStemmer, which the
-# phase decision forbids (no stemming); tokenization is done in tokenizer_fr.py.
+# the removal of pickle from FaissVectorStore's metadata persistence).
+# Base package only (numpy dep): the [core] extra pulls in PyStemmer, but the
+# design deliberately avoids stemming; tokenization is done in tokenizer_fr.py.
 bm25s==0.3.9
 
 # Document Processing
-pypdf==6.14.2
+pypdf==6.19.0
 python-docx==1.1.0
-markdown==3.5.1
+markdown==3.8.1
 # Direct pin: pypdf's AES crypto provider needs `cryptography` at runtime.
 # It used to be pulled in transitively via the old JOSE-based auth stack;
-# pinned explicitly now that stack is removed (DEBT-02, RESEARCH Pitfall 4).
-cryptography==45.0.7
+# pinned explicitly now that stack is removed.
+cryptography==50.0.0
 
 # Cache
 cachetools==5.3.2
 
 # Auth
-PyJWT==2.13.0
+PyJWT==2.15.0
 pwdlib[argon2,bcrypt]==0.3.0
-python-multipart==0.0.6
+python-multipart==0.0.31
 
 # Monitoring
 watchdog==3.0.0
 
 # Email
-aiosmtplib==3.0.1
+aiosmtplib==5.1.2
+# Escalation email templates (imported at startup by email_service/smtp_client.py).
+# Was only present transitively through locust -> flask.
+jinja2==3.1.6
 
 # Rate Limiting
 slowapi==0.1.9
 
 # HTTP client (transitive dependency of the Mistral SDK, now pinned explicitly
 # for reproducibility -- was previously unpinned in this file)
-aiohttp==3.12.15
+aiohttp==3.14.3
 
 # System metrics (used by the admin system-info endpoint, now pinned explicitly
 # for reproducibility -- was previously unpinned in this file)

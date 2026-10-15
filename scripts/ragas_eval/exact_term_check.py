@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Exact-term retrieval regression check: dense vs hybrid (RAG-02, venv principal).
+"""Exact-term retrieval regression check: dense vs hybrid (venv principal).
 
-Why this exists: the hybrid adoption gate (plan 06-07) may only flip
+Why this exists: the hybrid adoption gate may only flip
 ``hybrid_search_enabled`` on if, among other conditions, hybrid retrieval does
 NOT regress on exact-term queries (identifiers, acronyms) -- the very case a
-lexical BM25 signal is meant to rescue (RESEARCH Pitfall #1). This script is a
+lexical BM25 signal is meant to rescue. This script is a
 TARGETED RETRIEVAL check (not a generation/RAGAS run): for a small list of
 exact-term queries with their expected document, it collects the document_ids
 retrieved in dense mode and in hybrid mode, then asserts hybrid recall never
@@ -25,8 +25,8 @@ Design choices:
 
 The pure comparison helper ``compare_exact_term_recall`` has no I/O and no
 network, so it is fully unit-tested (tests/unit/test_exact_term_check.py). The
-real run against the ingested corpus is a separate, budget-consuming step driven
-by plan 06-07 Task 3 -- this module provides the tested helper plus a runnable
+real run against the ingested corpus is a separate, budget-consuming step
+-- this module provides the tested helper plus a runnable
 CLI entry point.
 """
 
@@ -69,7 +69,7 @@ def compare_exact_term_recall(
 
     ``no_regression`` is True iff ``hybrid_recall >= dense_recall`` over the whole
     query set -- i.e. adding the lexical BM25 signal never degrades exact-term
-    retrieval (RAG-02 anti-regression guard). An empty query set is treated as a
+    retrieval (anti-regression guard). An empty query set is treated as a
     vacuous pass (no evidence of regression).
 
     Args:
@@ -190,7 +190,7 @@ async def _embed_question(
     """Embed one question, reserving budget BEFORE the call (fail-closed).
 
     Returns the numpy embedding vector, or None when the daily budget cap is
-    reached (COST-01 fail-closed). The Mistral key is never logged here.
+    reached (fail-closed). The Mistral key is never logged here.
     """
     import numpy as np
 

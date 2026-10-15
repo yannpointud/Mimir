@@ -1,6 +1,6 @@
 """
 Unit tests for BudgetGuard: reserve/finalize/release with own committed
-sessions, and the hot Admin > Configuration cap override (COST-01).
+sessions, and the hot Admin > Configuration cap override.
 
 BudgetGuard opens its OWN session per operation via
 db_manager.get_session_context() (not the conftest.py `test_session`

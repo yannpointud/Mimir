@@ -1,5 +1,5 @@
 """
-Integration tests for admin configuration endpoint security (SEC-01).
+Integration tests for admin configuration endpoint security.
 
 Proves that both GET config routes reject non-admin access, that all secrets
 are masked server-side with ***MASKED***, and that the PUT guard ignores
@@ -60,7 +60,7 @@ def user_token():
 
 
 class TestAdminConfigAccessControl:
-    """Access control on both GET config routes (D-04)."""
+    """Access control on both GET config routes."""
 
     @pytest.mark.parametrize("route", CONFIG_ROUTES)
     def test_get_without_auth_header_returns_403(self, test_app, route):
@@ -92,7 +92,7 @@ class TestAdminConfigAccessControl:
 
 
 class TestAdminConfigSecretMasking:
-    """Server-side masking of secrets in admin responses (D-01, D-02)."""
+    """Server-side masking of secrets in admin responses."""
 
     @pytest.mark.parametrize("route", CONFIG_ROUTES)
     def test_mistral_api_key_is_masked_in_response(
@@ -127,7 +127,7 @@ class TestAdminConfigSecretMasking:
 
 
 class TestAdminConfigPutGuard:
-    """PUT guard against masked value resubmission (D-03) and PUT alias fix."""
+    """PUT guard against masked value resubmission and PUT alias fix."""
 
     def test_put_with_masked_value_is_ignored_and_returns_200(
         self, test_app, admin_token, secret_settings

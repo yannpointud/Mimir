@@ -1,10 +1,10 @@
-"""Strict schema, loader and validator for the versioned RAGAS golden set (RAG-01).
+"""Strict schema, loader and validator for the versioned RAGAS golden set.
 
 Why this exists: the golden set (``golden_set_v1.jsonl``) is the frozen ground
 truth every RAGAS baseline is measured against. It is consumed as data by the
-06-02 evaluation harness, so it MUST be validated at load time -- exactly the
+run_pipeline evaluation harness, so it MUST be validated at load time -- exactly the
 discipline applied to ``MetadataPayload`` in ``faiss_store.py`` (ASVS V5 Input
-Validation, threat T-06-01-03). A malformed line is rejected with its line
+Validation). A malformed line is rejected with its line
 number rather than silently defaulted.
 
 This module is dependency-light on purpose (pydantic + stdlib only): it imports
@@ -18,8 +18,8 @@ from typing import List, Union
 
 from pydantic import BaseModel, ValidationError, field_validator
 
-# Bounds locked by the phase context: a versioned golden set of 50 to 200
-# questions, frozen before any baseline measurement (RAG-01, criterion 1).
+# Locked bounds: a versioned golden set of 50 to 200 questions, frozen
+# before any baseline measurement.
 MIN_ENTRIES = 50
 MAX_ENTRIES = 200
 
@@ -34,7 +34,7 @@ class GoldenSetEntry(BaseModel):
     """One golden set question with its expected answer and supporting context.
 
     All fields are required (no defaults) -- same strict-validation discipline
-    as ``MetadataPayload`` (ROB-02): a missing field is a hard error, never a
+    as ``MetadataPayload``: a missing field is a hard error, never a
     silent default. ``user_input`` must additionally be a non-empty string.
 
     Fields:
@@ -103,7 +103,7 @@ def load_golden_set(path: Union[str, Path]) -> List[GoldenSetEntry]:
 def validate_golden_set(entries: List[GoldenSetEntry]) -> List[GoldenSetEntry]:
     """Enforce the golden set invariants required before any baseline run.
 
-    Invariants (RAG-01, criterion 1):
+    Invariants:
         - ``MIN_ENTRIES`` <= len(entries) <= ``MAX_ENTRIES``
         - at least one adversarial (out-of-corpus) entry is present
 

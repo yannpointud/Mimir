@@ -316,9 +316,9 @@ class ChatCacheService(CacheService):
 
         Uses SHA-256 (not md5) over the normalised question plus the corpus
         version so a collision that would serve a wrong answer is
-        cryptographically improbable (T-4-05-01), and so any corpus mutation
+        cryptographically improbable, and so any corpus mutation
         (which changes corpus_version) yields a different key -- an implicit
-        cache invalidation (T-4-05-02). The question is normalised (stripped +
+        cache invalidation. The question is normalised (stripped +
         lower-cased) so trivial whitespace/case variants share one entry.
 
         Args:
@@ -359,7 +359,7 @@ class ChatCacheService(CacheService):
 
         Callers MUST invoke this only after a fully successful stream
         completion (never on an error or a mid-stream disconnect), so no
-        partial entry is ever stored (T-4-05-03).
+        partial entry is ever stored.
 
         Args:
             question: The user question

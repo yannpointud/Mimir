@@ -38,8 +38,8 @@ class MetadataPayload(BaseModel):
     schema (required fields, types, version) on load.
 
     Note: schema_version is intentionally required (no default). This is a
-    security-relevant validation control (ASVS V5 Input Validation, threat
-    T-02-01) -- a payload silently defaulting a missing version field would
+    security-relevant validation control (ASVS V5 Input Validation, unsafe
+    deserialization) -- a payload silently defaulting a missing version field would
     defeat the purpose of schema validation on load(). Callers writing new
     payloads (persist()) always pass schema_version=1 explicitly.
     """
@@ -81,7 +81,7 @@ class FaissVectorStore(AbstractVectorStore):
         self.legacy_metadata_path = Path(metadata_path).with_suffix('.pkl')
         # Set to True when load() migrated from the legacy pickle; the next
         # successful persist() then retires the .pkl (renamed .pkl.migrated)
-        # so the unsafe pickle.load() path can never run again (T-02-01).
+        # so the unsafe pickle.load() path can never run again.
         self._legacy_pickle_pending_retirement = False
         self.similarity_threshold = similarity_threshold
         self.index_type = index_type
@@ -119,8 +119,7 @@ class FaissVectorStore(AbstractVectorStore):
             # Recognize both the current JSON metadata format and the legacy
             # pickle format: without the OR on legacy_metadata_path, a legacy
             # install (index + .pkl, no .json yet) would fall through to
-            # _create_new_index() and WIPE the existing index (see ROB-02
-            # threat T-02-03).
+            # _create_new_index() and WIPE the existing index.
             if self.index_path.exists() and (
                 self.metadata_path.exists() or self.legacy_metadata_path.exists()
             ):
@@ -144,7 +143,7 @@ class FaissVectorStore(AbstractVectorStore):
                 # Simple brute-force search (good for small datasets).
                 # This is the only index type ever configured in production
                 # (dependencies.py hardcodes "FlatL2"); the other unreachable
-                # branches were removed as dead code (DEBT-03).
+                # branches were removed as dead code.
                 self.index = faiss.IndexFlatL2(self.dimension)
 
                 # Reset metadata
@@ -278,7 +277,7 @@ class FaissVectorStore(AbstractVectorStore):
                 own similarity_threshold is used -- byte-identical to the
                 pre-hybrid behavior. Hybrid retrieval passes similarity_floor=0.0
                 to obtain the RAW candidate pool, so RRF can re-rank chunks that
-                the cosine threshold would otherwise drop (RAG-02, Pitfall #1).
+                the cosine threshold would otherwise drop.
 
         Returns:
             List of search results ordered by similarity
@@ -325,7 +324,7 @@ class FaissVectorStore(AbstractVectorStore):
                     # Apply similarity threshold. Default (similarity_floor is
                     # None) keeps the exact dense-only semantics; hybrid mode
                     # passes similarity_floor=0.0 to keep the raw pool intact for
-                    # RRF fusion (Pitfall #1).
+                    # RRF fusion.
                     threshold = (
                         self.similarity_threshold
                         if similarity_floor is None
@@ -481,7 +480,7 @@ class FaissVectorStore(AbstractVectorStore):
         `_update_stats()` at the end of every `upsert()` and `delete()`, i.e.
         on every corpus mutation. Any ingestion or deletion therefore changes
         this token, which implicitly invalidates all corpus-versioned cache
-        entries (COST-03) without any extra bookkeeping. Read under the same
+        entries without any extra bookkeeping. Read under the same
         lock as `get_stats()`, but without assembling the full stats dict.
 
         Returns:
@@ -493,7 +492,7 @@ class FaissVectorStore(AbstractVectorStore):
     def snapshot_active_chunks(self) -> List[Dict[str, Any]]:
         """Return a lock-safe snapshot of the non-deleted chunk metadata.
 
-        Used by the BM25 lexical store (RAG-02) to rebuild itself from the FAISS
+        Used by the BM25 lexical store to rebuild itself from the FAISS
         source of truth. Copies each metadata dict under the store lock so the
         BM25 rebuild — which may run off the event loop via asyncio.to_thread —
         iterates a stable snapshot and can never hit a "list changed size during
@@ -615,7 +614,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 # Retire the legacy pickle after the first successful JSON
                 # persist following a migration: rename it so the unsafe
-                # pickle.load() fallback can never be re-executed (T-02-01).
+                # pickle.load() fallback can never be re-executed.
                 if (self._legacy_pickle_pending_retirement
                         and self.legacy_metadata_path.exists()):
                     try:
@@ -1036,13 +1035,17 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.error(f"Failed to save optimized index: {e}")
                 raise VectorStoreOperationError(f"Index optimization save failed: {e}")
 
-    def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True) -> Dict[str, Any]:
+    def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True,
+                             existing_document_ids: Optional[set] = None) -> Dict[str, Any]:
         """
         Completely rebuild the vector store with optional orphan cleanup.
 
         Args:
             force_rebuild: Force rebuild even without deleted chunks
             cleanup_orphans: Clean orphaned chunks before rebuild
+            existing_document_ids: Document ids known to the database, forwarded
+                to clean_orphans(). When None, clean_orphans() queries the
+                database itself.
 
         Returns:
             Dict with rebuild statistics
@@ -1060,7 +1063,10 @@ class FaissVectorStore(AbstractVectorStore):
                 cleanup_result = None
                 if cleanup_orphans:
                     try:
-                        cleanup_result = self.clean_orphans(create_backup=True)
+                        cleanup_result = self.clean_orphans(
+                            existing_document_ids=existing_document_ids,
+                            create_backup=True
+                        )
                         logger.info(f"Orphan cleanup completed: {cleanup_result['cleaned_chunks']} chunks cleaned")
                     except Exception as e:
                         logger.warning(f"Orphan cleanup failed during rebuild: {e}")

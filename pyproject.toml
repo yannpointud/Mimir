@@ -1,5 +1,5 @@
 # Mimir - Python tooling configuration.
-# This project had no Python linter before phase 05 (OPS-02); ruff is onboarded here
+# This project had no Python linter before; ruff is onboarded here
 # with a small, high-value rule set so local CI is green from the first commit and only
 # NEW violations fail going forward (pre-existing ones are baselined with inline noqa).
 

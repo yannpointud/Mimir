@@ -1,5 +1,5 @@
 """
-Startup validation of production secrets (SEC-02).
+Startup validation of production secrets.
 
 Fails fast when default secrets are detected in a production environment,
 warns (and continues) in any other environment. Neither the secret value
@@ -25,11 +25,11 @@ def validate_production_secrets(settings) -> None:
 
     Pure function taking settings as a parameter (testable without the app).
     Detection rules:
-    - JWT_SECRET_KEY: direct comparison with the code default (D-06)
+    - JWT_SECRET_KEY: direct comparison with the code default
     - ADMIN_PASSWORD_HASH: bcrypt verification of the default password
       against the effective hash, which also catches a hash regenerated
-      with a different salt (D-07). The effective hash is
-      settings.admin_password_hash; there is no DB override (D-08).
+      with a different salt. The effective hash is
+      settings.admin_password_hash; there is no DB override.
 
     Args:
         settings: Application Settings instance (src.config.Settings)
@@ -54,10 +54,10 @@ def validate_production_secrets(settings) -> None:
 
     joined_names = ", ".join(issues)
     if settings.is_production:
-        # D-05: fail fast before any service initialization.
+        # Fail fast before any service initialization.
         raise RuntimeError(
             f"Refusing to start in production: default value detected for {joined_names}"
         )
 
-    # D-09: outside production, warn and let startup continue.
+    # Outside production, warn and let startup continue.
     logger.warning(f"Default secrets in use (non-production only): {joined_names}")

@@ -1,8 +1,8 @@
 """
-Unit tests for the admin document upload endpoint (phase 02, it. 2).
+Unit tests for the admin document upload endpoint.
 
-Covers the input-validation parity with /documents/upload (WR-01: max file
-size and empty-file rejection) added by the review-fix pass.
+Covers the input-validation parity with /documents/upload (max file size and
+empty-file rejection).
 """
 
 import asyncio
@@ -44,7 +44,7 @@ def _run_admin_upload(mock_file, ingestion_processor=None):
 
 
 class TestAdminUploadInputValidation:
-    """WR-01: size and empty-file guards, parity with /documents/upload."""
+    """Size and empty-file guards, parity with /documents/upload."""
 
     @patch('backend.src.api.endpoints.admin.settings')
     def test_admin_upload_file_too_large_returns_413(
@@ -88,7 +88,7 @@ class TestAdminUploadInputValidation:
 
 
 class TestAdminUploadQueueFullCleanup:
-    """WR-03 (it. 2): on queue-full 503, the pending DB record and the stored
+    """On queue-full 503, the pending DB record and the stored
     file must be rolled back, otherwise any retry of the same file hits 409
     (get_by_hash matches the orphaned pending record) and is never ingested."""
 

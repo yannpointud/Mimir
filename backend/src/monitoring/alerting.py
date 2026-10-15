@@ -1,5 +1,5 @@
 """
-Fingerprinted SMTP error alerting (OPS-05).
+Fingerprinted SMTP error alerting.
 
 An in-process ``logging.Handler`` subclass that captures ERROR+ records from the
 existing ``app_logger``, groups them by a fingerprint of (exception type, module,
@@ -25,8 +25,8 @@ class FingerprintAlertHandler(logging.Handler):
 
     Fingerprint = sha256(exception type + module + function + line)[:16].
     Two different error MESSAGES at the same call site with the same exception
-    type collapse to the same fingerprint (intentional: OPS-05 asks for grouping
-    by *where/what*, not by message text).
+    type collapse to the same fingerprint (intentional: alerts are grouped by
+    *where/what*, not by message text).
     """
 
     def __init__(self, throttle_seconds: int, level=logging.ERROR):
@@ -112,7 +112,7 @@ class FingerprintAlertHandler(logging.Handler):
         )
         # Body limited to message + location + fingerprint + occurrence count.
         # No traceback, no request payload, no settings/secret interpolation
-        # (threat T-05-02-01, information disclosure).
+        # (information disclosure).
         message = (
             f"Fingerprint: {fingerprint}\n"
             f"Location: {record.module}.{record.funcName}:{record.lineno}\n"

@@ -1,18 +1,18 @@
 """
-Concurrency load test proving ROB-01: concurrent searches against a FAISS
+Concurrency load test proving that concurrent searches against a FAISS
 vector store remain safe (no exceptions, no corruption) while an ingestion
 (upsert + persist) is actively writing to the SAME singleton instance.
 
-This is the phase 02 capstone proof for the offload work (plan 02,
-asyncio.to_thread call sites) and the atomic persist work (plan 01,
-index-then-metadata crash-safe writes): it exercises both together under
+This is the capstone proof for the offload work (asyncio.to_thread
+call sites) and the atomic persist work (index-then-metadata crash-safe
+writes): it exercises both together under
 real concurrent load, sharing ONE FaissVectorStore instance between the
 simulated writer and N concurrent readers -- instantiating a separate store
-per task would mask exactly the kind of duplicate-instance bug this phase
-fixed in admin.py (see 02-RESEARCH.md Pitfall 4).
+per task would mask exactly the kind of duplicate-instance bug that was
+fixed in admin.py (an endpoint building its own FaissVectorStore).
 
-This test is also the base reused by TEST-02 in Phase 5 (per ROADMAP
-decision), so its structure (shared singleton, write contention during
+This test is also the base reused by the milestone validation script
+(scripts/validate_milestone.sh), so its structure (shared singleton, write contention during
 reads, fresh-reload proof) should remain stable for future extension.
 """
 import asyncio
@@ -60,13 +60,13 @@ def _random_chunk(document_id: str) -> Chunk:
 async def test_concurrent_queries_during_ingestion(temp_dir):
     """Concurrent queries + an active ingestion on ONE shared instance must
     raise nothing, leave get_stats() internally consistent, and a fresh
-    reload from disk must reflect the same state (ROB-01 + ROB-02 proof).
+    reload from disk must reflect the same state.
     """
     index_path = temp_dir / "concurrency_index.bin"
     metadata_path = temp_dir / "concurrency_metadata.json"
 
     # ONE shared instance for writer AND readers -- see module docstring:
-    # a store-per-task would hide the exact admin.py-style bug this phase fixed.
+    # a store-per-task would hide the exact admin.py-style bug fixed earlier.
     store = FaissVectorStore(
         dimension=DIMENSION,
         index_path=str(index_path),
@@ -76,8 +76,7 @@ async def test_concurrent_queries_during_ingestion(temp_dir):
     async def simulated_ingestion():
         """Writer coroutine: several upsert+persist rounds, active for the
         whole test duration, to guarantee real write contention against the
-        concurrent readers below (a read-only test would prove nothing --
-        see 02-RESEARCH.md Pitfall 4)."""
+        concurrent readers below (a read-only test would prove nothing)."""
         for batch in range(INGESTION_BATCHES):
             chunks = [
                 _random_chunk(f"batch{batch}_doc{i}")
@@ -106,7 +105,7 @@ async def test_concurrent_queries_during_ingestion(temp_dir):
     assert stats["active_vectors"] + stats["deleted_vectors"] == stats["total_vectors"]
     assert stats["total_vectors"] == INGESTION_BATCHES * CHUNKS_PER_BATCH
 
-    # Fresh load() from disk (JSON format from phase 02 plan 01) via a NEW
+    # Fresh load() from disk (JSON metadata format) via a NEW
     # instance on the SAME paths -- proves the on-disk pair is coherent, not
     # just the in-memory state of the instance that just wrote it.
     reloaded_store = FaissVectorStore(

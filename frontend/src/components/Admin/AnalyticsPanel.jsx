@@ -261,7 +261,7 @@ const AnalyticsPanel = () => {
 
       {usageData && (
         <>
-          {/* Coûts IA - spend gauge (focal), today by model, 30-day history (COST-02) */}
+          {/* Coûts IA - spend gauge (focal), today by model, 30-day history */}
           <section className="card overflow-hidden">
             <div className="card-header">
               <h2 className="card-title">

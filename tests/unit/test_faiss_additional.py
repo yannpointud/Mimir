@@ -559,7 +559,7 @@ class TestMetadataMigration:
     def test_pickle_retired_after_first_persist(self):
         """After a pickle migration, the first successful persist() renames
         the legacy .pkl to .pkl.migrated so the unsafe pickle.load() path
-        can never be re-executed (WR-02 / T-02-01)."""
+        can never be re-executed."""
         with tempfile.TemporaryDirectory() as temp_dir:
             index_path = Path(temp_dir) / "index.bin"
             legacy_pkl_path = Path(temp_dir) / "metadata.pkl"

@@ -1,21 +1,20 @@
 #!/usr/bin/env python
-"""Synthetic golden set generator for the RAGAS baseline (RAG-01, venv principal).
+"""Synthetic golden set generator for the RAGAS baseline (venv principal).
 
-Why this exists: the phase gates every RAGAS measurement on a frozen golden set
+Why this exists: every RAGAS measurement is gated on a frozen golden set
 of 50 to 200 questions (including out-of-corpus adversarials). This script
 builds that set PURELY synthetically -- it samples active chunks from the FAISS
 metadata and asks Mistral to author questions, reference answers and reference
 contexts. It deliberately does NOT use ``ragas.testset.TestsetGenerator`` (which
 is un-budget-tracked and lives outside the main venv): every Mistral call here
 goes through the existing ``MistralAPIService`` under a ``budget_guard``
-reservation, so the run stays under the phase-3 daily cap (COST-01 fail-closed).
+reservation, so the run stays under the daily budget cap (fail-closed).
 
 Security / operational guardrails:
   - ``MISTRAL_API_KEY`` transits ONLY via environment (read by settings). It is
-    never interpolated into a log line, a print, or the generated file
-    (threat T-06-01-02).
+    never interpolated into a log line, a print, or the generated file.
   - Mistral output is consumed strictly as DATA (question / answer / context),
-    never executed or interpreted as an instruction (threat T-06-01-01). The
+    never executed or interpreted as an instruction. The
     generation prompt frames document passages as quoted data.
   - Mistral free tier allows ~1 request/second; the generation loop throttles
     to <= 1 call/sec (``THROTTLE_SECONDS``) IN ADDITION to the budget
@@ -24,7 +23,7 @@ Security / operational guardrails:
     (50-200 entries, >= 1 adversarial) before being written.
 
 Running the real generation against the ingested corpus is a separate,
-budget-consuming step (plan 06-01 Task 3, human-verified) -- this module only
+budget-consuming step (human-verified) -- this module only
 provides the pure, unit-tested building blocks plus the CLI entry point.
 """
 
@@ -72,8 +71,8 @@ def _build_generation_prompt(chunk_texts: List[str], adversarial: bool) -> str:
     """Build the Mistral generation prompt (pure, no network).
 
     The document passages are embedded between explicit delimiters and framed
-    as DATA to quote from, never as instructions to follow (threat T-06-01-01,
-    same discipline as MIMIR_SYSTEM_PROMPT).
+    as DATA to quote from, never as instructions to follow (same discipline
+    as MIMIR_SYSTEM_PROMPT).
 
     Args:
         chunk_texts: Active corpus passages sampled from the vector store.
@@ -256,8 +255,8 @@ async def _generate_entries(
         if index > 0:
             await asyncio.sleep(THROTTLE_SECONDS)
 
-        # Reserve budget BEFORE the call (COST-01 fail-closed): a None result
-        # means the phase-3 daily cap is reached -- stop generating.
+        # Reserve budget BEFORE the call (fail-closed): a None result
+        # means the daily cap is reached -- stop generating.
         reservation = budget_guard.reserve("chat")
         if reservation is None:
             print("Budget quotidien atteint -- arrêt de la génération.", file=sys.stderr)
@@ -294,7 +293,7 @@ async def _generate_entries(
 # fictional "Innovatech Solutions"), so their exact wording is immaterial to the
 # measurement -- they test that the RAG correctly answers "not in the docs".
 # Used only as a fallback when the Mistral adversarial batch yields no parseable
-# entries, so the RAG-01 "at least one adversarial" contract is always met.
+# entries, so the "at least one adversarial" contract is always met.
 _FALLBACK_ADVERSARIAL_QUESTIONS = [
     "Quelle est la capitale de l'Australie ?",
     "Comment prépare-t-on un risotto aux champignons ?",
@@ -378,7 +377,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     adversarial_entries = [e for e in entries if e.is_adversarial]
 
     # Fallback: if the model produced no parseable adversarial entry, synthesize
-    # deterministic out-of-corpus questions so the RAG-01 contract still holds.
+    # deterministic out-of-corpus questions so the contract still holds.
     if not adversarial_entries:
         adversarial_entries = _fallback_adversarial_entries(num_adversarial)
         print("Aucune adversariale parsée depuis Mistral -- repli déterministe "

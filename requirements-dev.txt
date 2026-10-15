@@ -4,12 +4,11 @@
 # These are dev/CI-only tools, NOT runtime dependencies (do not add to requirements.txt).
 # Used by scripts/local_ci.sh: ruff (lint) + pip-audit (dependency vulnerability scan).
 #
-# Legitimacy note (see 05-RESEARCH.md "Package Legitimacy Audit"): both ruff (astral-sh)
-# and pip-audit (pypa) received a SUS verdict driven purely by an `unknown-downloads`
-# metadata gap (and, for ruff, a `too-new` latest-patch-date signal). Both are maintained
-# by well-known official organizations (astral-sh, also publisher of uv; pypa, the Python
-# Packaging Authority itself) and were cross-verified via Context7. This is a documented
-# false positive, so we proceed without a human legitimacy checkpoint per the phase constraint.
+# Legitimacy note: a package legitimacy audit flagged ruff (astral-sh) and pip-audit (pypa)
+# as suspicious purely because of an `unknown-downloads` metadata gap (and, for ruff, a
+# `too-new` latest-patch-date signal). Both are maintained by well-known official
+# organizations (astral-sh, also publisher of uv; pypa, the Python Packaging Authority
+# itself), so this is a false positive.
 # Versions re-verified as the latest on PyPI at execution time via `pip index versions`.
 
 ruff==0.15.21

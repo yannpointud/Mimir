@@ -305,7 +305,7 @@ async def download_document(
 
 
 @router.post("/upload", response_model=DocumentResponse)
-# Rate limit per JWT user with IP fallback (SEC-03). The `request` parameter
+# Rate limit per JWT user with IP fallback. The `request` parameter
 # is REQUIRED by slowapi: without it the decorator raises at import time.
 @limiter.limit(lambda: f"{settings.rate_limit_upload_per_minute}/minute",
                key_func=get_client_identifier)
@@ -504,7 +504,7 @@ async def delete_document(
         audit_repo: Audit log repository
         vector_store: Vector store service
         bm25_store: BM25 lexical store; rebuilt from the FAISS source of truth
-            after deletion so both indexes stay synchronized (RAG-02)
+            after deletion so both indexes stay synchronized
 
     Returns:
         BaseResponse: Operation result
@@ -555,7 +555,7 @@ async def delete_document(
                 # (after multiple deletions, inconsistencies may occur)
                 try:
                     # Offload to a worker thread: get_stats() acquires the
-                    # FAISS RLock and must never block the event loop (ROB-01)
+                    # FAISS RLock and must never block the event loop
                     stats = await asyncio.to_thread(vector_store.get_stats)
                     deleted_ratio = stats.get('deleted_vectors', 0) / max(stats.get('total_vectors', 1), 1)
 
@@ -569,14 +569,14 @@ async def delete_document(
                     # Do not fail the deletion if cleanup fails
 
                 # Rebuild the BM25 lexical index from the FAISS source of truth
-                # (RAG-02). This is the SECOND single-writer call site (the
+                # This is the SECOND single-writer call site (the
                 # ingestion worker is the first); no separate writer keeps the
                 # two indexes in sync. Read metadata AFTER orphan cleanup so the
                 # chunk_ids reflect any optimization. Offloaded via
-                # asyncio.to_thread (ROB-01) and non-fatal: a BM25 failure must
+                # asyncio.to_thread and non-fatal: a BM25 failure must
                 # not fail a deletion whose FAISS removal already succeeded.
                 try:
-                    # Snapshot active chunks UNDER the FAISS lock (WR-01).
+                    # Snapshot active chunks UNDER the FAISS lock.
                     active_chunks = vector_store.snapshot_active_chunks()
                     await asyncio.to_thread(bm25_store.rebuild, active_chunks)
                 except Exception as bm25_error:
@@ -803,7 +803,7 @@ async def get_document_stats(
         
         # Vector store statistics -- both get_stats() and health_check()
         # acquire the FAISS RLock, so they are offloaded to a worker thread
-        # to keep the event loop responsive (ROB-01)
+        # to keep the event loop responsive
         vector_stats = await asyncio.to_thread(vector_store.get_stats)
         health_status = await asyncio.to_thread(vector_store.health_check)
 

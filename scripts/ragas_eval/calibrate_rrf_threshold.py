@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""Calibrate rrf_score_threshold on the REAL RRF score distribution (RAG-02, venv principal).
+"""Calibrate rrf_score_threshold on the REAL RRF score distribution (venv principal).
 
-Why this exists: ``settings.rrf_score_threshold`` starts at 0.015 (06-03), an
-ASSUMED value. Before the hybrid-vs-baseline comparative run (plan 06-07 Task 3),
+Why this exists: ``settings.rrf_score_threshold`` starts at 0.015, an
+ASSUMED value. Before the hybrid-vs-baseline comparative run,
 that threshold MUST be confronted with the actual RRF scores produced on the
 FROZEN golden set -- a threshold set too high silently empties the hybrid mode
-(RESEARCH Pitfall #2: RRF scores peak around 0.033 at k=60), while one set too
+(RRF scores peak around 0.033 at k=60), while one set too
 low filters nothing. This script runs the hybrid RRF fusion over every golden
 question WITHOUT applying the threshold filter, aggregates the score
 distribution (min/max/mean/median/percentiles), recommends a data-driven
@@ -22,11 +22,11 @@ Design choices:
   - It does NOT rewrite config.py: source edits from a script are fragile. It
     emits a clear recommendation in the JSON and on stdout; applying the
     calibrated value to ``settings.rrf_score_threshold`` is a deliberate operator
-    step (plan 06-07 Task 3), keeping the conservative posture explicit.
+    step, keeping the conservative posture explicit.
 
 The aggregation/recommendation helpers are pure (no I/O, no network) so the
 output-shape contract is verifiable offline. The real run against the ingested
-corpus is a separate, budget-consuming step (plan 06-07 Task 3).
+corpus is a separate, budget-consuming step.
 """
 
 import argparse
@@ -52,7 +52,7 @@ for _path in (_PROJECT_ROOT, _BACKEND_DIR):
 # budget_guard reservation, which bounds spend, not request rate.
 THROTTLE_SECONDS = 1.1
 
-# The starting value seeded in 06-03; calibration confirms or replaces it.
+# The initial assumed value; calibration confirms or replaces it.
 _STARTING_THRESHOLD = 0.015
 
 _DEFAULT_GOLDEN_SET = _SCRIPT_DIR / "golden_set" / "golden_set_v1.jsonl"
@@ -144,7 +144,7 @@ def assess_starting_value(
 ) -> Tuple[bool, str]:
     """Judge whether ``starting_value`` is coherent with the observed scores (pure).
 
-    Two failure modes (RESEARCH Pitfall #2):
+    Two failure modes:
       - TOO HIGH: above at least one query's best score -> that query would be
         emptied of every hybrid source.
       - TOO LOW: at or below every observed score -> the threshold filters

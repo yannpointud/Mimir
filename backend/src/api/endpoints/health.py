@@ -224,7 +224,7 @@ async def _check_vector_store_health() -> Dict[str, Any]:
         # EITHER the current JSON file OR the legacy pickle file exists, to
         # avoid a false "inconsistent" report right after an index exists
         # but metadata.json has not been written yet (see faiss_store.py
-        # legacy_metadata_path / ROB-02 migration).
+        # legacy_metadata_path, pickle -> JSON metadata migration).
         legacy_metadata_path = os.path.splitext(settings.faiss_metadata_path)[0] + '.pkl'
         metadata_exists = (
             os.path.exists(settings.faiss_metadata_path)
@@ -345,7 +345,7 @@ async def _check_email_health() -> Dict[str, Any]:
 @router.get("/live")
 async def liveness() -> Dict[str, str]:
     """
-    Liveness probe (OPS-04).
+    Liveness probe.
 
     Pure process check: returns 200 as long as the ASGI worker can execute
     Python. It performs no dependency I/O (no DB session, no FAISS, no Mistral)
@@ -364,7 +364,7 @@ async def readiness(
     db: Session = Depends(get_db_session)
 ) -> Dict[str, Any]:
     """
-    Readiness probe (OPS-04).
+    Readiness probe.
 
     Aggregates the cheap in-process dependency checks (database, vector store,
     LLM API configuration) by reusing the existing `_check_*_health` helpers.
@@ -377,8 +377,7 @@ async def readiness(
     `llm_api` here and never affects `/live`.
 
     The payload carries only component names + boolean health + a coarse status
-    (no secret values, no connection strings) to avoid information disclosure
-    (T-05-01-01).
+    (no secret values, no connection strings) to avoid information disclosure.
 
     Returns:
         dict: {"status": "ready"|"not_ready", "checks": {...}, "unhealthy": [...]}

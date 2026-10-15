@@ -1,5 +1,5 @@
 """
-Unit tests for production secrets startup validation (SEC-02).
+Unit tests for production secrets startup validation.
 
 Covers the pure validator (validate_production_secrets) and, in a later
 task, the application startup fail-fast wiring in backend/main.py.
@@ -82,7 +82,7 @@ class TestValidateProductionSecrets:
         assert "ADMIN_PASSWORD_HASH" not in str(exc_info.value)
 
     def test_production_default_admin_password_rehashed_raises(self, make_settings):
-        """Test 2: default admin password detected even with a fresh salt (D-07)."""
+        """Test 2: default admin password detected even with a fresh salt."""
         # Regenerate the hash of the default password with a different salt:
         # string comparison against the config default hash would miss this.
         rehashed_default = jwt_handler.hash_password(DEFAULT_ADMIN_PASSWORD)
@@ -136,7 +136,7 @@ class TestValidateProductionSecrets:
     def test_development_defaults_warn_and_continue(
         self, make_settings, validation_caplog
     ):
-        """Test 5: development + defaults -> no raise, warning names variables (D-09)."""
+        """Test 5: development + defaults -> no raise, warning names variables."""
         settings = make_settings(
             environment="development",
             jwt_secret_key=DEFAULT_JWT_SECRET,
@@ -185,7 +185,7 @@ class TestValidateProductionSecrets:
 class TestStartupFailFast:
     """Application startup wiring: the lifespan refuses to boot in production.
 
-    Proves assumption A1 from RESEARCH.md: a RuntimeError raised in the
+    Proves that a RuntimeError raised in the
     lifespan before yield propagates through `with TestClient(app)`.
     """
 

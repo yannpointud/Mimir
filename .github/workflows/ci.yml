@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest
+
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install pip-audit
+        run: pip install -r requirements-dev.txt
+
+      # Same ignore list as scripts/local_ci.sh; any other advisory fails the job.
+      # - PYSEC-2026-107 (orjson 3.10.18, fix 3.11.5): pinned below 3.11 by
+      #   mistralai 0.4.2; the fix requires migrating the Mistral SDK.
+      # - PYSEC-2026-1845 (pytest 7.4.3, fix 9.0.3): test-only dependency, major
+      #   upgrade that also requires a pytest-asyncio upgrade.
+      - name: Audit runtime and test dependencies
+        run: >-
+          pip-audit -r requirements.txt
+          --ignore-vuln PYSEC-2026-107
+          --ignore-vuln PYSEC-2026-1845

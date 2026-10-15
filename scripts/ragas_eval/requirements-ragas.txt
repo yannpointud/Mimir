@@ -1,4 +1,4 @@
-# RAGAS scoring harness dependencies (RAG-01) -- installed in a SEPARATE
+# RAGAS scoring harness dependencies -- installed in a SEPARATE
 # Python 3.11 virtualenv, NEVER in the main project venv.
 #
 # Rationale: ragas pulls heavy / conflicting transitive dependencies

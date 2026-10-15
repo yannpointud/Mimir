@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Replayable SIGKILL-during-persist harness (ROB-02 capstone proof).
+Replayable SIGKILL-during-persist harness (crash-safe persistence proof).
 
 Spawns a child process that repeatedly upserts and persists to a shared
 FAISS index/metadata pair on disk, then sends a real SIGKILL to it at a
@@ -9,8 +9,8 @@ After each kill, the parent instantiates a fresh FaissVectorStore on the
 SAME on-disk paths (triggering load()) and asserts the reloaded pair is
 coherent: metadata length must never exceed index.ntotal.
 
-This invariant follows directly from the crash-safe write order established
-in phase 02 plan 01 (index written and atomically replaced BEFORE metadata,
+This invariant follows directly from the crash-safe write order used by
+FaissVectorStore.persist() (index written and atomically replaced BEFORE metadata,
 inside the same lock): a crash mid-write can only ever leave the index ahead
 of the metadata (harmless orphan vectors, cleaned by existing
 clean_orphans()/optimize() machinery), never metadata pointing beyond the
@@ -110,7 +110,7 @@ def _run_iteration(iteration: int, index_path: str, metadata_path: str) -> tuple
     time.sleep(random.uniform(0.01, 0.05))
 
     # Real SIGKILL -- not SIGTERM -- gives the child zero chance to run any
-    # cleanup code, which is exactly the crash scenario ROB-02 must survive.
+    # cleanup code, which is exactly the crash scenario persistence must survive.
     os.kill(child.pid, signal.SIGKILL)
     child.join(timeout=5)
 
@@ -128,7 +128,7 @@ def _run_iteration(iteration: int, index_path: str, metadata_path: str) -> tuple
     metadata_len = len(reloaded.metadata)
     index_total = reloaded.index.ntotal if reloaded.index else 0
 
-    # Core ROB-02 invariant: metadata must never point beyond the index.
+    # Core invariant: metadata must never point beyond the index.
     # Index-ahead-of-metadata (orphan vectors) is expected and harmless;
     # metadata-ahead-of-index is the corruption this harness exists to catch.
     if metadata_len > index_total:

@@ -1,5 +1,5 @@
 """
-Unit tests for the corpus-aware SSE cache primitives (COST-03, plan 04-05).
+Unit tests for the corpus-aware SSE cache primitives.
 
 Covers the ChatCacheService stream methods added on top of the existing md5
 non-stream methods:
@@ -7,9 +7,9 @@ non-stream methods:
     the normalised question plus the corpus version.
   - A different corpus version for the same question yields a different key,
     so a set with an old version is a miss after the corpus mutates (implicit
-    invalidation, T-4-05-02).
+    invalidation).
   - Key derivation normalises case/whitespace.
-  - The key is a 64-char SHA-256 hex digest (T-4-05-01).
+  - The key is a 64-char SHA-256 hex digest.
 
 The existing md5 non-stream methods (get_chat_response/set_chat_response) are
 left untouched and are not re-tested here.
@@ -76,7 +76,7 @@ class TestStreamCacheGetSet:
 
     def test_old_version_is_a_miss_after_corpus_change(self, chat_cache):
         """After the corpus version changes, the same question misses -- the
-        old entry is not served (implicit invalidation, T-4-05-02)."""
+        old entry is not served (implicit invalidation)."""
         payload = {"answer": "stale answer", "sources": [], "confidence_score": 0.5}
         chat_cache.set_stream_response("What is Mimir?", "v1", payload)
 

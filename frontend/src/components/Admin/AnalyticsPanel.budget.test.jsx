@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getBudgetStatus } from '../../utils/budget';
 
-// Pure helper coverage for the Coûts IA gauge three-state mapping (COST-02).
+// Pure helper coverage for the Coûts IA gauge three-state mapping.
 describe('getBudgetStatus', () => {
   it('returns "normal" when spend is well under the cap', () => {
     expect(getBudgetStatus(7.9, 10)).toBe('normal');

@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     # Hybrid Search / RRF Configuration (feature flags — the cosine semantics of
     # similarity_threshold above are left untouched; dense-only stays byte-identical
     # when hybrid_search_enabled is False, so this flag is fully reversible).
-    # ADOPTED (06-07): measured on the frozen golden set, hybrid BM25+RRF beat
+    # ADOPTED: measured on the frozen golden set, hybrid BM25+RRF beat
     # dense-only by +17.8% context_recall (0.679->0.800) and +14.2% context_precision
     # (0.579->0.661), NaN 0%, with NO exact-term regression -> flipped to True.
     hybrid_search_enabled: bool = Field(
@@ -124,7 +124,7 @@ class Settings(BaseSettings):
         description="Chemin de persistance de l'index lexical BM25"
     )
 
-    # Structure-aware Chunking (RAG-05 — feature flag, reversible). ADOPTED (07-06):
+    # Structure-aware Chunking (feature flag, reversible). ADOPTED:
     # default flipped False->True on a measured net RAGAS gain over the frozen corpus
     # (context_precision +7.3%, context_recall +3.4%, 60-question golden set). Reversible
     # to the byte-identical current splitter by setting this back to False.
@@ -318,9 +318,8 @@ class Settings(BaseSettings):
     )
 
     # Cost/Budget Configuration
-    # Values below are LOW-MEDIUM confidence defaults (see 03-RESEARCH.md Assumptions
-    # Log A1): they are operator-configurable via .env and never hardcoded elsewhere
-    # in business logic. The fail-closed reservation mechanism does not depend on
+    # Values below are LOW-MEDIUM confidence defaults: they are operator-configurable
+    # via .env and never hardcoded elsewhere in business logic. The fail-closed reservation mechanism does not depend on
     # these exact values being correct.
     daily_budget_eur: float = Field(
         default=20.0,

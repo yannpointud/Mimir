@@ -1,7 +1,7 @@
 """
 Unit tests for the pure cost-calculation module (src/cost/pricing.py).
 
-Covers the fail-closed behavior on unpriced models (T-03-04) and the
+Covers the fail-closed behavior on unpriced models and the
 independent input/output pricing contract required for differentiated
 per-model billing. Zero Mistral calls -- pure function only.
 """
@@ -41,6 +41,6 @@ class TestComputeCostEur:
         assert result == pytest.approx(expected)
 
     def test_unpriced_model_raises_value_error(self):
-        """An unpriced model must raise, never silently bill 0 (fail-closed, T-03-04)."""
+        """An unpriced model must raise, never silently bill 0 (fail-closed)."""
         with pytest.raises(ValueError, match="unknown-model"):
             compute_cost_eur("unknown-model", 100, 100, PRICE_TABLE)

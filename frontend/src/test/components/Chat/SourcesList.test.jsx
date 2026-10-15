@@ -4,7 +4,7 @@ import SourcesList from '../../../components/Chat/SourcesList';
 
 // Mock Lucide icons — must include EVERY icon the component imports
 // (FileText, ExternalLink, ChevronDown, ChevronUp). A missing export makes
-// the whole render throw (Pitfall 6).
+// the whole render throw.
 vi.mock('lucide-react', () => ({
   FileText: ({ className }) => <div className={className} data-testid="file-icon" />,
   ExternalLink: ({ className }) => <div className={className} data-testid="external-icon" />,

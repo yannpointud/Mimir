@@ -1,5 +1,5 @@
 """
-Integration tests for admin audit-log endpoint security (phase 02, CR-01 it. 2).
+Integration tests for admin audit-log endpoint security.
 
 The audit log exposes admin usernames, configuration update values, client
 IPs and 90 days of admin action history: it must never be readable without
@@ -68,7 +68,7 @@ class TestAuditLogAccessControl:
         of a pre-existing defect unrelated to authentication (the handler
         calls AuditLogRepository.get_logs_paginated(), which does not exist;
         the repository only exposes get_logs()). That defect is out of scope
-        for the CR-01 auth fix, so this test only proves the guard behavior.
+        for the auth fix, so this test only proves the guard behavior.
         """
         client = TestClient(test_app)
         response = client.get(
@@ -78,7 +78,7 @@ class TestAuditLogAccessControl:
 
 
 class TestAuditLogRegression:
-    """Regression coverage for the audit-log 500 deferred since phase 2.
+    """Regression coverage for the previously deferred audit-log 500.
 
     The handler calls AuditLogRepository.get_logs_paginated() and reads
     entry.additional_data; both were missing, so an authenticated admin GET

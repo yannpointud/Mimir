@@ -1,11 +1,11 @@
-"""Structural unit tests for the versioned RAGAS golden set (RAG-01).
+"""Structural unit tests for the versioned RAGAS golden set.
 
 Mock-based and offline: these tests exercise the pydantic schema, the JSONL
-loader/validator (Task 1) and the two pure generation helpers (Task 2). They
+loader/validator and the two pure generation helpers. They
 NEVER hit the Mistral API nor the network -- generation responses are simulated
 inline. This mirrors the MetadataPayload validation discipline (faiss_store.py,
 ASVS V5 Input Validation): the golden set is ground truth consumed by the
-06-02 harness, so a malformed file must be rejected at load time.
+run_pipeline harness, so a malformed file must be rejected at load time.
 """
 
 import json
@@ -52,7 +52,7 @@ def _make_entries(count: int, adversarial_count: int = 1) -> list:
     return entries
 
 
-# --- Task 1: schema + loader + validator ----------------------------------
+# --- Schema + loader + validator ------------------------------------------
 
 class TestGoldenSetEntrySchema:
     def test_valid_entry_accepts_all_required_fields(self):
@@ -146,7 +146,7 @@ class TestValidateGoldenSet:
             validate_golden_set(entries)
 
 
-# --- Task 2: pure generation helpers (mock responses, zero network) --------
+# --- Pure generation helpers (mock responses, zero network) ---------------
 
 class TestBuildGenerationPrompt:
     def test_corpus_prompt_embeds_chunk_texts_as_data(self):
@@ -160,7 +160,7 @@ class TestBuildGenerationPrompt:
         prompt = _build_generation_prompt(["Un chunk quelconque."], adversarial=False)
         lowered = prompt.lower()
         # The prompt must frame the passages as data to quote, not instructions
-        # to follow (T-06-01-01: untrusted document content is never executed).
+        # to follow (untrusted document content is never executed).
         assert "donnée" in lowered or "donnees" in lowered or "données" in lowered
 
     def test_adversarial_prompt_requests_out_of_corpus_marker(self):
