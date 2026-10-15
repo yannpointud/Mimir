@@ -1,9 +1,16 @@
 """HTTP responses shared by several routes and exception handlers."""
 
-from fastapi import status
+from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 
+from src.services.errors import RequestRejectedError
+
 BUDGET_EXCEEDED_MESSAGE = "Plafond quotidien de dépense IA atteint."
+
+
+def rejection_to_http(error: RequestRejectedError) -> HTTPException:
+    """HTTPException with the status code and message of a service rejection."""
+    return HTTPException(status_code=error.status_code, detail=error.detail)
 
 
 def budget_exceeded_response() -> JSONResponse:

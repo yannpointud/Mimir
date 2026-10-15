@@ -19,12 +19,10 @@ from fastapi import (
     Response,
 )
 from fastapi.responses import FileResponse
-from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 import asyncio
 import logging
 import os
-import hashlib
 import urllib.parse
 from pathlib import Path
 
@@ -38,19 +36,20 @@ from src.api.dependencies import (
     get_vector_store,
     get_bm25_store,
 )
+from src.api.responses import rejection_to_http
 from src.shared.models import (
     DocumentResponse,
     DocumentListResponse,
     BaseResponse,
     DocumentWithChunksResponse,
-    ChunkResponse,
     PaginationModel,
-    validate_filename,
-    sanitize_filename,
 )
-from src.ingestion.extractors import ExtractorFactory
+from src.services import index_maintenance
+from src.services.document_deletion import delete_document_everywhere
+from src.services.document_reader import build_document_view
+from src.services.document_upload import DocumentUpload, UploadPolicy
+from src.services.errors import RequestRejectedError
 from src.config import settings
-from src.shared.errors import RetrievalError
 
 logger = logging.getLogger(__name__)
 
@@ -172,100 +171,10 @@ async def get_document_with_chunks(
     Returns:
         DocumentWithChunksResponse: Document details with chunks
     """
-    document = doc_repo.get_by_id(document_id)
-
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document with ID {document_id} not found",
-        )
-
-    # Retrieve chunks from the vector store
-    chunk_responses = []
     try:
-        # Retrieve all chunks for this document from the vector store
-        # The vector store stores chunks with document_id as metadata
-        all_chunks = await asyncio.to_thread(vector_store.get_document_chunks, str(document_id))
-
-        # Convert to ChunkResponse - use the original chunk_index for consistency
-        chunk_indexes = []
-        for i, chunk in enumerate(all_chunks):
-            # Vector store chunks always have a consistent chunk_index
-            # No more artificial fallback that caused inconsistencies
-            chunk_indexes.append(chunk.chunk_index)
-            chunk_responses.append(
-                ChunkResponse(
-                    id=i,  # Temporary index since there is no real ID
-                    document_id=document_id,
-                    chunk_index=chunk.chunk_index,  # Always present in FAISS metadata
-                    text=chunk.text,
-                    metadata=chunk.metadata if hasattr(chunk, "metadata") else {},
-                )
-            )
-
-        # Logging for consistency validation
-        if chunk_indexes:
-            logger.info(
-                f"Document {document_id} chunks loaded: {len(chunk_indexes)} chunks, chunk_indexes: {chunk_indexes[:10]}"
-            )
-        else:
-            logger.warning(f"Document {document_id}: No chunks found in vector store")
-    except Exception as e:  # noqa: BLE001 - best effort: the reader view is served without chunks
-        logger.warning(f"Could not retrieve chunks for document {document_id}: {e}")
-        # Continue without chunks on error
-
-    # Read original file content if possible
-    content = None
-    file_size = None
-    mime_type = None
-
-    if document.path and os.path.exists(document.path):
-        try:
-            file_size = os.path.getsize(document.path)
-
-            # Determine MIME type based on file extension
-            file_ext = Path(document.path).suffix.lower()
-            mime_type_mapping = {
-                ".txt": "text/plain",
-                ".pdf": "application/pdf",
-                ".doc": "application/msword",
-                ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                ".md": "text/markdown",
-                ".html": "text/html",
-            }
-            mime_type = mime_type_mapping.get(file_ext, "application/octet-stream")
-
-            # Use ExtractorFactory to read content (same as during indexing)
-            extractor_factory = ExtractorFactory()
-            try:
-                content = extractor_factory.extract_text(document.path)
-                logger.debug(
-                    f"Successfully extracted text from {document.path} ({len(content) if content else 0} characters)"
-                )
-            except Exception as extraction_error:  # noqa: BLE001 - best effort: parsers may fail on any file; served without content
-                logger.warning(f"Could not extract text from {document.path}: {extraction_error}")
-                content = None
-
-        except OSError as e:
-            logger.warning(f"Could not read file metadata for document {document_id}: {e}")
-
-    # Build the response with all details
-    return DocumentWithChunksResponse(
-        id=document.id,
-        filename=document.filename,
-        path=document.path,
-        preserve=document.preserve,
-        file_hash=document.file_hash,
-        status=document.status,
-        error_message=document.error_message,
-        chunk_count=document.chunk_count,
-        created_at=document.created_at,
-        indexed_at=document.indexed_at,
-        chunks=chunk_responses,
-        content=content,
-        file_size=file_size,
-        mime_type=mime_type,
-    )
+        return await build_document_view(document_id, doc_repo, vector_store)
+    except RequestRejectedError as e:
+        raise rejection_to_http(e) from e
 
 
 @reader_router.get("/{document_id}/download")
@@ -342,150 +251,29 @@ async def upload_document(
     """
     Upload a new document for processing.
 
-    Args:
-        request: FastAPI request object required by the rate limiter
-        response: Response object required by slowapi to inject
-            X-RateLimit-* headers on successful (Pydantic) returns
-        file: Uploaded file
-        preserve: Whether to protect from deletion
-        current_user: Current authenticated user
-        doc_repo: Document repository
-        audit_repo: Audit log repository
-        ingestion_processor: Ingestion processor service
-
-    Returns:
-        DocumentResponse: Created document information
+    ``request`` is required by the rate limiter and ``response`` lets slowapi
+    inject the X-RateLimit-* headers on the returned model.
     """
+    upload = DocumentUpload(
+        file,
+        UploadPolicy(
+            upload_dir=settings.upload_dir,
+            max_file_size_mb=settings.max_file_size_mb,
+            invalid_filename_detail="Invalid filename",
+            supported_extensions=settings.supported_file_extensions,
+            warn_on_duplicate=True,
+        ),
+    )
     try:
-        # Validate file
-        if not file.filename:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided"
-            )
-
-        # Validate filename
-        if not validate_filename(file.filename):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid filename")
-
-        # Sanitize filename
-        safe_filename = sanitize_filename(file.filename)
-
-        # Check file size
-        if file.size and file.size > settings.max_file_size_mb * 1024 * 1024:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File too large. Maximum size: {settings.max_file_size_mb}MB",
-            )
-
-        # Check file extension
-        file_ext = Path(safe_filename).suffix.lower()
-        if file_ext not in settings.supported_file_extensions:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported file type: {file_ext}"
-            )
-
-        # Read and save file
-        content = await file.read()
-        if len(content) == 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
-
-        # Calculate file hash for deduplication
-        file_hash = hashlib.sha256(content).hexdigest()
-
-        # Check for duplicate
-        existing_doc = doc_repo.get_by_hash(file_hash)
-        if existing_doc:
-            logger.warning(f"Duplicate file upload attempted: {safe_filename}")
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"File already exists: {existing_doc.filename}",
-            )
-
-        # Save file to upload directory
-        upload_dir = Path(settings.upload_dir)
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        file_path = upload_dir / f"{file_hash}_{safe_filename}"
-        with open(file_path, "wb") as f:
-            f.write(content)
-
-        # Create document record
-        document = doc_repo.create(
-            filename=safe_filename, path=str(file_path), file_hash=file_hash, preserve=preserve
+        upload.check_name_and_size()
+        document = await upload.run(
+            doc_repo, ingestion_processor, preserve, current_user, audit_repo=audit_repo
         )
-
-        # Log upload event
-        audit_repo.create_log(
-            user_type="admin",
-            action="document_upload",
-            details=f"File uploaded: {safe_filename}",
-            ip_address="system",
-            success=True,
-            additional_data={
-                "document_id": document.id,
-                "filename": safe_filename,
-                "file_size": len(content),
-                "preserve": preserve,
-            },
-        )
-
-        # Queue document for processing with the ingestion processor
-        try:
-            # Queue the document for processing
-            queued = ingestion_processor.queue_document(
-                file_path=file_path,
-                document_id=str(document.id),
-                preserve=preserve,
-                metadata={"uploaded_by": current_user.get("username", "unknown")},
-            )
-
-            if not queued:
-                # Queue is full - return 503 Service Unavailable
-                logger.warning(
-                    f"Ingestion queue is full, cannot queue document: {safe_filename}",
-                    extra={
-                        "extra_fields": {
-                            "document_id": document.id,
-                            "filename": safe_filename,
-                            "queue_size": ingestion_processor.get_queue_size(),
-                            "type": "queue_full_upload",
-                        }
-                    },
-                )
-                # Roll back the pending DB record and the stored file before
-                # returning 503: otherwise any retry of the same file would
-                # hit 409 (get_by_hash matches the orphaned pending record)
-                # and the document would never be ingested.
-                try:
-                    doc_repo.delete(document.id, force=True)
-                    file_path.unlink(missing_ok=True)
-                except (SQLAlchemyError, ValueError, OSError) as cleanup_error:
-                    logger.warning(
-                        f"Failed to clean up after queue-full rejection "
-                        f"(document_id={document.id}): {cleanup_error}"
-                    )
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Ingestion queue is full. The system is currently processing many documents. Please try again later.",
-                )
-
-            logger.info(f"Document queued for processing: {safe_filename} (ID: {document.id})")
-
-        except HTTPException:
-            raise
-        except Exception as e:  # noqa: BLE001 - API boundary: a queueing failure becomes a 500
-            logger.error(f"Error queuing document for processing: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to queue document for processing",
-            ) from e
-
-        logger.info(f"Document uploaded successfully: {safe_filename} (ID: {document.id})")
-
+        logger.info(f"Document uploaded successfully: {upload.filename} (ID: {document.id})")
         return DocumentResponse.from_orm(document)
 
-    except HTTPException:
-        raise
+    except RequestRejectedError as e:
+        raise rejection_to_http(e) from e
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Document upload error: {e}")
         raise HTTPException(
@@ -520,116 +308,22 @@ async def delete_document(
         BaseResponse: Operation result
     """
     try:
-        document = doc_repo.get_by_id(document_id)
-        if not document:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Document with ID {document_id} not found",
-            )
-
-        # Check if document is protected
-        if document.preserve and not force:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Document is protected from deletion. Use force=true to override.",
-            )
-
-        filename = document.filename
-        file_path = document.path
-
-        # Delete from database
-        success = doc_repo.delete(document_id, force=force)
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete document from database",
-            )
-
-        # Delete physical file
-        if file_path and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-                logger.debug(f"Deleted file: {file_path}")
-            except OSError as e:
-                logger.warning(f"Failed to delete file {file_path}: {e}")
-                # Continue - database deletion was successful
-
-        # Remove from vector store
-        try:
-            vector_deleted = await asyncio.to_thread(vector_store.delete, str(document_id))
-            if vector_deleted:
-                logger.info(
-                    f"Document chunks removed from vector store: {filename} (ID: {document_id})"
-                )
-
-                # Trigger orphan cleanup if necessary
-                # (after multiple deletions, inconsistencies may occur)
-                try:
-                    # Offload to a worker thread: get_stats() acquires the
-                    # FAISS RLock and must never block the event loop
-                    stats = await asyncio.to_thread(vector_store.get_stats)
-                    deleted_ratio = stats.get("deleted_vectors", 0) / max(
-                        stats.get("total_vectors", 1), 1
-                    )
-
-                    # If more than 20% of chunks are deleted, trigger preventive cleanup
-                    if deleted_ratio > 0.20:
-                        logger.info(
-                            f"Triggering orphan cleanup after deletion (deleted ratio: {deleted_ratio:.2%})"
-                        )
-                        cleanup_result = await asyncio.to_thread(
-                            vector_store.clean_orphans, create_backup=False
-                        )
-                        logger.info(
-                            f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed"
-                        )
-                except RetrievalError as cleanup_error:
-                    logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
-                    # Do not fail the deletion if cleanup fails
-
-                # Rebuild the BM25 lexical index from the FAISS source of truth
-                # This is the SECOND single-writer call site (the
-                # ingestion worker is the first); no separate writer keeps the
-                # two indexes in sync. Read metadata AFTER orphan cleanup so the
-                # chunk_ids reflect any optimization. Offloaded via
-                # asyncio.to_thread and non-fatal: a BM25 failure must
-                # not fail a deletion whose FAISS removal already succeeded.
-                try:
-                    # Snapshot active chunks UNDER the FAISS lock.
-                    active_chunks = vector_store.snapshot_active_chunks()
-                    await asyncio.to_thread(bm25_store.rebuild, active_chunks)
-                except RetrievalError as bm25_error:
-                    logger.warning(
-                        f"BM25 rebuild after deletion failed - continuing anyway: {bm25_error}"
-                    )
-
-            else:
-                logger.warning(f"Failed to remove document chunks from vector store: {filename}")
-        except Exception as e:  # noqa: BLE001 - best effort: the database deletion already succeeded
-            logger.error(f"Error removing document from vector store: {e}")
-            # Continue with deletion even if vector store removal fails
-
-        # Log deletion event
-        audit_repo.create_log(
-            user_type="admin",
-            action="document_delete",
-            details=f"Document deleted: {filename}",
-            ip_address="system",
-            success=True,
-            additional_data={"document_id": document_id, "filename": filename, "forced": force},
+        filename = await delete_document_everywhere(
+            document_id,
+            force=force,
+            doc_repo=doc_repo,
+            audit_repo=audit_repo,
+            vector_store=vector_store,
+            bm25_store=bm25_store,
         )
-
-        logger.info(f"Document deleted successfully: {filename} (ID: {document_id})")
-
         return BaseResponse(
             success=True,
             message=f"Document '{filename}' deleted successfully",
             timestamp=datetime.utcnow(),
         )
 
-    except HTTPException:
-        raise
+    except RequestRejectedError as e:
+        raise rejection_to_http(e) from e
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Document deletion error: {e}")
         raise HTTPException(
@@ -881,105 +575,22 @@ async def validate_vector_store_consistency(
         Dict: Validation results
     """
     try:
-        logger.info(
-            f"Consistency validation initiated by {current_user.get('username', 'unknown')}"
+        return index_maintenance.validate_index_consistency(
+            vector_store,
+            doc_repo,
+            audit_repo,
+            fix_issues=fix_issues,
+            report_dir=(
+                Path(settings.upload_dir).parent / "reports" / "validation" if save_report else None
+            ),
+            initiated_by=current_user.get("username", "unknown"),
         )
-
-        # Import the validator
-        from src.rag_core.implementations.validation_utils import VectorStoreValidator
-
-        # Create the validator and run the validation
-        validator = VectorStoreValidator(vector_store, doc_repo)
-        validation_result = validator.validate_consistency(fix_issues=fix_issues)
-
-        # Save the report if requested
-        report_path = None
-        if save_report:
-            try:
-                from pathlib import Path
-                import json
-
-                # Create the reports directory
-                reports_dir = Path(settings.upload_dir).parent / "reports" / "validation"
-                reports_dir.mkdir(parents=True, exist_ok=True)
-
-                # Filename with timestamp
-                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                report_filename = f"consistency_validation_{timestamp}.json"
-                report_path = reports_dir / report_filename
-
-                # Save
-                with open(report_path, "w", encoding="utf-8") as f:
-                    json.dump(validation_result, f, indent=2, default=str)
-
-                logger.info(f"Validation report saved to {report_path}")
-
-            except (OSError, TypeError, ValueError) as e:
-                logger.warning(f"Failed to save validation report: {e}")
-                # Do not fail the validation if saving the report fails
-
-        # Log the audit event
-        audit_repo.create_log(
-            user_type="admin",
-            action="maintenance_consistency_validation",
-            details=f"Consistency validation: {validation_result.get('issues_found', {}).get('total_issues', 0)} issues found",
-            ip_address="system",
-            success=True,
-            additional_data={
-                "validation_result": {
-                    "total_issues": validation_result.get("issues_found", {}).get(
-                        "total_issues", 0
-                    ),
-                    "consistency_score": validation_result.get("consistency_score", 0),
-                    "fixes_applied": len(validation_result.get("fixes_applied", [])),
-                    "duration_seconds": validation_result.get("duration_seconds", 0),
-                },
-                "fix_issues": fix_issues,
-                "report_saved": report_path is not None,
-                "initiated_by": current_user.get("username", "unknown"),
-            },
-        )
-
-        # Format the response
-        issues_found = validation_result.get("issues_found", {})
-        total_issues = issues_found.get("total_issues", 0)
-        consistency_score = validation_result.get("consistency_score", 1.0)
-
-        logger.info(
-            f"Consistency validation completed: {total_issues} issues found, "
-            f"score: {consistency_score:.2%}, fixes applied: {len(validation_result.get('fixes_applied', []))}",
-            extra={
-                "extra_fields": {
-                    "validation_result": validation_result,
-                    "type": "consistency_validation",
-                }
-            },
-        )
-
-        return {
-            "success": True,
-            "message": f"Validation completed: {total_issues} issues found (consistency score: {consistency_score:.1%})",
-            "validation_result": validation_result,
-            "report_path": str(report_path) if report_path else None,
-            "timestamp": datetime.utcnow(),
-        }
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Consistency validation failed: {e}")
-
-        # Log the failure
-        audit_repo.create_log(
-            user_type="admin",
-            action="maintenance_consistency_validation",
-            details=f"Consistency validation failed: {str(e)}",
-            ip_address="system",
-            success=False,
-            additional_data={
-                "error": str(e),
-                "initiated_by": current_user.get("username", "unknown"),
-            },
+        index_maintenance.record_validation_failure(
+            audit_repo, e, current_user.get("username", "unknown")
         )
-
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Consistency validation failed",

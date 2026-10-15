@@ -19,12 +19,8 @@ from fastapi import (
     Response,
 )
 from datetime import datetime, timedelta
-import asyncio
 import logging
-import time
-from pathlib import Path
 
-from sqlalchemy.exc import SQLAlchemyError
 
 from src.auth.middleware import require_admin
 from src.database.repository import (
@@ -49,6 +45,10 @@ from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.rag_core.implementations.bm25_store import Bm25LexicalStore
 from src.shared.models import BaseResponse, PaginationModel
 from src.shared.constants import MASKED_VALUE, mask_secrets
+from src.api.responses import rejection_to_http
+from src.services import index_maintenance
+from src.services.document_upload import DocumentUpload, UploadPolicy
+from src.services.errors import RequestRejectedError
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -741,126 +741,25 @@ async def admin_upload_document(
     current_user: dict[str, Any] = Depends(require_admin),
     ingestion_processor=Depends(get_ingestion_processor),
 ) -> dict[str, Any]:
-    """Upload document via admin interface."""
+    """Upload document via admin interface.
+
+    Shares the /documents/upload pipeline, but accepts any extension, writes
+    no audit event, uses its own database session and removes the stored
+    file on an unexpected error.
+    """
     from src.database.repository import DocumentRepository
     from src.database.connection import get_db_session
-    from src.shared.models import validate_filename, sanitize_filename
-    import hashlib
 
-    if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided")
-
-    # Validate the file
-    if not validate_filename(file.filename):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type or filename"
-        )
-
-    # Check file size before reading the content into memory (parity with
-    # /documents/upload): a single unbounded read() of an arbitrarily large
-    # file could exhaust memory on the deployment target.
-    if file.size and file.size > settings.max_file_size_mb * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size: {settings.max_file_size_mb}MB",
-        )
+    upload = DocumentUpload(file, _admin_upload_policy())
+    try:
+        upload.check_name_and_size()
+    except RequestRejectedError as e:
+        raise rejection_to_http(e) from e
 
     db = next(get_db_session())
     doc_repo = DocumentRepository(db)
-
     try:
-        # Create upload directory if needed
-        upload_dir = Path(settings.upload_dir)
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        # Sanitize the filename
-        clean_filename = sanitize_filename(file.filename)
-
-        # Read content once, then hash it. SHA-256 keeps this route
-        # consistent with /documents/upload so get_by_hash deduplication
-        # works across both routes.
-        content = await file.read()
-
-        # Reject empty files (parity with /documents/upload): an empty
-        # document would be persisted and sent to ingestion for nothing.
-        if len(content) == 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
-
-        file_hash = hashlib.sha256(content).hexdigest()
-
-        # Reject duplicates instead of silently overwriting
-        existing_doc = doc_repo.get_by_hash(file_hash)
-        if existing_doc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"File already exists: {existing_doc.filename}",
-            )
-
-        # Hash-prefixed path (same scheme as /documents/upload) prevents a
-        # silent overwrite when two uploads share the same sanitized name.
-        file_path = upload_dir / f"{file_hash}_{clean_filename}"
-
-        # Save the file
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
-
-        # Create the database record
-        document = doc_repo.create(
-            filename=clean_filename, file_hash=file_hash, path=str(file_path), preserve=preserve
-        )
-
-        # Queue the document for ingestion (mirrors /documents/upload):
-        # without this the document would stay 'pending' forever and never
-        # be extracted nor indexed.
-        try:
-            queued = ingestion_processor.queue_document(
-                file_path=file_path,
-                document_id=str(document.id),
-                preserve=preserve,
-                metadata={"uploaded_by": current_user.get("username", "unknown")},
-            )
-
-            if not queued:
-                # Queue is full - return 503 Service Unavailable
-                logger.warning(
-                    f"Ingestion queue is full, cannot queue document: {clean_filename}",
-                    extra={
-                        "extra_fields": {
-                            "document_id": document.id,
-                            "filename": clean_filename,
-                            "queue_size": ingestion_processor.get_queue_size(),
-                            "type": "queue_full_upload",
-                        }
-                    },
-                )
-                # Roll back the pending DB record and the stored file before
-                # returning 503: otherwise any retry of the same file would
-                # hit 409 (get_by_hash matches the orphaned pending record)
-                # and the document would never be ingested.
-                try:
-                    doc_repo.delete(document.id, force=True)
-                    file_path.unlink(missing_ok=True)
-                except (SQLAlchemyError, ValueError, OSError) as cleanup_error:
-                    logger.warning(
-                        f"Failed to clean up after queue-full rejection "
-                        f"(document_id={document.id}): {cleanup_error}"
-                    )
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Ingestion queue is full. The system is currently processing many documents. Please try again later.",
-                )
-
-            logger.info(f"Document queued for processing: {clean_filename} (ID: {document.id})")
-
-        except HTTPException:
-            raise
-        except Exception as e:  # noqa: BLE001 - API boundary: a queueing failure becomes a 500
-            logger.error(f"Error queuing document for processing: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to queue document for processing",
-            ) from e
-
+        document = await upload.run(doc_repo, ingestion_processor, preserve, current_user)
         return {
             "success": True,
             "message": "Document uploaded successfully",
@@ -872,20 +771,26 @@ async def admin_upload_document(
             },
             "timestamp": datetime.utcnow(),
         }
-
-    except HTTPException:
-        # Propagate intentional HTTP errors (e.g. 409 duplicate) as-is
-        raise
+    except RequestRejectedError as e:
+        # Intentional client errors (e.g. 409 duplicate) keep their status
+        raise rejection_to_http(e) from e
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Upload error: {e}")
-        # Clean up the file on error
-        if "file_path" in locals() and file_path.exists():
-            file_path.unlink(missing_ok=True)
+        upload.discard_stored_file()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload failed"
         ) from e
     finally:
         db.close()
+
+
+def _admin_upload_policy() -> UploadPolicy:
+    return UploadPolicy(
+        upload_dir=settings.upload_dir,
+        max_file_size_mb=settings.max_file_size_mb,
+        invalid_filename_detail="Invalid file type or filename",
+        prepare_dir_first=True,
+    )
 
 
 # ============= CONFIG ALIAS ENDPOINTS =============
@@ -1083,140 +988,25 @@ async def rebuild_vector_store(
     """
     Force complete rebuild of the FAISS vector index.
 
-    This will:
-    1. Get vector store instance from dependencies
-    2. Force optimization/rebuild to remove deleted entries
-    3. Persist the rebuilt index to disk
-    4. Resync the BM25 lexical index from the optimized FAISS snapshot
-    5. Clear related caches
-
-    Args:
-        current_user: Current authenticated admin user
-        audit_repo: Audit log repository
-        vector_store: Shared FAISS vector store singleton (same instance
-            used by chat/documents endpoints, guarded by its internal
-            threading.RLock)
-        bm25_store: Shared BM25 lexical store singleton; resynced from the
-            optimized FAISS snapshot so a manual rebuild leaves no ghost/orphan
-            chunk in the lexical index (anti-ghost)
-        document_repo: Request-scoped document repository, the source of truth
-            for which documents still exist during orphan cleanup
-
-    Returns:
-        BaseResponse: Operation result with statistics
+    Optimizes FAISS (dropping deleted entries and orphan chunks of documents
+    missing from ``document_repo``), persists it, resyncs the BM25 lexical
+    index from the optimized FAISS snapshot so no ghost chunk survives, and
+    clears the caches. ``vector_store`` and ``bm25_store`` are the shared
+    singletons used by the chat and documents endpoints.
 
     Raises:
         HTTPException: If rebuild fails
     """
     try:
-        # Get stats before rebuild (blocking FAISS call offloaded to a worker thread)
-        stats_before = await asyncio.to_thread(vector_store.get_stats)
-        start_time = time.time()
-
-        # Resolve the existing document ids through the injected repository so
-        # orphan cleanup uses the same database as this request, instead of the
-        # vector store opening its own global DatabaseManager connection. On a
-        # database error, fall back to None: the store then applies its own
-        # lookup and fallback, as before.
-        try:
-            existing_document_ids = {str(doc.id) for doc in document_repo.get_all()}
-        except Exception as e:  # noqa: BLE001 - best effort: the store falls back to its own document lookup
-            logger.error(f"Failed to list documents for orphan cleanup: {str(e)}")
-            existing_document_ids = None
-
-        # Force rebuild with orphan cleanup (blocking FAISS call offloaded to a worker thread)
-        rebuild_result = await asyncio.to_thread(
-            vector_store.rebuild_vector_store,
-            force_rebuild=True,
-            cleanup_orphans=True,
-            existing_document_ids=existing_document_ids,
-        )
-
-        # Resync the BM25 lexical index from the freshly-optimized FAISS
-        # snapshot (anti-ghost). Rebuilding FAISS alone would leave
-        # the lexical index with ghost/orphan chunks that FAISS just dropped;
-        # snapshotting the active chunks and rebuilding BM25 from them keeps both
-        # indexes consistent. Both blocking calls are offloaded via
-        # asyncio.to_thread (same convention as every FAISS call here) so the
-        # event loop is never stalled.
-        active_chunks = await asyncio.to_thread(vector_store.snapshot_active_chunks)
-        await asyncio.to_thread(bm25_store.rebuild, active_chunks)
-
-        # Get stats after rebuild (blocking FAISS call offloaded to a worker thread)
-        stats_after = await asyncio.to_thread(vector_store.get_stats)
-        duration_ms = rebuild_result.get("duration_ms", (time.time() - start_time) * 1000)
-
-        # Clear related caches to ensure fresh data
-        from src.cache.lru_cache import cache_service, chat_cache_service
-
-        cache_service.invalidate_all()
-        chat_cache_service.invalidate_all()
-
-        # Extract cleanup and rebuild information
-        cleanup_result = rebuild_result.get("cleanup_result", {})
-        orphans_cleaned = cleanup_result.get("cleaned_chunks", 0) if cleanup_result else 0
-        deleted_removed = rebuild_result.get("deleted_chunks_removed", 0)
-        rebuild_performed = rebuild_result.get("rebuild_performed", False)
-
-        # Log rebuild action
-        audit_repo.create_log(
-            user_type="admin",
-            action="vector_index_rebuild",
-            details=f"FAISS index rebuilt - vectors: {stats_before['total_vectors']} → {stats_after['total_vectors']}, orphans cleaned: {orphans_cleaned}",
-            ip_address="system",
-            success=True,
-            additional_data={
-                "stats_before": stats_before,
-                "stats_after": stats_after,
-                "duration_ms": duration_ms,
-                "rebuild_result": rebuild_result,
-                "admin_user": current_user["sub"],
-            },
-        )
-
-        logger.info(
-            f"FAISS index rebuilt by admin {current_user['sub']}: "
-            f"{stats_before['total_vectors']} → {stats_after['total_vectors']} vectors, "
-            f"cleaned {orphans_cleaned} orphans, removed {deleted_removed} deleted chunks in {duration_ms:.1f}ms"
-        )
-
-        # Create informative message
-        message_parts = ["Vector index rebuilt successfully."]
-        if orphans_cleaned > 0:
-            message_parts.append(f"Cleaned {orphans_cleaned} orphaned chunks.")
-        if deleted_removed > 0:
-            message_parts.append(f"Removed {deleted_removed} deleted chunks.")
-        if rebuild_performed:
-            message_parts.append(
-                f"Optimized from {stats_before['total_vectors']} to {stats_after['total_vectors']} vectors."
-            )
-        message_parts.append(f"Completed in {duration_ms:.0f}ms.")
-
-        return BaseResponse(
-            success=True, message=" ".join(message_parts), timestamp=datetime.utcnow()
-        )
+        rebuild = await index_maintenance.rebuild_indexes(vector_store, bm25_store, document_repo)
+        index_maintenance.record_rebuild(audit_repo, rebuild, current_user["sub"])
+        return BaseResponse(success=True, message=rebuild.message(), timestamp=datetime.utcnow())
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         # Full detail goes to the logs only; the client gets a generic
-        # message (same convention as every other endpoint: exception text
-        # may contain file paths or FAISS internals).
+        # message (exception text may contain file paths or FAISS internals).
         logger.error(f"Failed to rebuild vector index: {str(e)}")
-
-        # Log failed rebuild attempt
-        try:
-            audit_repo.create_log(
-                user_type="admin",
-                action="vector_index_rebuild",
-                details=f"FAISS index rebuild failed: {str(e)}",
-                ip_address="system",
-                success=False,
-                additional_data={"error": str(e), "admin_user": current_user["sub"]},
-            )
-        except SQLAlchemyError as audit_error:
-            # Do not fail the request on audit log error, but never
-            # silence it either (admin traceability requirement).
-            logger.warning(f"Failed to write audit log for rebuild failure: {audit_error}")
-
+        index_maintenance.record_rebuild_failure(audit_repo, e, current_user["sub"])
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Vector index rebuild failed"
         ) from e

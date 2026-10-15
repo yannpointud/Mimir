@@ -272,10 +272,10 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
             yield temp_dir
 
     @patch("backend.src.api.endpoints.documents.settings")
-    @patch("backend.src.api.endpoints.documents.Path")
-    @patch("backend.src.api.endpoints.documents.hashlib.sha256")
-    @patch("backend.src.api.endpoints.documents.validate_filename")
-    @patch("backend.src.api.endpoints.documents.sanitize_filename")
+    @patch("src.services.document_upload.Path")
+    @patch("src.services.document_upload.hashlib.sha256")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
     def test_upload_document_success(
         self,
         mock_sanitize,
@@ -378,7 +378,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "No filename" in str(exc_info.value.detail)
 
-    @patch("backend.src.api.endpoints.documents.validate_filename")
+    @patch("src.services.document_upload.validate_filename")
     def test_upload_document_invalid_filename(
         self, mock_validate, mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
@@ -404,7 +404,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert "Invalid filename" in str(exc_info.value.detail)
 
     @patch("backend.src.api.endpoints.documents.settings")
-    @patch("backend.src.api.endpoints.documents.validate_filename")
+    @patch("src.services.document_upload.validate_filename")
     def test_upload_document_file_too_large(
         self,
         mock_validate,
@@ -438,8 +438,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert "File too large" in str(exc_info.value.detail)
 
     @patch("backend.src.api.endpoints.documents.settings")
-    @patch("backend.src.api.endpoints.documents.validate_filename")
-    @patch("backend.src.api.endpoints.documents.sanitize_filename")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
     def test_upload_document_unsupported_extension(
         self,
         mock_sanitize,
@@ -475,8 +475,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert "Unsupported file type" in str(exc_info.value.detail)
 
     @patch("backend.src.api.endpoints.documents.settings")
-    @patch("backend.src.api.endpoints.documents.validate_filename")
-    @patch("backend.src.api.endpoints.documents.sanitize_filename")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
     def test_upload_document_empty_file(
         self,
         mock_sanitize,
@@ -513,9 +513,9 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert "Empty file" in str(exc_info.value.detail)
 
     @patch("backend.src.api.endpoints.documents.settings")
-    @patch("backend.src.api.endpoints.documents.validate_filename")
-    @patch("backend.src.api.endpoints.documents.sanitize_filename")
-    @patch("backend.src.api.endpoints.documents.hashlib.sha256")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
+    @patch("src.services.document_upload.hashlib.sha256")
     def test_upload_document_duplicate(
         self,
         mock_sha256,
