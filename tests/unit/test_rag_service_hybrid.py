@@ -211,7 +211,7 @@ class TestHybridBranch:
         ]
         vs.query.return_value = dense_pool
         # chunk_id 3 is lexical-only: reconstructed from the FAISS metadata.
-        vs.metadata = [
+        vs.snapshot_active_chunks.return_value = [
             {
                 "chunk_id": 1,
                 "document_id": "10",
@@ -333,7 +333,7 @@ class TestHybridBranch:
             _sr(2, "11", "dense hit two", "b.txt", 0.40),
         ]
         vs.query.return_value = dense_pool
-        vs.metadata = [
+        vs.snapshot_active_chunks.return_value = [
             {
                 "chunk_id": 1,
                 "document_id": "10",

@@ -11,7 +11,10 @@ harness -- without going through HTTP. This module imports NOTHING from
 FastAPI.
 """
 
-from typing import Any, Optional
+from collections.abc import AsyncIterator
+from contextlib import aclosing
+from dataclasses import dataclass, field
+from typing import Any
 from datetime import datetime
 import asyncio
 import logging
@@ -20,10 +23,10 @@ import numpy as np
 from rapidfuzz import fuzz
 from sqlalchemy.exc import SQLAlchemyError
 
+from src.cache.lru_cache import ChatCacheService
 from src.database.repository import DocumentRepository
-from src.llm_interface.implementations.mistral_api import MistralAPIService
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.interfaces import SearchResult
+from src.llm_interface.interfaces import AbstractLLMService, EmbeddingResponse
+from src.rag_core.interfaces import AbstractVectorStore, LexicalIndex, SearchResult
 from src.rag_core.fusion import reciprocal_rank_fusion
 from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
@@ -55,6 +58,17 @@ Contexte documentaire:
 {context}
 
 Répondez à la question suivante en vous basant sur ce contexte:"""
+
+# System prompt used when retrieval returned no relevant context
+NO_CONTEXT_SYSTEM_PROMPT = """Vous êtes Mimir, un assistant documentaire intelligent.
+L'utilisateur vous pose une question mais aucun contexte pertinent n'a été trouvé dans la documentation."""
+
+# Generation parameters of the RAG answer
+_ANSWER_MAX_TOKENS = 800
+_ANSWER_TEMPERATURE = 0.1
+
+# Client-facing message of the SSE error event (details stay in the logs)
+_STREAM_ERROR_MESSAGE = "Une erreur interne est survenue."
 
 
 def _clean_filename(filename: str) -> str:
@@ -222,7 +236,7 @@ def _merge_and_attach_rrf_scores(
     dense_pool: list[Any],
     extra_results: list[Any],
     fused_scores: dict[int, float],
-    vector_store: Any,
+    vector_store: AbstractVectorStore,
 ) -> list[Any]:
     """Build a unified SearchResult list carrying fused RRF scores.
 
@@ -248,11 +262,10 @@ def _merge_and_attach_rrf_scores(
     for r in extra_results or []:
         by_id.setdefault(r.chunk_id, r)
 
-    # chunk_id -> metadata dict, restricted to non-deleted FAISS entries.
-    meta_by_id: dict[int, dict[str, Any]] = {}
-    for meta in getattr(vector_store, "metadata", None) or []:
-        if isinstance(meta, dict) and not meta.get("deleted", False):
-            meta_by_id[meta["chunk_id"]] = meta
+    # chunk_id -> metadata dict of the non-deleted FAISS entries.
+    meta_by_id: dict[int, dict[str, Any]] = {
+        meta["chunk_id"]: meta for meta in vector_store.snapshot_active_chunks()
+    }
 
     merged: list[Any] = []
     for chunk_id, rrf_score in fused_scores.items():
@@ -442,8 +455,8 @@ def _filter_dynamic_sources(
 async def _hybrid_retrieve(
     question: str,
     question_embedding: np.ndarray,
-    vector_store: Any,
-    bm25_store: Any,
+    vector_store: AbstractVectorStore,
+    bm25_store: LexicalIndex,
     pre_included_chunks: list[Any],
     rag_debug: RagDebugService,
     session_id: str,
@@ -514,285 +527,414 @@ async def _hybrid_retrieve(
     return search_results
 
 
-async def _process_question_with_rag_stream(  # noqa: C901
+@dataclass
+class _QuestionSpend:
+    """Euro cost of the LLM calls made while answering one question."""
+
+    usage_tracker: UsageTracker | None
+    session_id: str
+    total_eur: float = 0.0
+    llm_call_made: bool = False
+
+    async def record(
+        self,
+        call_type: str,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        estimated: bool,
+    ) -> None:
+        """Price and persist one call (no-op without a usage tracker)."""
+        if self.usage_tracker is None:
+            return
+        # asyncio.to_thread: record() is a blocking SQLite write.
+        self.total_eur += await asyncio.to_thread(
+            self.usage_tracker.record,
+            call_type,
+            model,
+            prompt_tokens,
+            completion_tokens,
+            estimated=estimated,
+            session_id=self.session_id,
+        )
+
+    async def settle(
+        self, budget_guard: BudgetGuard | None, reservation: BudgetReservation | None
+    ) -> None:
+        """Finalize the reservation with the real cost, or release it if no call was made."""
+        if budget_guard is None or reservation is None:
+            return
+        # asyncio.to_thread keeps the blocking SQLite ledger write off the
+        # event loop.
+        if self.llm_call_made:
+            await asyncio.to_thread(budget_guard.finalize, reservation, self.total_eur)
+        else:
+            await asyncio.to_thread(budget_guard.release, reservation)
+
+
+@dataclass
+class _AnswerContext:
+    """Numbered context passages and the matching source references."""
+
+    passages: list[str] = field(default_factory=list)
+    sources: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def citations(self) -> dict[str, dict[str, Any]]:
+        """[N] -> source map, derived from the numbering of the prompt passages."""
+        return {str(i + 1): source for i, source in enumerate(self.sources)}
+
+
+async def _embed_question(
+    question: str,
+    llm_service: AbstractLLMService,
+    rag_debug: RagDebugService,
+    spend: _QuestionSpend,
+) -> tuple[np.ndarray, EmbeddingResponse]:
+    """Step 1: embed the question and record the embedding cost."""
+    logger.info("Generating embeddings for streaming question")
+    response = await llm_service.embed([question], session_id=spend.session_id, rag_debug=rag_debug)
+    question_embedding = np.array(response.embeddings[0], dtype=np.float32)
+
+    spend.llm_call_made = True
+    await spend.record(
+        "embedding",
+        response.model,
+        response.prompt_tokens,
+        response.completion_tokens,
+        estimated=False,
+    )
+    return question_embedding, response
+
+
+async def _pre_include_by_filename(
+    question: str,
+    question_embedding: np.ndarray,
+    vector_store: AbstractVectorStore,
+    document_repository: DocumentRepository,
+) -> list[Any]:
+    """Step 1.5: boost every chunk of the documents whose filename matches the question."""
+    if not settings.filename_pre_inclusion:
+        return []
+
+    matched_docs = _find_documents_by_fuzzy_match(
+        question, document_repository, threshold=settings.filename_fuzzy_threshold
+    )
+    if not matched_docs:
+        return []
+
+    return await _pre_include_document_chunks(
+        document_ids=[doc_id for doc_id, _, _ in matched_docs],
+        question_embedding=question_embedding,
+        vector_store=vector_store,
+        document_repository=document_repository,
+        boost_factor=settings.filename_boost,
+        filename_similarities={doc_id: score for doc_id, _, score in matched_docs},
+    )
+
+
+async def _dense_retrieve(
+    question_embedding: np.ndarray,
+    vector_store: AbstractVectorStore,
+    pre_included_chunks: list[Any],
+    rag_debug: RagDebugService,
+    session_id: str,
+    embedding_tokens: int,
+) -> list[Any]:
+    """Step 2, dense mode: cosine search, then merge the pre-included chunks."""
+    start_search = datetime.utcnow()
+    search_results = await asyncio.to_thread(
+        vector_store.query,
+        vector=question_embedding,
+        top_k=settings.max_sources * 2,
+        filter_dict=None,
+    )
+    search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
+
+    rag_debug.log_vector_search(
+        session_id=session_id,
+        search_results=search_results,
+        embedding_tokens=embedding_tokens,
+        search_time_ms=search_time,
+    )
+
+    if pre_included_chunks:
+        pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
+        unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
+        search_results = pre_included_chunks + unique_vector_results
+        search_results.sort(key=lambda x: x.similarity_score, reverse=True)
+
+    return search_results
+
+
+async def _retrieve(
+    question: str,
+    question_embedding: np.ndarray,
+    embedding_tokens: int,
+    vector_store: AbstractVectorStore,
+    bm25_store: LexicalIndex | None,
+    pre_included_chunks: list[Any],
+    rag_debug: RagDebugService,
+    session_id: str,
+) -> tuple[list[Any], str]:
+    """Step 2: hybrid or dense retrieval, then dynamic source filtering.
+
+    Returns:
+        The filtered results and the retrieval mode ("hybrid" or "dense").
+    """
+    if settings.hybrid_search_enabled and bm25_store is not None:
+        retrieval_mode = "hybrid"
+        search_results = await _hybrid_retrieve(
+            question=question,
+            question_embedding=question_embedding,
+            vector_store=vector_store,
+            bm25_store=bm25_store,
+            pre_included_chunks=pre_included_chunks,
+            rag_debug=rag_debug,
+            session_id=session_id,
+            embedding_tokens=embedding_tokens,
+        )
+    else:
+        retrieval_mode = "dense"
+        search_results = await _dense_retrieve(
+            question_embedding,
+            vector_store,
+            pre_included_chunks,
+            rag_debug,
+            session_id,
+            embedding_tokens,
+        )
+
+    if search_results:
+        search_results = _filter_dynamic_sources(
+            search_results, settings, question, mode=retrieval_mode
+        )
+    return search_results, retrieval_mode
+
+
+def _load_source_documents(
+    search_results: list[Any], document_repository: DocumentRepository
+) -> dict[int, Any]:
+    """Load every distinct source document in one query.
+
+    Avoids one get_by_id() per chunk (chunks frequently share a document). Any
+    database error degrades to the chunk source names.
+    """
+    try:
+        return document_repository.get_by_ids(list({int(r.document_id) for r in search_results}))
+    except (ValueError, SQLAlchemyError):
+        return {}
+
+
+def _build_context(
+    search_results: list[Any], include_sources: bool, document_repository: DocumentRepository
+) -> _AnswerContext:
+    """Step 3: numbered passages and source references, from one single ordering.
+
+    Building both in the same enumerate() pass keeps the [N] citation map from
+    drifting away from the numbering of the prompt.
+    """
+    context = _AnswerContext()
+    if not search_results:
+        return context
+
+    documents_by_id = (
+        _load_source_documents(search_results, document_repository) if include_sources else {}
+    )
+    for i, result in enumerate(search_results, start=1):
+        context.passages.append(f"[{i}] {result.text}")
+
+        if include_sources:
+            document = documents_by_id.get(int(result.document_id))
+            filename = document.filename if document else str(result.source)
+            context.sources.append(
+                {
+                    "document_id": int(result.document_id),
+                    "filename": filename,
+                    "chunk_text": result.text,
+                    "similarity_score": float(round(result.similarity_score, 3)),
+                    "chunk_index": int(result.chunk_index),
+                    "total_chunks": int(result.total_chunks),
+                }
+            )
+    return context
+
+
+def _build_prompt(passages: list[str]) -> tuple[str, str, str]:
+    """Step 4: system prompt template, context text and the final system prompt."""
+    if passages:
+        context_text = "\n\n".join(passages)
+        return MIMIR_SYSTEM_PROMPT, context_text, MIMIR_SYSTEM_PROMPT.format(context=context_text)
+
+    logger.warning("No relevant context found")
+    return NO_CONTEXT_SYSTEM_PROMPT, "", NO_CONTEXT_SYSTEM_PROMPT
+
+
+async def _stream_answer(
+    question: str,
+    full_prompt: str,
+    llm_service: AbstractLLMService,
+    rag_debug: RagDebugService,
+    spend: _QuestionSpend,
+    answer_parts: list[str],
+) -> AsyncIterator[dict[str, Any]]:
+    """Step 5: stream the answer as chunk events and record exactly one chat usage row.
+
+    The real usage is recorded when the provider reports it at the end of the
+    stream. Otherwise -- no usage chunk, an error, or a client disconnect
+    (GeneratorExit) -- the tokens are estimated from the text lengths in the
+    finally block. The prompt side is estimated too: the provider bills the
+    whole prompt even for an interrupted stream, and the document context is
+    usually the dominant share of the billed tokens. Awaiting (no yield) in an
+    async generator's finally is legal during aclose().
+    """
+    logger.info("Starting streaming LLM generation...")
+    usage_out: dict[str, Any] = {}
+    chat_usage_recorded = False
+    try:
+        async for chunk in llm_service.generate_stream(
+            prompt=question,
+            system_prompt=full_prompt,
+            max_tokens=_ANSWER_MAX_TOKENS,
+            temperature=_ANSWER_TEMPERATURE,
+            session_id=spend.session_id,
+            rag_debug=rag_debug,
+            usage_out=usage_out,
+        ):
+            answer_parts.append(chunk)
+            yield {"type": "chunk", "content": chunk}
+
+        if spend.usage_tracker is not None and usage_out:
+            await spend.record(
+                "chat",
+                llm_service.model_name,
+                usage_out.get("prompt_tokens", 0),
+                usage_out.get("completion_tokens", 0),
+                estimated=False,
+            )
+            chat_usage_recorded = True
+    finally:
+        if spend.usage_tracker is not None and not chat_usage_recorded:
+            full_answer = "".join(answer_parts)
+            await spend.record(
+                "chat",
+                llm_service.model_name,
+                max(1, (len(full_prompt) + len(question)) // 4),
+                max(1, len(full_answer) // 4),
+                estimated=True,
+            )
+
+
+def _cache_answer(
+    chat_cache: ChatCacheService | None,
+    corpus_version: str | None,
+    question: str,
+    answer: str,
+    context: _AnswerContext,
+    confidence_score: float,
+) -> None:
+    """Store a fully streamed answer in the corpus-aware SSE cache."""
+    if chat_cache is None or corpus_version is None:
+        return
+    chat_cache.set_stream_response(
+        question,
+        corpus_version,
+        {
+            "answer": answer,
+            "sources": context.sources,
+            "citations": context.citations,
+            "confidence_score": float(round(confidence_score, 2)),
+        },
+    )
+
+
+async def _process_question_with_rag_stream(
     question: str,
     context_limit: int,
     include_sources: bool,
     session_id: str,
-    llm_service: MistralAPIService,
-    vector_store: FaissVectorStore,
+    llm_service: AbstractLLMService,
+    vector_store: AbstractVectorStore,
     document_repository: DocumentRepository,
     rag_debug: RagDebugService,
-    budget_guard: Optional["BudgetGuard"] = None,
-    usage_tracker: Optional["UsageTracker"] = None,
-    reservation: Optional["BudgetReservation"] = None,
-    chat_cache: Any | None = None,
+    budget_guard: BudgetGuard | None = None,
+    usage_tracker: UsageTracker | None = None,
+    reservation: BudgetReservation | None = None,
+    chat_cache: ChatCacheService | None = None,
     corpus_version: str | None = None,
-    bm25_store: Any | None = None,
-):
+    bm25_store: LexicalIndex | None = None,
+) -> AsyncIterator[dict[str, Any]]:
     """
-    Process question using RAG pipeline with streaming.
-    Yields SSE events as processing progresses.
+    Answer a question with the streaming RAG pipeline, yielding SSE event dicts.
 
-    budget_guard/usage_tracker/reservation are settled in an OUTER finally
-    block here (see below) rather than an inner one because a mid-stream
-    client disconnect throws GeneratorExit -- a
-    BaseException, not caught by `except Exception` -- straight through this
-    generator; only a finally at the outermost scope is guaranteed to run in
-    every case (normal completion, error, or disconnect).
+    Events: one "chunk" per generated text chunk, then "citation" and "done";
+    or "error" if any step fails.
+
+    The reservation is settled in the outermost finally: a mid-stream client
+    disconnect throws GeneratorExit -- a BaseException, not caught by the
+    except clause -- straight through this generator, and only that finally
+    runs in every case (completion, error or disconnect).
     """
-    # Accumulates the real euro cost of every LLM call actually made.
-    total_cost_eur = 0.0
-    llm_call_made = False
+    spend = _QuestionSpend(usage_tracker=usage_tracker, session_id=session_id)
     try:
-        # Step 1: Generate embeddings
-        logger.info("Generating embeddings for streaming question")
-        embedding_response = await llm_service.embed(
-            [question], session_id=session_id, rag_debug=rag_debug
+        question_embedding, embedding_response = await _embed_question(
+            question, llm_service, rag_debug, spend
         )
-        question_embedding = np.array(embedding_response.embeddings[0], dtype=np.float32)
-
-        llm_call_made = True
-        if usage_tracker is not None:
-            # asyncio.to_thread: record() is a blocking SQLite write.
-            total_cost_eur += await asyncio.to_thread(
-                usage_tracker.record,
-                "embedding",
-                embedding_response.model,
-                embedding_response.prompt_tokens,
-                embedding_response.completion_tokens,
-                estimated=False,
-                session_id=session_id,
-            )
-
-        # Step 1.5: Filename pre-inclusion
-        pre_included_chunks = []
-        if settings.filename_pre_inclusion:
-            matched_docs = _find_documents_by_fuzzy_match(
-                question, document_repository, threshold=settings.filename_fuzzy_threshold
-            )
-
-            if matched_docs:
-                filename_similarities = {doc_id: score for doc_id, _, score in matched_docs}
-                document_ids = [doc_id for doc_id, _, _ in matched_docs]
-
-                pre_included_chunks = await _pre_include_document_chunks(
-                    document_ids=document_ids,
-                    question_embedding=question_embedding,
-                    vector_store=vector_store,
-                    document_repository=document_repository,
-                    boost_factor=settings.filename_boost,
-                    filename_similarities=filename_similarities,
-                )
-
-        # Step 2: Vector search
-        hybrid_active = settings.hybrid_search_enabled and bm25_store is not None
-        retrieval_mode = "hybrid" if hybrid_active else "dense"
-        if hybrid_active:
-            search_results = await _hybrid_retrieve(
-                question=question,
-                question_embedding=question_embedding,
-                vector_store=vector_store,
-                bm25_store=bm25_store,
-                pre_included_chunks=pre_included_chunks,
-                rag_debug=rag_debug,
-                session_id=session_id,
-                embedding_tokens=embedding_response.usage_tokens,
-            )
-        else:
-            start_search = datetime.utcnow()
-            dense_top_k = settings.max_sources * 2
-            search_results = await asyncio.to_thread(
-                vector_store.query, vector=question_embedding, top_k=dense_top_k, filter_dict=None
-            )
-            search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
-
-            rag_debug.log_vector_search(
-                session_id=session_id,
-                search_results=search_results,
-                embedding_tokens=embedding_response.usage_tokens,
-                search_time_ms=search_time,
-            )
-
-            # Step 2.1: Merge pre-included chunks
-            if pre_included_chunks:
-                pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
-                unique_vector_results = [
-                    r for r in search_results if r.chunk_id not in pre_included_ids
-                ]
-                search_results = pre_included_chunks + unique_vector_results
-                search_results.sort(key=lambda x: x.similarity_score, reverse=True)
-
-        # Step 2.5: Apply filtering.
-        if search_results:
-            search_results = _filter_dynamic_sources(
-                search_results, settings, question, mode=retrieval_mode
-            )
-
-        # Step 3: Build context
-        context_parts = []
-        sources = []
-
-        if search_results:
-            # Batch-load every distinct source document in ONE query instead of a
-            # get_by_id() per chunk (the N+1 this loop used to issue): chunks
-            # frequently share a document, so this de-duplicates the lookups too.
-            # Any DB error degrades to per-source names, matching the previous
-            # per-chunk fallback.
-            documents_by_id = {}
-            if include_sources:
-                try:
-                    documents_by_id = document_repository.get_by_ids(
-                        list({int(r.document_id) for r in search_results})
-                    )
-                except (ValueError, SQLAlchemyError):
-                    documents_by_id = {}
-
-            # Single enumerate() pass: numbered [N] context + sources built from
-            # one ordering so the derived citation map cannot drift from the
-            # prompt.
-            for i, result in enumerate(search_results, start=1):
-                context_parts.append(f"[{i}] {result.text}")
-
-                if include_sources:
-                    document = documents_by_id.get(int(result.document_id))
-                    filename = document.filename if document else str(result.source)
-
-                    sources.append(
-                        {
-                            "document_id": int(result.document_id),
-                            "filename": filename,
-                            "chunk_text": result.text,
-                            "similarity_score": float(round(result.similarity_score, 3)),
-                            "chunk_index": int(result.chunk_index),
-                            "total_chunks": int(result.total_chunks),
-                        }
-                    )
-
-        # Derive the [N] -> source citation map from the SAME numbering used above,
-        # emitted as its own SSE event before `done`.
-        citations = {str(i + 1): sources[i] for i in range(len(sources))}
-
-        # Step 4: Build prompt
-        if context_parts:
-            context_text = "\n\n".join(context_parts)
-            system_prompt = MIMIR_SYSTEM_PROMPT
-            full_prompt = system_prompt.format(context=context_text)
-        else:
-            logger.warning("No relevant context found")
-            context_text = ""
-            system_prompt = """Vous êtes Mimir, un assistant documentaire intelligent.
-L'utilisateur vous pose une question mais aucun contexte pertinent n'a été trouvé dans la documentation."""
-            full_prompt = system_prompt
-
+        pre_included_chunks = await _pre_include_by_filename(
+            question, question_embedding, vector_store, document_repository
+        )
+        search_results, retrieval_mode = await _retrieve(
+            question,
+            question_embedding,
+            embedding_response.usage_tokens,
+            vector_store,
+            bm25_store,
+            pre_included_chunks,
+            rag_debug,
+            session_id,
+        )
+        context = _build_context(search_results, include_sources, document_repository)
+        system_prompt, context_text, full_prompt = _build_prompt(context.passages)
         rag_debug.log_context_building(
             session_id=session_id,
             system_prompt=system_prompt,
             context_text=context_text,
-            context_chunks=len(context_parts),
-            filtered_sources=sources,
+            context_chunks=len(context.passages),
+            filtered_sources=context.sources,
         )
 
-        # Step 5: Stream LLM generation
-        logger.info("Starting streaming LLM generation...")
-        full_answer = ""
-        usage_out: dict[str, Any] = {}
-        chat_usage_recorded = False
+        # aclosing(): on a client disconnect the answer stream is closed (and
+        # its usage recorded) before this generator settles the reservation.
+        answer_parts: list[str] = []
+        async with aclosing(
+            _stream_answer(question, full_prompt, llm_service, rag_debug, spend, answer_parts)
+        ) as answer_stream:
+            async for event in answer_stream:
+                yield event
 
-        try:
-            async for chunk in llm_service.generate_stream(
-                prompt=question,
-                system_prompt=full_prompt,
-                max_tokens=800,
-                temperature=0.1,
-                session_id=session_id,
-                rag_debug=rag_debug,
-                usage_out=usage_out,
-            ):
-                full_answer += chunk
-                yield {"type": "chunk", "content": chunk}
-
-            # Stream completed and the final SSE chunk carried real usage.
-            if usage_tracker is not None and usage_out:
-                # asyncio.to_thread: record() is a blocking SQLite write.
-                total_cost_eur += await asyncio.to_thread(
-                    usage_tracker.record,
-                    "chat",
-                    llm_service.model_name,
-                    usage_out.get("prompt_tokens", 0),
-                    usage_out.get("completion_tokens", 0),
-                    estimated=False,
-                    session_id=session_id,
-                )
-                chat_usage_recorded = True
-        finally:
-            # Guarantee exactly one chat usage row per request: if
-            # the async-for loop ended -- normal completion without a final
-            # usage chunk, an exception, or a mid-stream client disconnect
-            # (GeneratorExit) -- without recording real usage above, estimate
-            # tokens from the text lengths instead. The prompt side MUST be
-            # estimated too: Mistral bills the full prompt (system prompt +
-            # entire document context) even for an interrupted stream, and
-            # in this RAG pipeline the prompt is usually the dominant share
-            # of billed tokens -- recording prompt_tokens=0 would make the
-            # ledger drift below the real Mistral spend on every disconnect.
-            # asyncio.to_thread: awaiting (no yield) in an async generator's
-            # finally is legal during aclose(); keeps the blocking SQLite
-            # write off the event loop.
-            if usage_tracker is not None and not chat_usage_recorded:
-                estimated_prompt_tokens = max(1, (len(full_prompt) + len(question)) // 4)
-                estimated_completion_tokens = max(1, len(full_answer) // 4)
-                total_cost_eur += await asyncio.to_thread(
-                    usage_tracker.record,
-                    "chat",
-                    llm_service.model_name,
-                    estimated_prompt_tokens,
-                    estimated_completion_tokens,
-                    estimated=True,
-                    session_id=session_id,
-                )
-                chat_usage_recorded = True
-
-        # Calculate confidence
         confidence_score = _calculate_weighted_confidence(
             search_results, settings.confidence_algorithm, mode=retrieval_mode, rrf_k=settings.rrf_k
         )
 
-        # Emit the [N] -> source citation map as its own SSE event immediately
-        # before `done`. The `done` event below is left untouched so the
-        # existing frontend contract stays byte-identical; the citation event is
-        # purely additive. Consumed by the frontend as event.citations.
-        yield {"type": "citation", "citations": citations}
-
-        # Send completion event - convert numpy types to Python native
+        # The citation map travels in its own event so the "done" payload
+        # keeps the shape the frontend already consumes.
+        yield {"type": "citation", "citations": context.citations}
         yield {
             "type": "done",
-            "sources": sources,
+            "sources": context.sources,
             "confidence_score": float(round(confidence_score, 2)),
             "cached": False,
         }
 
         logger.info(f"Streaming RAG completed - confidence: {confidence_score:.2f}")
 
-        # Anti-partial cache write: store the
-        # streamed answer ONLY here, on the fully-successful path AFTER the
-        # done event was yielded. This is deliberately NOT in the `except`
-        # branch (an error response is never cached) and NOT in a `finally`
-        # (which also runs on GeneratorExit / mid-stream client disconnect),
-        # so no partial or error entry can ever be stored. set_stream_response
-        # performs no await/yield, so a GeneratorExit cannot interrupt between
-        # the done yield resuming here and the write completing.
-        if chat_cache is not None and corpus_version is not None:
-            chat_cache.set_stream_response(
-                question,
-                corpus_version,
-                {
-                    "answer": full_answer,
-                    "sources": sources,
-                    "citations": citations,
-                    "confidence_score": float(round(confidence_score, 2)),
-                },
-            )
+        # Written only here, after the done event: never in the except branch
+        # (errors are not cached) nor in a finally (which also runs on a
+        # disconnect). The write performs no await, so a GeneratorExit cannot
+        # interrupt it once the done event has been consumed.
+        _cache_answer(
+            chat_cache, corpus_version, question, "".join(answer_parts), context, confidence_score
+        )
 
     except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event
         logger.error(f"Streaming RAG pipeline failed: {str(e)}", exc_info=True)
@@ -802,50 +944,35 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
             error_message=str(e),
             stage="streaming_rag_pipeline",
         )
-        # Generic client-facing message; details stay in logs/rag_debug only
-        yield {"type": "error", "message": "Une erreur interne est survenue."}
+        yield {"type": "error", "message": _STREAM_ERROR_MESSAGE}
 
     finally:
-        # Settle the reservation exactly once, regardless of normal
-        # completion, an exception caught above, or a mid-stream client
-        # disconnect (GeneratorExit propagates straight through the except
-        # clause -- which only catches Exception -- but always runs this
-        # finally before the generator closes). asyncio.to_thread keeps the
-        # blocking SQLite ledger write off the event loop; awaiting (no
-        # yield) in a finally is legal during aclose().
-        if budget_guard is not None and reservation is not None:
-            if llm_call_made:
-                await asyncio.to_thread(budget_guard.finalize, reservation, total_cost_eur)
-            else:
-                await asyncio.to_thread(budget_guard.release, reservation)
+        await spend.settle(budget_guard, reservation)
 
 
 class RagService:
     """
     Framework-agnostic RAG pipeline service.
 
-    Wraps the module-level streaming pipeline function above so the full
-    pipeline can be constructed once via dependency injection (see
-    backend/src/api/dependencies.py::get_rag_service) and reused outside an
-    HTTP request context -- notably by the RAGAS evaluation harness,
-    which drains answer_stream() into a result dict.
+    Constructed once through dependency injection (see
+    ``src/api/dependencies.py::get_rag_service``) and usable outside an HTTP
+    request, notably by the RAGAS evaluation harness, which drains
+    answer_stream() into a result dict.
 
-    document_repository is intentionally NOT stored as an instance
-    attribute: it wraps a request-scoped SQLAlchemy session (FastAPI
-    Depends(get_document_repository)), so it must be passed as a per-call
-    argument to answer_stream() to avoid leaking a session across
-    requests.
+    document_repository is a per-call argument of answer_stream(), not an
+    attribute: it wraps a request-scoped SQLAlchemy session that must not leak
+    across requests.
     """
 
     def __init__(
         self,
-        llm_service: MistralAPIService,
-        vector_store: FaissVectorStore,
+        llm_service: AbstractLLMService,
+        vector_store: AbstractVectorStore,
         rag_debug: RagDebugService,
         budget_guard: BudgetGuard | None = None,
         usage_tracker: UsageTracker | None = None,
-        chat_cache: Any | None = None,
-        bm25_store: Any | None = None,
+        chat_cache: ChatCacheService | None = None,
+        bm25_store: LexicalIndex | None = None,
     ):
         self.llm_service = llm_service
         self.vector_store = vector_store
@@ -853,8 +980,8 @@ class RagService:
         self.budget_guard = budget_guard
         self.usage_tracker = usage_tracker
         self.chat_cache = chat_cache
-        # Optional lexical index for hybrid retrieval; only used when
-        # settings.hybrid_search_enabled is True (dense-only ignores it).
+        # Lexical index of hybrid retrieval; ignored when
+        # settings.hybrid_search_enabled is False.
         self.bm25_store = bm25_store
 
     async def answer_stream(
@@ -866,19 +993,13 @@ class RagService:
         document_repository: DocumentRepository,
         reservation: BudgetReservation | None = None,
         corpus_version: str | None = None,
-    ):
+    ) -> AsyncIterator[dict[str, Any]]:
         """
-        Run the streaming RAG pipeline for a single question, yielding the
-        same SSE event dicts as `_process_question_with_rag_stream`.
+        Answer one question, yielding the SSE event dicts of the pipeline.
 
-        Settles `reservation` in an outer `finally` internally, covering
-        normal completion, an exception, and a mid-stream GeneratorExit
-        (client disconnect) -- exactly as the moved function did.
-
-        When `corpus_version` is supplied and this service was constructed
-        with a `chat_cache`, the fully-successful streamed answer is written
-        to the corpus-aware SSE cache after the done event; the
-        write is on the success path only, never on error or disconnect.
+        The reservation is always settled, including on a mid-stream
+        disconnect. When corpus_version is given and the service has a chat
+        cache, a fully successful answer is cached after the done event.
         """
         async for event in _process_question_with_rag_stream(
             question=question,
