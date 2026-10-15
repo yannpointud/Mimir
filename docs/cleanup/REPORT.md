@@ -103,7 +103,17 @@ ou documentées, sans correction :
 
 ## Test réel
 
-En cours : le résultat sera ajouté avant l'ouverture de la PR.
+Test fait sur une copie isolée de la branche (`3ee582a`), avec la vraie API
+Mistral. La clé n'a jamais été affichée ni écrite. Tout passe :
+
+- **Démarrage et connexion** : `health/live` répond 200, le login admin aussi.
+- **Ingestion** : 3 documents du corpus de l'oracle passent à `indexed` en environ 2 s.
+- **2 questions en streaming** : séquence SSE `start`, `chunk` × N, `citation`, `done`. Les réponses sont correctes et sourcées, avec une confiance de 0,89 et 0,83.
+- **Rebuild admin** : OK. Le contrôle de cohérence trouve 0 problème, et la question reposée après le rebuild n'est pas servie par le cache et donne les mêmes sources.
+- **Dépense IA** : enregistrée dans `/admin/usage` (9 appels, environ 0,0008 €).
+- **Logs** : 0 ERROR.
+  - La console affiche des erreurs de logging : `PosixPath` n'est pas sérialisable en JSON dans les logs d'ingestion.
+  - L'anomalie existait déjà avant la mission (D0.4, point 4). Seul le log de `queue_document` est corrigé, car c'était la seule correction autorisée.
 
 ## Reproduire
 
