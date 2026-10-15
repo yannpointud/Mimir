@@ -42,3 +42,17 @@ ignore = [
 
 [tool.ruff.lint.mccabe]
 max-complexity = 15
+
+[tool.mypy]
+# Normal (non-strict) mode, run as `mypy backend/src` locally and in CI.
+python_version = "3.13"
+warn_unused_ignores = true
+warn_redundant_casts = true
+show_error_codes = true
+
+# Third-party libraries shipping neither inline types nor a stub package.
+# Libraries that do have stubs (cachetools, Markdown, psutil) get them from
+# requirements-dev.txt instead of being ignored.
+[[tool.mypy.overrides]]
+module = ["faiss", "faiss.*", "bm25s", "bm25s.*", "docx", "docx.*"]
+ignore_missing_imports = true
