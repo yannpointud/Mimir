@@ -10,8 +10,6 @@ from enum import Enum
 
 
 class DocumentStatus(str, Enum):
-    """Document status enumeration"""
-
     PENDING = "pending"
     INDEXING = "indexing"
     INDEXED = "indexed"
@@ -40,8 +38,6 @@ class BaseResponse(BaseModel):
 
 
 class PaginationModel(BaseModel):
-    """Pagination model"""
-
     limit: int = Field(default=50, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
     order_by: str = Field(default="created_at")
@@ -52,16 +48,12 @@ class PaginationModel(BaseModel):
 
 
 class DocumentBase(BaseModel):
-    """Base model for documents"""
-
     filename: str = Field(..., min_length=1, max_length=255)
     path: str | None = Field(None, max_length=500)
     preserve: bool = Field(default=False)
 
 
 class DocumentCreate(DocumentBase):
-    """Model for creating a document"""
-
     file_hash: str = Field(..., min_length=64, max_length=64)
 
     @validator("file_hash")
@@ -72,8 +64,6 @@ class DocumentCreate(DocumentBase):
 
 
 class DocumentUpdate(BaseModel):
-    """Model for updating a document"""
-
     status: DocumentStatus | None = None
     error_message: str | None = Field(None, max_length=1000)
     chunk_count: int | None = Field(None, ge=0)
@@ -81,8 +71,6 @@ class DocumentUpdate(BaseModel):
 
 
 class DocumentResponse(DocumentBase):
-    """Response model for documents"""
-
     id: int
     file_hash: str
     status: DocumentStatus
@@ -96,8 +84,6 @@ class DocumentResponse(DocumentBase):
 
 
 class ChunkResponse(BaseModel):
-    """Response model for document chunks"""
-
     id: int
     document_id: int
     chunk_index: int
@@ -109,8 +95,6 @@ class ChunkResponse(BaseModel):
 
 
 class DocumentWithChunksResponse(DocumentBase):
-    """Response model for a document with its chunks"""
-
     id: int
     file_hash: str
     status: DocumentStatus
@@ -128,16 +112,12 @@ class DocumentWithChunksResponse(DocumentBase):
 
 
 class DocumentListResponse(BaseResponse):
-    """Response for the document list"""
-
     documents: list[DocumentResponse]
     total_count: int
     pagination: dict[str, Any]
 
 
 class DocumentStatsResponse(BaseResponse):
-    """Response for document statistics"""
-
     stats: dict[str, Any]
 
 
@@ -145,27 +125,19 @@ class DocumentStatsResponse(BaseResponse):
 
 
 class ConfigurationBase(BaseModel):
-    """Base model for configuration"""
-
     key: str = Field(..., min_length=1, max_length=100)
     value: str = Field(..., min_length=0)
 
 
 class ConfigurationCreate(ConfigurationBase):
-    """Model for creating a configuration"""
-
     pass
 
 
 class ConfigurationUpdate(BaseModel):
-    """Model for updating a configuration"""
-
     value: str = Field(..., min_length=0)
 
 
 class ConfigurationResponse(ConfigurationBase):
-    """Response model for configurations"""
-
     updated_at: datetime
 
     class Config:
@@ -173,8 +145,6 @@ class ConfigurationResponse(ConfigurationBase):
 
 
 class ConfigurationListResponse(BaseResponse):
-    """Response for the configuration list"""
-
     configurations: list[ConfigurationResponse]
 
 
@@ -182,8 +152,6 @@ class ConfigurationListResponse(BaseResponse):
 
 
 class AuditLogBase(BaseModel):
-    """Base model for audit logs"""
-
     user_type: UserType
     action: str = Field(..., min_length=1, max_length=100)
     details: str | None = Field(None, max_length=1000)
@@ -193,14 +161,10 @@ class AuditLogBase(BaseModel):
 
 
 class AuditLogCreate(AuditLogBase):
-    """Model for creating an audit log"""
-
     pass
 
 
 class AuditLogResponse(AuditLogBase):
-    """Response model for audit logs"""
-
     id: int
     created_at: datetime
 
@@ -209,8 +173,6 @@ class AuditLogResponse(AuditLogBase):
 
 
 class AuditLogListResponse(BaseResponse):
-    """Response for the audit log list"""
-
     logs: list[AuditLogResponse]
     total_count: int
 
@@ -219,8 +181,6 @@ class AuditLogListResponse(BaseResponse):
 
 
 class HealthCheckResponse(BaseResponse):
-    """Health check response"""
-
     status: str = Field(default="healthy")
     checks: dict[str, Any] = Field(default_factory=dict)
     uptime_seconds: float | None = None
@@ -228,8 +188,6 @@ class HealthCheckResponse(BaseResponse):
 
 
 class ErrorResponse(BaseModel):
-    """Standardized error response model"""
-
     success: bool = False
     error_code: str
     error_message: str
@@ -241,8 +199,6 @@ class ErrorResponse(BaseModel):
 
 
 class FileUploadValidation(BaseModel):
-    """Validation for file uploads"""
-
     max_size_mb: int = Field(default=100, ge=1, le=1000)
     allowed_extensions: list[str] = Field(default=[".pdf", ".docx", ".txt", ".md"], min_length=1)
 
@@ -255,8 +211,6 @@ class FileUploadValidation(BaseModel):
 
 
 class DatabaseStatsResponse(BaseResponse):
-    """Database statistics"""
-
     table_counts: dict[str, int]
     database_size_mb: float | None = None
     last_backup: datetime | None = None
@@ -532,7 +486,6 @@ def validate_filename(filename: str) -> bool:
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize a filename"""
     import os
     import re
     import unicodedata

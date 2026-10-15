@@ -68,9 +68,6 @@ def load_golden_set(path: str | Path) -> list[GoldenSetEntry]:
     the offending line number -- so a corrupted ground-truth file fails loudly
     at load time rather than poisoning the baseline.
 
-    Args:
-        path: Path to the JSONL golden set file.
-
     Returns:
         The parsed entries in file order.
 
@@ -104,9 +101,6 @@ def validate_golden_set(entries: list[GoldenSetEntry]) -> list[GoldenSetEntry]:
         - ``MIN_ENTRIES`` <= len(entries) <= ``MAX_ENTRIES``
         - at least one adversarial (out-of-corpus) entry is present
 
-    Args:
-        entries: The parsed golden set entries.
-
     Returns:
         The same ``entries`` list (for fluent use), when valid.
 
@@ -128,10 +122,6 @@ def write_golden_set(entries: list[GoldenSetEntry], path: str | Path) -> None:
 
     Creates the parent directory if needed. Used by the generation script to
     freeze ``golden_set_v1.jsonl``.
-
-    Args:
-        entries: The entries to serialize.
-        path: Destination JSONL path.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

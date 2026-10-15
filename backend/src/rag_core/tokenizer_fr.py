@@ -1,7 +1,6 @@
-"""
-Light French tokenizer for the BM25 lexical index.
+"""Light French tokenizer for the BM25 lexical index.
 
-Locked design decision: lowercase + accent folding (é -> e) +
+Design decision: lowercase + accent folding (é -> e) +
 split on non-alphanumerics, with NO stemming and NO stopword removal. The goal
 is to preserve exact terms, identifiers and acronyms (e.g. "JIRA-4521",
 "API") which the dense embedding path tends to miss -- that is precisely what
@@ -39,7 +38,7 @@ def _split_alnum(text: str) -> list[str]:
     """Lowercase then split on non-alphanumerics.
 
     Preserves identifiers/acronyms without stemming or stopword filtering
-    (locked decision): "Le ticket JIRA-4521 concerne l'API REST" ->
+    (deliberate): "Le ticket JIRA-4521 concerne l'API REST" ->
     ['le', 'ticket', 'jira', '4521', 'concerne', 'l', 'api', 'rest'].
     """
     return _TOKEN_PATTERN.findall(text.lower())
@@ -51,11 +50,5 @@ def light_french_tokenizer(texts: list[str]) -> list[list[str]]:
     Applied identically at index time and query time (same transformation on
     both sides). Accent-folds first, then lowercases and splits on
     non-alphanumerics. No stemming, no stopwords.
-
-    Args:
-        texts: Raw input strings (documents or queries).
-
-    Returns:
-        One list of lowercase, accent-folded tokens per input string.
     """
     return [_split_alnum(_fold_accents(t)) for t in texts]

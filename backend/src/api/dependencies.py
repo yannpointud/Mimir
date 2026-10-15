@@ -33,52 +33,42 @@ logger = setup_logger(__name__)
 
 
 def get_document_repository(db: Session = Depends(get_db_session)) -> DocumentRepository:
-    """Get document repository instance."""
     return DocumentRepository(db)
 
 
 def get_configuration_repository(db: Session = Depends(get_db_session)) -> ConfigurationRepository:
-    """Get configuration repository instance."""
     return ConfigurationRepository(db)
 
 
 def get_audit_log_repository(db: Session = Depends(get_db_session)) -> AuditLogRepository:
-    """Get audit log repository instance."""
     return AuditLogRepository(db)
 
 
 def get_usage_repository(db: Session = Depends(get_db_session)) -> UsageRepository:
-    """Get usage repository instance."""
     return UsageRepository(db)
 
 
 def get_cache_service():
-    """Get cache service instance."""
     return cache_service
 
 
 def get_chat_cache_service():
-    """Get chat cache service instance."""
     return chat_cache_service
 
 
 def get_email_service():
-    """Get email service instance."""
     return email_service
 
 
 def get_jwt_handler():
-    """Get JWT handler instance."""
     return jwt_handler
 
 
 def get_budget_guard() -> BudgetGuard:
-    """Get budget guard instance (singleton)."""
     return budget_guard
 
 
 def get_usage_tracker() -> UsageTracker:
-    """Get usage tracker instance (singleton)."""
     return usage_tracker
 
 
@@ -89,7 +79,6 @@ _ingestion_processor = None
 
 
 def get_llm_service() -> MistralAPIService:
-    """Get LLM service instance (singleton)."""
     global _llm_service
     if _llm_service is None:
         _llm_service = MistralAPIService(
@@ -103,7 +92,6 @@ def get_llm_service() -> MistralAPIService:
 
 
 def get_vector_store() -> FaissVectorStore:
-    """Get vector store instance (singleton)."""
     global _vector_store
     if _vector_store is None:
         _vector_store = FaissVectorStore(
@@ -140,7 +128,6 @@ def get_bm25_store() -> Bm25LexicalStore:
 
 
 def get_ingestion_processor():
-    """Get ingestion processor instance (singleton)."""
     global _ingestion_processor
     if _ingestion_processor is None:
         raise RuntimeError(
@@ -156,7 +143,6 @@ def set_ingestion_processor(processor):
 
 
 def get_rag_debug_service():
-    """Get RAG debug service instance."""
     # Configure the service from settings on first call
     rag_debug_service.configure(
         enabled=settings.rag_debug_enabled,

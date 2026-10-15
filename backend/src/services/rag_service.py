@@ -100,13 +100,9 @@ def _clean_filename(filename: str) -> str:
 def _find_documents_by_fuzzy_match(
     question: str, document_repository, threshold: int = 70
 ) -> list[tuple]:
-    """
-    Find documents whose filename matches the question via fuzzy matching.
+    """Find documents whose filename matches the question via fuzzy matching.
 
-    Args:
-        question: The user question
-        document_repository: Document repository
-        threshold: Minimum fuzzy score threshold (0-100)
+    ``threshold`` is the minimum fuzzy score (0-100).
 
     Returns:
         List of tuples (document_id, filename, fuzzy_score)
@@ -141,19 +137,10 @@ async def _pre_include_document_chunks(
     boost_factor: float,
     filename_similarities: dict[int, float],
 ) -> list[Any]:
-    """
-    Retrieve all chunks from specified documents and apply the boost.
+    """Retrieve all chunks from specified documents and apply the boost.
 
-    Args:
-        document_ids: IDs of documents to pre-include
-        question_embedding: Question embedding vector
-        vector_store: The FAISS vector store
-        document_repository: Document repository
-        boost_factor: Boost factor to apply
-        filename_similarities: Dictionary {document_id: fuzzy_score}
-
-    Returns:
-        List of chunks with boosted scores
+    ``filename_similarities`` maps each document_id to its fuzzy score.
+    Returns the chunks with boosted scores.
     """
     pre_included_chunks = []
 
@@ -197,7 +184,7 @@ async def _pre_include_document_chunks(
 
 
 def _calculate_rrf_confidence(search_results: list[Any], rrf_k: int = 60) -> float:
-    """Confidence for hybrid (RRF) mode -- rank/consensus based (Option A).
+    """Confidence for hybrid (RRF) mode -- rank/consensus based.
 
     RRF scores are NOT cosine similarities, so the weighted-magnitude formula
     used in dense mode does not apply. A chunk retrieved by BOTH the dense and

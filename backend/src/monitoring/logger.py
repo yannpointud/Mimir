@@ -19,7 +19,6 @@ class JSONFormatter(logging.Formatter):
     """Format logs as JSON for better parsing and analysis"""
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format log record as JSON"""
         log_obj = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
@@ -57,16 +56,8 @@ class ConsoleFormatter(logging.Formatter):
 
 
 def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
-    """
-    Setup centralized logger with multiple handlers
+    """Setup centralized logger with multiple handlers
     All logs go to /logs directory with rotation
-
-    Args:
-        name: Logger name (usually __name__)
-        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-
-    Returns:
-        Configured logger instance
     """
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
@@ -138,15 +129,8 @@ app_logger = setup_logger("mimir", level=settings.log_level.upper())
 
 
 def setup_frontend_logger(level: str = "DEBUG") -> logging.Logger:
-    """
-    Setup specialized logger for frontend logs
+    """Setup specialized logger for frontend logs
     Logs frontend events to dedicated frontend.log file
-
-    Args:
-        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-
-    Returns:
-        Configured frontend logger instance
     """
     logger = logging.getLogger("frontend")
     logger.setLevel(getattr(logging, level.upper()))
@@ -193,17 +177,7 @@ def log_api_request(
     user_type: str | None = None,
     **kwargs,
 ):
-    """
-    Helper to log API requests consistently
-
-    Args:
-        endpoint: API endpoint path
-        method: HTTP method
-        duration_ms: Request duration in milliseconds
-        status_code: HTTP status code
-        user_type: Type of user (admin, user, etc.)
-        **kwargs: Additional fields
-    """
+    """Helper to log API requests consistently"""
     extra_fields = {"endpoint": endpoint, "method": method, "type": "api_request", **kwargs}
 
     if duration_ms is not None:
@@ -234,17 +208,7 @@ def log_ingestion_event(
     file_size_mb: float | None = None,
     **kwargs,
 ):
-    """
-    Helper to log ingestion events
-
-    Args:
-        document: Document filename or path
-        status: Processing status
-        duration_ms: Processing duration in milliseconds
-        chunk_count: Number of chunks created
-        file_size_mb: File size in megabytes
-        **kwargs: Additional fields
-    """
+    """Helper to log ingestion events"""
     extra_fields = {"document": document, "status": status, "type": "ingestion", **kwargs}
 
     if duration_ms is not None:
@@ -271,17 +235,7 @@ def log_search_query(
     similarity_threshold: float | None = None,
     **kwargs,
 ):
-    """
-    Helper to log search queries
-
-    Args:
-        query: Search query (truncated for privacy)
-        results_count: Number of results returned
-        duration_ms: Search duration in milliseconds
-        user_type: Type of user performing search
-        similarity_threshold: Minimum similarity threshold used
-        **kwargs: Additional fields
-    """
+    """Helper to log search queries"""
     # Truncate query for privacy and log size
     query_truncated = query[:100] + "..." if len(query) > 100 else query
 
@@ -313,18 +267,7 @@ def log_llm_request(
     error: str | None = None,
     **kwargs,
 ):
-    """
-    Helper to log LLM API requests
-
-    Args:
-        model: LLM model name
-        operation: Operation type (generate, embed)
-        tokens: Number of tokens processed
-        duration_ms: Request duration in milliseconds
-        success: Whether request succeeded
-        error: Error message if failed
-        **kwargs: Additional fields
-    """
+    """Helper to log LLM API requests"""
     extra_fields = {
         "model": model,
         "operation": operation,
@@ -354,17 +297,7 @@ def log_vector_operation(
     error: str | None = None,
     **kwargs,
 ):
-    """
-    Helper to log vector store operations
-
-    Args:
-        operation: Operation type (upsert, query, delete)
-        vector_count: Number of vectors involved
-        duration_ms: Operation duration in milliseconds
-        success: Whether operation succeeded
-        error: Error message if failed
-        **kwargs: Additional fields
-    """
+    """Helper to log vector store operations"""
     extra_fields = {
         "operation": operation,
         "vector_count": vector_count,
@@ -393,17 +326,7 @@ def log_auth_event(
     reason: str | None = None,
     **kwargs,
 ):
-    """
-    Helper to log authentication events
-
-    Args:
-        event: Event type (login, logout, token_refresh)
-        user_type: Type of user (admin, user)
-        ip_address: Client IP address
-        success: Whether event succeeded
-        reason: Failure reason if applicable
-        **kwargs: Additional fields
-    """
+    """Helper to log authentication events"""
     extra_fields = {"event": event, "success": success, "type": "auth", **kwargs}
 
     if user_type:
@@ -430,16 +353,7 @@ def log_health_check(
     details: dict[str, Any] | None = None,
     **kwargs,
 ):
-    """
-    Helper to log health check events
-
-    Args:
-        component: Component name (database, llm, vector_store)
-        status: Health status (healthy, unhealthy, degraded)
-        duration_ms: Check duration in milliseconds
-        details: Additional health details
-        **kwargs: Additional fields
-    """
+    """Helper to log health check events"""
     extra_fields = {"component": component, "status": status, "type": "health_check", **kwargs}
 
     if duration_ms is not None:
@@ -458,15 +372,7 @@ def log_health_check(
 def log_system_event(
     event: str, severity: str = "info", details: dict[str, Any] | None = None, **kwargs
 ):
-    """
-    Helper to log system-level events
-
-    Args:
-        event: Event description
-        severity: Event severity (info, warning, error, critical)
-        details: Additional event details
-        **kwargs: Additional fields
-    """
+    """Helper to log system-level events"""
     extra_fields = {"event": event, "severity": severity, "type": "system", **kwargs}
 
     if details:
@@ -485,12 +391,7 @@ def log_system_event(
 
 # Performance monitoring decorator
 def log_performance(operation: str):
-    """
-    Decorator to automatically log function performance
-
-    Args:
-        operation: Operation name for logging
-    """
+    """Decorator to automatically log function performance"""
     import functools
     import time
 

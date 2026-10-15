@@ -26,16 +26,9 @@ SENSITIVE_CONFIG_KEYS = frozenset(
 
 
 def mask_secrets(config: dict) -> dict:
-    """
-    Return a copy of the config dict with all sensitive values fully masked.
+    """Return a copy of the config dict with all sensitive values fully masked.
 
     Falsy sensitive values (empty string, None) are left untouched so that
     a missing configuration remains visible to the administrator.
-
-    Args:
-        config: Configuration dictionary possibly containing secret values
-
-    Returns:
-        dict: New dictionary with sensitive truthy values replaced by MASKED_VALUE
     """
     return {k: (MASKED_VALUE if k in SENSITIVE_CONFIG_KEYS and v else v) for k, v in config.items()}

@@ -52,25 +52,14 @@ class IngestionProcessor:
         usage_tracker=None,
         bm25_store=None,
     ):
-        """
-        Initialize ingestion processor
+        """Initialize ingestion processor.
 
-        Args:
-            llm_service: LLM service for embeddings
-            vector_store: Vector store for indexing
-            document_repository: Database repository for documents
-            chunking_config: Configuration for text chunking
-            max_file_size_mb: Maximum file size in MB
-            max_chunks_per_doc: Maximum chunks per document
-            budget_guard: Optional BudgetGuard override (defaults to the
-                module-level singleton); injectable for tests
-            usage_tracker: Optional UsageTracker override (defaults to the
-                module-level singleton); injectable for tests
-            bm25_store: Optional BM25 lexical store. When provided, the
-                lexical index is rebuilt from the FAISS source of truth after
-                each successful upsert, keeping both indexes synchronized
-                through this single-writer worker. None disables the hybrid
-                sync (dense-only behavior unchanged).
+        ``budget_guard`` and ``usage_tracker`` default to the module-level
+        singletons (injectable for tests). When ``bm25_store`` is provided, the
+        lexical index is rebuilt from the FAISS source of truth after successful
+        upserts (coalesced once the queue drains), keeping both indexes
+        synchronized through this single-writer worker. None disables the
+        hybrid sync (dense-only behavior unchanged).
         """
         self.llm_service = llm_service
         self.vector_store = vector_store
@@ -123,17 +112,10 @@ class IngestionProcessor:
         preserve: bool = False,
         metadata: dict[str, Any] | None = None,
     ) -> bool:
-        """
-        Queue a document for processing
+        """Queue a document for processing; return True if queued.
 
-        Args:
-            file_path: Path to the document file
-            document_id: Optional document ID, will be generated if None
-            preserve: Whether to protect from deletion
-            metadata: Additional metadata
-
-        Returns:
-            True if queued successfully
+        Without ``document_id`` a new document record is created; otherwise the
+        existing document is reprocessed.
         """
         try:
             # Validate file
@@ -219,15 +201,7 @@ class IngestionProcessor:
             return False
 
     async def _process_task(self, task: IngestionTask) -> bool:
-        """
-        Process a single ingestion task
-
-        Args:
-            task: Ingestion task to process
-
-        Returns:
-            True if processing succeeded
-        """
+        """Process a single ingestion task"""
         try:
             # Update status to indexing
             self.document_repository.update_status(
@@ -307,15 +281,7 @@ class IngestionProcessor:
                 logger.warning(f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}")
 
     async def _process_document_pipeline(self, task: IngestionTask) -> bool:
-        """
-        Execute the complete processing pipeline
-
-        Args:
-            task: Ingestion task
-
-        Returns:
-            True if pipeline succeeded
-        """
+        """Execute the complete processing pipeline"""
         start_time = time.time()
 
         try:
@@ -511,14 +477,7 @@ class IngestionProcessor:
             logger.warning(f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}")
 
     def _extract_text(self, file_path: str) -> str:
-        """
-        Extract text from file
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            Extracted text
+        """Extract text from file
 
         Raises:
             ProcessingError: If extraction fails
@@ -529,11 +488,7 @@ class IngestionProcessor:
             raise ProcessingError(f"Text extraction failed: {str(e)}") from e
 
     async def _generate_embeddings(self, chunks_data: list[dict[str, Any]]) -> EmbeddingResponse:
-        """
-        Generate embeddings for chunks
-
-        Args:
-            chunks_data: List of chunk dictionaries
+        """Generate embeddings for chunks
 
         Returns:
             EmbeddingResponse carrying both the embedding vectors and the
@@ -560,19 +515,7 @@ class IngestionProcessor:
         source: str,
         metadata: dict[str, Any],
     ) -> list[Chunk]:
-        """
-        Create Chunk objects from data
-
-        Args:
-            chunks_data: Chunk data dictionaries
-            embeddings: Embedding vectors
-            document_id: Document identifier
-            source: Source file path
-            metadata: Additional metadata
-
-        Returns:
-            List of Chunk objects
-        """
+        """Create Chunk objects from data"""
         chunks = []
 
         for chunk_data, embedding in zip(chunks_data, embeddings, strict=False):

@@ -27,10 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_sqlite_performance(dbapi_connection, connection_record):
-    """
-    Configure SQLite for better performance and concurrency
-    Enables WAL mode and other optimizations per specs
-    """
+    """Configure SQLite for performance and concurrency (WAL mode and related pragmas)."""
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
 

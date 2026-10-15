@@ -1,5 +1,4 @@
-"""
-BM25 lexical store implementation.
+"""BM25 lexical store implementation.
 
 Second retrieval index living beside FaissVectorStore: a lexical BM25 index that
 recovers exact terms (identifiers, acronyms) the dense embedding path tends to
@@ -7,7 +6,7 @@ miss. It is a *derived* artifact -- reconstructed in full from the source of
 truth (FaissVectorStore's active chunks) at every mutation, exactly like
 FaissVectorStore.optimize() rebuilds from non-deleted metadata.
 
-Design constraints (locked):
+Design constraints:
 - Persistence uses the native bm25s save/load API (JSON + .npy, allow_pickle=False):
   NO arbitrary-object deserialization, consistent with the removal of pickle
   from FaissVectorStore's metadata persistence.
@@ -49,11 +48,7 @@ class Bm25LexicalStore:
     """
 
     def __init__(self, index_path: str):
-        """Initialize the lexical store.
-
-        Args:
-            index_path: Directory path where the bm25s index is persisted.
-        """
+        """``index_path`` is the directory where the bm25s index is persisted."""
         self.index_path = Path(index_path)
         self._retriever: bm25s.BM25 | None = None
         # Corpus index position i -> real chunk_id (from FaissVectorStore metadata).

@@ -67,16 +67,10 @@ class FaissVectorStore(AbstractVectorStore):
         similarity_threshold: float = 0.5,
         index_type: str = "FlatL2",
     ):
-        """
-        Initialize FAISS vector store
+        """Initialize FAISS vector store.
 
-        Args:
-            dimension: Embedding vector dimension
-            index_path: Path to FAISS index file
-            metadata_path: Path to metadata pickle file
-            similarity_threshold: Minimum similarity score threshold
-            index_type: FAISS index type (only "FlatL2" is built; the value is
-                otherwise a passthrough label used for logging/tests)
+        Only the "FlatL2" ``index_type`` is built; the value is otherwise a
+        passthrough label used for logging/tests.
         """
         self.dimension = dimension
         self.index_path = Path(index_path)
@@ -144,7 +138,6 @@ class FaissVectorStore(AbstractVectorStore):
             self._create_new_index()
 
     def _create_new_index(self):
-        """Create a new FAISS index"""
         with self._lock:
             try:
                 # Simple brute-force search (good for small datasets).
@@ -166,14 +159,7 @@ class FaissVectorStore(AbstractVectorStore):
                 raise VectorStoreConnectionError(error_msg) from e
 
     def upsert(self, chunks: list[Chunk]) -> bool:
-        """
-        Insert or update chunks in the vector store
-
-        Args:
-            chunks: List of chunks with embeddings to store
-
-        Returns:
-            True if successful
+        """Insert or update chunks in the vector store
 
         Raises:
             VectorStoreOperationError: If upsert operation fails
@@ -278,22 +264,14 @@ class FaissVectorStore(AbstractVectorStore):
         filter_dict: dict[str, Any] | None = None,
         similarity_floor: float | None = None,
     ) -> list[SearchResult]:
-        """
-        Search for similar vectors
+        """Search for similar vectors, ordered by similarity.
 
-        Args:
-            vector: Query embedding vector
-            top_k: Maximum number of results to return
-            filter_dict: Optional metadata filters
-            similarity_floor: Optional override for the minimum similarity a
-                result must reach to be kept. When None (default) the store's
-                own similarity_threshold is used -- byte-identical to the
-                pre-hybrid behavior. Hybrid retrieval passes similarity_floor=0.0
-                to obtain the RAW candidate pool, so RRF can re-rank chunks that
-                the cosine threshold would otherwise drop.
-
-        Returns:
-            List of search results ordered by similarity
+        ``similarity_floor`` overrides the minimum similarity a result must
+        reach to be kept. When None (default) the store's own
+        similarity_threshold is used -- byte-identical to the pre-hybrid
+        behavior. Hybrid retrieval passes similarity_floor=0.0 to obtain the RAW
+        candidate pool, so RRF can re-rank chunks that the cosine threshold would
+        otherwise drop.
 
         Raises:
             VectorStoreOperationError: If query operation fails
@@ -397,7 +375,6 @@ class FaissVectorStore(AbstractVectorStore):
                 raise VectorStoreOperationError(error_msg) from e
 
     def _matches_filter(self, metadata: dict[str, Any], filter_dict: dict[str, Any]) -> bool:
-        """Check if metadata matches filter conditions"""
         for key, value in filter_dict.items():
             if key not in metadata:
                 return False
@@ -406,14 +383,7 @@ class FaissVectorStore(AbstractVectorStore):
         return True
 
     def delete(self, document_id: str) -> bool:
-        """
-        Delete all chunks for a document
-
-        Args:
-            document_id: Document identifier
-
-        Returns:
-            True if successful
+        """Delete all chunks for a document
 
         Note: FAISS doesn't support efficient deletion, so we mark as deleted
         and rebuild index periodically or on demand
@@ -514,9 +484,6 @@ class FaissVectorStore(AbstractVectorStore):
         BM25 rebuild — which may run off the event loop via asyncio.to_thread —
         iterates a stable snapshot and can never hit a "list changed size during
         iteration" race with a concurrent upsert/delete.
-
-        Returns:
-            List[Dict[str, Any]]: shallow copies of active chunk metadata dicts.
         """
         with self._lock:
             return [dict(m) for m in self.metadata if not m.get("deleted", False)]
@@ -734,7 +701,6 @@ class FaissVectorStore(AbstractVectorStore):
             raise VectorStoreConnectionError(error_msg) from e
 
     def _update_stats(self):
-        """Update internal statistics"""
         self._stats.update(
             {
                 "total_vectors": self.index.ntotal if self.index else 0,
@@ -746,15 +712,7 @@ class FaissVectorStore(AbstractVectorStore):
     def clean_orphans(
         self, existing_document_ids: set[str] | None = None, create_backup: bool = True
     ) -> dict[str, Any]:
-        """
-        Clean orphaned chunks whose documents no longer exist in the database.
-
-        Args:
-            existing_document_ids: Set of document_ids existing in DB (optional)
-            create_backup: Create a backup before cleanup
-
-        Returns:
-            Dict with cleanup statistics
+        """Clean orphaned chunks whose documents no longer exist in the database.
 
         Raises:
             VectorStoreOperationError: If cleanup fails
@@ -1064,8 +1022,7 @@ class FaissVectorStore(AbstractVectorStore):
         cleanup_orphans: bool = True,
         existing_document_ids: set | None = None,
     ) -> dict[str, Any]:
-        """
-        Completely rebuild the vector store with optional orphan cleanup.
+        """Completely rebuild the vector store with optional orphan cleanup.
 
         Args:
             force_rebuild: Force rebuild even without deleted chunks
@@ -1073,9 +1030,6 @@ class FaissVectorStore(AbstractVectorStore):
             existing_document_ids: Document ids known to the database, forwarded
                 to clean_orphans(). When None, clean_orphans() queries the
                 database itself.
-
-        Returns:
-            Dict with rebuild statistics
         """
         with self._lock:
             try:
@@ -1150,15 +1104,7 @@ class FaissVectorStore(AbstractVectorStore):
                 raise VectorStoreOperationError(error_msg) from e
 
     def get_document_chunks(self, document_id: str) -> list[Chunk]:
-        """
-        Get all chunks for a specific document
-
-        Args:
-            document_id: Document ID to retrieve chunks for
-
-        Returns:
-            List[Chunk]: List of chunks for the document
-        """
+        """Get all chunks for a specific document"""
         try:
             with self._lock:
                 chunk_ids = self.document_to_chunks.get(document_id, [])

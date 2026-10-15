@@ -24,7 +24,6 @@ class BaseRepository:
         self.session = session
 
     def _handle_db_error(self, e: Exception, operation: str) -> None:
-        """Centralized database error handling"""
         logger.error(f"Database error during {operation}: {e}")
         self.session.rollback()
 
@@ -38,17 +37,7 @@ class DocumentRepository(BaseRepository):
     def create(
         self, filename: str, file_hash: str, path: str | None = None, preserve: bool = False
     ) -> Document:
-        """
-        Create a new document
-
-        Args:
-            filename: File name
-            file_hash: SHA-256 hash of the file
-            path: Optional path
-            preserve: Protection against automatic deletion
-
-        Returns:
-            Created document
+        """Create a new document
 
         Raises:
             IntegrityError: If the hash already exists
@@ -125,14 +114,9 @@ class DocumentRepository(BaseRepository):
         order_by: str = "created_at",
         desc_order: bool = True,
     ) -> list[Document]:
-        """
-        Retrieve all documents with pagination and sorting
+        """Retrieve all documents with pagination and sorting.
 
-        Args:
-            limit: Maximum number of results
-            offset: Offset for pagination
-            order_by: Sort field ('created_at', 'filename', 'status')
-            desc_order: Descending order if True
+        ``order_by`` names a Document column (created_at if it does not exist).
         """
         try:
             query = self.session.query(Document)
@@ -163,17 +147,10 @@ class DocumentRepository(BaseRepository):
         filters: dict[str, Any] | None = None,
         search: str | None = None,
     ) -> tuple[list["Document"], int]:
-        """
-        Retrieve all documents with pagination and total count
+        """Retrieve documents (newest first) with pagination and the total count.
 
-        Args:
-            offset: Offset for pagination
-            limit: Maximum number of results
-            filters: Filters to apply (e.g., {"status": "indexed"})
-            search: Search term in the filename
-
-        Returns:
-            Tuple (documents, total_count)
+        Only the ``status`` key of ``filters`` is applied; ``search`` is a
+        case-insensitive filename match. Returns (documents, total_count).
         """
         try:
             query = self.session.query(Document)
@@ -211,15 +188,7 @@ class DocumentRepository(BaseRepository):
         error_message: str | None = None,
         chunk_count: int | None = None,
     ) -> None:
-        """
-        Update a document's status
-
-        Args:
-            doc_id: Document ID
-            status: New status
-            error_message: Optional error message
-            chunk_count: Number of chunks if indexed
-        """
+        """Update a document's status"""
         try:
             document = self.get_by_id(doc_id)
             if not document:
@@ -244,15 +213,10 @@ class DocumentRepository(BaseRepository):
             raise
 
     def delete(self, doc_id: int, force: bool = False) -> bool:
-        """
-        Delete a document
+        """Delete a document; return False if it does not exist.
 
-        Args:
-            doc_id: Document ID
-            force: Force deletion even if protected
-
-        Returns:
-            True if deleted, False otherwise
+        Raises:
+            ValueError: If the document is protected and ``force`` is False.
         """
         try:
             document = self.get_by_id(doc_id)
@@ -407,15 +371,7 @@ class AuditLogRepository(BaseRepository):
         limit: int = 100,
         offset: int = 0,
     ) -> list[AuditLog]:
-        """
-        Retrieve audit logs with filters
-
-        Args:
-            user_type: Filter by user type
-            action: Filter by action
-            limit: Maximum number of results
-            offset: Offset for pagination
-        """
+        """Retrieve audit logs with filters"""
         try:
             query = self.session.query(AuditLog)
 
@@ -439,17 +395,13 @@ class AuditLogRepository(BaseRepository):
     def get_logs_paginated(
         self, offset: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
     ) -> tuple[list[AuditLog], int]:
-        """
-        Retrieve audit logs with pagination and total count
+        """Retrieve audit logs with pagination and total count.
 
-        Args:
-            offset: Offset for pagination
-            limit: Maximum number of results
-            filters: Optional filters. Supported keys:
-                - action: partial match (LIKE %action%)
-                - user_type: exact match
-                - success: exact bool match
-                - since_date: created_at >= since_date
+        Supported ``filters`` keys:
+            - action: partial match (LIKE %action%)
+            - user_type: exact match
+            - success: exact bool match
+            - since_date: created_at >= since_date
 
         Returns:
             Tuple (entries, total_count) where total_count reflects the
@@ -484,15 +436,7 @@ class AuditLogRepository(BaseRepository):
             raise
 
     def cleanup_old_logs(self, days_to_keep: int = 90) -> int:
-        """
-        Clean up old audit logs
-
-        Args:
-            days_to_keep: Number of days to retain
-
-        Returns:
-            Number of deleted logs
-        """
+        """Delete audit logs older than ``days_to_keep`` days and return how many were deleted."""
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
 
@@ -534,21 +478,11 @@ class UsageRepository(BaseRepository):
         estimated: bool = False,
         session_id: str | None = None,
     ) -> LlmUsage:
-        """
-        Create a new per-call usage log entry.
+        """Create a new per-call usage log entry.
 
-        Args:
-            call_type: 'chat' or 'embedding'
-            model: Model name as billed
-            prompt_tokens: Input tokens
-            completion_tokens: Output tokens
-            total_tokens: Total tokens (prompt + completion)
-            cost_eur: Computed cost in euros
-            estimated: True if tokens/cost are estimated (e.g. stream disconnect)
-            session_id: Optional session or "doc:{id}" identifier for traceability
-
-        Returns:
-            Created LlmUsage row
+        ``estimated`` flags token counts/cost that are estimates (e.g. stream
+        disconnect); ``session_id`` is a session or "doc:{id}" identifier for
+        traceability.
         """
         try:
             usage_entry = LlmUsage(
@@ -613,12 +547,8 @@ class UsageRepository(BaseRepository):
             raise
 
     def get_daily_history(self, days_back: int = 30) -> list[dict[str, Any]]:
-        """
-        Aggregate usage per day (and model) for the last `days_back` days,
+        """Aggregate usage per day (and model) for the last `days_back` days,
         ordered by date (dashboard "30 day history" section).
-
-        Args:
-            days_back: Number of days to look back
 
         Returns:
             List of {date, model, calls, tokens, cost_eur}
@@ -666,12 +596,8 @@ class UsageRepository(BaseRepository):
             raise
 
     def cleanup_old_usage(self, days_to_keep: int = 90) -> int:
-        """
-        Purge llm_usage rows older than the retention window (aligned with
+        """Purge llm_usage rows older than the retention window (aligned with
         the audit_log retention policy).
-
-        Args:
-            days_to_keep: Number of days to retain
 
         Returns:
             Number of deleted rows
@@ -786,12 +712,7 @@ class UsageRepository(BaseRepository):
 
 
 def create_repositories(session: Session) -> dict[str, Any]:
-    """
-    Factory to create all repositories with a given session
-
-    Returns:
-        Dictionary containing all repositories
-    """
+    """Factory to create all repositories with a given session"""
     return {
         "document": DocumentRepository(session),
         "config": ConfigurationRepository(session),

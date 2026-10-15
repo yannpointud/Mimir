@@ -67,14 +67,7 @@ class TextExtractor(ABC):
 
     @abstractmethod
     def extract(self, file_path: str) -> str:
-        """
-        Extract text from file
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Extracted text content
+        """Extract text from file
 
         Raises:
             ExtractionError: If extraction fails
@@ -83,27 +76,11 @@ class TextExtractor(ABC):
 
     @abstractmethod
     def can_extract(self, file_path: str) -> bool:
-        """
-        Check if this extractor can handle the file
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            True if extractor can handle this file type
-        """
+        """Check if this extractor can handle the file"""
         pass
 
     def get_metadata(self, file_path: str) -> dict[str, Any]:
-        """
-        Extract metadata from file (optional override)
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Dictionary with metadata
-        """
+        """Extract metadata from file (optional override)"""
         file_path_obj = Path(file_path)
         stat = file_path_obj.stat()
 
@@ -310,12 +287,7 @@ class MarkdownExtractor(TextExtractor):
     """Extract text from Markdown files"""
 
     def __init__(self, convert_to_html: bool = False):
-        """
-        Initialize Markdown extractor
-
-        Args:
-            convert_to_html: If True, convert markdown to HTML first (requires markdown library)
-        """
+        """Optionally convert the Markdown to HTML first (requires the markdown library)."""
         self.convert_to_html = convert_to_html
         if convert_to_html and markdown is None:
             raise ImportError(
@@ -369,7 +341,6 @@ class ExtractorFactory:
         self._initialize_extractors()
 
     def _initialize_extractors(self):
-        """Initialize available extractors"""
         # Add extractors in order of preference
 
         # PDF extractor
@@ -401,15 +372,7 @@ class ExtractorFactory:
         logger.info(f"Initialized {len(self._extractors)} text extractors")
 
     def get_extractor(self, file_path: str) -> TextExtractor | None:
-        """
-        Get appropriate extractor for file
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            TextExtractor instance or None if no suitable extractor found
-        """
+        """Get appropriate extractor for file"""
         for extractor in self._extractors:
             if extractor.can_extract(file_path):
                 return extractor
@@ -418,14 +381,7 @@ class ExtractorFactory:
         return None
 
     def extract_text(self, file_path: str) -> str:
-        """
-        Extract text using appropriate extractor
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Extracted text
+        """Extract text using appropriate extractor
 
         Raises:
             UnsupportedFormatError: If no suitable extractor found

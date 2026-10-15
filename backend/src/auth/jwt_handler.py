@@ -23,7 +23,6 @@ class JWTHandler:
     """Handles JWT token creation, validation, and password operations."""
 
     def __init__(self):
-        """Initialize JWT handler with configuration from settings."""
         self.secret_key = settings.jwt_secret_key
         self.algorithm = settings.jwt_algorithm
         self.expiration_hours = settings.jwt_expiration_hours
@@ -38,16 +37,7 @@ class JWTHandler:
     def create_access_token(
         self, data: dict[str, Any], expires_delta: timedelta | None = None
     ) -> str:
-        """
-        Create a JWT access token.
-
-        Args:
-            data: Dictionary with claims to encode in the token
-            expires_delta: Optional custom expiration time
-
-        Returns:
-            str: The encoded JWT token
-        """
+        """Create a JWT access token."""
         to_encode = data.copy()
 
         # Set expiration time
@@ -67,15 +57,7 @@ class JWTHandler:
             raise
 
     def verify_token(self, token: str) -> dict[str, Any] | None:
-        """
-        Verify and decode a JWT token.
-
-        Args:
-            token: The JWT token to verify
-
-        Returns:
-            Dict containing the token payload if valid, None otherwise
-        """
+        """Verify and decode a JWT token."""
         try:
             payload = jwt.decode(
                 token,
@@ -109,31 +91,14 @@ class JWTHandler:
             return None
 
     def hash_password(self, password: str) -> str:
-        """
-        Hash a password using Argon2 (current default hasher).
-
-        Args:
-            password: The plain text password
-
-        Returns:
-            str: The hashed password
-        """
+        """Hash a password using Argon2 (current default hasher)."""
         if not password:
             raise ValueError("Password cannot be empty")
 
         return self.pwd_context.hash(password)
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """
-        Verify a password against its hash.
-
-        Args:
-            plain_password: The plain text password
-            hashed_password: The hashed password to verify against
-
-        Returns:
-            bool: True if password matches, False otherwise
-        """
+        """Verify a password against its hash."""
         if not plain_password or not hashed_password:
             return False
 
@@ -145,15 +110,7 @@ class JWTHandler:
             return False
 
     def get_token_expiry(self, token: str) -> datetime | None:
-        """
-        Get the expiration time of a token.
-
-        Args:
-            token: The JWT token
-
-        Returns:
-            datetime: The expiration time if valid, None otherwise
-        """
+        """Get the expiration time of a token."""
         payload = self.verify_token(token)
         if payload and "exp" in payload:
             return datetime.utcfromtimestamp(payload["exp"])

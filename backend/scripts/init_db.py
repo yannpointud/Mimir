@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""
-Script d'initialisation de la base de données
-Crée les tables et peut insérer des données de test
+"""Database initialization script.
+
+Creates the tables and can insert test data.
 """
 
 import contextlib
@@ -17,7 +17,6 @@ from src.database.repository import create_repositories
 
 
 def main():
-    """Point d'entrée principal"""
     import argparse
 
     parser = argparse.ArgumentParser(description="Initialize Mimir database")
@@ -61,7 +60,7 @@ def main():
 
 
 def insert_test_data():
-    """Insère des données de test dans la base"""
+    """Insert test data into the database."""
     with db_manager.get_session_context() as session:
         repos = create_repositories(session)
 

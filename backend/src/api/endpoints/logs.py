@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 # Request models
 class FrontendLogEntry(BaseModel):
-    """Frontend log entry model for API requests"""
-
     timestamp: str = Field(..., max_length=64, description="ISO timestamp of the log entry")
     level: str = Field(..., max_length=16, description="Log level (DEBUG, INFO, WARN, ERROR)")
     module: str = Field(..., max_length=128, description="Frontend module name")
@@ -31,8 +29,6 @@ class FrontendLogEntry(BaseModel):
 
 
 class LogResponse(BaseModel):
-    """Response model for log submission"""
-
     status: str = Field(..., description="Status of log submission")
     message: str = Field(..., description="Response message")
 
@@ -50,20 +46,10 @@ router = APIRouter(
 
 @router.post("/frontend", response_model=LogResponse)
 async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
-    """
-    Receive and store a frontend log entry.
+    """Receive and store a frontend log entry.
 
     This endpoint accepts log entries from the frontend application
     and writes them to the dedicated frontend.log file.
-
-    Args:
-        log_entry: Frontend log entry data
-
-    Returns:
-        LogResponse: Confirmation of log storage
-
-    Raises:
-        HTTPException: If log processing fails
     """
     try:
         # Map frontend log levels to Python logging levels
@@ -116,12 +102,7 @@ async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
 
 @router.get("/frontend/health")
 async def frontend_logging_health() -> dict[str, Any]:
-    """
-    Health check for frontend logging system.
-
-    Returns:
-        Dict containing logging system status
-    """
+    """Health check for frontend logging system."""
     try:
         # Check if frontend logger is properly configured
         handlers_count = len(frontend_logger.handlers)

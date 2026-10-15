@@ -13,12 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cors_middleware(app):
-    """
-    Configure CORS middleware for the FastAPI application.
-
-    Args:
-        app: FastAPI application instance
-    """
+    """Configure CORS middleware for the FastAPI application."""
     # CORS configuration based on environment
     if settings.is_production:
         # Production: restrictive CORS

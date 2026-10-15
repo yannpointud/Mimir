@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""
-Script de test pour valider l'impact des paramètres de logging.
-Ce script prouve que settings.log_level est actuellement IGNORÉ.
+"""Test script checking the effect of the logging settings.
+
+This script proves that settings.log_level is currently IGNORED.
 """
 
 import os
@@ -16,7 +16,7 @@ from src.monitoring.logger import app_logger, frontend_logger
 
 
 def test_current_implementation():
-    """Test de l'implémentation actuelle - PROUVE LE BUG"""
+    """Test the current implementation - PROVES THE BUG"""
     print("=" * 80)
     print("TEST: Implémentation actuelle du système de logging")
     print("=" * 80)
@@ -60,7 +60,7 @@ def test_current_implementation():
 
 
 def show_file_sizes():
-    """Affiche la taille des fichiers de logs"""
+    """Show the size of the log files"""
     print("\n" + "=" * 80)
     print("TAILLE DES FICHIERS DE LOGS ACTUELS:")
     print("=" * 80)

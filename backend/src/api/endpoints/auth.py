@@ -36,15 +36,11 @@ router = APIRouter(
 
 
 class LoginRequest(BaseModel):
-    """Request model for login."""
-
     username: str
     password: str
 
 
 class LoginResponse(BaseModel):
-    """Response model for successful login."""
-
     access_token: str
     token_type: str = "bearer"
     expires_in: int
@@ -52,15 +48,11 @@ class LoginResponse(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    """Request model for password change."""
-
     current_password: str
     new_password: str
 
 
 class TokenRefreshResponse(BaseModel):
-    """Response model for token refresh."""
-
     access_token: str
     token_type: str = "bearer"
     expires_in: int
@@ -79,18 +71,10 @@ async def login(
     login_data: LoginRequest,
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> LoginResponse:
-    """
-    Authenticate admin user and return access token.
+    """Authenticate admin user and return access token.
 
-    Args:
-        request: FastAPI request object for IP tracking
-        response: Response object required by slowapi to inject
-            X-RateLimit-* headers on successful (Pydantic) returns
-        login_data: Login credentials
-        audit_repo: Audit log repository for logging attempts
-
-    Returns:
-        LoginResponse: Access token and user information
+    ``response`` is required by slowapi to inject the X-RateLimit-* headers
+    on successful (Pydantic) returns.
     """
     client_ip = _get_client_ip(request)
 
@@ -164,19 +148,10 @@ async def logout(
     current_user: dict[str, Any] = Depends(get_current_user),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> dict[str, str]:
-    """
-    Logout current user (invalidate session).
+    """Logout current user (invalidate session).
 
     Note: Since JWT is stateless, this endpoint mainly serves to log the logout
     event. Client should discard the token.
-
-    Args:
-        request: FastAPI request object for IP tracking
-        current_user: Current authenticated user
-        audit_repo: Audit log repository
-
-    Returns:
-        dict: Logout confirmation message
     """
     client_ip = _get_client_ip(request)
 
@@ -206,17 +181,7 @@ async def refresh_token(
     current_user: dict[str, Any] = Depends(get_current_user),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> TokenRefreshResponse:
-    """
-    Refresh access token for authenticated user.
-
-    Args:
-        request: FastAPI request object
-        current_user: Current authenticated user from token
-        audit_repo: Audit log repository
-
-    Returns:
-        TokenRefreshResponse: New access token
-    """
+    """Refresh access token for authenticated user."""
     client_ip = _get_client_ip(request)
 
     try:
@@ -267,15 +232,7 @@ async def refresh_token(
 async def get_current_user_info(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """
-    Get current authenticated user information.
-
-    Args:
-        current_user: Current authenticated user
-
-    Returns:
-        dict: User information
-    """
+    """Get current authenticated user information."""
     return {
         "username": current_user["sub"],
         "user_type": current_user["user_type"],
@@ -288,15 +245,7 @@ async def get_current_user_info(
 async def verify_admin_access(
     admin_user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, str]:
-    """
-    Verify admin access (protected endpoint for testing admin auth).
-
-    Args:
-        admin_user: Admin user from require_admin dependency
-
-    Returns:
-        dict: Confirmation message
-    """
+    """Verify admin access (protected endpoint for testing admin auth)."""
     return {"message": "Admin access confirmed", "user": admin_user["sub"]}
 
 
@@ -307,18 +256,7 @@ async def change_password(
     admin_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> dict[str, str]:
-    """
-    Change admin password.
-
-    Args:
-        request: FastAPI request object for IP tracking
-        data: Current and new password
-        admin_user: Authenticated admin user
-        audit_repo: Audit log repository
-
-    Returns:
-        dict: Success confirmation
-    """
+    """Change admin password."""
     client_ip = _get_client_ip(request)
     username = admin_user.get("sub", "admin")
 
@@ -369,13 +307,7 @@ async def change_password(
 
 
 def _update_env_file(key: str, value: str) -> None:
-    """
-    Update a key in the backend .env file and refresh in-memory settings.
-
-    Args:
-        key: Environment variable name
-        value: New value
-    """
+    """Update a key in the backend .env file and refresh in-memory settings."""
     env_path = Path(__file__).resolve().parents[3] / ".env"
 
     lines = env_path.read_text(encoding="utf-8").splitlines()
@@ -399,16 +331,7 @@ def _update_env_file(key: str, value: str) -> None:
 
 
 def _authenticate_admin(username: str, password: str) -> bool:
-    """
-    Authenticate admin credentials against configured password.
-
-    Args:
-        username: Username to authenticate
-        password: Password to verify
-
-    Returns:
-        bool: True if authentication successful
-    """
+    """Authenticate admin credentials against configured password."""
     try:
         # For MVP, we use single admin account with configurable password
         expected_username = "admin"
@@ -430,15 +353,6 @@ def _authenticate_admin(username: str, password: str) -> bool:
 
 
 def _get_client_ip(request: Request) -> str:
-    """
-    Extract client IP address from request.
-
-    Args:
-        request: FastAPI request object
-
-    Returns:
-        str: Client IP address
-    """
     # Check for forwarded headers (when behind proxy)
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
@@ -460,17 +374,6 @@ async def _log_auth_event(
     success: bool,
     details: str | None = None,
 ) -> None:
-    """
-    Log authentication event to audit log.
-
-    Args:
-        audit_repo: Audit log repository
-        action: Action being performed
-        username: Username involved
-        ip_address: Client IP address
-        success: Whether action was successful
-        details: Additional details
-    """
     try:
         audit_repo.create_log(
             user_type="admin",

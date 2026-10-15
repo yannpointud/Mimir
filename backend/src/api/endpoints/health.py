@@ -31,12 +31,7 @@ router = APIRouter(
 async def health_check(
     response: Response, db: Session = Depends(get_db_session)
 ) -> HealthCheckResponse:
-    """
-    Comprehensive health check of all system components.
-
-    Returns:
-        HealthCheckResponse: Overall system health status
-    """
+    """Comprehensive health check of all system components."""
     try:
         health_status: dict[str, Any] = {
             "status": "healthy",
@@ -101,34 +96,19 @@ async def health_check(
 
 @router.get("/database", response_model=dict[str, Any])
 async def database_health(db: Session = Depends(get_db_session)) -> dict[str, Any]:
-    """
-    Database-specific health check.
-
-    Returns:
-        dict: Database health information
-    """
+    """Database-specific health check."""
     return await _check_database_health(db)
 
 
 @router.get("/cache", response_model=dict[str, Any])
 async def cache_health() -> dict[str, Any]:
-    """
-    Cache service health check.
-
-    Returns:
-        dict: Cache health information
-    """
+    """Cache service health check."""
     return await _check_cache_health()
 
 
 @router.get("/disk-usage", response_model=dict[str, Any])
 async def disk_usage() -> dict[str, Any]:
-    """
-    Disk usage information for data directories.
-
-    Returns:
-        dict: Disk usage statistics
-    """
+    """Disk usage information for data directories."""
     import shutil
     import os
 
@@ -192,7 +172,6 @@ async def _check_database_health(db: Session) -> dict[str, Any]:
 
 
 async def _check_vector_store_health() -> dict[str, Any]:
-    """Check vector store (FAISS) health."""
     try:
         # This would check if FAISS index is accessible
         # For now, just check if index files exist (pure file-existence
@@ -235,7 +214,7 @@ async def _check_vector_store_health() -> dict[str, Any]:
 
 
 async def _check_llm_health() -> dict[str, Any]:
-    """Check LLM API connectivity."""
+    """Report whether the LLM API key is configured (no live API call)."""
     try:
         # This would test actual LLM API connection
         # For now, just check if API key is configured
@@ -255,7 +234,6 @@ async def _check_llm_health() -> dict[str, Any]:
 
 
 async def _check_cache_health() -> dict[str, Any]:
-    """Check cache service health."""
     try:
         from src.cache.lru_cache import cache_service, chat_cache_service
 
@@ -310,16 +288,12 @@ async def _check_email_health() -> dict[str, Any]:
 
 @router.get("/live")
 async def liveness() -> dict[str, str]:
-    """
-    Liveness probe.
+    """Liveness probe.
 
     Pure process check: returns 200 as long as the ASGI worker can execute
     Python. It performs no dependency I/O (no DB session, no FAISS, no Mistral)
     so a downstream outage (including a Mistral rate-limit/outage) can never
     fail this probe. This is the target of the container HEALTHCHECK.
-
-    Returns:
-        dict: {"status": "alive"}
     """
     return {"status": "alive"}
 

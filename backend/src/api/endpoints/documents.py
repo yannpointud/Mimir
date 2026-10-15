@@ -88,18 +88,7 @@ async def list_documents(
     search: str | None = Query(None, description="Search in filenames"),
     doc_repo: DocumentRepository = Depends(get_document_repository),
 ) -> DocumentListResponse:
-    """
-    List all documents with optional filtering and pagination.
-
-    Args:
-        pagination: Pagination parameters
-        status_filter: Optional status filter
-        search: Optional filename search
-        doc_repo: Document repository
-
-    Returns:
-        DocumentListResponse: List of documents with pagination
-    """
+    """List all documents with optional filtering and pagination."""
     try:
         # Build filters
         filters = {}
@@ -138,16 +127,7 @@ async def list_documents(
 async def get_document(
     document_id: int, doc_repo: DocumentRepository = Depends(get_document_repository)
 ) -> DocumentResponse:
-    """
-    Get specific document by ID.
-
-    Args:
-        document_id: Document ID
-        doc_repo: Document repository
-
-    Returns:
-        DocumentResponse: Document details
-    """
+    """Get specific document by ID."""
     document = doc_repo.get_by_id(document_id)
 
     if not document:
@@ -165,17 +145,7 @@ async def get_document_with_chunks(
     doc_repo: DocumentRepository = Depends(get_document_repository),
     vector_store=Depends(get_vector_store),
 ) -> DocumentWithChunksResponse:
-    """
-    Get specific document by ID with all its chunks and content.
-
-    Args:
-        document_id: Document ID
-        doc_repo: Document repository
-        vector_store: Vector store for retrieving chunks
-
-    Returns:
-        DocumentWithChunksResponse: Document details with chunks
-    """
+    """Get specific document by ID with all its chunks and content."""
     try:
         return await build_document_view(document_id, doc_repo, vector_store)
     except RequestRejectedError as e:
@@ -186,16 +156,7 @@ async def get_document_with_chunks(
 async def download_document(
     document_id: int, doc_repo: DocumentRepository = Depends(get_document_repository)
 ):
-    """
-    Download the original document file.
-
-    Args:
-        document_id: Document ID
-        doc_repo: Document repository
-
-    Returns:
-        FileResponse: The original document file
-    """
+    """Download the original document file."""
     document = doc_repo.get_by_id(document_id)
 
     if not document:
@@ -296,21 +257,10 @@ async def delete_document(
     vector_store=Depends(get_vector_store),
     bm25_store=Depends(get_bm25_store),
 ) -> BaseResponse:
-    """
-    Delete a document and its associated data.
+    """Delete a document and its associated data.
 
-    Args:
-        document_id: Document ID to delete
-        force: Force delete even if protected
-        current_user: Current authenticated user
-        doc_repo: Document repository
-        audit_repo: Audit log repository
-        vector_store: Vector store service
-        bm25_store: BM25 lexical store; rebuilt from the FAISS source of truth
-            after deletion so both indexes stay synchronized
-
-    Returns:
-        BaseResponse: Operation result
+    The BM25 lexical index is rebuilt from the FAISS source of truth after
+    deletion so both indexes stay synchronized.
     """
     try:
         filename = await delete_document_everywhere(
@@ -344,19 +294,7 @@ async def toggle_document_preservation(
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> DocumentResponse:
-    """
-    Toggle document preservation status.
-
-    Args:
-        document_id: Document ID
-        preserve: New preservation status
-        current_user: Current authenticated user
-        doc_repo: Document repository
-        audit_repo: Audit log repository
-
-    Returns:
-        DocumentResponse: Updated document
-    """
+    """Toggle document preservation status."""
     try:
         document = doc_repo.get_by_id(document_id)
         if not document:
@@ -407,19 +345,7 @@ async def reprocess_document(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
     ingestion_processor=Depends(get_ingestion_processor),
 ) -> BaseResponse:
-    """
-    Queue document for reprocessing.
-
-    Args:
-        document_id: Document ID to reprocess
-        current_user: Current authenticated user
-        doc_repo: Document repository
-        audit_repo: Audit log repository
-        ingestion_processor: Ingestion processor service
-
-    Returns:
-        BaseResponse: Operation result
-    """
+    """Queue document for reprocessing."""
     try:
         document = doc_repo.get_by_id(document_id)
         if not document:
@@ -505,16 +431,7 @@ async def get_document_stats(
     doc_repo: DocumentRepository = Depends(get_document_repository),
     vector_store=Depends(get_vector_store),
 ) -> DocumentStatsOverview:
-    """
-    Get document statistics overview with vector store health.
-
-    Args:
-        doc_repo: Document repository
-        vector_store: Vector store service
-
-    Returns:
-        dict: Document statistics with vector store info
-    """
+    """Get document statistics overview with vector store health."""
     try:
         # Database statistics
         db_stats = doc_repo.get_statistics()
@@ -568,20 +485,7 @@ async def validate_vector_store_consistency(
     vector_store=Depends(get_vector_store),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> ConsistencyValidationResponse:
-    """
-    Validate consistency between SQLite and FAISS with optional auto-fix.
-
-    Args:
-        fix_issues: Automatically fix detected issues
-        save_report: Save detailed report to file
-        current_user: Authenticated user
-        doc_repo: Document repository
-        vector_store: Vector store service
-        audit_repo: Audit log repository
-
-    Returns:
-        Dict: Validation results
-    """
+    """Validate consistency between SQLite and FAISS with optional auto-fix."""
     try:
         return index_maintenance.validate_index_consistency(
             vector_store,

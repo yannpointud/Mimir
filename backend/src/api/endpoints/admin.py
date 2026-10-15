@@ -89,15 +89,7 @@ router = APIRouter(
 
 @router.get("/system-info", response_model=dict[str, Any])
 async def get_system_info(current_user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
-    """
-    Get comprehensive system information.
-
-    Args:
-        current_user: Current authenticated admin user
-
-    Returns:
-        dict: System information and statistics
-    """
+    """Get comprehensive system information."""
     try:
         import psutil
         import platform
@@ -165,15 +157,7 @@ async def get_system_info(current_user: dict[str, Any] = Depends(require_admin))
 async def get_cache_stats(
     current_user: dict[str, Any] = Depends(require_admin),
 ) -> CacheStatsResponse:
-    """
-    Get cache service statistics.
-
-    Args:
-        current_user: Current authenticated admin user
-
-    Returns:
-        dict: Cache statistics for all cache services
-    """
+    """Get cache service statistics."""
     try:
         main_cache_stats = cache_service.get_stats()
         chat_cache_stats = chat_cache_service.get_stats()
@@ -214,17 +198,7 @@ async def clear_cache(
     current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> BaseResponse:
-    """
-    Clear cache entries.
-
-    Args:
-        cache_type: Type of cache to clear
-        current_user: Current authenticated admin user
-        audit_repo: Audit log repository
-
-    Returns:
-        BaseResponse: Operation result
-    """
+    """Clear cache entries."""
     try:
         cleared_counts = {}
 
@@ -275,16 +249,7 @@ async def get_configuration(
     current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
 ) -> AdminConfigurationResponse:
-    """
-    Get system configuration settings.
-
-    Args:
-        current_user: Current authenticated admin user
-        config_repo: Configuration repository
-
-    Returns:
-        dict: Current configuration settings with all secrets masked server-side
-    """
+    """Get system configuration settings, with every secret masked server-side."""
     try:
         # Get all configuration from database
         db_config = config_repo.get_all()
@@ -329,18 +294,7 @@ async def update_configuration(
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> BaseResponse:
-    """
-    Update system configuration settings.
-
-    Args:
-        config_updates: Dictionary of configuration updates
-        current_user: Current authenticated admin user
-        config_repo: Configuration repository
-        audit_repo: Audit log repository
-
-    Returns:
-        BaseResponse: Operation result
-    """
+    """Update system configuration settings."""
     try:
         # Drop any masked value resubmitted by the frontend: a mask must never
         # overwrite the real secret nor trigger the allow-list validation
@@ -412,24 +366,11 @@ async def get_audit_log(
     current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> AuditLogPage:
-    """
-    Get audit log entries with filtering.
+    """Get audit log entries with filtering.
 
     The audit log exposes admin usernames, configuration update values and
     client IPs: it must never be readable anonymously (explicit guard kept
     in addition to the router-level default-deny).
-
-    Args:
-        pagination: Pagination parameters
-        action_filter: Optional action filter
-        user_type_filter: Optional user type filter
-        success_filter: Optional success status filter
-        days_back: Number of days to look back
-        current_user: Current authenticated admin user
-        audit_repo: Audit log repository
-
-    Returns:
-        dict: Audit log entries with metadata
     """
     try:
         # Build filters
@@ -497,23 +438,13 @@ async def get_usage(
     usage_repo: UsageRepository = Depends(get_usage_repository),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
 ) -> UsageResponse:
-    """
-    Get today's per-model LLM spend, the daily history, and today's spend
+    """Get today's per-model LLM spend, the daily history, and today's spend
     vs the daily budget cap, for the admin cost dashboard.
 
     Internal cost data must never be readable anonymously (explicit guard
     kept in addition to the router-level default-deny, same convention as
-    get_audit_log).
-
-    Args:
-        days_back: Number of days of history to return (bounded to cap the
-            query window, same convention as get_audit_log)
-        current_user: Current authenticated admin user
-        usage_repo: Usage repository
-
-    Returns:
-        dict: today_by_model aggregates, daily history, today's spend, and
-            the daily budget cap (settings default or hot Admin override)
+    get_audit_log). ``days_back`` is bounded to cap the query window. The
+    cap is the settings default or the hot Admin override.
     """
     try:
         today_by_model = usage_repo.get_today_by_model()
@@ -553,19 +484,7 @@ async def toggle_maintenance_mode(
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> BaseResponse:
-    """
-    Toggle system maintenance mode.
-
-    Args:
-        enabled: Whether to enable maintenance mode
-        message: Optional maintenance message
-        current_user: Current authenticated admin user
-        config_repo: Configuration repository
-        audit_repo: Audit log repository
-
-    Returns:
-        BaseResponse: Operation result
-    """
+    """Toggle system maintenance mode."""
     try:
         # Update maintenance mode configuration
         config_repo.set("maintenance_mode", "true" if enabled else "false")
@@ -612,17 +531,7 @@ async def test_email_service(
     current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> BaseResponse:
-    """
-    Test email service configuration.
-
-    Args:
-        test_email: Email address to send test to
-        current_user: Current authenticated admin user
-        audit_repo: Audit log repository
-
-    Returns:
-        BaseResponse: Test result
-    """
+    """Test email service configuration."""
     try:
         # Send test email
         success = await email_service.send_notification_email(
@@ -839,8 +748,7 @@ async def update_config_alias(
 
 @router.get("/metrics/chat", response_model=dict[str, Any])
 async def get_chat_metrics(current_user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
-    """
-    Get chat system metrics for monitoring dashboard.
+    """Get chat system metrics for monitoring dashboard.
 
     Returns real-time metrics including:
     - Request volume in last hour
@@ -850,15 +758,6 @@ async def get_chat_metrics(current_user: dict[str, Any] = Depends(require_admin)
     - Active sessions estimate
     - Token usage statistics
     - Performance status assessment
-
-    Args:
-        current_user: Current authenticated admin user
-
-    Returns:
-        Dict containing chat metrics and performance indicators
-
-    Raises:
-        HTTPException: If user lacks admin privileges
     """
     try:
         # Import log_parser module to extract real metrics
@@ -885,8 +784,7 @@ async def get_chat_metrics(current_user: dict[str, Any] = Depends(require_admin)
 async def get_usage_analytics(
     current_user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, Any]:
-    """
-    Get comprehensive usage analytics for dashboard.
+    """Get comprehensive usage analytics for dashboard.
 
     Returns analytics data including:
     - Usage trends over multiple time periods
@@ -894,15 +792,6 @@ async def get_usage_analytics(
     - System resource utilization
     - User activity patterns
     - Growth metrics and comparisons
-
-    Args:
-        current_user: Current authenticated admin user
-
-    Returns:
-        Dict containing comprehensive usage analytics
-
-    Raises:
-        HTTPException: If user lacks admin privileges
     """
     try:
         # Import log_parser module to extract analytics
@@ -935,25 +824,10 @@ async def get_system_logs(
     limit: int = Query(50, ge=1, le=200, description="Maximum number of logs to return"),
     current_user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, Any]:
-    """
-    Get filtered system logs from backend and frontend sources.
+    """Get filtered system logs from backend and frontend sources.
 
     This endpoint provides unified access to both backend application logs
     and frontend logs with advanced filtering capabilities.
-
-    Query Parameters:
-        level: Filter by log level (ALL, DEBUG, INFO, WARN, ERROR)
-        source: Filter by source (ALL, backend, frontend)
-        module: Filter by module name (partial match)
-        search: Search text in log messages
-        since: ISO timestamp to get logs since that time
-        limit: Maximum number of logs to return (1-200)
-
-    Returns:
-        Dict containing filtered logs, count info, and metadata
-
-    Raises:
-        HTTPException: If log retrieval fails
     """
     try:
         # Import log reader utility
@@ -1005,17 +879,13 @@ async def rebuild_vector_store(
     bm25_store: Bm25LexicalStore = Depends(get_bm25_store),
     document_repo: DocumentRepository = Depends(get_document_repository),
 ) -> BaseResponse:
-    """
-    Force complete rebuild of the FAISS vector index.
+    """Force complete rebuild of the FAISS vector index.
 
     Optimizes FAISS (dropping deleted entries and orphan chunks of documents
     missing from ``document_repo``), persists it, resyncs the BM25 lexical
     index from the optimized FAISS snapshot so no ghost chunk survives, and
     clears the caches. ``vector_store`` and ``bm25_store`` are the shared
     singletons used by the chat and documents endpoints.
-
-    Raises:
-        HTTPException: If rebuild fails
     """
     try:
         rebuild = await index_maintenance.rebuild_indexes(vector_store, bm25_store, document_repo)

@@ -29,16 +29,6 @@ class DocumentFileHandler(FileSystemEventHandler):
         ignore_hidden: bool = True,
         ignore_temp: bool = True,
     ):
-        """
-        Initialize file handler.
-
-        Args:
-            supported_extensions: Set of file extensions to monitor (e.g. {'.pdf', '.docx'})
-            on_file_added: Callback for new files
-            on_file_modified: Optional callback for modified files
-            ignore_hidden: Whether to ignore hidden files (starting with .)
-            ignore_temp: Whether to ignore temporary files
-        """
         super().__init__()
         self.supported_extensions = {ext.lower() for ext in supported_extensions}
         self.on_file_added = on_file_added
@@ -53,15 +43,6 @@ class DocumentFileHandler(FileSystemEventHandler):
         logger.info(f"DocumentFileHandler initialized - extensions: {self.supported_extensions}")
 
     def _should_ignore_file(self, file_path: str) -> bool:
-        """
-        Check if file should be ignored.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            bool: True if file should be ignored
-        """
         file_name = os.path.basename(file_path)
 
         # Ignore hidden files
@@ -87,16 +68,7 @@ class DocumentFileHandler(FileSystemEventHandler):
         return file_ext not in self.supported_extensions
 
     def _is_recently_processed(self, file_path: str, event_type: str) -> bool:
-        """
-        Check if file was recently processed to avoid duplicates.
-
-        Args:
-            file_path: Path to the file
-            event_type: Type of event (created, modified)
-
-        Returns:
-            bool: True if recently processed
-        """
+        """Check if file was recently processed to avoid duplicates."""
         with self._lock:
             key = f"{file_path}:{event_type}"
             current_time = time.time()
@@ -168,13 +140,7 @@ class DocumentFileHandler(FileSystemEventHandler):
                 logger.error(f"Error processing modified file {file_path}: {e}")
 
     def _wait_for_file_stability(self, file_path: str, max_wait: int = 5):
-        """
-        Wait for file to be stable (no size changes).
-
-        Args:
-            file_path: Path to the file
-            max_wait: Maximum time to wait in seconds
-        """
+        """Wait for file to be stable (no size changes)."""
         if not os.path.exists(file_path):
             return
 
@@ -205,16 +171,6 @@ class FileWatcher:
         on_file_modified: Callable[[str], None] | None = None,
         recursive: bool = True,
     ):
-        """
-        Initialize file watcher.
-
-        Args:
-            watch_directories: List of directories to monitor
-            supported_extensions: Set of file extensions to monitor
-            on_file_added: Callback for new files
-            on_file_modified: Optional callback for modified files
-            recursive: Whether to monitor subdirectories
-        """
         self.watch_directories = [Path(d).resolve() for d in watch_directories]
         self.supported_extensions = supported_extensions
         self.recursive = recursive
@@ -240,12 +196,7 @@ class FileWatcher:
         logger.info(f"FileWatcher initialized - directories: {self.watch_directories}")
 
     def start(self) -> bool:
-        """
-        Start the file watcher.
-
-        Returns:
-            bool: True if started successfully
-        """
+        """Start the file watcher."""
         try:
             if self.is_running:
                 logger.warning("FileWatcher is already running")
@@ -282,15 +233,7 @@ class FileWatcher:
             return False
 
     def stop(self, timeout: int = 5) -> bool:
-        """
-        Stop the file watcher.
-
-        Args:
-            timeout: Timeout in seconds to wait for stop
-
-        Returns:
-            bool: True if stopped successfully
-        """
+        """Stop the file watcher."""
         try:
             if not self.is_running:
                 return True
@@ -308,12 +251,7 @@ class FileWatcher:
             return False
 
     def get_stats(self) -> dict[str, Any]:
-        """
-        Get file watcher statistics.
-
-        Returns:
-            dict: Statistics about file watching activity
-        """
+        """Get file watcher statistics."""
         stats = self.stats.copy()
         stats["is_running"] = self.is_running
         stats["watched_directories"] = [str(d) for d in self.watch_directories]
@@ -325,15 +263,7 @@ class FileWatcher:
         return stats
 
     def add_directory(self, directory: str) -> bool:
-        """
-        Add a new directory to watch.
-
-        Args:
-            directory: Path to directory to add
-
-        Returns:
-            bool: True if added successfully
-        """
+        """Add a new directory to watch."""
         try:
             dir_path = Path(directory).resolve()
 
@@ -358,15 +288,7 @@ class FileWatcher:
             return False
 
     def remove_directory(self, directory: str) -> bool:
-        """
-        Remove a directory from watching.
-
-        Args:
-            directory: Path to directory to remove
-
-        Returns:
-            bool: True if removed successfully
-        """
+        """Remove a directory from watching."""
         try:
             dir_path = Path(directory).resolve()
 
@@ -389,12 +311,7 @@ class FileWatcher:
             return False
 
     def scan_existing_files(self) -> list[str]:
-        """
-        Scan existing files in watched directories.
-
-        Returns:
-            list: List of existing files that match criteria
-        """
+        """Scan existing files in watched directories."""
         existing_files = []
 
         try:

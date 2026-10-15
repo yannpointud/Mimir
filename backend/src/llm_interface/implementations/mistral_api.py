@@ -85,16 +85,9 @@ class MistralAPIService(AbstractLLMService):
         max_retries: int = 3,
         retry_delay: float = 1.0,
     ):
-        """
-        Initialize Mistral API service
+        """Initialize Mistral API service.
 
-        Args:
-            api_key: Mistral API key
-            model: Model for text generation
-            embedding_model: Model for embeddings
-            base_url: Mistral API base URL
-            max_retries: Maximum retry attempts
-            retry_delay: Initial delay between retries (exponential backoff)
+        ``retry_delay`` is the initial delay between retries (exponential backoff).
         """
         self.api_key = api_key
         self._model = model
@@ -122,15 +115,7 @@ class MistralAPIService(AbstractLLMService):
         return self._session
 
     async def _make_request(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """
-        Make HTTP request with retry logic and comprehensive error handling
-
-        Args:
-            endpoint: API endpoint
-            payload: Request payload
-
-        Returns:
-            Response JSON
+        """Make HTTP request with retry logic and comprehensive error handling
 
         Raises:
             LLMAPIError: API communication issues
@@ -238,19 +223,7 @@ class MistralAPIService(AbstractLLMService):
         rag_debug=None,
         **kwargs,
     ) -> GenerationResponse:
-        """
-        Generate text using Mistral API
-
-        Args:
-            prompt: User input prompt
-            system_prompt: Optional system instruction
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0 to 1.0)
-            **kwargs: Additional model parameters
-
-        Returns:
-            GenerationResponse with generated text and metadata
-        """
+        """Generate text using Mistral API"""
         start_time = time.time()
 
         # Build messages array
@@ -348,29 +321,17 @@ class MistralAPIService(AbstractLLMService):
         usage_out: dict[str, Any] | None = None,
         **kwargs,
     ):
-        """
-        Generate text using Mistral API with streaming support.
-        Yields chunks as they arrive from the API.
+        """Generate text using Mistral API with streaming support.
 
-        Args:
-            prompt: User input prompt
-            system_prompt: Optional system instruction
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0 to 1.0)
-            session_id: Optional session ID for logging
-            rag_debug: Optional RAG debug service
-            usage_out: Optional mutable dict populated with real token usage
-                (prompt_tokens, completion_tokens, total_tokens) once the
-                final SSE chunk is received. A generator cannot return a
-                value directly, so this sink is the only channel by which a
-                streaming caller learns real usage after the async-for
-                completes. Left untouched (empty) if the final usage chunk
-                never arrives (schema drift / disconnect), enabling the
-                caller to fall back to estimated usage.
-            **kwargs: Additional model parameters
+        Yields text chunks as they arrive from the API.
 
-        Yields:
-            str: Text chunks as they are generated
+        ``usage_out``, when given, is populated with the real token usage
+        (prompt_tokens, completion_tokens, total_tokens) once the final SSE
+        chunk is received. A generator cannot return a value directly, so this
+        sink is the only channel by which a streaming caller learns real usage
+        after the async-for completes. It is left untouched (empty) if the final
+        usage chunk never arrives (schema drift / disconnect), enabling the
+        caller to fall back to estimated usage.
         """
         start_time = time.time()
         payload = self._stream_payload(prompt, system_prompt, max_tokens, temperature, kwargs)
@@ -476,15 +437,7 @@ class MistralAPIService(AbstractLLMService):
     async def embed(
         self, texts: list[str], session_id: str | None = None, rag_debug=None
     ) -> EmbeddingResponse:
-        """
-        Generate embeddings using Mistral API with batching support
-
-        Args:
-            texts: List of texts to embed
-
-        Returns:
-            EmbeddingResponse with embeddings and metadata
-        """
+        """Generate embeddings using Mistral API with batching support"""
         if not texts:
             raise LLMInvalidRequestError("No texts provided for embedding")
 
@@ -570,16 +523,7 @@ class MistralAPIService(AbstractLLMService):
         session_id: str | None = None,
         rag_debug=None,
     ) -> EmbeddingResponse:
-        """
-        Generate embeddings for a single batch of texts
-
-        Args:
-            texts: List of texts to embed (should be <= batch_size)
-            start_time: Optional start time for timing calculation
-
-        Returns:
-            EmbeddingResponse for this batch
-        """
+        """Generate embeddings for a single batch of texts (at most batch_size)."""
         if start_time is None:
             start_time = time.time()
 
@@ -629,12 +573,7 @@ class MistralAPIService(AbstractLLMService):
             raise LLMAPIError(error_msg) from e
 
     async def health_check(self) -> bool:
-        """
-        Check if Mistral API is available
-
-        Returns:
-            True if service is healthy, False otherwise
-        """
+        """Check if Mistral API is available"""
         try:
             # Simple test with minimal request
             test_payload = {
@@ -670,9 +609,7 @@ class MistralAPIService(AbstractLLMService):
             logger.debug("Mistral API session closed")
 
     async def __aenter__(self):
-        """Async context manager entry"""
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
         await self.close()

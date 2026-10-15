@@ -103,7 +103,7 @@ except Exception as e:  # noqa: BLE001 - CLI boundary: report any failure and ex
 
 
 def generate_long_content(doc_type, subject):
-    """Génère un contenu de document plus long et détaillé."""
+    """Generate a longer, more detailed document content."""
 
     prompt = f"""
     Rédige un document d'entreprise complet et professionnel pour la société "{COMPANY_NAME}".
@@ -134,7 +134,7 @@ def generate_long_content(doc_type, subject):
 
 
 def create_docx(content, filepath):
-    """Crée un fichier .docx à partir du contenu textuel."""
+    """Create a .docx file from the text content."""
     doc = Document()
     for line in content.split("\n"):
         line = line.strip()
@@ -152,7 +152,7 @@ def create_docx(content, filepath):
 
 
 def create_pdf(content, filepath):
-    """Crée un fichier .pdf directement à partir du contenu textuel."""
+    """Create a .pdf file directly from the text content."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -187,7 +187,7 @@ def create_pdf(content, filepath):
 
 
 def main():
-    """Fonction principale pour générer tous les documents."""
+    """Generate every test document."""
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         print(f"Dossier '{OUTPUT_DIR}' créé.")

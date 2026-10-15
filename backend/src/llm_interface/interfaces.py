@@ -78,18 +78,7 @@ class AbstractLLMService(ABC):
         temperature: float = 0.1,
         **kwargs,
     ) -> GenerationResponse:
-        """
-        Generate text response from prompt
-
-        Args:
-            prompt: User input prompt
-            system_prompt: Optional system instruction
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0 to 1.0)
-            **kwargs: Additional model-specific parameters
-
-        Returns:
-            GenerationResponse with generated text and metadata
+        """Generate text response from prompt
 
         Raises:
             LLMAPIError: API communication issues
@@ -110,23 +99,11 @@ class AbstractLLMService(ABC):
         usage_out: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[str]:
-        """
-        Stream the generated text chunk by chunk
+        """Stream the generated text chunk by chunk.
 
-        Args:
-            prompt: User input prompt
-            system_prompt: Optional system instruction
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0 to 1.0)
-            session_id: Optional session ID for debug logging
-            rag_debug: Optional RAG debug service
-            usage_out: Optional dict filled with the real token usage
-                (prompt_tokens, completion_tokens, total_tokens) once the
-                provider reports it; left empty otherwise
-            **kwargs: Additional model-specific parameters
-
-        Yields:
-            Text chunks as they are generated
+        ``usage_out``, when given, is filled with the real token usage
+        (prompt_tokens, completion_tokens, total_tokens) once the provider
+        reports it; it is left empty otherwise.
 
         Raises:
             LLMAPIError: API communication issues
@@ -136,16 +113,7 @@ class AbstractLLMService(ABC):
     async def embed(
         self, texts: list[str], session_id: str | None = None, rag_debug: Any = None
     ) -> EmbeddingResponse:
-        """
-        Generate embeddings for list of texts
-
-        Args:
-            texts: List of texts to embed
-            session_id: Optional session ID for debug logging
-            rag_debug: Optional RAG debug service
-
-        Returns:
-            EmbeddingResponse with embeddings and metadata
+        """Generate embeddings for list of texts
 
         Raises:
             LLMAPIError: API communication issues
@@ -160,12 +128,7 @@ class AbstractLLMService(ABC):
 
     @abstractmethod
     async def health_check(self) -> bool:
-        """
-        Check if LLM service is available
-
-        Returns:
-            True if service is healthy, False otherwise
-        """
+        """Check if LLM service is available"""
         pass
 
     @property

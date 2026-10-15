@@ -1,7 +1,4 @@
-"""
-Main FastAPI application for Mimir
-Application entry point with full configuration - Milestone 3: API & Services
-"""
+"""Main FastAPI application for Mimir: entry point with the full configuration."""
 
 from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -71,10 +68,7 @@ class CustomJSONResponse(JSONResponse):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifespan manager - Milestone 3
-    Initialization at startup, cleanup at shutdown
-    """
+    """Application lifespan manager: initialization at startup, cleanup at shutdown."""
     # Startup
     logger.info("Starting Mimir application - Jalon 3: API & Services...")
 
@@ -411,10 +405,7 @@ app.include_router(logs.router, prefix="/api/v1")
 # Compatibility route for root health check
 @app.get("/health", response_model=HealthCheckResponse)
 async def root_health_check(response: Response):
-    """
-    Root health check for compatibility
-    Delegates to the full Milestone 3 health check
-    """
+    """Root health check kept for compatibility; delegates to the full health check."""
     try:
         # Delegate to the full health check
         from src.api.endpoints.health import health_check

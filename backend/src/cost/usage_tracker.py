@@ -1,12 +1,11 @@
-"""
-UsageTracker: prices and persists a single LLM call's usage row.
+"""UsageTracker: prices and persists a single LLM call's usage row.
 
 Orchestrates pricing.compute_cost_eur() -> UsageRepository.create_usage_entry(),
 opening its own short-lived DB session (db_manager.get_session_context()),
 mirroring BudgetGuard's session lifecycle. Deliberately does NOT import
-src.llm_interface: mistral_api.py stays free of any DB/session coupling
-(see 03-PATTERNS.md), and UsageTracker stays free of any HTTP/gateway
-coupling -- both directions of the layering boundary are enforced.
+src.llm_interface: mistral_api.py stays free of any DB/session coupling,
+and UsageTracker stays free of any HTTP/gateway coupling -- both
+directions of the layering boundary are enforced.
 """
 
 import logging

@@ -20,8 +20,7 @@ __all__ = ["validate_production_secrets"]
 
 
 def validate_production_secrets(settings) -> None:
-    """
-    Refuse to start in production when default secrets are detected.
+    """Refuse to start in production when default secrets are detected.
 
     Pure function taking settings as a parameter (testable without the app).
     Detection rules:
@@ -30,9 +29,6 @@ def validate_production_secrets(settings) -> None:
       against the effective hash, which also catches a hash regenerated
       with a different salt. The effective hash is
       settings.admin_password_hash; there is no DB override.
-
-    Args:
-        settings: Application Settings instance (src.config.Settings)
 
     Raises:
         RuntimeError: In production, when at least one default secret is

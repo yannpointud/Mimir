@@ -15,11 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def validate_password_strength(password: str) -> dict[str, Any]:
-    """
-    Validate password strength against security requirements.
-
-    Args:
-        password: The password to validate
+    """Validate password strength against security requirements.
 
     Returns:
         dict: Validation result with 'valid' boolean and 'errors' list
@@ -72,16 +68,7 @@ def validate_password_strength(password: str) -> dict[str, Any]:
 
 
 def has_sequential_chars(password: str, min_length: int = 3) -> bool:
-    """
-    Check if password contains sequential characters.
-
-    Args:
-        password: The password to check
-        min_length: Minimum length of sequential chars to flag
-
-    Returns:
-        bool: True if sequential characters found
-    """
+    """Check if password contains a run of at least ``min_length`` sequential characters."""
     password = password.lower()
 
     # Check for sequential letters
@@ -100,15 +87,7 @@ def has_sequential_chars(password: str, min_length: int = 3) -> bool:
 
 
 def calculate_password_strength(password: str) -> str:
-    """
-    Calculate password strength score.
-
-    Args:
-        password: The password to evaluate
-
-    Returns:
-        str: Strength level (weak, moderate, strong, very_strong)
-    """
+    """Calculate password strength level: weak, moderate, strong or very_strong."""
     score = 0
 
     # Length scoring
@@ -149,15 +128,7 @@ def calculate_password_strength(password: str) -> str:
 
 
 def generate_secure_password(length: int = 16) -> str:
-    """
-    Generate a cryptographically secure random password.
-
-    Args:
-        length: Desired password length (minimum 8)
-
-    Returns:
-        str: The generated password
-    """
+    """Generate a cryptographically secure random password (``length`` >= 8)."""
     if length < 8:
         raise ValueError("Password length must be at least 8 characters")
 
@@ -200,17 +171,10 @@ def generate_secure_password(length: int = 16) -> str:
 
 
 def is_password_compromised(password: str) -> bool:
-    """
-    Check if password appears in known breach lists.
+    """Check if password appears in known breach lists.
 
     Note: This is a placeholder for future implementation.
     In production, this could integrate with services like HaveIBeenPwned API.
-
-    Args:
-        password: The password to check
-
-    Returns:
-        bool: True if password is known to be compromised
     """
     # For now, just check against a small list of very common passwords
     very_common_passwords = {
@@ -239,15 +203,7 @@ def is_password_compromised(password: str) -> bool:
 
 
 def sanitize_password_error_message(error_messages: list[str]) -> str:
-    """
-    Create a user-friendly error message from password validation errors.
-
-    Args:
-        error_messages: List of error messages
-
-    Returns:
-        str: Combined error message
-    """
+    """Create a user-friendly error message from password validation errors."""
     if not error_messages:
         return "Password is valid"
 

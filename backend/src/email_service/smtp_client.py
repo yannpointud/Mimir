@@ -25,7 +25,6 @@ class EmailService:
     """Handles email sending for escalation and notifications."""
 
     def __init__(self):
-        """Initialize email service with SMTP configuration."""
         self.smtp_host = settings.smtp_host
         self.smtp_port = settings.smtp_port
         self.smtp_user = settings.smtp_user
@@ -45,18 +44,7 @@ class EmailService:
         user_info: dict[str, Any] | None = None,
         context_sources: list[str] | None = None,
     ) -> bool:
-        """
-        Send escalation email to support team.
-
-        Args:
-            user_question: The question that triggered escalation
-            chat_history: Recent chat conversation history
-            user_info: Optional user information (IP, session, etc.)
-            context_sources: Sources used to answer the question
-
-        Returns:
-            bool: True if email sent successfully
-        """
+        """Send escalation email to support team."""
         try:
             if not self._is_configured():
                 logger.error("Email service not configured for escalation")
@@ -94,18 +82,7 @@ class EmailService:
     async def send_notification_email(
         self, to_email: str, subject: str, message: str, is_html: bool = False
     ) -> bool:
-        """
-        Send a general notification email.
-
-        Args:
-            to_email: Recipient email address
-            subject: Email subject
-            message: Email message content
-            is_html: Whether message is HTML formatted
-
-        Returns:
-            bool: True if sent successfully
-        """
+        """Send a general notification email."""
         if not self._is_configured():
             logger.error("Email service not configured")
             return False
@@ -132,19 +109,7 @@ class EmailService:
         html_content: str | None = None,
         attachments: list[dict[str, Any]] | None = None,
     ) -> bool:
-        """
-        Internal method to send email via SMTP.
-
-        Args:
-            to_emails: List of recipient email addresses
-            subject: Email subject
-            text_content: Plain text content
-            html_content: HTML content
-            attachments: Optional list of attachments
-
-        Returns:
-            bool: True if sent successfully
-        """
+        """Internal method to send email via SMTP."""
         try:
             # Create message
             message = MIMEMultipart("alternative")
@@ -189,13 +154,7 @@ class EmailService:
             return False
 
     def _add_attachment(self, message: MIMEMultipart, attachment: dict[str, Any]):
-        """
-        Add attachment to email message.
-
-        Args:
-            message: The email message object
-            attachment: Attachment info dict with 'filename', 'content', 'mime_type'
-        """
+        """Add an attachment (dict with 'filename', 'content', 'mime_type') to the message."""
         try:
             part = MIMEBase("application", "octet-stream")
             part.set_payload(attachment["content"])
@@ -214,7 +173,6 @@ class EmailService:
         user_info: dict[str, Any] | None,
         context_sources: list[str] | None,
     ) -> str:
-        """Generate HTML content for escalation email."""
         template_str = """
         <!DOCTYPE html>
         <html>
@@ -321,7 +279,6 @@ class EmailService:
         user_info: dict[str, Any] | None,
         context_sources: list[str] | None,
     ) -> str:
-        """Generate plain text content for escalation email."""
         content = []
         content.append("MIMIR CHAT ESCALATION")
         content.append("=" * 50)
@@ -370,16 +327,10 @@ class EmailService:
         return "\n".join(content)
 
     def _is_configured(self) -> bool:
-        """Check if email service is properly configured."""
         return bool(self.smtp_host and self.smtp_user and self.escalation_email)
 
     def get_configuration_status(self) -> dict[str, Any]:
-        """
-        Get email service configuration status.
-
-        Returns:
-            dict: Configuration status information
-        """
+        """Get email service configuration status."""
         return {
             "configured": self._is_configured(),
             "smtp_host": bool(self.smtp_host),

@@ -1,7 +1,4 @@
-"""
-SQLAlchemy models for Mimir
-Defines table structure according to LLD specifications
-"""
+"""SQLAlchemy models for Mimir."""
 
 from sqlalchemy import (
     Integer,
@@ -28,10 +25,7 @@ class Base(DeclarativeBase):
 
 
 class Document(Base):
-    """
-    Indexed documents table
-    Follows the schema defined in the LLD with status management and preservation
-    """
+    """Indexed documents table, with status management and preservation."""
 
     __tablename__ = "documents"
 
@@ -57,7 +51,6 @@ class Document(Base):
     )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dictionary for serialization"""
         return {
             "id": self.id,
             "filename": self.filename,
@@ -72,15 +65,12 @@ class Document(Base):
         }
 
     def is_indexed(self) -> bool:
-        """Check if the document is successfully indexed"""
         return self.status == "indexed" and self.chunk_count > 0
 
     def is_processing(self) -> bool:
-        """Check if the document is being processed"""
         return self.status in ["pending", "indexing"]
 
     def has_error(self) -> bool:
-        """Check if the document has an error"""
         return self.status == "error"
 
     def __repr__(self):
@@ -102,7 +92,6 @@ class Configuration(Base):
     )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dictionary"""
         return {"key": self.key, "value": self.value, "updated_at": self.updated_at.isoformat()}
 
     @staticmethod
@@ -125,10 +114,7 @@ class Configuration(Base):
 
 
 class AuditLog(Base):
-    """
-    Audit table for action traceability
-    Follows security specifications with logging of critical actions
-    """
+    """Audit table tracing critical actions."""
 
     __tablename__ = "audit_log"
 
@@ -150,7 +136,6 @@ class AuditLog(Base):
     )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dictionary"""
         return {
             "id": self.id,
             "user_type": self.user_type,
@@ -170,7 +155,6 @@ class AuditLog(Base):
         ip_address: str | None = None,
         success: bool = True,
     ) -> Self:
-        """Factory method to create admin action logs"""
         return cls(
             user_type="admin",
             action=action,
@@ -187,7 +171,6 @@ class AuditLog(Base):
         ip_address: str | None = None,
         success: bool = True,
     ) -> Self:
-        """Factory method to create user action logs"""
         return cls(
             user_type="user", action=action, details=details, ip_address=ip_address, success=success
         )
@@ -196,7 +179,6 @@ class AuditLog(Base):
     def create_system_action(
         cls, action: str, details: str | None = None, success: bool = True
     ) -> Self:
-        """Factory method to create system action logs"""
         return cls(user_type="system", action=action, details=details, success=success)
 
     def __repr__(self):
@@ -234,7 +216,6 @@ class LlmUsage(Base):
     )
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dictionary for serialization"""
         return {
             "id": self.id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -268,7 +249,6 @@ class LlmBudgetLedger(Base):
     spent_eur: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dictionary"""
         return {"date": self.date, "spent_eur": self.spent_eur}
 
     def __repr__(self):
@@ -279,7 +259,6 @@ class LlmBudgetLedger(Base):
 
 
 def create_tables(engine: Engine) -> None:
-    """Create all tables in the database"""
     Base.metadata.create_all(bind=engine)
 
 

@@ -36,15 +36,7 @@ class VectorStoreValidator:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     def validate_consistency(self, fix_issues: bool = False) -> dict[str, Any]:
-        """
-        Validate consistency between SQLite and FAISS.
-
-        Args:
-            fix_issues: If True, attempt to automatically fix inconsistencies
-
-        Returns:
-            Dict with detailed validation report
-        """
+        """Validate consistency between SQLite and FAISS."""
         start_time = datetime.utcnow()
 
         self.logger.info("Starting comprehensive validation between SQLite and FAISS")
@@ -109,7 +101,6 @@ class VectorStoreValidator:
             raise RetrievalError(error_msg) from e
 
     def _get_database_documents(self) -> dict[str, dict[str, Any]]:
-        """Retrieve documents from SQLite."""
         try:
             documents = self.doc_repo.get_all()
             return {
@@ -130,7 +121,6 @@ class VectorStoreValidator:
             raise
 
     def _get_vector_store_documents(self) -> dict[str, list[dict[str, Any]]]:
-        """Retrieve documents from FAISS."""
         try:
             with self.vector_store._lock:
                 vector_docs: dict[str, list[dict[str, Any]]] = {}
@@ -159,7 +149,6 @@ class VectorStoreValidator:
             raise
 
     def _analyze_inconsistencies(self, db_docs: dict, vector_docs: dict) -> dict[str, Any]:
-        """Analyze inconsistencies between the two sources."""
         issues: dict[str, Any] = {
             # Chunks in FAISS without a document in DB
             "orphaned_chunks": _orphaned_chunks(db_docs, vector_docs),
@@ -198,7 +187,6 @@ class VectorStoreValidator:
         return ghost_chunks
 
     def _apply_fixes(self, issues: dict[str, Any]) -> list[dict[str, Any]]:
-        """Apply possible automatic fixes."""
         fixes = []
 
         try:
@@ -299,7 +287,6 @@ class VectorStoreValidator:
         return base_score
 
     def _generate_recommendations(self, issues: dict[str, Any]) -> list[str]:
-        """Generate recommendations based on found issues."""
         recommendations = []
 
         if issues.get("orphaned_chunks"):

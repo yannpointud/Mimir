@@ -32,15 +32,11 @@ class AsyncQueueManager:
         retry_base_delay: float = 2.0,
         retry_max_delay: float = 60.0,
     ):
-        """
-        Initialize async queue manager
+        """Initialize async queue manager.
 
-        Args:
-            max_size: Maximum queue size (0 = unlimited)
-            worker_timeout: Timeout for processing callback
-            stats_interval: Interval for logging statistics
-            retry_base_delay: Base delay (s) for exponential backoff before re-queuing a failed task
-            retry_max_delay: Cap (s) for the exponential backoff between retries
+        ``max_size`` 0 means unlimited. A failed task is re-queued after a capped
+        exponential backoff starting at ``retry_base_delay`` seconds and bounded
+        by ``retry_max_delay`` seconds.
         """
         self.max_size = max_size
         self.worker_timeout = worker_timeout
@@ -74,12 +70,7 @@ class AsyncQueueManager:
         logger.info(f"Async queue manager initialized (max_size={max_size})")
 
     async def start(self, processing_callback: Callable[[IngestionTask], Awaitable[bool]]):
-        """
-        Start the async worker task
-
-        Args:
-            processing_callback: Async function to process tasks, returns True on success
-        """
+        """Start the async worker task"""
         if self.worker_task and not self.worker_task.done():
             logger.warning("Worker task already running")
             return
@@ -96,15 +87,7 @@ class AsyncQueueManager:
         logger.info("Async queue manager started with worker task")
 
     async def stop(self, timeout: float = 30.0) -> bool:
-        """
-        Stop the worker task gracefully
-
-        Args:
-            timeout: Maximum time to wait for worker to stop
-
-        Returns:
-            True if stopped successfully
-        """
+        """Stop the worker task gracefully"""
         if not self.worker_task or self.worker_task.done():
             logger.info("Worker task not running")
             return True
@@ -128,15 +111,7 @@ class AsyncQueueManager:
         return True
 
     def add_task(self, task: IngestionTask) -> bool:
-        """
-        Add task to processing queue
-
-        Args:
-            task: IngestionTask to process
-
-        Returns:
-            True if task was added successfully
-        """
+        """Add task to processing queue"""
         try:
             # Use put_nowait for non-blocking add
             self.queue.put_nowait(task)
@@ -238,11 +213,7 @@ class AsyncQueueManager:
         logger.info("Async worker task stopped")
 
     def _compute_retry_delay(self, retry_count: int) -> float:
-        """
-        Compute the wait before a retry using capped exponential backoff + jitter.
-
-        Args:
-            retry_count: The task's retry attempt number (1 for the first retry)
+        """Compute the wait before a retry using capped exponential backoff + jitter.
 
         Returns:
             Delay in seconds: min(base * 2^(retry_count-1), max) + uniform jitter
@@ -253,15 +224,7 @@ class AsyncQueueManager:
         return delay + random.uniform(0.0, self.retry_base_delay)
 
     async def _process_task(self, task: IngestionTask) -> bool:
-        """
-        Process a single task with timing and error handling
-
-        Args:
-            task: Task to process
-
-        Returns:
-            True if processing succeeded
-        """
+        """Process a single task with timing and error handling"""
         if not self.processing_callback:
             logger.error("No processing callback configured")
             return False
@@ -332,7 +295,6 @@ class AsyncQueueManager:
             self._last_stats_log = current_time
 
     def _log_stats(self):
-        """Log current statistics"""
         stats = self.get_stats()
 
         # Convert datetime objects to ISO strings for JSON serialization
@@ -352,12 +314,7 @@ class AsyncQueueManager:
         )
 
     def get_stats(self) -> dict[str, Any]:
-        """
-        Get current queue statistics
-
-        Returns:
-            Statistics dictionary
-        """
+        """Get current queue statistics"""
         stats_copy = self.stats.copy()
         stats_copy["queue_size"] = self.queue.qsize()
         return stats_copy
@@ -379,12 +336,7 @@ class AsyncQueueManager:
         )
 
     async def clear_queue(self) -> int:
-        """
-        Clear all pending tasks from queue
-
-        Returns:
-            Number of tasks cleared
-        """
+        """Clear all pending tasks from queue and return how many were cleared"""
         count = 0
         try:
             while True:

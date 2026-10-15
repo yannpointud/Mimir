@@ -23,17 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 def get_client_identifier(request: Request) -> str:
-    """
-    Get client identifier for rate limiting.
+    """Get client identifier for rate limiting.
 
     Uses IP address by default, but can be enhanced to use
     authenticated user ID for more sophisticated limiting.
-
-    Args:
-        request: FastAPI request object
-
-    Returns:
-        str: Client identifier
     """
     # Check if user is authenticated
     if hasattr(request.state, "jwt_payload") and request.state.jwt_payload:
@@ -57,14 +50,10 @@ limiter = Limiter(
 
 
 def configure_rate_limiting(app):
-    """
-    Configure rate limiting for the FastAPI application.
+    """Configure rate limiting for the FastAPI application.
 
     Registers the limiter on app.state and the 429 exception handler.
     Deliberately registers NO ASGI middleware (see module docstring).
-
-    Args:
-        app: FastAPI application instance
     """
     app.state.limiter = limiter
 

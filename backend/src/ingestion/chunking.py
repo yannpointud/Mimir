@@ -44,26 +44,11 @@ class ChunkingStrategy:
     """Smart text chunking with sentence and paragraph boundaries"""
 
     def __init__(self, config: ChunkingConfig | None = None):
-        """
-        Initialize chunking strategy
-
-        Args:
-            config: Chunking configuration, uses defaults if None
-        """
         self.config = config or ChunkingConfig()
         logger.debug(f"Chunking strategy initialized: {self.config}")
 
     def chunk_text(self, text: str, source: str = "") -> list[dict[str, Any]]:
-        """
-        Chunk text into smaller segments with overlap
-
-        Args:
-            text: Input text to chunk
-            source: Source identifier for logging
-
-        Returns:
-            List of chunk dictionaries with text and metadata
-        """
+        """Chunk text into smaller segments with overlap"""
         if not text or not text.strip():
             logger.warning(f"Empty text provided for chunking from source: {source}")
             return []
@@ -132,15 +117,7 @@ class ChunkingStrategy:
         return chunks
 
     def _clean_text(self, text: str) -> str:
-        """
-        Clean and normalize text for chunking
-
-        Args:
-            text: Raw input text
-
-        Returns:
-            Cleaned text
-        """
+        """Clean and normalize text for chunking"""
         # Remove excessive whitespace but preserve paragraph breaks
         lines = text.split("\n")
         cleaned_lines = []
@@ -162,8 +139,7 @@ class ChunkingStrategy:
         return result
 
     def _detect_headings(self, text: str) -> list[tuple]:
-        """
-        Detect document headings in reading order from the (line-intact) text.
+        """Detect document headings in reading order from the (line-intact) text.
 
         Detection runs against the CLEANED text — before chunking joins sentences
         with spaces and destroys line boundaries — so raw `#{1,6}` headings are
@@ -175,9 +151,6 @@ class ChunkingStrategy:
         heading in its MARKED form (tag- or `#`-prefixed) inside a chunk, so a
         section title is never confused with the same words appearing in body
         prose (e.g. "Details" the heading vs. "Details" in a sentence).
-
-        Args:
-            text: Cleaned document text
 
         Returns:
             List of (signature_regex, title) in order of appearance
@@ -201,8 +174,7 @@ class ChunkingStrategy:
         return [(signature, title) for _, signature, title in found]
 
     def _assign_section_titles(self, chunks: list[dict[str, Any]], headings: list[tuple]) -> None:
-        """
-        Tag each chunk with its section title by consuming headings in order.
+        """Tag each chunk with its section title by consuming headings in order.
 
         Headings appear across chunks in document order, so a single forward
         pointer suffices: for each chunk, consume every heading whose signature
@@ -210,11 +182,6 @@ class ChunkingStrategy:
         then assign the current section to the chunk. Chunks before the first
         heading get None. This never touches chunk text or positions, so the
         flag-off path stays byte-identical. Mutates the chunk dicts in place.
-
-        Args:
-            chunks: Chunk dicts (carrying 'text'); each gains a 'section_title'.
-            headings: Ordered (signature_regex, title) list from
-                ``_detect_headings``.
         """
         current_section: str | None = None
         index = 0
@@ -230,15 +197,7 @@ class ChunkingStrategy:
             chunk["section_title"] = current_section
 
     def _chunk_by_paragraphs(self, text: str) -> list[dict[str, Any]]:
-        """
-        Chunk text by paragraphs with sentence awareness
-
-        Args:
-            text: Cleaned input text
-
-        Returns:
-            List of chunk data dictionaries
-        """
+        """Chunk text by paragraphs with sentence awareness"""
         paragraphs = re.split(r"\n\s*\n", text)
         chunks: list[dict[str, Any]] = []
         current_chunk = ""
@@ -299,16 +258,7 @@ class ChunkingStrategy:
         return final_chunks
 
     def _chunk_by_sentences(self, text: str, start_offset: int = 0) -> list[dict[str, Any]]:
-        """
-        Chunk text by sentences
-
-        Args:
-            text: Input text
-            start_offset: Starting character offset
-
-        Returns:
-            List of chunk data dictionaries
-        """
+        """Chunk text by sentences"""
         sentences = self._split_sentences(text)
         if not sentences:
             return []
@@ -374,15 +324,7 @@ class ChunkingStrategy:
         return chunks
 
     def _split_sentences(self, text: str) -> list[str]:
-        """
-        Split text into sentences using regex patterns
-
-        Args:
-            text: Input text
-
-        Returns:
-            List of sentences
-        """
+        """Split text into sentences using regex patterns"""
         # Advanced sentence splitting pattern
         # Handles common abbreviations and edge cases
         sentence_pattern = r"""
@@ -419,16 +361,7 @@ class ChunkingStrategy:
         return cleaned_sentences
 
     def _get_overlap_text(self, text: str, overlap_size: int) -> str:
-        """
-        Get overlap text from the end of current chunk
-
-        Args:
-            text: Source text
-            overlap_size: Desired overlap size in characters
-
-        Returns:
-            Overlap text
-        """
+        """Get overlap text from the end of current chunk"""
         if not text or overlap_size <= 0:
             return ""
 
@@ -457,15 +390,7 @@ class ChunkingStrategy:
             return text[-overlap_size:] + " "
 
     def get_chunk_statistics(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
-        """
-        Calculate statistics for chunked text
-
-        Args:
-            chunks: List of chunk data dictionaries
-
-        Returns:
-            Statistics dictionary
-        """
+        """Calculate statistics for chunked text"""
         if not chunks:
             return {
                 "total_chunks": 0,

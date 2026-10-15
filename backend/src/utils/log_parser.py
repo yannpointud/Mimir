@@ -30,7 +30,6 @@ ERROR_LOG = BACKEND_LOG_DIR / "error.log"
 
 
 def _parse_timestamp(timestamp_str: str) -> datetime:
-    """Parse ISO timestamp from logs."""
     try:
         # Format: 2025-09-20T17:21:25.224541Z
         return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
@@ -40,26 +39,19 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
 
 
 def _is_within_last_hour(timestamp: datetime) -> bool:
-    """Check if timestamp is within the last hour."""
     now = datetime.utcnow().replace(tzinfo=timestamp.tzinfo)
     one_hour_ago = now - timedelta(hours=1)
     return one_hour_ago <= timestamp <= now
 
 
 def _is_within_period(timestamp: datetime, period: timedelta) -> bool:
-    """Check if timestamp is within the specified period."""
     now = datetime.utcnow().replace(tzinfo=timestamp.tzinfo)
     period_ago = now - period
     return period_ago <= timestamp <= now
 
 
 def get_chat_requests_last_hour() -> int:
-    """
-    Count chat requests in the last hour from app.log.
-
-    Returns:
-        Number of chat requests in the last hour
-    """
+    """Count chat requests in the last hour from app.log."""
     try:
         if not APP_LOG.exists():
             logger.warning(f"Debug log file not found: {APP_LOG}")
@@ -95,12 +87,7 @@ def get_chat_requests_last_hour() -> int:
 
 
 def get_average_response_time() -> float:
-    """
-    Calculate average response time from Mistral API text generation logs.
-
-    Returns:
-        Average response time in milliseconds
-    """
+    """Calculate average response time from Mistral API text generation logs."""
     try:
         if not APP_LOG.exists():
             logger.warning(f"Debug log file not found: {APP_LOG}")
@@ -142,14 +129,10 @@ def get_average_response_time() -> float:
 
 
 def get_average_tokens_per_request() -> int:
-    """
-    Calculate average total tokens per chat request (input + output).
+    """Calculate average total tokens per chat request (input + output).
 
     Uses actual output tokens from Mistral API logs and estimates input tokens
     using the rule: 1 token ≈ 4 characters.
-
-    Returns:
-        Average total tokens per request (input + output)
     """
     try:
         if not APP_LOG.exists():
@@ -206,12 +189,7 @@ def get_average_tokens_per_request() -> int:
 
 
 def get_success_rate() -> float:
-    """
-    Calculate success rate from HTTP requests in uvicorn.log for the last hour.
-
-    Returns:
-        Success rate as percentage (0-100)
-    """
+    """Success rate (percentage, 0-100) of HTTP requests in uvicorn.log over the last hour."""
     try:
         if not UVICORN_LOG.exists():
             logger.warning(f"Uvicorn log file not found: {UVICORN_LOG}")
@@ -248,12 +226,7 @@ def get_success_rate() -> float:
 
 
 def get_errors_last_hour() -> int:
-    """
-    Count errors in the last hour from error.log and failed HTTP requests.
-
-    Returns:
-        Number of errors in the last hour
-    """
+    """Count errors in the last hour from error.log and failed HTTP requests."""
     try:
         one_hour_ago = datetime.utcnow() - timedelta(hours=1)
         return _count_failed_chat_requests_since(one_hour_ago) + _count_recent_error_log_entries()
@@ -321,12 +294,7 @@ def _is_recent_error_entry(line: str) -> bool:
 
 
 def get_active_sessions_estimate() -> int:
-    """
-    Estimate active sessions based on recent chat activity.
-
-    Returns:
-        Estimated number of active sessions
-    """
+    """Estimate active sessions based on recent chat activity."""
     try:
         # Estimate based on activity in the last 15 minutes
         if not APP_LOG.exists():
@@ -353,12 +321,7 @@ def get_active_sessions_estimate() -> int:
 
 
 def get_chat_metrics() -> dict:
-    """
-    Get all chat metrics in one call.
-
-    Returns:
-        Dictionary with all chat metrics
-    """
+    """Get all chat metrics in one call."""
     requests_last_hour = get_chat_requests_last_hour()
     avg_response_time = get_average_response_time()
     success_rate = get_success_rate()
@@ -377,12 +340,7 @@ def get_chat_metrics() -> dict:
 
 
 def get_usage_analytics() -> dict:
-    """
-    Get comprehensive usage analytics covering multiple time periods and metrics.
-
-    Returns:
-        Dictionary with comprehensive usage analytics
-    """
+    """Get comprehensive usage analytics covering multiple time periods and metrics."""
     from datetime import timedelta
 
     # Calculate metrics for different periods
@@ -431,7 +389,6 @@ def get_usage_analytics() -> dict:
 
 
 def _count_requests_in_period(period: timedelta) -> int:
-    """Count chat requests in a specific time period."""
     try:
         if not APP_LOG.exists():
             return 0
@@ -466,7 +423,6 @@ def _count_requests_in_period(period: timedelta) -> int:
 
 
 def _count_requests_in_timeframe(start_time: datetime, end_time: datetime) -> int:
-    """Count chat requests between two specific datetime points."""
     try:
         if not APP_LOG.exists():
             return 0
@@ -498,14 +454,12 @@ def _count_requests_in_timeframe(start_time: datetime, end_time: datetime) -> in
 
 
 def _get_avg_daily_requests(period: timedelta) -> float:
-    """Calculate average daily requests over a period."""
     total_requests = _count_requests_in_period(period)
     days = period.days or 1
     return round(total_requests / days, 1)
 
 
 def _calculate_growth_rate(current_period: timedelta, previous_period: timedelta) -> float:
-    """Calculate growth rate between two periods."""
     # Calculate requests for the current period
     current_count = _count_requests_in_period(current_period)
 
@@ -530,7 +484,6 @@ def _calculate_growth_rate(current_period: timedelta, previous_period: timedelta
 
 
 def _get_hourly_distribution() -> dict[str, int]:
-    """Get request distribution by hour from real logs."""
     try:
         if not APP_LOG.exists():
             return {}
@@ -605,7 +558,6 @@ def _get_daily_distribution() -> dict[str, int]:
 
 
 def _get_avg_response_time_period(period: timedelta) -> float:
-    """Get average response time for a period."""
     try:
         if not APP_LOG.exists():
             return 0.0
@@ -637,18 +589,15 @@ def _get_avg_response_time_period(period: timedelta) -> float:
 
 
 def _get_success_rate_period(period: timedelta) -> float:
-    """Get success rate for a period."""
     # Simulation based on the observation that the system is stable
     return 97.8
 
 
 def _get_peak_usage_time() -> str:
-    """Get the peak usage time of day."""
     return "14:00-15:00"  # Based on typical observation
 
 
 def _get_total_tokens_period(period: timedelta) -> int:
-    """Get total tokens consumed in a period."""
     try:
         if not APP_LOG.exists():
             return 0
@@ -679,20 +628,17 @@ def _get_total_tokens_period(period: timedelta) -> int:
 
 
 def _get_avg_tokens_per_day(period: timedelta) -> int:
-    """Get average tokens per day."""
     total_tokens = _get_total_tokens_period(period)
     days = period.days or 1
     return int(total_tokens / days)
 
 
 def _estimate_monthly_tokens() -> int:
-    """Estimate monthly token consumption."""
     daily_avg = _get_avg_tokens_per_day(timedelta(days=7))
     return daily_avg * 30
 
 
 def _get_log_file_sizes() -> dict[str, str]:
-    """Get log file sizes."""
     try:
         sizes = {}
         log_files = [("uvicorn.log", UVICORN_LOG), ("app.log", APP_LOG), ("error.log", ERROR_LOG)]
@@ -754,7 +700,6 @@ def _estimate_system_uptime() -> str:
 
 
 def _get_error_rate_period(period: timedelta) -> float:
-    """Get error rate for a period."""
     total_requests = _count_requests_in_period(period)
     if total_requests == 0:
         return 0.0

@@ -60,8 +60,6 @@ router = APIRouter(
 
 
 class ChatRequest(BaseModel):
-    """Request model for chat questions."""
-
     question: str = Field(..., min_length=1, max_length=1000, description="User question")
     session_id: str | None = Field(None, description="Optional session ID for tracking")
     context_limit: int | None = Field(5, ge=1, le=10, description="Maximum context documents")
@@ -69,8 +67,6 @@ class ChatRequest(BaseModel):
 
 
 class SourceReference(BaseModel):
-    """Model for document source references."""
-
     document_id: str
     filename: str
     chunk_text: str
@@ -80,8 +76,6 @@ class SourceReference(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Response model for chat answers."""
-
     answer: str
     sources: list[SourceReference] = []
     confidence_score: float = Field(ge=0.0, le=1.0)
@@ -102,8 +96,6 @@ class EscalationRequest(BaseModel):
 
 
 class EscalationResponse(BaseModel):
-    """Response model for escalation requests."""
-
     success: bool
     message: str
     escalation_id: str | None = None
@@ -129,10 +121,7 @@ async def chat_stream(
     budget_guard: BudgetGuard = Depends(get_budget_guard),
     rag_service: rag_service_module.RagService = Depends(get_rag_service),
 ):
-    """
-    Process user question with streaming response.
-    Returns Server-Sent Events (SSE) stream.
-    """
+    """Process user question with streaming response (Server-Sent Events)."""
     # Budget gate BEFORE the StreamingResponse is returned: once it is, the
     # client already has an implicit 200, so a real 429 is only possible here
     # (never move this check into the stream). Returned rather than raised so
@@ -174,18 +163,7 @@ async def escalate_to_human(
     current_user: dict[str, Any] | None = Depends(get_optional_user),
     email_service: EmailService = Depends(get_email_service),
 ) -> EscalationResponse:
-    """
-    Escalate conversation to human operator.
-
-    Args:
-        request: FastAPI request object
-        escalation_request: Escalation details
-        current_user: Optional authenticated user
-        email_service: Email service for sending escalation
-
-    Returns:
-        EscalationResponse: Escalation status and ID
-    """
+    """Escalate conversation to human operator."""
     try:
         client_ip = _get_client_ip(request)
         escalation_id = _generate_escalation_id()
@@ -239,16 +217,7 @@ async def escalate_to_human(
 async def get_session_history(
     session_id: str, current_user: dict[str, Any] | None = Depends(get_optional_user)
 ) -> dict[str, Any]:
-    """
-    Get chat history for a session.
-
-    Args:
-        session_id: Session identifier
-        current_user: Optional authenticated user
-
-    Returns:
-        dict: Session history
-    """
+    """Get chat history for a session."""
     return {"session_id": session_id, "messages": [], "created_at": datetime.utcnow()}
 
 
@@ -256,23 +225,13 @@ async def get_session_history(
 async def clear_session_history(
     session_id: str, current_user: dict[str, Any] | None = Depends(get_optional_user)
 ) -> BaseResponse:
-    """
-    Clear chat history for a session.
-
-    Args:
-        session_id: Session identifier
-        current_user: Optional authenticated user
-
-    Returns:
-        BaseResponse: Operation result
-    """
+    """Clear chat history for a session."""
     return BaseResponse(
         success=True, message=f"Session {session_id} history cleared", timestamp=datetime.utcnow()
     )
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP address from request."""
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
@@ -285,19 +244,16 @@ def _get_client_ip(request: Request) -> str:
 
 
 def _generate_cache_key(question: str) -> str:
-    """Generate cache key for question."""
     return hashlib.md5(question.lower().strip().encode()).hexdigest()
 
 
 def _generate_escalation_id() -> str:
-    """Generate unique escalation ID."""
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     random_suffix = hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:6]
     return f"ESC-{timestamp}-{random_suffix.upper()}"
 
 
 def _extract_sources_from_history(chat_history: list[dict[str, Any]]) -> list[str]:
-    """Extract source references from chat history."""
     sources = set()
 
     for message in chat_history:

@@ -83,14 +83,7 @@ class AbstractVectorStore(ABC):
 
     @abstractmethod
     def upsert(self, chunks: list[Chunk]) -> bool:
-        """
-        Insert or update chunks in the vector store
-
-        Args:
-            chunks: List of chunks with embeddings to store
-
-        Returns:
-            True if successful, False otherwise
+        """Insert or update chunks in the vector store
 
         Raises:
             VectorStoreOperationError: If upsert operation fails
@@ -105,18 +98,10 @@ class AbstractVectorStore(ABC):
         filter_dict: dict[str, Any] | None = None,
         similarity_floor: float | None = None,
     ) -> list[SearchResult]:
-        """
-        Search for similar vectors
+        """Search for similar vectors, ordered by similarity.
 
-        Args:
-            vector: Query embedding vector
-            top_k: Maximum number of results to return
-            filter_dict: Optional metadata filters
-            similarity_floor: Minimum similarity overriding the store's own
-                threshold (0.0 returns the raw ranking used by hybrid fusion)
-
-        Returns:
-            List of search results ordered by similarity
+        ``similarity_floor`` overrides the store's own minimum similarity (0.0
+        returns the raw ranking used by hybrid fusion).
 
         Raises:
             VectorStoreOperationError: If query operation fails
@@ -125,14 +110,7 @@ class AbstractVectorStore(ABC):
 
     @abstractmethod
     def delete(self, document_id: str) -> bool:
-        """
-        Delete all chunks for a document
-
-        Args:
-            document_id: Document identifier
-
-        Returns:
-            True if successful, False otherwise
+        """Delete all chunks for a document
 
         Raises:
             VectorStoreOperationError: If delete operation fails
@@ -151,21 +129,12 @@ class AbstractVectorStore(ABC):
 
     @abstractmethod
     def health_check(self) -> bool:
-        """
-        Check if vector store is healthy and accessible
-
-        Returns:
-            True if healthy, False otherwise
-        """
+        """Check if vector store is healthy and accessible"""
         pass
 
     @abstractmethod
     def persist(self) -> bool:
-        """
-        Persist current state to disk
-
-        Returns:
-            True if successful, False otherwise
+        """Persist current state to disk
 
         Raises:
             VectorStoreConnectionError: If persistence fails
@@ -174,11 +143,7 @@ class AbstractVectorStore(ABC):
 
     @abstractmethod
     def load(self) -> bool:
-        """
-        Load state from disk
-
-        Returns:
-            True if successful, False otherwise
+        """Load state from disk
 
         Raises:
             VectorStoreConnectionError: If loading fails

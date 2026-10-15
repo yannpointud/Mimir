@@ -164,10 +164,6 @@ def _write_eval_rows(rows: Sequence[dict[str, Any]], path: Path) -> None:
 
     One compact JSON object per line, UTF-8, ``ensure_ascii=False`` so French
     text stays readable. Creates the parent directory if needed.
-
-    Args:
-        rows: The assembled eval rows.
-        path: Destination ``.jsonl`` path.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -40,13 +40,11 @@ class RagDebugService:
     """
 
     def __init__(self):
-        """Initialize RAG debug service with dedicated logger."""
         # Dedicated logger for RAG debug logs
         self.logger = self._setup_rag_debug_logger()
         self.enabled = False  # Will be set from config
 
     def _setup_rag_debug_logger(self) -> logging.Logger:
-        """Setup dedicated logger for RAG debug logs."""
         logger = logging.getLogger("rag_debug")
         logger.setLevel(logging.DEBUG)
 
@@ -98,7 +96,6 @@ class RagDebugService:
             )
 
     def _format_log(self, data: dict[str, Any]) -> str:
-        """Format log data as JSON with proper serialization."""
         # Clean data for JSON serialization
         clean_data = _make_json_serializable(data)
         return json.dumps(clean_data, ensure_ascii=False, indent=None)

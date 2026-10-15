@@ -39,7 +39,6 @@ class LogEntry:
         self.details = details or {}
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for API response"""
         return {
             "timestamp": self.timestamp,
             "level": self.level,
@@ -51,7 +50,6 @@ class LogEntry:
 
 
 def _parse_timestamp(timestamp_str: str) -> datetime:
-    """Parse ISO timestamp string to datetime object"""
     try:
         # Remove 'Z' suffix if present and parse
         if timestamp_str.endswith("Z"):
@@ -167,7 +165,6 @@ def _apply_filters(
     search: str | None = None,
     since: str | None = None,
 ) -> list[LogEntry]:
-    """Apply filters to log entries"""
     filtered_logs = logs
     if level and level != "ALL":
         filtered_logs = _filter_by_level(filtered_logs, level)

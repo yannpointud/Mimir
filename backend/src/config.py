@@ -306,7 +306,6 @@ class Settings(BaseSettings):
         self._ensure_directories()
 
     def _ensure_directories(self):
-        """Create required directories if they do not exist"""
         directories = [
             self.data_dir,
             self.upload_dir,
@@ -326,7 +325,6 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        """Determine if we are in a production environment"""
         return self.environment.lower() == "production"
 
 
