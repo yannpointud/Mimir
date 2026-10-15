@@ -33,10 +33,10 @@ class CacheService:
             ttl_seconds: Time to live for cache entries in seconds
         """
         # Using cachetools.LRUCache instead of a custom implementation
-        self._cache = LRUCache(maxsize=max_size)
+        self._cache: LRUCache[str, Any] = LRUCache(maxsize=max_size)
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self._ttl_seconds = ttl_seconds
-        self._expiry_times = {}
+        self._expiry_times: dict[str, datetime] = {}
         self._stats = {"hits": 0, "misses": 0, "evictions": 0, "total_requests": 0}
         logger.info(f"CacheService initialized - max_size: {max_size}, ttl: {ttl_seconds}s")
 
@@ -346,7 +346,7 @@ class ChatCacheService(CacheService):
         cache_key = self._generate_stream_key(question, corpus_version)
         self.set(cache_key, payload, ttl)
 
-    def invalidate_on_document_change(self, document_ids: list = None):
+    def invalidate_on_document_change(self, document_ids: list[Any] | None = None) -> None:
         """
         Invalidate cache entries when documents change.
 

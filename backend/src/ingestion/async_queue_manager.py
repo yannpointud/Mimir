@@ -9,7 +9,7 @@ import contextlib
 import random
 import time
 from typing import Any
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from .queue_manager import IngestionTask
@@ -54,10 +54,10 @@ class AsyncQueueManager:
         # Worker task management
         self.worker_task: asyncio.Task | None = None
         self.stop_event = asyncio.Event()
-        self.processing_callback: Callable[[IngestionTask], bool] | None = None
+        self.processing_callback: Callable[[IngestionTask], Awaitable[bool]] | None = None
 
         # Statistics and monitoring
-        self.stats = {
+        self.stats: dict[str, Any] = {
             "tasks_processed": 0,
             "tasks_failed": 0,
             "tasks_retried": 0,
@@ -73,7 +73,7 @@ class AsyncQueueManager:
 
         logger.info(f"Async queue manager initialized (max_size={max_size})")
 
-    async def start(self, processing_callback: Callable[[IngestionTask], bool]):
+    async def start(self, processing_callback: Callable[[IngestionTask], Awaitable[bool]]):
         """
         Start the async worker task
 

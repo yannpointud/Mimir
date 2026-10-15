@@ -95,13 +95,18 @@ class FaissVectorStore(AbstractVectorStore):
         # Thread safety
         self._lock = threading.RLock()
 
-        # FAISS index and metadata storage
-        self.index: faiss.Index | None = None
+        # FAISS index and metadata storage. faiss ships no type stubs, so the
+        # index object is untyped; _initialize_index() sets it below.
+        self.index: Any = None
         self.metadata: list[dict[str, Any]] = []
         self.document_to_chunks: dict[str, list[int]] = {}  # document_id -> chunk_ids
 
         # Statistics
-        self._stats = {"total_vectors": 0, "total_documents": 0, "last_updated": None}
+        self._stats: dict[str, Any] = {
+            "total_vectors": 0,
+            "total_documents": 0,
+            "last_updated": None,
+        }
 
         # Create directories if needed
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -210,7 +215,7 @@ class FaissVectorStore(AbstractVectorStore):
                     embeddings.append(embedding)
 
                     # Prepare metadata
-                    metadata = {
+                    metadata: dict[str, Any] = {
                         "document_id": chunk.document_id,
                         "text": chunk.text,  # No truncation - already handled by chunking
                         "source": chunk.source,
@@ -739,7 +744,7 @@ class FaissVectorStore(AbstractVectorStore):
         )
 
     def clean_orphans(
-        self, existing_document_ids: set = None, create_backup: bool = True
+        self, existing_document_ids: set[str] | None = None, create_backup: bool = True
     ) -> dict[str, Any]:
         """
         Clean orphaned chunks whose documents no longer exist in the database.

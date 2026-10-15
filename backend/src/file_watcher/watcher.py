@@ -47,7 +47,7 @@ class DocumentFileHandler(FileSystemEventHandler):
         self.ignore_temp = ignore_temp
 
         # Tracking for avoiding duplicate events
-        self._recently_processed = {}
+        self._recently_processed: dict[str, float] = {}
         self._lock = threading.Lock()
 
         logger.info(f"DocumentFileHandler initialized - extensions: {self.supported_extensions}")
@@ -179,7 +179,7 @@ class DocumentFileHandler(FileSystemEventHandler):
             return
 
         previous_size = -1
-        waited = 0
+        waited: float = 0
 
         while waited < max_wait:
             try:
@@ -229,7 +229,7 @@ class FileWatcher:
         )
 
         # Statistics
-        self.stats = {
+        self.stats: dict[str, Any] = {
             "files_processed": 0,
             "files_added": 0,
             "files_modified": 0,

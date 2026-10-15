@@ -133,7 +133,7 @@ class VectorStoreValidator:
         """Retrieve documents from FAISS."""
         try:
             with self.vector_store._lock:
-                vector_docs = {}
+                vector_docs: dict[str, list[dict[str, Any]]] = {}
 
                 # Iterate through all FAISS metadata
                 for i, meta in enumerate(self.vector_store.metadata):

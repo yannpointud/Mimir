@@ -240,7 +240,7 @@ class ChunkingStrategy:
             List of chunk data dictionaries
         """
         paragraphs = re.split(r"\n\s*\n", text)
-        chunks = []
+        chunks: list[dict[str, Any]] = []
         current_chunk = ""
         current_start = 0
 
