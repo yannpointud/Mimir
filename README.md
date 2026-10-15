@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-teal.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.133-teal.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -27,7 +27,8 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 - Upload manuel de documents (PDF, DOCX, TXT, MD)
 - Liste et gestion des documents indexés
 - Nettoyage automatique des chunks orphelins (rebuild index)
-- Configuration email d'escalade
+- Test de l'email d'escalade (SMTP configuré par variables d'environnement)
+- Changement du mot de passe admin
 - Indicateurs de santé système en temps réel
 - Tableau de bord avec métriques d'utilisation
 - Suivi des coûts IA : plafond budgétaire quotidien + dépense par modèle
@@ -59,57 +60,64 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 #### Backend
 - **Framework** : Python 3.13+, FastAPI, Uvicorn
 - **Base de données** : SQLite (mode WAL)
-- **Index vectoriel** : FAISS (local)
-- **LLM** : Mistral API (mistral-small-latest)
+- **Index** : FAISS (vectoriel, local) + BM25 (lexical, bm25s)
+- **LLM** : Mistral API (mistral-small-latest, embeddings mistral-embed)
 - **Cache** : LRU cache thread-safe avec TTL
 - **Email** : aiosmtplib pour escalades
-- **Auth** : JWT avec bcrypt
+- **Auth** : JWT (PyJWT), mots de passe hachés en Argon2 (pwdlib), bcrypt accepté en vérification
 
 #### Frontend
 - **Framework** : React 18 avec hooks
 - **Build** : Vite
 - **UI** : Tailwind CSS
-- **HTTP** : Axios avec intercepteurs
+- **HTTP** : Axios avec intercepteurs, `fetch` pour le streaming SSE
 - **Routing** : React Router v6
 
 #### Infrastructure
 - **Logs** : Système centralisé JSON structuré
+- **Déploiement** : Docker Compose (backend non-root + frontend nginx)
 
 ### Architecture Modulaire
 
 ```
 backend/
 ├── main.py                    # Point d'entrée FastAPI
-├── src/
-│   ├── api/
-│   │   ├── endpoints/         # Routes REST (chat, documents, admin, auth, health)
-│   │   ├── middleware/        # CORS, rate limiting
-│   │   └── dependencies.py    # Injection de dépendances
-│   ├── auth/                  # JWT, password utils, middleware
-│   ├── cache/                 # LRU cache services
-│   ├── config.py              # Configuration Pydantic centralisée
-│   ├── database/
-│   │   ├── models.py          # Modèles ORM SQLAlchemy
-│   │   ├── repository.py      # Pattern Repository
-│   │   └── connection.py      # Gestion connexions DB
-│   ├── email_service/         # Service SMTP pour escalades
-│   ├── ingestion/
-│   │   ├── processor.py       # Pipeline d'ingestion
-│   │   ├── extractors.py      # Extraction multi-format
-│   │   ├── chunking.py        # Stratégie de découpage
-│   │   └── async_queue_manager.py  # Queue asynchrone
-│   ├── llm_interface/
-│   │   ├── interfaces.py      # Abstractions LLM
-│   │   └── implementations/mistral_api.py
-│   ├── rag_core/
-│   │   ├── interfaces.py      # Abstractions Vector Store
-│   │   └── implementations/faiss_store.py
-│   ├── monitoring/            # Logging centralisé JSON
-│   ├── shared/                # Modèles Pydantic partagés
-│   └── utils/                 # Utilitaires (logs reader, parser)
-└── tests/
-    ├── unit/                  # Tests unitaires
-    └── integration/           # Tests d'intégration
+├── scripts/init_db.py         # Initialisation de la base
+└── src/
+    ├── api/
+    │   ├── endpoints/         # Routes REST (chat, documents, admin, auth, health, logs)
+    │   ├── middleware/        # CORS, rate limiting
+    │   ├── responses.py       # Réponses HTTP partagées (429 budget)
+    │   └── dependencies.py    # Injection de dépendances
+    ├── auth/                  # JWT, password utils, middleware
+    ├── cache/                 # LRU cache services
+    ├── config.py              # Configuration Pydantic centralisée
+    ├── cost/                  # Plafond budgétaire IA, grille de prix, suivi d'usage
+    ├── database/
+    │   ├── models.py          # Modèles ORM SQLAlchemy
+    │   ├── repository.py      # Pattern Repository
+    │   ├── connection.py      # Gestion connexions DB
+    │   └── migrations/        # Migrations Alembic
+    ├── email_service/         # Service SMTP pour escalades
+    ├── file_watcher/          # Surveillance de dossier
+    ├── ingestion/
+    │   ├── processor.py       # Pipeline d'ingestion
+    │   ├── extractors.py      # Extraction multi-format
+    │   ├── chunking.py        # Stratégie de découpage
+    │   └── async_queue_manager.py  # Queue asynchrone
+    ├── llm_interface/
+    │   ├── interfaces.py      # Abstractions LLM
+    │   └── implementations/mistral_api.py
+    ├── rag_core/
+    │   ├── interfaces.py      # Abstractions Vector Store, protocole LexicalIndex
+    │   ├── fusion.py          # Reciprocal Rank Fusion
+    │   ├── tokenizer_fr.py    # Tokenizer BM25
+    │   └── implementations/   # faiss_store.py, bm25_store.py, validation_utils.py
+    ├── security/              # Mot de passe admin, contrôle des secrets au démarrage
+    ├── services/              # Logique des routes : pipeline RAG, flux SSE, upload, suppression, maintenance des index
+    ├── monitoring/            # Logging centralisé JSON, alertes SMTP
+    ├── shared/                # Modèles Pydantic, constantes, exceptions métier (errors.py)
+    └── utils/                 # Utilitaires (logs reader, parser)
 
 frontend/
 ├── src/
@@ -120,8 +128,51 @@ frontend/
 │   ├── services/
 │   │   └── api.js             # Client API centralisé
 │   ├── hooks/                 # Hooks personnalisés (useAuth)
-│   └── utils/                 # Utilitaires (storage, logger, auth)
+│   ├── utils/                 # Utilitaires (storage, logger, auth)
+│   └── test/                  # Tests vitest
 └── package.json
+
+tests/                         # Suite pytest (lancée depuis la racine)
+├── unit/                      # Tests unitaires
+├── integration/               # Tests d'intégration
+├── oracle/                    # Tests de caractérisation (instantanés)
+└── performance/               # Tests de performance
+
+scripts/                       # Sauvegarde SQLite, CI locale, évaluation RAGAS (ragas_eval/)
+docs/adr/                      # Décisions d'architecture
+```
+
+### Décisions d'architecture
+
+Les choix structurants sont décrits dans [docs/adr/](docs/adr/README.md) :
+- [0001](docs/adr/0001-budget-ia-par-reservation.md) : plafond quotidien de dépense IA par réservation ;
+- [0002](docs/adr/0002-recherche-hybride-bm25-rrf.md) : recherche hybride BM25 + dense avec fusion RRF ;
+- [0003](docs/adr/0003-evaluation-ragas.md) : évaluation RAG hors ligne avec RAGAS ;
+- [0004](docs/adr/0004-sqlite-wal-et-faiss-local.md) : SQLite en mode WAL et index FAISS local ;
+- [0005](docs/adr/0005-streaming-sse.md) : réponses du chat en streaming SSE.
+
+### Taille du code
+
+Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) :
+
+| Périmètre | Fichiers | Lignes de code |
+| --- | ---: | ---: |
+| Backend : `backend/src`, `backend/main.py`, `backend/scripts` (Python) | 77 | 9 448 |
+| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 39 | 5 152 |
+| **Code applicatif** | **116** | **14 600** |
+| Tests backend : `tests/` (Python) | 86 | 13 858 |
+| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 15 | 1 381 |
+| **Tests** | **101** | **15 239** |
+| Outillage : `scripts/` (Python, Bash) | 16 | 2 013 |
+
+```bash
+pygount --format=summary --suffix=py backend/src backend/main.py backend/scripts
+pygount --format=summary --merge-embedded-languages --folders-to-skip='...,test' \
+  --names-to-skip='...,*.test.js,*.test.jsx' frontend/src
+pygount --format=summary --suffix=py tests
+pygount --format=summary --merge-embedded-languages frontend/src/test \
+  frontend/src/components/Admin/AnalyticsPanel.budget.test.jsx
+pygount --format=summary --suffix=py,sh scripts
 ```
 
 ## 🚀 Installation et Déploiement
@@ -146,10 +197,12 @@ source venv/bin/activate  # Linux/Mac
 
 # Installer les dépendances (requirements.txt est à la racine du projet)
 pip install -r ../requirements.txt
+# ou, versions et hachages figés :
+# pip install --require-hashes -r ../requirements.lock
 
 # Créer le fichier .env
 cp .env.example .env
-# Éditer .env et configurer MISTRAL_API_KEY
+# Éditer .env : MISTRAL_API_KEY, JWT_SECRET_KEY et le mot de passe admin (voir Configuration)
 
 # Lancer le serveur
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -179,7 +232,7 @@ L'application sera accessible sur :
 docker compose up -d --build
 ```
 
-Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin avant le premier démarrage : en production, le backend refuse de démarrer si ces secrets sont aux valeurs par défaut.
+Le fichier `.env` est lu à la racine du dépôt ou dans `backend/`. Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin (`ADMIN_PASSWORD`) avant le premier démarrage, avec `ENVIRONMENT=production` : le backend refuse alors de démarrer si `JWT_SECRET_KEY` ou le mot de passe admin n'ont pas été changés.
 
 ## ⚙️ Configuration
 
@@ -195,13 +248,13 @@ API_PORT=8000
 DATABASE_URL=sqlite:///./data/sqlite/mimir.db
 SQLITE_WAL_MODE=true
 
-# LLM Configuration
+# LLM Configuration (LLM_PROVIDER est seulement affiché : Mistral est la seule implémentation)
 LLM_PROVIDER=mistral
 MISTRAL_API_KEY=your_mistral_api_key_here
 MISTRAL_MODEL=mistral-small-latest
 MISTRAL_EMBEDDING_MODEL=mistral-embed
 
-# Vector Store
+# Vector Store (VECTOR_STORE_TYPE est seulement affiché : FAISS est la seule implémentation)
 VECTOR_STORE_TYPE=faiss
 FAISS_INDEX_PATH=./data/faiss/index.bin
 FAISS_METADATA_PATH=./data/faiss/metadata.json
@@ -214,7 +267,7 @@ MAX_CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 MAX_FILE_SIZE_MB=100
 
-# Cache
+# Cache (déclarées mais non lues : les caches en mémoire ont une taille fixe)
 CACHE_ENABLED=true
 CACHE_MAX_SIZE=100
 CACHE_TTL=3600
@@ -230,16 +283,30 @@ ESCALATION_EMAIL=support@example.com
 JWT_SECRET_KEY=change_me_to_a_long_random_secret
 JWT_ALGORITHM=HS256
 JWT_EXPIRATION_HOURS=2
-ADMIN_PASSWORD_HASH=your_bcrypt_hash_here
+# Mot de passe admin : définir l'un des deux (voir « Mot de passe admin »)
+# ADMIN_PASSWORD=un_mot_de_passe_robuste
+ADMIN_PASSWORD_HASH=your_argon2_hash_here
 
-# Rate Limiting
+# Rate Limiting (requêtes par minute et par client)
 RATE_LIMIT_ENABLED=true
-RATE_LIMIT_PER_MINUTE=20
+RATE_LIMIT_LOGIN_PER_MINUTE=5
+RATE_LIMIT_CHAT_PER_MINUTE=20
+RATE_LIMIT_UPLOAD_PER_MINUTE=10
 
 # Environment & Logging
 ENVIRONMENT=development
 LOG_LEVEL=INFO
 ```
+
+### Mot de passe admin
+
+L'unique compte d'administration s'appelle `admin`. Son mot de passe se définit de l'une de ces façons :
+
+1. **`ADMIN_PASSWORD`** (variable d'environnement ou `.env`) : le mot de passe en clair, haché au démarrage en mémoire seulement, prioritaire sur `ADMIN_PASSWORD_HASH`. Il doit respecter les règles de robustesse (8 caractères minimum, une majuscule, une minuscule, un chiffre, un caractère spécial) ; en production, un mot de passe trop faible bloque le démarrage. C'est la méthode à utiliser en conteneur.
+2. **`ADMIN_PASSWORD_HASH`** : un hash Argon2, généré par la commande ci-dessous.
+3. **Interface Admin > Configuration** (mot de passe actuel requis) : le nouveau hash est écrit dans `ADMIN_PASSWORD_HASH` du fichier `backend/.env`, qui doit donc exister et être modifiable (ce n'est pas le cas dans l'image Docker). Si `ADMIN_PASSWORD` est défini, il reprend la main au redémarrage suivant.
+
+Sans `ADMIN_PASSWORD` ni `ADMIN_PASSWORD_HASH`, le backend utilise un hash intégré au code source, donc public : il refuse de démarrer en production (`ENVIRONMENT=production`) et journalise un avertissement dans les autres environnements.
 
 ### Génération du hash admin
 
@@ -252,11 +319,7 @@ python -c "from src.auth.jwt_handler import JWTHandler; print(JWTHandler().hash_
 
 ### 1. Connexion Admin
 
-Accédez à l'interface admin via http://localhost:3000/admin et connectez-vous avec :
-- Username : `admin`
-- Password par défaut : `Abc1234`
-
-Le mot de passe peut être modifié depuis l'interface Admin > Configuration.
+Accédez à l'interface admin via http://localhost:3000/admin et connectez-vous avec l'utilisateur `admin` et le mot de passe défini à l'installation (voir [Mot de passe admin](#mot-de-passe-admin)).
 
 ### 2. Upload de Documents
 
@@ -276,13 +339,13 @@ Le mot de passe peut être modifié depuis l'interface Admin > Configuration.
 ### 4. Monitoring
 
 - Tableau de bord admin pour métriques en temps réel
-- Health check : `/api/v1/health`
-- Logs système : `logs/`
+- Health check : `/api/v1/health/`
+- Logs système : `backend/logs/`
 
 ## 🧪 Tests
 
 ```bash
-# Lancer tous les tests (unit + integration + performance)
+# Depuis la racine du dépôt : tous les tests (unit + integration + oracle + performance)
 python -m pytest
 
 # Tests unitaires uniquement
@@ -291,18 +354,46 @@ python -m pytest tests/unit/ -v
 # Tests d'intégration
 python -m pytest tests/integration/ -v
 
+# Tests de caractérisation (contrat OpenAPI, JSON, flux SSE, classement, ingestion)
+python -m pytest tests/oracle/ -v
+
 # Tests de performance
 python -m pytest tests/performance/ -v
 
-# Avec rapport de couverture
-python -m pytest --cov=backend/src --cov-report=html
+# Frontend
+cd frontend && npx vitest run
 ```
 
-La suite de tests (backend ~1000 pytest + frontend ~138 vitest, ~83% coverage backend) couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance.
+La couverture de `backend/src` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
+
+La suite compte 1010 tests pytest (812 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 86,23 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
+
+## 🔍 Qualité et CI
+
+- **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90 ; complexité cyclomatique maximale 15).
+- **Typage** : mypy en mode normal sur `backend/src` (`mypy backend/src`), sans erreur.
+- **Tests** : pytest 9 (pytest-asyncio, pytest-cov), vitest côté frontend.
+- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.txt`, avec une seule exclusion : PYSEC-2026-107 (orjson 3.10.18, maintenu sous 3.11 par mistralai 0.4.2).
+- **Mesures ponctuelles** : radon (complexité), pygount (lignes de code), mutmut (tests de mutation de `rag_core/fusion.py`, `ingestion/chunking.py` et `rag_core/tokenizer_fr.py`, configuré dans `pyproject.toml`).
+
+`bash scripts/local_ci.sh` enchaîne ruff, mypy, pytest et pip-audit (outils installés depuis `requirements-dev.txt`).
+
+La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs ruff, mypy, pytest et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt`. Les tests vitest et le build du frontend ne sont pas exécutés par la CI.
+
+**Dépendances**
+- `requirements.txt` (runtime et tests) et `requirements-dev.txt` (outils de qualité) restent la source.
+- `requirements.lock` et `requirements-dev.lock` en sont dérivés (versions et hachages figés, résolution universelle pour Python 3.13). Les régénérer depuis la racine avec les commandes inscrites dans leur en-tête :
+
+```bash
+uv pip compile requirements.txt --universal --python-version 3.13 --generate-hashes -o requirements.lock
+uv pip compile requirements.txt requirements-dev.txt --universal --python-version 3.13 --generate-hashes -o requirements-dev.lock
+```
+
+- Dependabot (`.github/dependabot.yml`) propose chaque semaine des mises à jour pip, npm (`frontend/`) et GitHub Actions. Pour pip, il ne modifie que les `requirements*.txt` : régénérer les deux lockfiles sur sa branche, sinon la vérification de la CI échoue. Les versions majeures de `mistralai` sont ignorées (la 1.x est un nouveau SDK).
 
 ## 🛠️ API Documentation
 
-L'API REST complète est documentée via OpenAPI/Swagger :
+L'API REST complète est documentée via OpenAPI/Swagger (désactivé quand `ENVIRONMENT=production`) :
 
 **Accès à la documentation :**
 - Swagger UI : http://localhost:8000/docs
@@ -311,15 +402,16 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 ### Endpoints principaux
 
 #### Chat
-- `POST /api/v1/chat` : Envoyer une question
+- `POST /api/v1/chat/stream` : Poser une question (réponse en streaming SSE)
 - `POST /api/v1/chat/escalate` : Escalader vers support humain
 
 #### Documents (Admin)
-- `GET /api/v1/documents` : Lister les documents
+- `GET /api/v1/documents/` : Lister les documents
 - `POST /api/v1/documents/upload` : Upload un document
 - `GET /api/v1/documents/{id}` : Détails d'un document
 - `DELETE /api/v1/documents/{id}` : Supprimer un document
 - `POST /api/v1/documents/{id}/reprocess` : Retraiter un document
+- `POST /api/v1/documents/maintenance/validate-consistency` : Comparer SQLite et FAISS
 
 #### Admin
 - `GET /api/v1/admin/system-info` : Infos système
@@ -332,11 +424,12 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 #### Auth
 - `POST /api/v1/auth/login` : Connexion admin
 - `POST /api/v1/auth/refresh` : Rafraîchir le token
+- `POST /api/v1/auth/change-password` : Changer le mot de passe admin
 
 #### Health
 - `GET /api/v1/health/live` : Liveness (processus seul)
 - `GET /api/v1/health/ready` : Readiness (dépendances : DB, vector store, LLM)
-- `GET /api/v1/health` : Health check complet
+- `GET /api/v1/health/` : Health check complet
 - `GET /api/v1/health/database` : Santé de la BD
 - `GET /api/v1/health/cache` : Santé du cache
 
@@ -346,7 +439,8 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 - Cache LRU avec TTL pour réponses chat
 - Mode WAL SQLite pour concurrence
 - Batch processing pour embeddings
-- Index FAISS optimisé (FlatL2)
+- Index FAISS exact (IndexFlatL2), compacté au-delà de 25 % de vecteurs supprimés
+- Index BM25 reconstruit une seule fois par lot d'ingestion
 - **Nettoyage automatique des chunks orphelins**
 - Scoring adaptatif avec boost nom de fichier
 - Queue asynchrone séquentielle pour ingestion
@@ -357,12 +451,12 @@ L'API REST complète est documentée via OpenAPI/Swagger :
 ### Mesures Implémentées
 - **Authentification** : JWT avec tokens signés
 - **Passwords** : Hash Argon2 (pwdlib), bcrypt legacy rétrocompatible
-- **Secrets** : fail-fast au démarrage en production si JWT_SECRET ou mot de passe admin par défaut
-- **Rate Limiting** : Par type d'endpoint (chat, admin, upload, auth)
+- **Secrets** : fail-fast au démarrage en production si `JWT_SECRET_KEY` ou le mot de passe admin n'ont pas été changés
+- **Rate Limiting** : par client sur le login, le chat et les uploads
 - **CORS** : Configuré selon environnement
 - **Validation** : Pydantic sur tous les inputs
 - **Validation fichiers** : Sanitization des noms de fichiers uploadés
-- **Isolation** : Déploiement sur infrastructure dédiée
+- **Isolation** : Déploiement sur infrastructure dédiée, backend non-root, seul nginx expose un port
 
 ### Conformité
 - RGPD : Données en local uniquement
@@ -413,7 +507,7 @@ curl -X POST http://localhost:8000/api/v1/admin/cache/clear \
 
 #### 5. Chunks orphelins après suppression de documents
 
-Les chunks orphelins sont des chunks vectoriels qui existent dans FAISS mais dont le document parent a été supprimé de la base de données. Ils peuvent causer l'apparition de résultats fantômes dans les recherches.
+Les chunks orphelins sont des chunks vectoriels qui existent dans FAISS mais dont le document parent a été supprimé de la base de données. Ils peuvent causer l'apparition de résultats fantômes dans les recherches. Une suppression n'est écrite sur disque qu'à la prochaine écriture de l'index (ingestion, rebuild, compactage automatique) : si le backend redémarre entre-temps, les chunks du document supprimé réapparaissent jusqu'au prochain rebuild.
 
 **Symptômes :**
 - Documents supprimés qui apparaissent encore dans les résultats de recherche
@@ -428,22 +522,24 @@ curl -X POST http://localhost:8000/api/v1/admin/vector-store/rebuild \
 ```
 
 Le rebuild effectue automatiquement :
+- ✅ Sauvegarde horodatée de l'index FAISS
 - ✅ Détection des chunks orphelins
 - ✅ Marquage comme supprimés  
 - ✅ Optimisation de l'index FAISS
 - ✅ Suppression physique des chunks deleted
+- ✅ Resynchronisation de l'index BM25 et vidage des caches
 
 ### Logs
 
 ```bash
-# Backend logs
-tail -f logs/app.log
+# Backend logs (dossier logs/ du répertoire de lancement d'uvicorn)
+tail -f backend/logs/app.log
 
 # Frontend logs (envoyés au backend)
-tail -f logs/frontend.log
+tail -f backend/logs/frontend.log
 
 # Filtrer par niveau
-grep "ERROR" logs/app.log
+grep "ERROR" backend/logs/app.log
 ```
 
 
@@ -452,10 +548,11 @@ grep "ERROR" logs/app.log
 Ce projet est libre.
 
 ### Standards de Code
-- **Python** : PEP 8, type hints, docstrings
+- **Python** : ruff (lint et format), mypy, type hints, docstrings des API publiques
 - **JavaScript** : ESLint
 - **Commits** : Conventional Commits
-- **Tests** : Couverture ~83% (backend)
+- **Tests** : Couverture 86 % (backend) ; la CI (ruff, mypy, pytest, pip-audit) tourne sur chaque pull request
+- **Décisions** : un ADR par décision d'architecture dans `docs/adr/`
 
 ## 📝 License MIT
 
