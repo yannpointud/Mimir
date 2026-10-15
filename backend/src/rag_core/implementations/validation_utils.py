@@ -158,122 +158,44 @@ class VectorStoreValidator:
             self.logger.error(f"Failed to get vector store documents: {e}")
             raise
 
-    def _analyze_inconsistencies(self, db_docs: dict, vector_docs: dict) -> dict[str, Any]:  # noqa: C901
+    def _analyze_inconsistencies(self, db_docs: dict, vector_docs: dict) -> dict[str, Any]:
         """Analyze inconsistencies between the two sources."""
-        issues = {
-            "orphaned_chunks": [],  # Chunks in FAISS without a document in DB
-            "missing_chunks": [],  # Documents in DB without chunks in FAISS
-            "chunk_count_mismatch": [],  # Inconsistent chunk count
-            "status_inconsistency": [],  # DB status vs presence in FAISS
-            "ghost_chunks": [],  # Chunks marked as deleted but still referenced
-            "metadata_issues": [],  # Missing or inconsistent metadata
+        issues: dict[str, Any] = {
+            # Chunks in FAISS without a document in DB
+            "orphaned_chunks": _orphaned_chunks(db_docs, vector_docs),
+            # Documents in DB without chunks in FAISS
+            "missing_chunks": _missing_chunks(db_docs, vector_docs),
+            # Inconsistent chunk count
+            "chunk_count_mismatch": _chunk_count_mismatches(db_docs, vector_docs),
+            # DB status vs presence in FAISS
+            "status_inconsistency": _status_inconsistencies(db_docs, vector_docs),
+            # Chunks marked as deleted but still referenced
+            "ghost_chunks": self._ghost_chunks(vector_docs),
+            # Missing or inconsistent metadata
+            "metadata_issues": _metadata_issues(vector_docs),
         }
-
-        # 1. Find orphaned chunks (in FAISS but not in DB)
-        for doc_id, chunks in vector_docs.items():
-            if doc_id not in db_docs:
-                active_chunks = [c for c in chunks if not c.get("deleted", False)]
-                if active_chunks:
-                    issues["orphaned_chunks"].append(
-                        {
-                            "document_id": doc_id,
-                            "chunk_count": len(active_chunks),
-                            "total_chunks": len(chunks),
-                            "details": "Document exists in FAISS but not in database",
-                        }
-                    )
-
-        # 2. Find documents without chunks (in DB but not in FAISS)
-        for doc_id, doc_info in db_docs.items():
-            if doc_info["status"] == "indexed" and doc_id not in vector_docs:
-                issues["missing_chunks"].append(
-                    {
-                        "document_id": doc_id,
-                        "filename": doc_info["filename"],
-                        "expected_chunks": doc_info["chunk_count"],
-                        "details": "Document marked as indexed but no chunks in FAISS",
-                    }
-                )
-
-        # 3. Verify chunk count consistency
-        for doc_id in set(db_docs.keys()) & set(vector_docs.keys()):
-            db_chunk_count = db_docs[doc_id]["chunk_count"]
-            vector_active_chunks = len(
-                [c for c in vector_docs[doc_id] if not c.get("deleted", False)]
-            )
-
-            if db_chunk_count != vector_active_chunks:
-                issues["chunk_count_mismatch"].append(
-                    {
-                        "document_id": doc_id,
-                        "filename": db_docs[doc_id]["filename"],
-                        "db_chunk_count": db_chunk_count,
-                        "vector_chunk_count": vector_active_chunks,
-                        "difference": abs(db_chunk_count - vector_active_chunks),
-                    }
-                )
-
-        # 4. Verify status consistency
-        for doc_id, doc_info in db_docs.items():
-            if doc_info["status"] == "indexed":
-                if doc_id not in vector_docs:
-                    # Already captured in missing_chunks
-                    continue
-
-                active_chunks = [c for c in vector_docs[doc_id] if not c.get("deleted", False)]
-                if not active_chunks:
-                    issues["status_inconsistency"].append(
-                        {
-                            "document_id": doc_id,
-                            "filename": doc_info["filename"],
-                            "db_status": doc_info["status"],
-                            "vector_status": "no_active_chunks",
-                            "details": "Document marked as indexed but no active chunks in FAISS",
-                        }
-                    )
-
-        # 5. Find ghost chunks (mapped but deleted)
-        for doc_id, chunk_ids in self.vector_store.document_to_chunks.items():
-            if doc_id in vector_docs:
-                for chunk_id in chunk_ids:
-                    # Find the chunk in metadata
-                    chunk_meta = None
-                    for meta in self.vector_store.metadata:
-                        if meta.get("chunk_id") == chunk_id:
-                            chunk_meta = meta
-                            break
-
-                    if chunk_meta and chunk_meta.get("deleted", False):
-                        issues["ghost_chunks"].append(
-                            {
-                                "document_id": doc_id,
-                                "chunk_id": chunk_id,
-                                "details": "Chunk referenced in mapping but marked as deleted",
-                            }
-                        )
-
-        # 6. Verify essential metadata
-        for doc_id, chunks in vector_docs.items():
-            for chunk in chunks:
-                missing_fields = []
-                if not chunk.get("chunk_index") and chunk.get("chunk_index") != 0:
-                    missing_fields.append("chunk_index")
-                if not chunk.get("indexed_at"):
-                    missing_fields.append("indexed_at")
-
-                if missing_fields:
-                    issues["metadata_issues"].append(
-                        {
-                            "document_id": doc_id,
-                            "chunk_id": chunk.get("chunk_id"),
-                            "missing_fields": missing_fields,
-                        }
-                    )
-
-        # Calculate total
         issues["total_issues"] = sum(len(issues[key]) for key in issues if key != "total_issues")
-
         return issues
+
+    def _ghost_chunks(self, vector_docs: dict) -> list[dict[str, Any]]:
+        """Chunks still mapped to their document but marked as deleted."""
+        ghost_chunks = []
+        for doc_id, chunk_ids in self.vector_store.document_to_chunks.items():
+            if doc_id not in vector_docs:
+                continue
+            for chunk_id in chunk_ids:
+                chunk_meta = next(
+                    (m for m in self.vector_store.metadata if m.get("chunk_id") == chunk_id), None
+                )
+                if chunk_meta and chunk_meta.get("deleted", False):
+                    ghost_chunks.append(
+                        {
+                            "document_id": doc_id,
+                            "chunk_id": chunk_id,
+                            "details": "Chunk referenced in mapping but marked as deleted",
+                        }
+                    )
+        return ghost_chunks
 
     def _apply_fixes(self, issues: dict[str, Any]) -> list[dict[str, Any]]:
         """Apply possible automatic fixes."""
@@ -415,3 +337,100 @@ class VectorStoreValidator:
             recommendations.append("System consistency is good - no immediate action required")
 
         return recommendations
+
+
+def _active(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [c for c in chunks if not c.get("deleted", False)]
+
+
+def _orphaned_chunks(db_docs: dict, vector_docs: dict) -> list[dict[str, Any]]:
+    """Documents with active chunks in FAISS but no record in the database."""
+    orphaned = []
+    for doc_id, chunks in vector_docs.items():
+        if doc_id not in db_docs:
+            active_chunks = _active(chunks)
+            if active_chunks:
+                orphaned.append(
+                    {
+                        "document_id": doc_id,
+                        "chunk_count": len(active_chunks),
+                        "total_chunks": len(chunks),
+                        "details": "Document exists in FAISS but not in database",
+                    }
+                )
+    return orphaned
+
+
+def _missing_chunks(db_docs: dict, vector_docs: dict) -> list[dict[str, Any]]:
+    """Documents marked as indexed in the database but absent from FAISS."""
+    return [
+        {
+            "document_id": doc_id,
+            "filename": doc_info["filename"],
+            "expected_chunks": doc_info["chunk_count"],
+            "details": "Document marked as indexed but no chunks in FAISS",
+        }
+        for doc_id, doc_info in db_docs.items()
+        if doc_info["status"] == "indexed" and doc_id not in vector_docs
+    ]
+
+
+def _chunk_count_mismatches(db_docs: dict, vector_docs: dict) -> list[dict[str, Any]]:
+    """Documents whose database chunk count differs from their active FAISS chunks."""
+    mismatches = []
+    for doc_id in set(db_docs.keys()) & set(vector_docs.keys()):
+        db_chunk_count = db_docs[doc_id]["chunk_count"]
+        vector_active_chunks = len(_active(vector_docs[doc_id]))
+        if db_chunk_count != vector_active_chunks:
+            mismatches.append(
+                {
+                    "document_id": doc_id,
+                    "filename": db_docs[doc_id]["filename"],
+                    "db_chunk_count": db_chunk_count,
+                    "vector_chunk_count": vector_active_chunks,
+                    "difference": abs(db_chunk_count - vector_active_chunks),
+                }
+            )
+    return mismatches
+
+
+def _status_inconsistencies(db_docs: dict, vector_docs: dict) -> list[dict[str, Any]]:
+    """Indexed documents present in FAISS without any active chunk.
+
+    Indexed documents absent from FAISS are reported as missing chunks.
+    """
+    return [
+        {
+            "document_id": doc_id,
+            "filename": doc_info["filename"],
+            "db_status": doc_info["status"],
+            "vector_status": "no_active_chunks",
+            "details": "Document marked as indexed but no active chunks in FAISS",
+        }
+        for doc_id, doc_info in db_docs.items()
+        if doc_info["status"] == "indexed"
+        and doc_id in vector_docs
+        and not _active(vector_docs[doc_id])
+    ]
+
+
+def _metadata_issues(vector_docs: dict) -> list[dict[str, Any]]:
+    """Chunks missing their chunk_index or indexed_at metadata."""
+    issues = []
+    for doc_id, chunks in vector_docs.items():
+        for chunk in chunks:
+            missing_fields = []
+            if not chunk.get("chunk_index") and chunk.get("chunk_index") != 0:
+                missing_fields.append("chunk_index")
+            if not chunk.get("indexed_at"):
+                missing_fields.append("indexed_at")
+
+            if missing_fields:
+                issues.append(
+                    {
+                        "document_id": doc_id,
+                        "chunk_id": chunk.get("chunk_id"),
+                        "missing_fields": missing_fields,
+                    }
+                )
+    return issues

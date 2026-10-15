@@ -757,50 +757,17 @@ class FaissVectorStore(AbstractVectorStore):
         with self._lock:
             try:
                 start_time = time.time()
-
-                # Initial statistics
-                initial_stats = {
-                    "total_chunks": len(self.metadata),
-                    "active_chunks": sum(
-                        1 for meta in self.metadata if not meta.get("deleted", False)
-                    ),
-                    "deleted_chunks": sum(
-                        1 for meta in self.metadata if meta.get("deleted", False)
-                    ),
-                    "total_documents": len(self.document_to_chunks),
-                }
-
+                initial_stats = self._chunk_stats()
                 logger.info(f"Starting orphan cleanup - Initial state: {initial_stats}")
 
-                # Create backup if requested
                 if create_backup:
-                    backup_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                    try:
-                        self._create_backup(backup_timestamp)
-                        logger.info(f"Backup created: {backup_timestamp}")
-                    except Exception as e:  # noqa: BLE001 - best effort: no backup failure may block the cleanup
-                        logger.warning(f"Backup creation failed: {e}")
-                        # Continue despite backup failure
+                    self._backup_before_cleanup()
 
                 # If no document_ids provided, retrieve from DB
                 if existing_document_ids is None:
                     existing_document_ids = self._get_existing_document_ids()
 
-                # Identify orphaned chunks
-                orphaned_chunks = []
-                orphaned_docs = set()
-
-                for meta in self.metadata:
-                    doc_id = meta.get("document_id")
-                    # Skip chunks already marked as deleted
-                    if (
-                        doc_id
-                        and doc_id not in existing_document_ids
-                        and not meta.get("deleted", False)
-                    ):
-                        orphaned_chunks.append(meta)
-                        orphaned_docs.add(doc_id)
-
+                orphaned_chunks, orphaned_docs = self._find_orphans(existing_document_ids)
                 if not orphaned_chunks:
                     logger.info("No orphaned chunks found")
                     return {
@@ -816,39 +783,8 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.info(
                     f"Found {len(orphaned_chunks)} orphaned chunks from {len(orphaned_docs)} documents"
                 )
-
-                # Mark orphaned chunks as deleted
-                cleaned_count = 0
-                for meta in orphaned_chunks:
-                    if not meta.get("deleted", False):
-                        meta["deleted"] = True
-                        meta["deleted_at"] = datetime.utcnow().isoformat()
-                        meta["deletion_reason"] = "orphan_cleanup"
-                        cleaned_count += 1
-
-                # Clean document_to_chunks mapping for orphaned documents
-                for doc_id in orphaned_docs:
-                    if doc_id in self.document_to_chunks:
-                        del self.document_to_chunks[doc_id]
-                        logger.debug(f"Removed orphaned document mapping: {doc_id}")
-
-                # Determine whether to trigger optimization
-                total_chunks_after = len(self.metadata)
-                deleted_chunks_after = sum(
-                    1 for meta in self.metadata if meta.get("deleted", False)
-                )
-                optimization_triggered = False
-
-                if total_chunks_after > 0 and (deleted_chunks_after / total_chunks_after) > 0.25:
-                    logger.info(
-                        f"Triggering optimization after cleanup: {deleted_chunks_after}/{total_chunks_after} chunks deleted"
-                    )
-                    try:
-                        self.optimize()
-                        optimization_triggered = True
-                    except INDEX_BACKEND_ERRORS as e:
-                        logger.warning(f"Optimization failed after cleanup: {e}")
-                        # Don't fail the cleanup if optimization fails
+                cleaned_count = self._mark_orphans_deleted(orphaned_chunks, orphaned_docs)
+                optimization_triggered = self._optimize_after_cleanup()
 
                 # Save changes
                 try:
@@ -858,20 +794,8 @@ class FaissVectorStore(AbstractVectorStore):
                     logger.error(f"Failed to persist cleanup changes: {e}")
                     raise VectorStoreOperationError(f"Cleanup persistence failed: {e}") from e
 
-                # Final statistics
-                final_stats = {
-                    "total_chunks": len(self.metadata),
-                    "active_chunks": sum(
-                        1 for meta in self.metadata if not meta.get("deleted", False)
-                    ),
-                    "deleted_chunks": sum(
-                        1 for meta in self.metadata if meta.get("deleted", False)
-                    ),
-                    "total_documents": len(self.document_to_chunks),
-                }
-
+                final_stats = self._chunk_stats()
                 duration_ms = (time.time() - start_time) * 1000
-
                 result = {
                     "orphaned_chunks_found": len(orphaned_chunks),
                     "orphaned_documents": len(orphaned_docs),
@@ -894,6 +818,70 @@ class FaissVectorStore(AbstractVectorStore):
                 error_msg = f"Orphan cleanup failed: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
+
+    def _chunk_stats(self) -> dict[str, int]:
+        """Chunk and document counts reported before and after an orphan cleanup."""
+        return {
+            "total_chunks": len(self.metadata),
+            "active_chunks": sum(1 for meta in self.metadata if not meta.get("deleted", False)),
+            "deleted_chunks": sum(1 for meta in self.metadata if meta.get("deleted", False)),
+            "total_documents": len(self.document_to_chunks),
+        }
+
+    def _backup_before_cleanup(self) -> None:
+        """Back up the index before an orphan cleanup; a failure never blocks it."""
+        backup_timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        try:
+            self._create_backup(backup_timestamp)
+            logger.info(f"Backup created: {backup_timestamp}")
+        except Exception as e:  # noqa: BLE001 - best effort: no backup failure may block the cleanup
+            logger.warning(f"Backup creation failed: {e}")
+
+    def _find_orphans(self, existing_document_ids: set) -> tuple[list[dict[str, Any]], set]:
+        """Active chunks whose document is not in existing_document_ids, and their documents."""
+        orphaned_chunks = []
+        orphaned_docs = set()
+        for meta in self.metadata:
+            doc_id = meta.get("document_id")
+            # Skip chunks already marked as deleted
+            if doc_id and doc_id not in existing_document_ids and not meta.get("deleted", False):
+                orphaned_chunks.append(meta)
+                orphaned_docs.add(doc_id)
+        return orphaned_chunks, orphaned_docs
+
+    def _mark_orphans_deleted(
+        self, orphaned_chunks: list[dict[str, Any]], orphaned_docs: set
+    ) -> int:
+        """Mark orphaned chunks as deleted and drop their documents' mapping."""
+        cleaned_count = 0
+        for meta in orphaned_chunks:
+            if not meta.get("deleted", False):
+                meta["deleted"] = True
+                meta["deleted_at"] = datetime.utcnow().isoformat()
+                meta["deletion_reason"] = "orphan_cleanup"
+                cleaned_count += 1
+
+        for doc_id in orphaned_docs:
+            if doc_id in self.document_to_chunks:
+                del self.document_to_chunks[doc_id]
+                logger.debug(f"Removed orphaned document mapping: {doc_id}")
+        return cleaned_count
+
+    def _optimize_after_cleanup(self) -> bool:
+        """Optimize the index when more than 25% of its chunks are deleted."""
+        total_chunks_after = len(self.metadata)
+        deleted_chunks_after = sum(1 for meta in self.metadata if meta.get("deleted", False))
+        if total_chunks_after > 0 and (deleted_chunks_after / total_chunks_after) > 0.25:
+            logger.info(
+                f"Triggering optimization after cleanup: {deleted_chunks_after}/{total_chunks_after} chunks deleted"
+            )
+            try:
+                self.optimize()
+                return True
+            except INDEX_BACKEND_ERRORS as e:
+                # Don't fail the cleanup if optimization fails
+                logger.warning(f"Optimization failed after cleanup: {e}")
+        return False
 
     def _create_backup(self, timestamp: str):
         """Create a FAISS backup with timestamp and rotate old backups"""
