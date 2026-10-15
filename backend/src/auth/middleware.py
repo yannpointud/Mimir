@@ -21,6 +21,18 @@ class JWTBearer(HTTPBearer):
     def __init__(self, auto_error: bool = True):
         super().__init__(auto_error=auto_error)
 
+    def make_not_authenticated_error(self) -> HTTPException:
+        """Error raised when the Authorization header is missing or not Bearer.
+
+        FastAPI >= 0.122 answers this case with 401 + WWW-Authenticate. Keep the
+        403 this API has always returned: the frontend treats any 401 as an
+        expired session and redirects to the login page.
+        """
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authenticated"
+        )
+
     async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
         """
         Extract and validate JWT token from Authorization header.
