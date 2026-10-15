@@ -11,7 +11,7 @@ harness -- without going through HTTP. This module imports NOTHING from
 FastAPI.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any
@@ -777,7 +777,7 @@ async def _stream_answer(
     rag_debug: RagDebugService,
     spend: _QuestionSpend,
     answer_parts: list[str],
-) -> AsyncIterator[dict[str, Any]]:
+) -> AsyncGenerator[dict[str, Any]]:
     """Step 5: stream the answer as chunk events and record exactly one chat usage row.
 
     The real usage is recorded when the provider reports it at the end of the
@@ -850,7 +850,7 @@ def _cache_answer(
 
 async def _process_question_with_rag_stream(
     question: str,
-    context_limit: int,
+    context_limit: int | None,
     include_sources: bool,
     session_id: str,
     llm_service: AbstractLLMService,
@@ -987,7 +987,7 @@ class RagService:
     async def answer_stream(
         self,
         question: str,
-        context_limit: int,
+        context_limit: int | None,
         include_sources: bool,
         session_id: str,
         document_repository: DocumentRepository,

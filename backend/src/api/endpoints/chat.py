@@ -14,8 +14,6 @@ from datetime import datetime
 import asyncio
 import logging
 import hashlib
-import json
-import numpy as np
 
 from src.auth.middleware import get_optional_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
@@ -36,13 +34,18 @@ from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.config import settings
 
-# RAG pipeline lives in src.services.rag_service: the stream route
-# delegates to RagService.answer_stream() via Depends(get_rag_service); the
-# route itself stays HTTP-pure (parse + budget gate + cache read + format).
-# Imported as a module (not `from ... import RagService`) so no pipeline symbol
-# is re-exported from this module's namespace -- the former re-import shims are
-# fully gone; only the RagService type hint on the injected dependency remains.
+# RAG pipeline lives in src.services.rag_service and the SSE stream in
+# src.services.chat_stream: the route stays HTTP-pure (parse + budget gate +
+# response). rag_service is imported as a module (not `from ... import
+# RagService`) so no pipeline symbol is re-exported from this module's
+# namespace; only the RagService type hint on the injected dependency remains.
 from src.services import rag_service as rag_service_module
+from src.services.chat_stream import (
+    SSE_HEADERS,
+    ChatQuestion,
+    ChatStream,
+    ReservationSettlement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,167 +133,37 @@ async def chat_stream(
     Process user question with streaming response.
     Returns Server-Sent Events (SSE) stream.
     """
-
-    # Budget gate in the SYNCHRONOUS body, BEFORE StreamingResponse is
-    # constructed/returned: once StreamingResponse is returned
-    # the client already has an implicit 200, so a real 429 is only possible
-    # here. Do NOT move this check inside generate_sse -- that would yield a
-    # 200 with an SSE error event instead of a genuine HTTP 429.
-    #
-    # A returned Response (not a raised exception) also lets slowapi add its
-    # rate-limit headers, exactly like the slowapi 429 handler.
-    #
-    # asyncio.to_thread: reserve() is a blocking SQLite write -- keep it off
-    # the event loop.
+    # Budget gate BEFORE the StreamingResponse is returned: once it is, the
+    # client already has an implicit 200, so a real 429 is only possible here
+    # (never move this check into the stream). Returned rather than raised so
+    # slowapi adds its rate-limit headers. reserve() is a blocking SQLite
+    # write, kept off the event loop.
     reservation: BudgetReservation | None = await asyncio.to_thread(budget_guard.reserve, "chat")
     if reservation is None:
         return budget_exceeded_response()
 
-    # Idempotent settle guard shared between generate_sse() below and the
-    # StreamingResponse background task. An async generator that is never
-    # iterated -- client disconnected before Starlette starts streaming, or
-    # the initial response send failed -- never executes its body nor its
-    # finally blocks, so settlement logic living only inside generate_sse()
-    # cannot cover that case: the reservation would stay charged until the
-    # next daily reset.
-    settle_state = {"settled": False}
-
-    def _release_if_unsettled():
-        """Release the reservation exactly once if no other path settled it.
-
-        Runs as the StreamingResponse background task (after the response
-        completes or the client disconnects) and as generate_sse's own
-        finally fallback; the shared flag makes both call sites idempotent.
-        Sync on purpose: Starlette runs sync background tasks in a
-        threadpool, so the blocking SQLite write never blocks the loop.
-        """
-        if not settle_state["settled"]:
-            settle_state["settled"] = True
-            budget_guard.release(reservation)
-
-    def convert_numpy_types(obj):
-        """Recursively convert numpy types to native Python types."""
-        if isinstance(obj, dict):
-            return {k: convert_numpy_types(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [convert_numpy_types(item) for item in obj]
-        elif isinstance(obj, (np.integer, np.int32, np.int64)):
-            return int(obj)
-        elif isinstance(obj, (np.floating, np.float32, np.float64)):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        else:
-            return obj
-
-    async def generate_sse():
-        start_time = datetime.utcnow()
-        client_ip = _get_client_ip(request)
-
-        try:
-            session_id = chat_request.session_id or _generate_session_id(
-                chat_request.question, client_ip
-            )
-
-            # Send start event
-            yield f"data: {json.dumps({'type': 'start', 'session_id': session_id})}\n\n"
-
-            rag_debug.log_user_request(
-                session_id=session_id,
-                question=chat_request.question,
-                user_context={
-                    "client_ip": client_ip,
-                    "user_type": current_user.get("user_type") if current_user else "anonymous",
-                    "streaming": True,
-                },
-                context_limit=chat_request.context_limit,
-            )
-
-            # Snapshot the corpus version BEFORE consulting the cache: it is
-            # part of the server-derived cache key, so any ingestion/deletion
-            # (which bumps FaissVectorStore.last_updated) implicitly
-            # invalidates all prior entries. The vector store lives inside the
-            # injected RagService (the route does not depend on it directly).
-            corpus_version = rag_service.vector_store.get_corpus_version()
-
-            # Check the corpus-aware SSE cache
-            cached_response = chat_cache.get_stream_response(chat_request.question, corpus_version)
-
-            if cached_response:
-                # No LLM call happens on a cache hit: release the reservation
-                # so the daily ledger is not charged for work never done.
-                # Mark settled BEFORE releasing so no other path can
-                # double-settle even if release itself raises.
-                settle_state["settled"] = True
-                await asyncio.to_thread(budget_guard.release, reservation)
-                yield f"data: {json.dumps({'type': 'chunk', 'content': cached_response['answer']})}\n\n"
-                # Replay the citation event before done so a cache hit is
-                # byte-for-byte indistinguishable from a fresh stream:
-                # the live pipeline yields chunk -> citation -> done, and the
-                # frontend must receive its [N] -> source map on hits too.
-                yield f"data: {json.dumps({'type': 'citation', 'citations': cached_response.get('citations', {})})}\n\n"
-                yield f"data: {json.dumps({'type': 'done', 'sources': cached_response.get('sources', []), 'confidence_score': cached_response.get('confidence_score', 0.0), 'cached': True})}\n\n"
-                return
-
-            # Delegate to the RAG service stream. RagService.answer_stream()
-            # always settles the reservation internally in its outer finally
-            # (finalize on success/partial usage, release if no LLM call was
-            # made) before the generator finishes, including on a mid-stream
-            # disconnect. It also writes the corpus-aware SSE cache after a
-            # successful done event (passing corpus_version below). The
-            # llm_service / vector_store / usage_tracker collaborators live
-            # inside the injected RagService.
-            settle_state["settled"] = True
-            async for event in rag_service.answer_stream(
-                question=chat_request.question,
-                context_limit=chat_request.context_limit,
-                include_sources=chat_request.include_sources,
-                session_id=session_id,
-                document_repository=document_repository,
-                reservation=reservation,
-                corpus_version=corpus_version,
-            ):
-                # Convert all numpy types before serialization
-                event = convert_numpy_types(event)
-                yield f"data: {json.dumps(event)}\n\n"
-
-            end_time = datetime.utcnow()
-            response_time_ms = int((end_time - start_time).total_seconds() * 1000)
-            logger.info(f"Streaming completed - session: {session_id}, time: {response_time_ms}ms")
-
-        except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event
-            logger.error(f"Streaming error: {type(e).__name__} - {str(e)}")
-            # Never leak raw exception details to the client (info disclosure);
-            # the full error is kept in the server logs above.
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Une erreur interne est survenue.'})}\n\n"
-
-        finally:
-            # Settle-once fallback: covers GeneratorExit (client disconnect
-            # at a yield point) and asyncio.CancelledError, neither of which
-            # the `except Exception` above catches. No-op when the cache-hit
-            # branch or the RAG stream pipeline already settled the
-            # reservation. Awaiting (no yield) inside an async generator's
-            # finally is legal during aclose(); asyncio.to_thread keeps the
-            # blocking SQLite write off the event loop.
-            if not settle_state["settled"]:
-                settle_state["settled"] = True
-                await asyncio.to_thread(budget_guard.release, reservation)
-
-    # background=BackgroundTask(...) is the never-iterated-generator guard:
-    # if the client disconnects before Starlette pulls the first SSE byte
-    # (or the initial response send fails), generate_sse()'s body/finally
-    # never run -- Starlette still runs the background task after the
-    # response terminates, which then releases the orphaned reservation.
-    # The shared settled flag keeps it a no-op in every normal case.
+    settlement = ReservationSettlement(budget_guard, reservation)
+    stream = ChatStream(
+        rag_service=rag_service,
+        chat_cache=chat_cache,
+        document_repository=document_repository,
+        rag_debug=rag_debug,
+    )
+    question = ChatQuestion(
+        question=chat_request.question,
+        session_id=chat_request.session_id,
+        context_limit=chat_request.context_limit,
+        include_sources=chat_request.include_sources,
+        client_ip=_get_client_ip(request),
+        current_user=current_user,
+    )
+    # The background task releases the reservation if the stream is never
+    # iterated (client gone before the first byte); a no-op otherwise.
     return StreamingResponse(
-        generate_sse(),
+        stream.events(question, settlement),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-        background=BackgroundTask(_release_if_unsettled),
+        headers=SSE_HEADERS,
+        background=BackgroundTask(settlement.release_if_unsettled),
     )
 
 
@@ -409,13 +282,6 @@ def _get_client_ip(request: Request) -> str:
         return real_ip
 
     return request.client.host if request.client else "unknown"
-
-
-def _generate_session_id(question: str, client_ip: str) -> str:
-    """Generate unique session ID based on question and IP."""
-    timestamp = datetime.utcnow().isoformat()
-    data = f"{question[:50]}:{client_ip}:{timestamp}"
-    return hashlib.md5(data.encode()).hexdigest()[:16]
 
 
 def _generate_cache_key(question: str) -> str:

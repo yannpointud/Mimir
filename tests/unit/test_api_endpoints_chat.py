@@ -367,9 +367,9 @@ class TestChatHelperFunctions:
 
     def test_generate_session_id(self):
         """Test session ID generation."""
-        from backend.src.api.endpoints.chat import _generate_session_id
+        from src.services.chat_stream import generate_session_id
 
-        session_id = _generate_session_id("Test question", "127.0.0.1")
+        session_id = generate_session_id("Test question", "127.0.0.1")
 
         assert isinstance(session_id, str)
         assert len(session_id) == 16  # Truncated MD5 hash
