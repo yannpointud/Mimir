@@ -142,3 +142,102 @@ passes 2 et 3 les retirent.
 
 Nouveau job `ruff` bloquant (`ruff check .` et `ruff format --check .`) ;
 `scripts/local_ci.sh` exécute aussi `ruff format --check .`.
+
+## Passe 2 : erreurs
+
+### D2.1 Familles d'exceptions métier
+
+`backend/src/shared/errors.py` définit `MimirError` et quatre familles :
+`IngestionError`, `RetrievalError`, `LLMError`, `BudgetExceeded`. Les
+exceptions existantes y sont rattachées sans changer de nom (elles sont
+importées par les tests gelés) : `LLMException` hérite de `LLMError`,
+`VectorStoreException` de `RetrievalError`, `ExtractionError` et
+`ProcessingError` d'`IngestionError`. `BudgetExceededError` reste importable
+depuis `src.cost.budget_guard` comme alias de `BudgetExceeded`.
+
+### D2.2 Traduction HTTP
+
+`main.py` enregistre deux handlers : `BudgetExceeded` vers le 429
+`budget_exceeded` (le même que la route de chat, construit par
+`src/api/responses.py`) et `MimirError` vers la même réponse 500 que le
+handler générique. Aucune route ne laisse aujourd'hui s'échapper une
+exception métier : ces handlers ne changent aucune réponse existante. La
+route de chat continue de *renvoyer* son 429 plutôt que de lever
+`BudgetExceeded`, sinon slowapi n'ajouterait plus ses en-têtes `X-RateLimit-*`
+à cette réponse.
+
+### D2.3 Ce qui reste en `except Exception`
+
+65 `except Exception` restent dans le backend (contre 188 avec `main.py`),
+tous annotés `# noqa: BLE001 - <raison>` et accompagnés d'un log :
+
+| Raison | Nombre |
+| --- | --- |
+| Frontière API (route : erreur inattendue vers 500 générique, échec de file vers 500) | 30 |
+| Sonde de santé (tout échec rapporté comme composant en mauvaise santé) | 8 |
+| Effet de bord « au mieux » dans une route ou imposé par un test gelé | 6 |
+| Worker d'ingestion | 5 |
+| Portée de transaction SQLAlchemy (rollback puis relance) | 4 |
+| Démarrage et arrêt de l'application (lifespan) | 5 |
+| Thread de l'observateur de fichiers | 2 |
+| Stream SSE | 2 |
+| Décorateur transparent, handler de log d'alerte, authentification « fail closed » | 3 |
+
+Les six « au mieux » sont des cas où l'oracle ou un test gelé fixe le
+comportement face à une exception quelconque : récupération des chunks dans
+la vue lecteur, extraction du contenu, retrait de l'index lors d'une
+suppression, liste des documents avant un rebuild, journal d'audit des
+événements d'authentification (oracle `test_failure_responses.py`), et
+sauvegarde avant nettoyage des orphelins (`tests/integration/test_orphan_cleanup.py`
+injecte une `Exception` brute).
+
+### D2.4 Exceptions précises ailleurs
+
+Les modules internes capturent désormais des types précis : erreurs
+d'infrastructure des index (`INDEX_BACKEND_ERRORS` dans
+`rag_core/interfaces.py`), `SQLAlchemyError`, `OSError`, erreurs de
+bibliothèques (`pypdf.errors.PyPdfError`, `docx.opc.exceptions.OpcError`,
+`aiosmtplib.SMTPException`, `jwt.PyJWTError`, `pwdlib.exceptions.PwdlibError`,
+`jinja2.TemplateError`, `aiohttp.ClientError`) ou les familles métier. Les
+chemins qui relançaient en enveloppant une exception métier le font toujours
+(mêmes messages), et `raise ... from e` est systématique.
+
+### D2.5 Code mort retiré au passage
+
+Trois fonctions sans aucun appelant, dont la seule raison d'être des
+`except Exception` était défensive : `create_validation_report`
+(`validation_utils.py`), `get_performance_status` (`log_parser.py`) et les
+`try/except` des agrégateurs de `log_parser.py` et `logs_reader.py` dont le
+corps ne peut pas lever (calculs sur des valeurs déjà protégées).
+
+### D2.6 Tests unitaires adaptés
+
+Plusieurs tests unitaires injectaient une `Exception` brute dans des
+collaborateurs pour vérifier un `except Exception`. Ils injectent maintenant
+l'exception réelle du contrat (`PdfReadError`, `PackageNotFoundError`,
+`OperationalError`, `SMTPConnectError`, `TemplateError`, `InvalidKeyError`,
+`RuntimeError`, `OSError`, `VectorStoreOperationError`, `ValueError` « already
+exists »). Un test importait `VectorStoreOperationError` via le chemin
+`backend.src` (double import du même module) : il passe par `src`. Deux tests
+qui n'affirmaient rien (`assert True` dans les deux branches, `pytest.fail` dans
+un `except`) affirment désormais le comportement attendu.
+
+### D2.7 Correction autorisée
+
+`IngestionProcessor.queue_document` journalise `str(file_path)` : les routes
+d'upload passent un `Path`, que le formateur JSON ne sait pas sérialiser, et
+l'enregistrement `document_queued` était perdu. Vérifié avant/après : plus de
+« Logging error » sur ce log. Les autres logs perdus pour la même raison
+(voir D0.4) ne sont pas corrigés.
+
+### D2.8 Module `file_watcher`
+
+`FileWatcher` n'est branché nulle part dans l'application (seuls ses tests
+unitaires l'utilisent), bien que `CLAUDE.md` le décrive. Il est conservé tel
+quel (option conservatrice), avec ses exceptions resserrées.
+
+### D2.9 Test intermittent
+
+Un échec isolé (1 test sur 1045) est apparu une fois pendant la passe, non
+reproduit sur quatre exécutions complètes suivantes ; la porte a été franchie
+sans relance.
