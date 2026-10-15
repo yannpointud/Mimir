@@ -408,3 +408,161 @@ Hors fichiers gelés : les patchs des tests d'upload visent
 d'identifiant de session importe `generate_session_id` depuis
 `src.services.chat_stream`. Les tests unitaires de l'upload admin passent
 sans modification.
+
+## Passe 4 : typage
+
+### D4.1 Configuration de mypy et stubs
+
+`[tool.mypy]` dans `pyproject.toml` : mode normal (aucun `disallow_*`),
+`python_version = "3.13"`, `warn_unused_ignores` et `warn_redundant_casts`.
+`ignore_missing_imports` n'est activé que par module, pour les trois
+bibliothèques qui n'ont ni types intégrés ni paquet de stubs : `faiss`,
+`bm25s` et `docx` (python-docx 1.1.0 ; aucun `types-docx` ni
+`types-python-docx` n'existe sur PyPI). Les trois bibliothèques qui ont des
+stubs les reçoivent, épinglés dans `requirements-dev.txt` sur la série qui
+correspond à la version installée, et non sur la dernière publiée (qui
+décrirait une autre API) : `types-cachetools==5.3.0.7` (cachetools 5.3.2),
+`types-Markdown==3.8.0.20250809` (Markdown 3.8.1),
+`types-psutil==7.0.0.20251116` (psutil 7.0.0). Bilan : 112 erreurs (porte de
+la passe 3) puis 0, y compris dans un venv vierge installé depuis
+`requirements.txt` et `requirements-dev.txt` comme en CI.
+
+### D4.2 Modèles SQLAlchemy 2.0
+
+`models.py` passe de `declarative_base()` et `Column(...)` à
+`DeclarativeBase`, `Mapped[...]` et `mapped_column(...)`, en gardant pour
+chaque colonne son type SQL, sa nullabilité, son défaut, son `onupdate` et ses
+drapeaux `index`/`unique` explicites. Vérifications avant/après :
+
+- DDL SQLite compilé (`CreateTable` et `CreateIndex` de chaque table) et
+  métadonnées de chaque colonne (défaut, `onupdate`, `autoincrement`, clé
+  primaire, contraintes nommées) : strictement identiques ;
+- `alembic.autogenerate.compare_metadata` (avec `compare_type` et
+  `compare_server_default`) : 0 différence, aussi bien contre une base créée
+  par les anciens modèles que contre une base créée par `alembic upgrade head`.
+
+Les fabriques `AuditLog.create_*_action` renvoient `Self`. Effet de bord
+utile : les 44 erreurs de `repository.py` liées aux `Column[...]` disparaissent
+sans toucher au code des dépôts, hormis les `None` implicites.
+
+### D4.3 `# type: ignore` restants
+
+Quatre, tous avec leur code et un commentaire :
+
+- `documents.py` : `doc_repo.update_preserve_status` (`attr-defined`), bug
+  figé par l'oracle (D0.4) : la route doit continuer de répondre 500 ;
+- `config.py` : `settings = None` (`assignment`), repli historique propre à
+  pytest quand la configuration ne se charge pas ; l'application ne tourne
+  jamais avec `None`, le type reste donc `Settings` ;
+- `extractors.py` : `pypdf = None` et `markdown = None` (`assignment`),
+  dépendances optionnelles testées contre `None` avant usage.
+
+### D4.4 Rétrécissements sans changement de comportement
+
+- `DatabaseManager` : attributs typés `Engine | None`,
+  `sessionmaker[Session] | None`, etc. ; les accesseurs paresseux renvoient
+  `typing.cast(...)` après `_initialize_database()` (qui lève en cas
+  d'échec). Pas d'`assert` : un test unitaire remplace
+  `_initialize_database` par un mock et lit `engine` sans erreur.
+- `FaissVectorStore.index` est annoté `Any` : faiss n'a pas de types (le
+  `faiss.Index | None` d'origine valait déjà `Any | None`) et l'index est posé
+  par le constructeur ; un `assert` ou un contrôle explicite aurait changé
+  l'exception levée (aujourd'hui une `AttributeError` enveloppée en
+  `VectorStoreOperationError`) sur un chemin inatteignable.
+
+### D4.5 Autres corrections d'annotations
+
+`None` implicites rendus explicites (`x: T | None = None`), conteneurs annotés
+quand mypy ne peut pas les inférer, `dict[str, any]` vers `dict[str, Any]`.
+Corrections sans effet à l'exécution :
+
+- `FileUploadValidation` : `min_items=1` (alias déprécié de Pydantic v2)
+  devient `min_length=1` ; même contrainte, même message d'erreur, même
+  `minItems` dans le schéma JSON (vérifié) ;
+- `send_notification_email` appelle `_send_email` avec `html_content=` ou
+  `text_content=` explicitement au lieu d'un `**dict` (mêmes arguments
+  nommés, que les tests unitaires vérifient) ;
+- `send_escalation_email(user_info=...)` accepte `dict[str, Any]` (la route
+  y met des `None`) ;
+- le rappel de la file d'ingestion est typé `Callable[..., Awaitable[bool]]`
+  (il est attendu par `await`), `question_embedding` est un `np.ndarray` ;
+- `IngestionProcessor.queue_document` : la variable du document relu en
+  retraitement s'appelle `existing` (elle réutilisait `document`, typé non
+  optionnel par la branche de création).
+
+### D4.6 Modèles de réponse Pydantic
+
+Sur les 18 routes déclarées en `response_model=dict` (les 17 de la mesure
+initiale et `GET /`), onze renvoient désormais un modèle de
+`src/shared/models.py` (les handlers et le service renvoient des instances) ;
+les sept autres sont listées en D4.7 :
+
+| Route | Modèle |
+| --- | --- |
+| `GET /` | `RootResponse` |
+| `GET /admin/cache/stats` | `CacheStatsResponse` (`AdminCacheStats`, `CacheGlobalStats`) |
+| `GET /admin/configuration`, `GET /admin/config` | `AdminConfigurationResponse` (`ApplicationConfig`) |
+| `GET /admin/audit-log` | `AuditLogPage` (`AuditLogEntry`, `AuditLogFilters`) |
+| `GET /admin/usage` | `UsageResponse` (`ModelUsageToday`, `DailyModelUsage`) |
+| `GET /admin/documents` | `AdminDocumentList` (`AdminDocumentSummary`) |
+| `GET /admin/documents/stats` | `AdminDocumentStats` |
+| `POST /admin/documents/upload` | `AdminUploadResponse` (`UploadedDocument`) |
+| `GET /documents/stats/overview` | `DocumentStatsOverview` (`DocumentStatusCounts`, `VectorStoreOverview`, `StorageInfo`) |
+| `POST /documents/maintenance/validate-consistency` | `ConsistencyValidationResponse`, renvoyé par `index_maintenance.validate_index_consistency` |
+
+Règles suivies pour que le JSON ne bouge pas : champs dans l'ordre des
+anciennes clés ; `str` pour les dates déjà formatées par `isoformat()`
+(`created_at` des documents), `datetime` pour les objets `datetime` que
+Pydantic sérialisait déjà (`timestamp`, `AuditLogEntry.timestamp`) ; `int`
+pour les compteurs (un champ `float` transformerait 0 en 0.0) et `int | float`
+pour `total_size_mb` (toujours 0 aujourd'hui) ; champs `X | None` sans défaut
+là où l'ancienne clé valait parfois `None`, jamais pour une clé absente ;
+`validation_result` reste un `dict[str, Any]` (rapport du validateur, aussi
+écrit en JSON et audité tel quel).
+
+Vérification au-delà de l'oracle (qui neutralise les horodatages et arrondit
+les flottants) : un greffon pytest a enregistré le texte brut des
+323 réponses `TestClient` de la suite complète avant la passe puis après,
+comparées en gardant l'ordre des clés, les types (0 contre 0.0, `null` contre
+clé absente) et le format des dates (chiffres masqués, `Z`, décalage et
+microsecondes conservés). Seules différences : le schéma OpenAPI (schémas de
+réponse, exclus de l'oracle a, comme prévu) et deux tests concurrents dont
+l'ordre d'exécution varie déjà d'une exécution à l'autre. Deux tests
+unitaires de `get_document_stats` lisent désormais des attributs au lieu de
+clés.
+
+### D4.7 Ce qui reste en `dict`
+
+- Routes dont le contenu dépend de la machine ou des logs : `/admin/system-info`,
+  `/health/disk-usage`, `/admin/logs`, `/admin/metrics/chat`,
+  `/admin/analytics/usage`.
+- Sondes `/health/database` et `/health/cache` : leurs clés changent selon le
+  résultat (succès : `connection`, `document_count`... ; échec : `error`) et
+  les tests gelés remplacent les fonctions `_check_*_health` par des `dict`
+  partiels. Un modèle émettrait `null` pour les clés absentes, sauf à
+  recourir à `response_model_exclude_unset` : option écartée, la plus
+  conservatrice étant de laisser ces sondes telles quelles (comme
+  `HealthCheckResponse.checks`, déjà un `dict[str, Any]`).
+- Statistiques des composants (`FaissVectorStore.get_stats`, `clean_orphans`,
+  `rebuild_vector_store`, `VectorStoreValidator.validate_consistency`,
+  `DocumentRepository.get_statistics`, `CacheService.get_stats`) : les tests
+  d'intégration gelés lisent ces `dict` par clé, et ils alimentent les
+  journaux d'audit et le rapport JSON de cohérence.
+- Routes hors des 17 `response_model=Dict` (`/auth/me`, `/chat/sessions/{id}/history`,
+  `/health/ready`, `/logs/frontend/health`) : leur annotation `dict` sert de
+  modèle de réponse implicite à FastAPI ; elles restent telles quelles. Les
+  routes déjà annotées `dict[str, str]` (`/auth/logout`, `/auth/verify-admin`,
+  `/auth/change-password`, `/health/live`) sont déjà typées précisément.
+
+### D4.8 Anomalie observée, non corrigée
+
+`GET /api/v1/health/` (et `/health`) ajoute `unhealthy_components` au `dict`
+passé à `HealthCheckResponse`, qui ignore les champs inconnus : la clé
+n'apparaît jamais dans la réponse. Comportement existant, conservé.
+
+### D4.9 CI
+
+Nouveau job `mypy` bloquant dans `.github/workflows/ci.yml` (installe
+`requirements.txt` et `requirements-dev.txt`, car mypy lit les types intégrés
+de FastAPI, Pydantic et SQLAlchemy, puis lance `mypy backend/src`) et étape
+`mypy backend/src` dans `scripts/local_ci.sh`, entre ruff et pytest.

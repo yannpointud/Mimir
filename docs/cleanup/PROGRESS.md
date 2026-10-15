@@ -8,20 +8,21 @@ Consigne : `docs/cleanup/MISSION.md`. Décisions : `docs/cleanup/DECISIONS.md`.
 | 1. Lint | réussie | 1 | `7501847` docs(cleanup): record pass 1 decisions and progress |
 | 2. Erreurs | réussie | 1 | `c5362df` docs(cleanup): record pass 2 decisions and progress |
 | 3. Architecture | réussie | 1 | `f810329` docs(cleanup): record pass 3 decisions and progress |
-| 4. Typage | à faire | 0 | |
+| 4. Typage | réussie | 1 | `6779cba` ci: run mypy on backend/src |
 | 5. Commentaires | à faire | 0 | |
 | 6. Tests | à faire | 0 | |
 | 7. Dépendances | à faire | 0 | |
 | 8. Façade | à faire | 0 | |
 
-## Dernière porte franchie (passe 3)
+## Dernière porte franchie (passe 4)
 
-1045 tests (1042 réussis, 3 ignorés), couverture 85,88 %, ruff 0, format OK,
-radon D+ 0, mypy 112, pip-audit OK, vitest 141, build OK, `/health/live` 200.
-Plus aucun `noqa: C901` ; les 7 handlers de plus de 100 lignes en font
-désormais moins de 60 (logique déplacée dans `backend/src/services/`).
+1045 tests (1042 réussis, 3 ignorés), couverture 86,21 %, ruff 0, format OK,
+radon D+ 0, mypy 0 (112 avant la passe), pip-audit OK, vitest 141, build OK,
+`/health/live` 200. mypy tourne en CI (job bloquant) et dans
+`scripts/local_ci.sh` ; 11 routes renvoient des modèles Pydantic au lieu de
+`dict`, JSON inchangé (voir DECISIONS D4.6).
 
-Prochaine étape : passe 4 (typage).
+Prochaine étape : passe 5 (commentaires).
 
 ## Reprendre après une coupure
 
