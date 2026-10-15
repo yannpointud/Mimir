@@ -7,7 +7,7 @@
 # through the eval_input.jsonl boundary file -- score_baseline.py imports
 # nothing from the Mimir backend.
 #
-# Version note (Assumption A6 resolved empirically): ragas 0.4.3 (latest) hard-
+# Version note (verified empirically): ragas 0.4.3 (latest) hard-
 # imports langchain 0.2/0.3-era paths at import time (e.g.
 # `langchain_community.chat_models.vertexai`). The langchain 1.x line removed
 # those, so a naive `langchain-mistralai==1.1.6` (which pulls langchain 1.x)
