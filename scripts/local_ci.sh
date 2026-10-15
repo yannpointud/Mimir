@@ -38,9 +38,6 @@ PIP_AUDIT_IGNORES=(
     # orjson 3.10.18 (fix 3.11.5): pinned below 3.11 by mistralai 0.4.2; the
     # fix requires migrating the Mistral SDK.
     --ignore-vuln PYSEC-2026-107
-    # pytest 7.4.3 (fix 9.0.3): test-only dependency, major upgrade that also
-    # requires a pytest-asyncio upgrade.
-    --ignore-vuln PYSEC-2026-1845
 )
 pip-audit -r requirements.txt "${PIP_AUDIT_IGNORES[@]}"
 

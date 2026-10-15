@@ -96,10 +96,7 @@ jobs:
       # Same ignore list as scripts/local_ci.sh; any other advisory fails the job.
       # - PYSEC-2026-107 (orjson 3.10.18, fix 3.11.5): pinned below 3.11 by
       #   mistralai 0.4.2; the fix requires migrating the Mistral SDK.
-      # - PYSEC-2026-1845 (pytest 7.4.3, fix 9.0.3): test-only dependency, major
-      #   upgrade that also requires a pytest-asyncio upgrade.
       - name: Audit runtime and test dependencies
         run: >-
           pip-audit -r requirements.txt
           --ignore-vuln PYSEC-2026-107
-          --ignore-vuln PYSEC-2026-1845
