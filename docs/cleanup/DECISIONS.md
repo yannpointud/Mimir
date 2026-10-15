@@ -1037,3 +1037,216 @@ Tentative 1 : porte franchie, métriques identiques à la passe 6 (1010 tests,
 mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200 depuis un venv
 vierge installé depuis `requirements.txt`, tests gelés et sommes de l'oracle
 OK). Aucun nouvel avis pip-audit pendant la passe.
+
+## Passe 8 : façade
+
+### D8.1 Périmètre
+
+Seuls des fichiers Markdown changent : `README.md`, `CLAUDE.md`, `docs/adr/`
+(nouveau) et `docs/cleanup/`. Aucun code, test ni fichier de configuration.
+Le bloc « **critical** » de `CLAUDE.md` est inchangé (vérifié par `diff` des
+21 premières lignes avec `HEAD`). Restent donc en l'état, hors périmètre :
+
+- `backend/.env.example` garde un commentaire qui donne la valeur du mot de
+  passe admin par défaut, à côté de `ADMIN_PASSWORD_HASH` (fichier
+  d'exemple de configuration, pas un document) ;
+- `backend/src/security/startup_validation.py` contient cette valeur en
+  constante : elle sert à détecter au démarrage un mot de passe resté à
+  l'origine (code, comportement) ; un commentaire de
+  `tests/unit/test_config_validation.py` la cite aussi ;
+- le commentaire de `_start_ingestion` (`backend/main.py`) dit
+  `structure_aware_chunking_enabled` à `False` « (current default) », alors
+  que le défaut est `True` ;
+- le commentaire de `hybrid_search_enabled` (`config.py`) annonce +14,2 % de
+  `context_precision` ; les fichiers de résultats donnent 0,5788 → 0,6606,
+  soit +14,1 % (chiffre aussi retenu par `adoption_decision.md`). Les ADR
+  citent les scores bruts des fichiers.
+
+### D8.2 Lignes de code (pygount 3.2.0)
+
+Mesurées depuis la racine, avec le `.venv` du projet, en lignes de code
+(colonne « Code », hors commentaires et lignes vides) ; aucun fichier non
+suivi par git dans ces dossiers (hors `__pycache__`, ignoré par pygount) :
+
+```
+pygount --format=summary --suffix=py backend/src backend/main.py backend/scripts
+pygount --format=summary --merge-embedded-languages --folders-to-skip='...,test' \
+  --names-to-skip='...,*.test.js,*.test.jsx' frontend/src
+pygount --format=summary --suffix=py tests
+pygount --format=summary --merge-embedded-languages frontend/src/test \
+  frontend/src/components/Admin/AnalyticsPanel.budget.test.jsx
+pygount --format=summary --suffix=py,sh scripts
+```
+
+| Périmètre | Fichiers | Code |
+| --- | ---: | ---: |
+| Backend (`backend/src`, `main.py`, `backend/scripts`), Python | 77 | 9 448 |
+| Frontend hors tests (JSX 4 117, JS 829, CSS 206) | 39 | 5 152 |
+| Code applicatif | 116 | 14 600 |
+| Tests backend (`tests/`), Python | 86 | 13 858 |
+| Tests frontend (JSX 1 117, JS 264) | 15 | 1 381 |
+| Tests | 101 | 15 239 |
+| `scripts/` (Python 1 818, Bash 195) | 16 | 2 013 |
+
+Choix : migrations Alembic comptées dans le backend (code Python livré) ;
+`--suffix=py` écarte les instantanés JSON et le corpus de `tests/oracle`, et
+le `README` et le gabarit `.mako` des migrations ; `--merge-embedded-languages`
+évite que pygount classe des `.js` en « JavaScript+Genshi Text » et le CSS en
+« CSS+Lasso » (mêmes totaux). `backend/scripts` (`init_db.py`) est compté
+avec le backend ; `scripts/` (évaluation, sauvegarde, CI locale) est donné à
+part, ni application ni tests. Les compteurs de tests par dossier viennent de
+`pytest --collect-only -q -o addopts=""` : 812 unitaires, 154 d'intégration,
+32 de l'oracle, 12 de performance.
+
+### D8.3 Mot de passe admin
+
+Retiré de `README.md` (section « Connexion Admin ») et de `CLAUDE.md`
+(section « Environment ») ; la valeur n'apparaît dans aucun texte nouveau.
+Remplacé par la façon dont le mot de passe est réellement fixé, d'après le
+code :
+
+- `ADMIN_PASSWORD` (en clair) : haché au démarrage par
+  `resolve_admin_password`, en mémoire seulement, prioritaire sur
+  `ADMIN_PASSWORD_HASH` ; règles de robustesse de
+  `validate_password_strength`, bloquantes en production ;
+- `ADMIN_PASSWORD_HASH` : hash Argon2 (commande de la section « Génération du
+  hash admin », conservée) ;
+- changement depuis Admin > Configuration (`POST /auth/change-password`) :
+  réécrit `ADMIN_PASSWORD_HASH` dans `backend/.env` ;
+- sans aucune des deux variables, le hash intégré à `config.py` s'applique :
+  `validate_production_secrets` refuse le démarrage si
+  `ENVIRONMENT=production`, avertit sinon.
+
+Le README disait aussi que la production refuse de démarrer « si ces secrets
+sont aux valeurs par défaut » en citant `MISTRAL_API_KEY` : seule la clé JWT
+et le mot de passe admin sont contrôlés, et seulement avec
+`ENVIRONMENT=production` (que `docker-compose.yml` ne fixe pas). Corrigé.
+
+### D8.4 « Easy to swap implementations » : promesse retirée
+
+Constat sur le code :
+
+- une seule implémentation par abstraction : `MistralAPIService`
+  (`AbstractLLMService`), `FaissVectorStore` (`AbstractVectorStore`),
+  `Bm25LexicalStore` (protocole `LexicalIndex`) ;
+- `RagService`, les étapes du pipeline et `IngestionProcessor` sont typés sur
+  les abstractions (D3.1) ;
+- mais `api/dependencies.py` instancie directement les classes concrètes et
+  ses fournisseurs sont annotés avec elles ; `LLM_PROVIDER` et
+  `VECTOR_STORE_TYPE` ne sont que lus pour affichage (`admin.py`,
+  `health.py`), jamais pour choisir une implémentation ;
+- la reconstruction admin (annotée `FaissVectorStore`/`Bm25LexicalStore`), le
+  nettoyage d'orphelins, `VectorStoreValidator` et la lecture des chunks d'un
+  document appellent des méthodes ou attributs propres à FAISS
+  (`rebuild_vector_store`, `clean_orphans`, `get_document_chunks`,
+  `metadata`, `document_to_chunks`, `_lock`), absents de
+  `AbstractVectorStore`.
+
+Changer de fournisseur demande donc du code, pas de la configuration. La
+ligne de `CLAUDE.md` est réécrite en ce sens (interfaces abstraites, une
+implémentation chacune, limites ci-dessus). Le README annote `LLM_PROVIDER` et
+`VECTOR_STORE_TYPE` comme seulement affichés.
+
+### D8.5 Autres affirmations fausses corrigées dans le README
+
+- `POST /api/v1/chat` n'existe pas : seule `POST /api/v1/chat/stream` répond
+  (et l'oracle OpenAPI le confirme) ; ajout de `change-password` et de
+  `validate-consistency`, chemins écrits avec leur barre oblique finale
+  réelle (`/documents/`, `/health/`) ;
+- arborescence : `backend/tests/` n'existe pas (les tests sont à la racine) ;
+  ajout de `services/`, `cost/`, `security/`, `shared/errors.py`,
+  `api/responses.py`, `rag_core/fusion.py`, `tokenizer_fr.py`,
+  `bm25_store.py`, `tests/oracle/`, `docs/adr/` ;
+- « Auth : JWT avec bcrypt » : les nouveaux hash sont Argon2, bcrypt n'est
+  accepté qu'en vérification ; badge FastAPI 0.116+ → 0.133 ;
+- logs dans `backend/logs/` (dossier `./logs` du répertoire de lancement
+  d'uvicorn), pas `logs/` ;
+- variables : `RATE_LIMIT_PER_MINUTE` n'est lue par aucun limiteur, remplacée
+  par les trois variables effectives (login, chat, upload) ; `CACHE_*`
+  annotées « déclarées mais non lues » (tailles fixes : 100 entrées et 1 h
+  pour le cache général, 50 entrées et 30 min pour les réponses) ;
+  `ADMIN_PASSWORD` ajouté ;
+- « Configuration email d'escalade » dans l'admin : l'écran Configuration est
+  en lecture seule (la configuration SMTP passe par l'environnement) ; il
+  permet de tester l'email et de changer le mot de passe ;
+- « Rate limiting (chat, admin, upload, auth) » : seuls le login, le chat et
+  les deux routes d'upload sont limités ;
+- Swagger et ReDoc sont désactivés en production ;
+- comptes : « ~1000 pytest + ~138 vitest, ~83 % » devient 1010 tests pytest,
+  141 vitest, couverture 86,23 %.
+
+Ajouts : section « Qualité et CI » (ruff, mypy, pytest 9, pip-audit et son
+exclusion, `scripts/local_ci.sh`, jobs de la CI, lockfiles et commandes de
+régénération reprises de leur en-tête, Dependabot), tableau pygount, liens
+vers `docs/adr/`. Ton, plan et sections d'origine conservés.
+
+### D8.6 ADR : revue des brouillons
+
+Cinq ADR et un index écrits dans `docs/adr/` à partir des brouillons ; chaque
+nombre, chemin et symbole a été vérifié dans le code et les fichiers de
+résultats. Corrections apportées :
+
+- 0001 : le plafond se modifie à chaud par `PUT /api/v1/admin/configuration`,
+  pas depuis l'écran Admin > Configuration (en lecture seule) ;
+- 0002 : la similarité FAISS n'est un cosinus que pour des vecteurs normés ;
+  scores bruts des fichiers (0,6792 → 0,8000 ; 0,5788 → 0,6606) sur 40
+  questions du corpus ; le contrôle à terme exact donne un rappel de 1,0 dans
+  les deux modes (non-régression, pas un gain) ; score RRF maximal 2/61 ou
+  3/61 selon la présence de la pré-inclusion ; si BM25 échoue, la fusion
+  porte sur le seul pool dense mais garde seuil et confiance hybrides ;
+- 0003 : la moyenne est globale (seul le taux de NaN est ventilé corpus /
+  adversarial) ; la CI ne lance aucun script d'évaluation ni appel à Mistral
+  (pip-audit, lui, interroge le réseau) ; scores bruts du chunking ajoutés ;
+  rerank : fichiers et code absents, aucun chiffre cité ;
+- 0004 : tables créées par `create_all` au démarrage, migrations Alembic à
+  côté ; seules les écritures budget/usage passent par `asyncio.to_thread` ;
+  doute (a) : `IndexFlatL2` renvoie la distance L2 au carré, `1 - d/2` est
+  exactement le cosinus pour des vecteurs de norme 1, le code ne normalise
+  pas et s'en remet à `mistral-embed` ; le nettoyage d'orphelins déclenché
+  après une suppression se fait sans sauvegarde (`create_backup=False`), seule
+  la reconstruction admin sauvegarde ; `validate-consistency` demande un
+  utilisateur authentifié, pas `require_admin` ; doute (b), voir D8.7 ;
+- 0005 : l'évaluation draine `RagService.answer_stream`, pas le flux SSE ;
+  `EventSource` écarté faute de POST et d'en-tête `Authorization` ; variables
+  `CACHE_*` non lues.
+
+### D8.7 Anomalies préexistantes relevées, non corrigées
+
+Aucun changement de comportement dans cette passe ; ces points sont décrits
+dans les ADR ou le README, sans correction :
+
+- **suppression FAISS non persistée** : `FaissVectorStore.delete()` ne pose
+  le drapeau `deleted` qu'en mémoire. La suppression n'atteint le disque qu'au
+  prochain `persist()` : ingestion, reconstruction admin, nettoyage
+  d'orphelins qui en trouve, validation avec corrections, ou `optimize()`
+  automatique au-delà de 25 % de vecteurs supprimés. Un redémarrage entre-temps
+  recharge les chunks comme actifs (orphelins côté SQLite, absents de BM25
+  déjà reconstruit) jusqu'au prochain nettoyage. Antérieur à la mission
+  (ADR 0004, README section 5 du dépannage) ;
+- **`run_pipeline.py --retrieval-mode dense`** laisse l'environnement
+  inchangé : depuis que `hybrid_search_enabled` vaut `True` par défaut, il
+  mesure le mode hybride sauf si `HYBRID_SEARCH_ENABLED=false` est défini
+  (ADR 0003) ;
+- **changement de mot de passe depuis l'interface en conteneur** :
+  `_update_env_file` réécrit `<backend>/.env`, absent de l'image (exclu par
+  `.dockerignore`, `/app` non inscriptible par l'utilisateur `mimir`) ; d'après
+  le code, la route répond alors 500. Le README oriente vers `ADMIN_PASSWORD`
+  en conteneur ;
+- variables déclarées mais sans effet : `CACHE_ENABLED`, `CACHE_MAX_SIZE`,
+  `CACHE_TTL`, `RATE_LIMIT_PER_MINUTE` ; `LLM_PROVIDER` et
+  `VECTOR_STORE_TYPE` seulement affichés (D8.4) ;
+- en mode hybride, l'interface affiche le score RRF (≤ 0,05) en pourcentage
+  de pertinence (ADR 0002) ;
+- `scripts/ragas_eval/rerank_adoption_decision.md` cite
+  `rerank_baseline_run.json`, `rerank_multibert_run.json`,
+  `rerank_latencies.json`, un test `test_rag_service_rerank.py` et un drapeau
+  `rerank_enabled` absents du dépôt. Document laissé tel quel (hors
+  périmètre), chiffres non repris.
+
+### D8.8 Porte de qualité
+
+Tentative 1 : porte franchie, métriques identiques à la passe 7 (1010 tests,
+1010 réussis, 0 ignoré, couverture 86,23 %, ruff 0, format OK, radon D+ 0,
+mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200 depuis un venv
+vierge, tests gelés et sommes de l'oracle OK). Attendu : la passe ne touche
+que du Markdown. Aucun nouvel avis pip-audit pendant la passe.
