@@ -4,7 +4,9 @@ Provides base classes for implementing different LLM providers
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Any
 
 from ..shared.errors import LLMError
 
@@ -97,12 +99,50 @@ class AbstractLLMService(ABC):
         pass
 
     @abstractmethod
-    async def embed(self, texts: list[str]) -> EmbeddingResponse:
+    def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.1,
+        session_id: str | None = None,
+        rag_debug: Any = None,
+        usage_out: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """
+        Stream the generated text chunk by chunk
+
+        Args:
+            prompt: User input prompt
+            system_prompt: Optional system instruction
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0.0 to 1.0)
+            session_id: Optional session ID for debug logging
+            rag_debug: Optional RAG debug service
+            usage_out: Optional dict filled with the real token usage
+                (prompt_tokens, completion_tokens, total_tokens) once the
+                provider reports it; left empty otherwise
+            **kwargs: Additional model-specific parameters
+
+        Yields:
+            Text chunks as they are generated
+
+        Raises:
+            LLMAPIError: API communication issues
+        """
+
+    @abstractmethod
+    async def embed(
+        self, texts: list[str], session_id: str | None = None, rag_debug: Any = None
+    ) -> EmbeddingResponse:
         """
         Generate embeddings for list of texts
 
         Args:
             texts: List of texts to embed
+            session_id: Optional session ID for debug logging
+            rag_debug: Optional RAG debug service
 
         Returns:
             EmbeddingResponse with embeddings and metadata
@@ -113,6 +153,10 @@ class AbstractLLMService(ABC):
             LLMInvalidRequestError: Invalid request parameters
         """
         pass
+
+    async def close(self) -> None:
+        """Release network resources held by the service (none by default)."""
+        return None
 
     @abstractmethod
     async def health_check(self) -> bool:

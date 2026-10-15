@@ -4,7 +4,7 @@ Provides base classes for implementing different vector store providers
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol
 from dataclasses import dataclass
 import numpy as np
 
@@ -99,7 +99,11 @@ class AbstractVectorStore(ABC):
 
     @abstractmethod
     def query(
-        self, vector: np.ndarray, top_k: int = 5, filter_dict: dict[str, Any] | None = None
+        self,
+        vector: np.ndarray,
+        top_k: int = 5,
+        filter_dict: dict[str, Any] | None = None,
+        similarity_floor: float | None = None,
     ) -> list[SearchResult]:
         """
         Search for similar vectors
@@ -108,6 +112,8 @@ class AbstractVectorStore(ABC):
             vector: Query embedding vector
             top_k: Maximum number of results to return
             filter_dict: Optional metadata filters
+            similarity_floor: Minimum similarity overriding the store's own
+                threshold (0.0 returns the raw ranking used by hybrid fusion)
 
         Returns:
             List of search results ordered by similarity
@@ -178,3 +184,45 @@ class AbstractVectorStore(ABC):
             VectorStoreConnectionError: If loading fails
         """
         pass
+
+    @abstractmethod
+    def get_corpus_version(self) -> str:
+        """
+        Token that changes on every corpus mutation (upsert, delete)
+
+        Returns:
+            Version string used to scope cache entries to a corpus state
+        """
+        pass
+
+    @abstractmethod
+    def snapshot_active_chunks(self) -> list[dict[str, Any]]:
+        """
+        Copy of the metadata of every non-deleted chunk
+
+        Returns:
+            One dict per active chunk (chunk_id, document_id, text, source,
+            chunk_index, total_chunks, metadata), safe to read while the store
+            keeps changing
+        """
+        pass
+
+
+class LexicalIndex(Protocol):
+    """Lexical index rebuilt from the vector store's active chunks.
+
+    Not an AbstractVectorStore: it is queried with raw text and rebuilt as a
+    whole rather than upserted chunk by chunk.
+    """
+
+    def rebuild(self, active_chunks: list[dict[str, Any]]) -> None:
+        """Replace the whole index with the given chunks (keys 'text' and 'chunk_id')."""
+        ...
+
+    def query(self, question: str, top_k: int = 50) -> list[tuple[int, float]]:
+        """Return (chunk_id, score) pairs by descending relevance."""
+        ...
+
+    def load(self) -> bool:
+        """Load the persisted index; False when none exists on disk."""
+        ...
