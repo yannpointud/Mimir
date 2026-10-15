@@ -1,0 +1,78 @@
+{
+  "budget_calls": [
+    "reserve:chat",
+    "finalize"
+  ],
+  "events": [
+    {
+      "session_id": "<session_id>",
+      "type": "start"
+    },
+    {
+      "content": "Réponse fondée sur ",
+      "type": "chunk"
+    },
+    {
+      "content": "1 extrait(s) ",
+      "type": "chunk"
+    },
+    {
+      "content": "[prompt:71a8f0ef1452e058]",
+      "type": "chunk"
+    },
+    {
+      "citations": {
+        "1": {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Procédure de remboursement des notes de frais</h1>\n<h2>Principes</h2>\n<p>Les frais engagés pour le compte de l'entreprise sont remboursés sur présentation des justificatifs originaux. Toute note de frais doit être déclarée dans l'application Notilus dans un délai de trente jours suivant la dépense.</p>\n<h2>Déclarer une note de frais</h2>\n<ol>\n<li>Photographier chaque justificatif avec l'application mobile.</li>\n<li>Renseigner la nature de la dépense, le projet et le centre de coût.</li>\n<li>Soumettre la note au manager, qui la valide sous cinq jours ouvrés.</li>\n<li>Le service comptable contrôle la note et déclenche le virement à la fin du mois.</li>\n</ol>\n<h2>Plafonds</h2>\n<ul>\n<li>Repas d'affaires : 25 euros par personne en province, 35 euros à Paris.</li>\n<li>Nuit d'hôtel : 110 euros en province, 160 euros à Paris, petit-déjeuner inclus.</li>\n<li>Indemnités kilométriques selon le barème fiscal en vigueur.</li>\n</ul>\n<p>Les dépassements de plafond doivent être justifiés par écrit et validés par le directeur de département.</p>\n<h2>Transports</h2>\n<p>Le train en seconde classe est la règle pour les trajets de moins de quatre heures. L'avion n'est autorisé qu'au-delà de quatre heures de train ou pour les déplacements internationaux. Les taxis sont remboursés uniquement entre vingt-deux heures et six heures, ou en l'absence de transport en commun.</p>",
+          "document_id": 3,
+          "filename": "procedure_notes_de_frais.md",
+          "similarity_score": 0.049,
+          "total_chunks": 1
+        }
+      },
+      "type": "citation"
+    },
+    {
+      "cached": false,
+      "confidence_score": 0.83,
+      "sources": [
+        {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Procédure de remboursement des notes de frais</h1>\n<h2>Principes</h2>\n<p>Les frais engagés pour le compte de l'entreprise sont remboursés sur présentation des justificatifs originaux. Toute note de frais doit être déclarée dans l'application Notilus dans un délai de trente jours suivant la dépense.</p>\n<h2>Déclarer une note de frais</h2>\n<ol>\n<li>Photographier chaque justificatif avec l'application mobile.</li>\n<li>Renseigner la nature de la dépense, le projet et le centre de coût.</li>\n<li>Soumettre la note au manager, qui la valide sous cinq jours ouvrés.</li>\n<li>Le service comptable contrôle la note et déclenche le virement à la fin du mois.</li>\n</ol>\n<h2>Plafonds</h2>\n<ul>\n<li>Repas d'affaires : 25 euros par personne en province, 35 euros à Paris.</li>\n<li>Nuit d'hôtel : 110 euros en province, 160 euros à Paris, petit-déjeuner inclus.</li>\n<li>Indemnités kilométriques selon le barème fiscal en vigueur.</li>\n</ul>\n<p>Les dépassements de plafond doivent être justifiés par écrit et validés par le directeur de département.</p>\n<h2>Transports</h2>\n<p>Le train en seconde classe est la règle pour les trajets de moins de quatre heures. L'avion n'est autorisé qu'au-delà de quatre heures de train ou pour les déplacements internationaux. Les taxis sont remboursés uniquement entre vingt-deux heures et six heures, ou en l'absence de transport en commun.</p>",
+          "document_id": 3,
+          "filename": "procedure_notes_de_frais.md",
+          "similarity_score": 0.049,
+          "total_chunks": 1
+        }
+      ],
+      "type": "done"
+    }
+  ],
+  "llm_generate_calls": [
+    {
+      "max_tokens": 800,
+      "prompt": "Quelle est la procédure pour déclarer une note de frais ?",
+      "temperature": 0.1
+    }
+  ],
+  "question": "Quelle est la procédure pour déclarer une note de frais ?",
+  "usage_records": [
+    {
+      "call_type": "embedding",
+      "completion_tokens": 0,
+      "estimated": false,
+      "model": "mistral-embed",
+      "prompt_tokens": 14,
+      "session_id": "<session_id>"
+    },
+    {
+      "call_type": "chat",
+      "completion_tokens": 20,
+      "estimated": false,
+      "model": "mistral-small-latest",
+      "prompt_tokens": 100,
+      "session_id": "<session_id>"
+    }
+  ]
+}

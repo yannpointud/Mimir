@@ -1,0 +1,11 @@
+{
+  "security_schemes": {
+    "Bearer": {
+      "bearerFormat": "JWT",
+      "scheme": "bearer",
+      "type": "http"
+    }
+  },
+  "title": "Mimir",
+  "version": "v1"
+}

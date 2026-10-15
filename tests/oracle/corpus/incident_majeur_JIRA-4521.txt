@@ -1,0 +1,9 @@
+Rapport d'incident majeur JIRA-4521
+
+Le ticket JIRA-4521 documente l'indisponibilité du serveur VPN-PROD-07 survenue le 3 mars. L'incident a duré deux heures et quarante minutes et a empêché toute connexion à distance des salariés en télétravail.
+
+Cause racine : le certificat TLS du concentrateur VPN-PROD-07 avait expiré. L'alerte de supervision prévue trente jours avant l'échéance n'avait pas été configurée lors de la migration de novembre.
+
+Actions correctives : renouvellement du certificat, ajout d'une alerte à trente, quinze et sept jours, et revue trimestrielle de l'inventaire des certificats par l'équipe infrastructure.
+
+Statut du ticket JIRA-4521 : clos le 10 mars après validation du plan d'action par le comité de changement.

@@ -1,0 +1,30 @@
+{
+  "events": [
+    {
+      "session_id": "oracle-session",
+      "type": "start"
+    },
+    {
+      "content": "Réponse fondée sur ",
+      "type": "chunk"
+    },
+    {
+      "content": "5 extrait(s) ",
+      "type": "chunk"
+    },
+    {
+      "content": "[prompt:82077bacab86e07e]",
+      "type": "chunk"
+    },
+    {
+      "citations": {},
+      "type": "citation"
+    },
+    {
+      "cached": false,
+      "confidence_score": 0.95,
+      "sources": [],
+      "type": "done"
+    }
+  ]
+}

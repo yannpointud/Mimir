@@ -1,0 +1,142 @@
+{
+  "budget_calls": [
+    "reserve:chat",
+    "finalize"
+  ],
+  "events": [
+    {
+      "session_id": "<session_id>",
+      "type": "start"
+    },
+    {
+      "content": "Réponse fondée sur ",
+      "type": "chunk"
+    },
+    {
+      "content": "5 extrait(s) ",
+      "type": "chunk"
+    },
+    {
+      "content": "[prompt:f495e9d9e9090b1f]",
+      "type": "chunk"
+    },
+    {
+      "citations": {
+        "1": {
+          "chunk_index": 1,
+          "chunk_text": "Messagerie et hameçonnage Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.\n\nSupports amovibles\n\nLes clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.\n\nMises à jour\n\nLes postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.",
+          "document_id": 2,
+          "filename": "guide_securite_informatique.txt",
+          "similarity_score": 0.032,
+          "total_chunks": 2
+        },
+        "2": {
+          "chunk_index": 0,
+          "chunk_text": "Guide de sécurité informatique\n\nMots de passe\n\nChaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.\n\nPerte ou vol de matériel\n\nEn cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.\n\nMessagerie et hameçonnage",
+          "document_id": 2,
+          "filename": "guide_securite_informatique.txt",
+          "similarity_score": 0.032,
+          "total_chunks": 2
+        },
+        "3": {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Politique de télétravail</h1>\n<h2>Objet</h2>\n<p>La présente politique encadre le télétravail au sein de l'entreprise. Elle s'applique à tous les salariés en contrat à durée indéterminée ayant terminé leur période d'essai. Le télétravail repose sur le volontariat et sur un accord écrit entre le salarié et son responsable hiérarchique.</p>\n<h2>Nombre de jours autorisés</h2>\n<p>Chaque salarié éligible peut télétravailler jusqu'à deux jours par semaine. Les jours de télétravail sont fixés d'un commun accord avec le manager et déclarés dans l'outil de planification avant le vendredi de la semaine précédente. Un troisième jour peut être accordé à titre exceptionnel pour raison médicale, sur présentation d'un avis de la médecine du travail.</p>\n<p>Les jours non utilisés ne sont pas reportables d'une semaine sur l'autre. Le mercredi reste un jour de présence obligatoire pour l'ensemble des équipes afin de faciliter les réunions transverses.</p>\n<h2>Équipement fourni</h2>\n<p>L'entreprise fournit un ordinateur portable, un écran externe et un casque audio. Une indemnité mensuelle de 30 euros couvre les frais de connexion internet et d'électricité. Le salarié s'engage à disposer d'un espace de travail calme et d'une connexion stable d'au moins 20 Mbit/s.</p>\n<h2>Sécurité et confidentialité</h2>\n<p>Le salarié en télétravail doit se connecter exclusivement via le VPN de l'entreprise. Il est interdit de travailler sur des documents confidentiels dans un lieu public. Le verrouillage de la session est obligatoire dès que le poste est laissé sans surveillance, même quelques minutes.</p>\n<h2>Réversibilité</h2>\n<p>Le salarié comme le manager peuvent mettre fin au télétravail avec un préavis d'un mois. En cas de non-respect des règles de sécurité, l'autorisation de télétravail peut être suspendue sans préavis.</p>",
+          "document_id": 1,
+          "filename": "politique_teletravail.md",
+          "similarity_score": 0.032,
+          "total_chunks": 1
+        },
+        "4": {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Accueil des nouveaux arrivants</h1>\n<h2>Avant l'arrivée</h2>\n<p>Le manager prépare le poste de travail et commande le matériel au moins dix jours avant l'arrivée. Le service RH envoie au nouvel arrivant le livret d'accueil, la charte informatique et le planning de sa première semaine.</p>\n<h2>Le premier jour</h2>\n<p>Le nouvel arrivant se présente à neuf heures à l'accueil du siège, au 12 rue des Lilas. Il est reçu par son parrain, désigné par le manager, qui l'accompagne tout au long de la journée. Le parrain est le premier contact pour toutes les questions pratiques : badge, cantine, outils et organisation de l'équipe.</p>\n<p>La matinée est consacrée à la remise du badge, du matériel informatique et à la création des comptes. L'après-midi, le nouvel arrivant rencontre son équipe et suit la formation obligatoire à la sécurité.</p>\n<h2>La première semaine</h2>\n<p>Un point d'étape est organisé le vendredi avec le manager et le parrain. Le nouvel arrivant complète le questionnaire d'intégration, dont les réponses servent à améliorer le parcours d'accueil.</p>",
+          "document_id": 5,
+          "filename": "onboarding_nouveaux_arrivants.md",
+          "similarity_score": 0.032,
+          "total_chunks": 1
+        },
+        "5": {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Procédure de remboursement des notes de frais</h1>\n<h2>Principes</h2>\n<p>Les frais engagés pour le compte de l'entreprise sont remboursés sur présentation des justificatifs originaux. Toute note de frais doit être déclarée dans l'application Notilus dans un délai de trente jours suivant la dépense.</p>\n<h2>Déclarer une note de frais</h2>\n<ol>\n<li>Photographier chaque justificatif avec l'application mobile.</li>\n<li>Renseigner la nature de la dépense, le projet et le centre de coût.</li>\n<li>Soumettre la note au manager, qui la valide sous cinq jours ouvrés.</li>\n<li>Le service comptable contrôle la note et déclenche le virement à la fin du mois.</li>\n</ol>\n<h2>Plafonds</h2>\n<ul>\n<li>Repas d'affaires : 25 euros par personne en province, 35 euros à Paris.</li>\n<li>Nuit d'hôtel : 110 euros en province, 160 euros à Paris, petit-déjeuner inclus.</li>\n<li>Indemnités kilométriques selon le barème fiscal en vigueur.</li>\n</ul>\n<p>Les dépassements de plafond doivent être justifiés par écrit et validés par le directeur de département.</p>\n<h2>Transports</h2>\n<p>Le train en seconde classe est la règle pour les trajets de moins de quatre heures. L'avion n'est autorisé qu'au-delà de quatre heures de train ou pour les déplacements internationaux. Les taxis sont remboursés uniquement entre vingt-deux heures et six heures, ou en l'absence de transport en commun.</p>",
+          "document_id": 3,
+          "filename": "procedure_notes_de_frais.md",
+          "similarity_score": 0.031,
+          "total_chunks": 1
+        }
+      },
+      "type": "citation"
+    },
+    {
+      "cached": false,
+      "confidence_score": 0.93,
+      "sources": [
+        {
+          "chunk_index": 1,
+          "chunk_text": "Messagerie et hameçonnage Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.\n\nSupports amovibles\n\nLes clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.\n\nMises à jour\n\nLes postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.",
+          "document_id": 2,
+          "filename": "guide_securite_informatique.txt",
+          "similarity_score": 0.032,
+          "total_chunks": 2
+        },
+        {
+          "chunk_index": 0,
+          "chunk_text": "Guide de sécurité informatique\n\nMots de passe\n\nChaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.\n\nPerte ou vol de matériel\n\nEn cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.\n\nMessagerie et hameçonnage",
+          "document_id": 2,
+          "filename": "guide_securite_informatique.txt",
+          "similarity_score": 0.032,
+          "total_chunks": 2
+        },
+        {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Politique de télétravail</h1>\n<h2>Objet</h2>\n<p>La présente politique encadre le télétravail au sein de l'entreprise. Elle s'applique à tous les salariés en contrat à durée indéterminée ayant terminé leur période d'essai. Le télétravail repose sur le volontariat et sur un accord écrit entre le salarié et son responsable hiérarchique.</p>\n<h2>Nombre de jours autorisés</h2>\n<p>Chaque salarié éligible peut télétravailler jusqu'à deux jours par semaine. Les jours de télétravail sont fixés d'un commun accord avec le manager et déclarés dans l'outil de planification avant le vendredi de la semaine précédente. Un troisième jour peut être accordé à titre exceptionnel pour raison médicale, sur présentation d'un avis de la médecine du travail.</p>\n<p>Les jours non utilisés ne sont pas reportables d'une semaine sur l'autre. Le mercredi reste un jour de présence obligatoire pour l'ensemble des équipes afin de faciliter les réunions transverses.</p>\n<h2>Équipement fourni</h2>\n<p>L'entreprise fournit un ordinateur portable, un écran externe et un casque audio. Une indemnité mensuelle de 30 euros couvre les frais de connexion internet et d'électricité. Le salarié s'engage à disposer d'un espace de travail calme et d'une connexion stable d'au moins 20 Mbit/s.</p>\n<h2>Sécurité et confidentialité</h2>\n<p>Le salarié en télétravail doit se connecter exclusivement via le VPN de l'entreprise. Il est interdit de travailler sur des documents confidentiels dans un lieu public. Le verrouillage de la session est obligatoire dès que le poste est laissé sans surveillance, même quelques minutes.</p>\n<h2>Réversibilité</h2>\n<p>Le salarié comme le manager peuvent mettre fin au télétravail avec un préavis d'un mois. En cas de non-respect des règles de sécurité, l'autorisation de télétravail peut être suspendue sans préavis.</p>",
+          "document_id": 1,
+          "filename": "politique_teletravail.md",
+          "similarity_score": 0.032,
+          "total_chunks": 1
+        },
+        {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Accueil des nouveaux arrivants</h1>\n<h2>Avant l'arrivée</h2>\n<p>Le manager prépare le poste de travail et commande le matériel au moins dix jours avant l'arrivée. Le service RH envoie au nouvel arrivant le livret d'accueil, la charte informatique et le planning de sa première semaine.</p>\n<h2>Le premier jour</h2>\n<p>Le nouvel arrivant se présente à neuf heures à l'accueil du siège, au 12 rue des Lilas. Il est reçu par son parrain, désigné par le manager, qui l'accompagne tout au long de la journée. Le parrain est le premier contact pour toutes les questions pratiques : badge, cantine, outils et organisation de l'équipe.</p>\n<p>La matinée est consacrée à la remise du badge, du matériel informatique et à la création des comptes. L'après-midi, le nouvel arrivant rencontre son équipe et suit la formation obligatoire à la sécurité.</p>\n<h2>La première semaine</h2>\n<p>Un point d'étape est organisé le vendredi avec le manager et le parrain. Le nouvel arrivant complète le questionnaire d'intégration, dont les réponses servent à améliorer le parcours d'accueil.</p>",
+          "document_id": 5,
+          "filename": "onboarding_nouveaux_arrivants.md",
+          "similarity_score": 0.032,
+          "total_chunks": 1
+        },
+        {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Procédure de remboursement des notes de frais</h1>\n<h2>Principes</h2>\n<p>Les frais engagés pour le compte de l'entreprise sont remboursés sur présentation des justificatifs originaux. Toute note de frais doit être déclarée dans l'application Notilus dans un délai de trente jours suivant la dépense.</p>\n<h2>Déclarer une note de frais</h2>\n<ol>\n<li>Photographier chaque justificatif avec l'application mobile.</li>\n<li>Renseigner la nature de la dépense, le projet et le centre de coût.</li>\n<li>Soumettre la note au manager, qui la valide sous cinq jours ouvrés.</li>\n<li>Le service comptable contrôle la note et déclenche le virement à la fin du mois.</li>\n</ol>\n<h2>Plafonds</h2>\n<ul>\n<li>Repas d'affaires : 25 euros par personne en province, 35 euros à Paris.</li>\n<li>Nuit d'hôtel : 110 euros en province, 160 euros à Paris, petit-déjeuner inclus.</li>\n<li>Indemnités kilométriques selon le barème fiscal en vigueur.</li>\n</ul>\n<p>Les dépassements de plafond doivent être justifiés par écrit et validés par le directeur de département.</p>\n<h2>Transports</h2>\n<p>Le train en seconde classe est la règle pour les trajets de moins de quatre heures. L'avion n'est autorisé qu'au-delà de quatre heures de train ou pour les déplacements internationaux. Les taxis sont remboursés uniquement entre vingt-deux heures et six heures, ou en l'absence de transport en commun.</p>",
+          "document_id": 3,
+          "filename": "procedure_notes_de_frais.md",
+          "similarity_score": 0.031,
+          "total_chunks": 1
+        }
+      ],
+      "type": "done"
+    }
+  ],
+  "llm_generate_calls": [
+    {
+      "max_tokens": 800,
+      "prompt": "Quelle est la recette de la tarte aux pommes ?",
+      "temperature": 0.1
+    }
+  ],
+  "question": "Quelle est la recette de la tarte aux pommes ?",
+  "usage_records": [
+    {
+      "call_type": "embedding",
+      "completion_tokens": 0,
+      "estimated": false,
+      "model": "mistral-embed",
+      "prompt_tokens": 11,
+      "session_id": "<session_id>"
+    },
+    {
+      "call_type": "chat",
+      "completion_tokens": 20,
+      "estimated": false,
+      "model": "mistral-small-latest",
+      "prompt_tokens": 100,
+      "session_id": "<session_id>"
+    }
+  ]
+}

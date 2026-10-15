@@ -1,0 +1,78 @@
+{
+  "budget_calls": [
+    "reserve:chat",
+    "finalize"
+  ],
+  "events": [
+    {
+      "session_id": "<session_id>",
+      "type": "start"
+    },
+    {
+      "content": "Réponse fondée sur ",
+      "type": "chunk"
+    },
+    {
+      "content": "1 extrait(s) ",
+      "type": "chunk"
+    },
+    {
+      "content": "[prompt:f68a509edfb4b3c9]",
+      "type": "chunk"
+    },
+    {
+      "citations": {
+        "1": {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Politique de télétravail</h1>\n<h2>Objet</h2>\n<p>La présente politique encadre le télétravail au sein de l'entreprise. Elle s'applique à tous les salariés en contrat à durée indéterminée ayant terminé leur période d'essai. Le télétravail repose sur le volontariat et sur un accord écrit entre le salarié et son responsable hiérarchique.</p>\n<h2>Nombre de jours autorisés</h2>\n<p>Chaque salarié éligible peut télétravailler jusqu'à deux jours par semaine. Les jours de télétravail sont fixés d'un commun accord avec le manager et déclarés dans l'outil de planification avant le vendredi de la semaine précédente. Un troisième jour peut être accordé à titre exceptionnel pour raison médicale, sur présentation d'un avis de la médecine du travail.</p>\n<p>Les jours non utilisés ne sont pas reportables d'une semaine sur l'autre. Le mercredi reste un jour de présence obligatoire pour l'ensemble des équipes afin de faciliter les réunions transverses.</p>\n<h2>Équipement fourni</h2>\n<p>L'entreprise fournit un ordinateur portable, un écran externe et un casque audio. Une indemnité mensuelle de 30 euros couvre les frais de connexion internet et d'électricité. Le salarié s'engage à disposer d'un espace de travail calme et d'une connexion stable d'au moins 20 Mbit/s.</p>\n<h2>Sécurité et confidentialité</h2>\n<p>Le salarié en télétravail doit se connecter exclusivement via le VPN de l'entreprise. Il est interdit de travailler sur des documents confidentiels dans un lieu public. Le verrouillage de la session est obligatoire dès que le poste est laissé sans surveillance, même quelques minutes.</p>\n<h2>Réversibilité</h2>\n<p>Le salarié comme le manager peuvent mettre fin au télétravail avec un préavis d'un mois. En cas de non-respect des règles de sécurité, l'autorisation de télétravail peut être suspendue sans préavis.</p>",
+          "document_id": 1,
+          "filename": "politique_teletravail.md",
+          "similarity_score": 0.049,
+          "total_chunks": 1
+        }
+      },
+      "type": "citation"
+    },
+    {
+      "cached": false,
+      "confidence_score": 0.83,
+      "sources": [
+        {
+          "chunk_index": 0,
+          "chunk_text": "<h1>Politique de télétravail</h1>\n<h2>Objet</h2>\n<p>La présente politique encadre le télétravail au sein de l'entreprise. Elle s'applique à tous les salariés en contrat à durée indéterminée ayant terminé leur période d'essai. Le télétravail repose sur le volontariat et sur un accord écrit entre le salarié et son responsable hiérarchique.</p>\n<h2>Nombre de jours autorisés</h2>\n<p>Chaque salarié éligible peut télétravailler jusqu'à deux jours par semaine. Les jours de télétravail sont fixés d'un commun accord avec le manager et déclarés dans l'outil de planification avant le vendredi de la semaine précédente. Un troisième jour peut être accordé à titre exceptionnel pour raison médicale, sur présentation d'un avis de la médecine du travail.</p>\n<p>Les jours non utilisés ne sont pas reportables d'une semaine sur l'autre. Le mercredi reste un jour de présence obligatoire pour l'ensemble des équipes afin de faciliter les réunions transverses.</p>\n<h2>Équipement fourni</h2>\n<p>L'entreprise fournit un ordinateur portable, un écran externe et un casque audio. Une indemnité mensuelle de 30 euros couvre les frais de connexion internet et d'électricité. Le salarié s'engage à disposer d'un espace de travail calme et d'une connexion stable d'au moins 20 Mbit/s.</p>\n<h2>Sécurité et confidentialité</h2>\n<p>Le salarié en télétravail doit se connecter exclusivement via le VPN de l'entreprise. Il est interdit de travailler sur des documents confidentiels dans un lieu public. Le verrouillage de la session est obligatoire dès que le poste est laissé sans surveillance, même quelques minutes.</p>\n<h2>Réversibilité</h2>\n<p>Le salarié comme le manager peuvent mettre fin au télétravail avec un préavis d'un mois. En cas de non-respect des règles de sécurité, l'autorisation de télétravail peut être suspendue sans préavis.</p>",
+          "document_id": 1,
+          "filename": "politique_teletravail.md",
+          "similarity_score": 0.049,
+          "total_chunks": 1
+        }
+      ],
+      "type": "done"
+    }
+  ],
+  "llm_generate_calls": [
+    {
+      "max_tokens": 800,
+      "prompt": "Que contient la politique de télétravail ?",
+      "temperature": 0.1
+    }
+  ],
+  "question": "Que contient la politique de télétravail ?",
+  "usage_records": [
+    {
+      "call_type": "embedding",
+      "completion_tokens": 0,
+      "estimated": false,
+      "model": "mistral-embed",
+      "prompt_tokens": 10,
+      "session_id": "<session_id>"
+    },
+    {
+      "call_type": "chat",
+      "completion_tokens": 20,
+      "estimated": false,
+      "model": "mistral-small-latest",
+      "prompt_tokens": 100,
+      "session_id": "<session_id>"
+    }
+  ]
+}

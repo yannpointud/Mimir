@@ -1,0 +1,21 @@
+Guide de sécurité informatique
+
+Mots de passe
+
+Chaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.
+
+Perte ou vol de matériel
+
+En cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.
+
+Messagerie et hameçonnage
+
+Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.
+
+Supports amovibles
+
+Les clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.
+
+Mises à jour
+
+Les postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.
