@@ -200,7 +200,9 @@ class IngestionProcessor:
                     f"Queued document for processing: {file_path_obj.name}",
                     extra={
                         "extra_fields": {
-                            "file_path": file_path,
+                            # str(): callers pass a Path, which the JSON log
+                            # formatter cannot serialize (the record was lost)
+                            "file_path": str(file_path),
                             "document_id": document_id,
                             "file_size_mb": file_size / 1024 / 1024,
                             "type": "document_queued",
