@@ -241,3 +241,170 @@ quel (option conservatrice), avec ses exceptions resserrées.
 Un échec isolé (1 test sur 1045) est apparu une fois pendant la passe, non
 reproduit sur quatre exécutions complètes suivantes ; la porte a été franchie
 sans relance.
+
+## Passe 3 : architecture
+
+### D3.1 Interfaces de rag_core et llm_interface
+
+`AbstractVectorStore` déclare désormais ce que `RagService` et les routes
+utilisent réellement : `query(..., similarity_floor=...)`,
+`get_corpus_version()` et `snapshot_active_chunks()`. Le store BM25
+n'implémente pas `AbstractVectorStore` (il est interrogé en texte brut et
+reconstruit d'un bloc) : il reçoit un `Protocol` `LexicalIndex`
+(`rebuild`, `query`, `load`). `AbstractLLMService` déclare `generate_stream`
+(abstrait), `close()` (sans effet par défaut) et la signature réelle de
+`embed(texts, session_id, rag_debug)`. `RagService` et les étapes du pipeline
+sont typés sur ces interfaces plutôt que sur les implémentations FAISS, BM25
+et Mistral.
+
+### D3.2 Pipeline RAG en étapes nommées
+
+`_process_question_with_rag_stream` (radon E 34, `noqa: C901`) est découpé en
+étapes : `_embed_question`, `_pre_include_by_filename`, `_retrieve`,
+`_build_context`, `_build_prompt`, `_stream_answer` (fermé par
+`contextlib.aclosing` pour que l'usage soit enregistré avant le règlement de
+la réservation), `_cache_answer`, et `_QuestionSpend` pour le suivi des
+dépenses. La fusion hybride lit les métadonnées actives via
+`snapshot_active_chunks()` (copies prises sous le verrou FAISS) au lieu de
+parcourir `FaissVectorStore.metadata` : mêmes entrées non supprimées, oracle
+hybride inchangé ; le mock d'un test unitaire hybride a été adapté en
+conséquence. Le point d'entrée `RagService.answer_stream` et l'appel
+`rag_debug.log_vector_search(search_results=...)` sur les candidats avant
+filtrage sont conservés.
+
+### D3.3 Services créés et traduction HTTP
+
+La logique des sept handlers de plus de 100 lignes passe dans des services de
+`backend/src/services/`, sans dépendance à FastAPI :
+
+| Handler | Lignes avant | Lignes après | Service |
+| --- | --- | --- | --- |
+| `chat.chat_stream` | 186 | 56 | `chat_stream.py` |
+| `documents.upload_document` | 168 | 47 | `document_upload.py` |
+| `admin.admin_upload_document` | 161 | 57 | `document_upload.py` |
+| `admin.rebuild_vector_store` | 148 | 33 | `index_maintenance.py` |
+| `documents.delete_document` | 142 | 48 | `document_deletion.py`, `index_maintenance.py` |
+| `documents.validate_vector_store_consistency` | 127 | 44 | `index_maintenance.py` |
+| `documents.get_document_with_chunks` | 111 | 21 | `document_reader.py` |
+
+(décorateurs, signature et docstring compris). Un service refuse une requête
+en levant `RequestRejectedError` (`services/errors.py`), qui porte le code
+HTTP (`http.HTTPStatus`, bibliothèque standard) et le message client ; la
+route le traduit en `HTTPException` identique via `rejection_to_http`
+(`api/responses.py`). Les `except Exception` de frontière (500 génériques
+propres à chaque route, messages inchangés) restent dans les routes ; les
+« au mieux » déplacés gardent leur annotation `noqa: BLE001`. Les handlers
+entre 60 et 100 lignes (`reprocess_document`, `login`, `get_audit_log`...)
+ne sont pas visés par la mission et restent tels quels.
+
+Points d'entrée gelés conservés : `rebuild_vector_store(current_user=,
+audit_repo=, vector_store=, bm25_store=, document_repo=)` et
+`delete_document(document_id=, force=, current_user=, doc_repo=, audit_repo=,
+vector_store=, bm25_store=)` gardent leurs noms, paramètres et effets (FAISS
+optimisé puis BM25 reconstruit depuis `snapshot_active_chunks()`, ids des
+documents existants pris dans le dépôt injecté).
+
+### D3.4 Fusion des deux uploads
+
+`DocumentUpload` porte le pipeline commun (nom, taille, lecture, doublon,
+écriture préfixée par le hachage, enregistrement, mise en file avec rollback
+sur file pleine) ; `UploadPolicy` exprime les différences observables, toutes
+conservées (figées par l'oracle, D0.4) :
+
+- message 400 du nom invalide : « Invalid filename » contre « Invalid file
+  type or filename » ;
+- contrôle d'extension seulement sur `/documents/upload` (l'admin accepte un
+  `.exe`) ;
+- log d'avertissement de doublon et audit `document_upload` seulement sur
+  `/documents/upload` (l'audit est écrit avant la mise en file, comme avant) ;
+  le log « Document uploaded successfully » reste dans cette route ;
+- côté admin : contrôles du nom et de la taille hors du `try` (avant
+  l'ouverture de la session), session obtenue par `next(get_db_session())`
+  et fermée en `finally`, répertoire d'upload créé avant la lecture du
+  fichier (même précédence d'erreur qu'avant), fichier stocké supprimé sur
+  erreur inattendue (« Upload failed »), réponse en `dict` ;
+- côté documents : 500 « Document upload failed », réponse `DocumentResponse`.
+
+503 file pleine (suppression forcée de l'enregistrement puis du fichier) et
+500 « Failed to queue document for processing » sont communs. Seule
+différence interne : côté admin, `sanitize_filename` est appelée juste après
+`validate_filename` au lieu d'après la création du répertoire (fonction pure,
+sans effet observable). Les imports différés de la route admin
+(`get_db_session`, `DocumentRepository`) sont gardés : les tests unitaires
+les remplacent dans leur module d'origine. Les routes construisent la
+politique à partir de leur propre `settings`, que les tests unitaires
+remplacent aussi.
+
+### D3.5 Flux SSE du chat
+
+`services/chat_stream.py` contient `ChatStream.events` (l'ancien
+`generate_sse`), `ReservationSettlement` (l'ancien drapeau `settled` partagé
+entre le générateur et la `BackgroundTask`, avec `release_if_unsettled`
+synchrone exécutée dans le pool de threads de Starlette), `convert_numpy_types`,
+`generate_session_id` et `SSE_HEADERS`. Ordre des événements, JSON
+(`json.dumps` des mêmes dictionnaires, mêmes clés dans le même ordre),
+rejeu du cache (libération puis chunk, citation, done, produits un par un),
+`finally` de règlement et retour (non levé) de `budget_exceeded_response()`
+sont inchangés ; aucun `aclosing` n'est ajouté autour de
+`RagService.answer_stream`. Seule différence : l'IP client est lue dans le
+corps de la route plutôt qu'à la première itération du générateur ; la
+valeur est la même (en-têtes immuables) et cette lecture ne peut pas
+échouer. `_generate_session_id` devient `generate_session_id` dans le
+service : le test unitaire qui l'importait depuis la route l'importe depuis
+le service (pas de réexport). `RagService` reste importé comme module dans
+la route, comme avant.
+
+### D3.6 Autres fonctions notées D ou pire, ou en `noqa: C901`
+
+Découpées sans changement de comportement (mêmes exceptions, mêmes messages,
+même ordre des effets) :
+
+| Fonction | Avant | Après |
+| --- | --- | --- |
+| `MistralAPIService.generate_stream` | D 21, C901 | C 12 |
+| `VectorStoreValidator._analyze_inconsistencies` | E 34, C901 | A 3 |
+| `FaissVectorStore.clean_orphans` | D 28 | B 6 |
+| `logs_reader._apply_filters` | D 24 | C 13 |
+| `main.lifespan` | C901 | A 3 |
+| `log_parser.get_errors_last_hour` | C901 | A 2 |
+
+Détails conservés : dans le flux Mistral, l'usage d'un chunk est lu après le
+`yield` de son texte (un consommateur qui s'arrête à ce chunk ne l'enregistre
+pas, comme avant) et une ligne `data: null` lève toujours une erreur de flux
+(sentinelle `_NO_CHUNK` plutôt que `None`) ; `clean_orphans` appelle toujours
+`_create_backup` quand `create_backup=True` et survit à toute exception de
+sauvegarde ; un échec de persistance reste enveloppé deux fois comme avant ;
+le filtre `since` des logs renvoie toujours la liste non filtrée sur
+horodatage invalide ; le comptage d'erreurs garde le total partiel si la
+lecture de `error.log` échoue. Les imports différés de `lifespan`
+(`db_manager`, `setup_alerting`, `_llm_service`) sont conservés. Aucune autre
+fonction notée A, B ou C n'a été modifiée.
+
+### D3.7 Noms de loggers
+
+Les messages déplacés dans les services sont émis par les loggers
+`src.services.<module>` au lieu de `src.api.endpoints.<module>` ; leur texte
+est inchangé. Aucun handler ni test ne filtre sur ces noms. Les logs des
+fonctions découpées dans `main.py`, `mistral_api.py`, `faiss_store.py`,
+`validation_utils.py`, `log_parser.py` et `logs_reader.py` gardent leur
+logger.
+
+### D3.8 Typage et mypy
+
+Le code du flux SSE n'était pas vérifié par mypy (fonction imbriquée non
+annotée). Une fois déplacé, mypy signale que `context_limit` peut valoir
+`None` (champ optionnel de `ChatRequest`) : l'annotation de
+`RagService.answer_stream` et de `_process_question_with_rag_stream` devient
+`int | None` (valeur transmise sans être lue, aucun effet à l'exécution).
+`_stream_answer` est annoté `AsyncGenerator` (et non `AsyncIterator`) pour
+satisfaire `aclosing`, erreur introduite par le découpage du pipeline. Bilan :
+mypy passe de 131 à 112 erreurs, aucune nouvelle.
+
+### D3.9 Tests unitaires adaptés
+
+Hors fichiers gelés : les patchs des tests d'upload visent
+`src.services.document_upload` (`validate_filename`, `sanitize_filename`,
+`Path`, `hashlib.sha256`) au lieu de la route, et le test de génération
+d'identifiant de session importe `generate_session_id` depuis
+`src.services.chat_stream`. Les tests unitaires de l'upload admin passent
+sans modification.
