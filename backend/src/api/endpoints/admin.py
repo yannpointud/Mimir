@@ -43,7 +43,27 @@ from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
 from src.rag_core.implementations.faiss_store import FaissVectorStore
 from src.rag_core.implementations.bm25_store import Bm25LexicalStore
-from src.shared.models import BaseResponse, PaginationModel
+from src.shared.models import (
+    AdminCacheStats,
+    AdminConfigurationResponse,
+    AdminDocumentList,
+    AdminDocumentStats,
+    AdminDocumentSummary,
+    AdminUploadResponse,
+    ApplicationConfig,
+    AuditLogEntry,
+    AuditLogFilters,
+    AuditLogPage,
+    BaseResponse,
+    CacheGlobalStats,
+    CacheStatsResponse,
+    DailyModelUsage,
+    DocumentStatusCounts,
+    ModelUsageToday,
+    PaginationModel,
+    UploadedDocument,
+    UsageResponse,
+)
 from src.shared.constants import MASKED_VALUE, mask_secrets
 from src.api.responses import rejection_to_http
 from src.services import index_maintenance
@@ -141,8 +161,10 @@ async def get_system_info(current_user: dict[str, Any] = Depends(require_admin))
         ) from e
 
 
-@router.get("/cache/stats", response_model=dict[str, Any])
-async def get_cache_stats(current_user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+@router.get("/cache/stats", response_model=CacheStatsResponse)
+async def get_cache_stats(
+    current_user: dict[str, Any] = Depends(require_admin),
+) -> CacheStatsResponse:
     """
     Get cache service statistics.
 
@@ -157,28 +179,26 @@ async def get_cache_stats(current_user: dict[str, Any] = Depends(require_admin))
         chat_cache_stats = chat_cache_service.get_stats()
 
         # Adapt data for the frontend
-        def adapt_cache_stats(stats):
-            adapted = stats.copy()
+        def adapt_cache_stats(stats: dict[str, Any]) -> AdminCacheStats:
             # Add 'utilization' expected by the frontend
-            adapted["utilization"] = stats.get("utilization_percent", 0.0)
-            return adapted
+            return AdminCacheStats(**stats, utilization=stats.get("utilization_percent", 0.0))
 
         # Compute global stats for the frontend
         total_requests = main_cache_stats["total_requests"] + chat_cache_stats["total_requests"]
         total_hits = main_cache_stats["hits"] + chat_cache_stats["hits"]
         hit_ratio = (total_hits / max(1, total_requests)) if total_requests > 0 else 0.0
 
-        return {
-            "main_cache": adapt_cache_stats(main_cache_stats),
-            "chat_cache": adapt_cache_stats(chat_cache_stats),
-            "global_stats": {
-                "total_requests": total_requests,
-                "hit_ratio": hit_ratio,
-                "total_hits": total_hits,
-                "total_misses": main_cache_stats["misses"] + chat_cache_stats["misses"],
-            },
-            "timestamp": datetime.utcnow(),
-        }
+        return CacheStatsResponse(
+            main_cache=adapt_cache_stats(main_cache_stats),
+            chat_cache=adapt_cache_stats(chat_cache_stats),
+            global_stats=CacheGlobalStats(
+                total_requests=total_requests,
+                hit_ratio=hit_ratio,
+                total_hits=total_hits,
+                total_misses=main_cache_stats["misses"] + chat_cache_stats["misses"],
+            ),
+            timestamp=datetime.utcnow(),
+        )
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving cache stats: {e}")
@@ -250,11 +270,11 @@ async def clear_cache(
         ) from e
 
 
-@router.get("/configuration", response_model=dict[str, Any])
+@router.get("/configuration", response_model=AdminConfigurationResponse)
 async def get_configuration(
     current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
-) -> dict[str, Any]:
+) -> AdminConfigurationResponse:
     """
     Get system configuration settings.
 
@@ -288,11 +308,11 @@ async def get_configuration(
         }
 
         # Server-side masking: secrets must never leave the backend in clear text
-        return {
-            "database_config": mask_secrets({item.key: item.value for item in db_config}),
-            "application_config": mask_secrets(app_config),
-            "timestamp": datetime.utcnow(),
-        }
+        return AdminConfigurationResponse(
+            database_config=mask_secrets({item.key: item.value for item in db_config}),
+            application_config=ApplicationConfig(**mask_secrets(app_config)),
+            timestamp=datetime.utcnow(),
+        )
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving configuration: {e}")
@@ -382,7 +402,7 @@ async def update_configuration(
         ) from e
 
 
-@router.get("/audit-log", response_model=dict[str, Any])
+@router.get("/audit-log", response_model=AuditLogPage)
 async def get_audit_log(
     pagination: PaginationModel = Depends(),
     action_filter: str | None = Query(None, description="Filter by action type"),
@@ -391,7 +411,7 @@ async def get_audit_log(
     days_back: int = Query(7, ge=1, le=90, description="Number of days to look back"),
     current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-) -> dict[str, Any]:
+) -> AuditLogPage:
     """
     Get audit log entries with filtering.
 
@@ -431,38 +451,37 @@ async def get_audit_log(
         )
 
         # Convert to response format
-        log_entries = []
-        for entry in entries:
-            log_entries.append(
-                {
-                    "id": entry.id,
-                    "timestamp": entry.created_at,
-                    "user_type": entry.user_type,
-                    "action": entry.action,
-                    "details": entry.details,
-                    "ip_address": entry.ip_address,
-                    "success": entry.success,
-                    # additional_data is accepted by create_log for compatibility
-                    # but not persisted on the AuditLog model; guard the read so a
-                    # missing column cannot turn the audit-log GET into a 500.
-                    "additional_data": getattr(entry, "additional_data", None),
-                }
+        log_entries = [
+            AuditLogEntry(
+                id=entry.id,
+                timestamp=entry.created_at,
+                user_type=entry.user_type,
+                action=entry.action,
+                details=entry.details,
+                ip_address=entry.ip_address,
+                success=entry.success,
+                # additional_data is accepted by create_log for compatibility
+                # but not persisted on the AuditLog model; guard the read so a
+                # missing column cannot turn the audit-log GET into a 500.
+                additional_data=getattr(entry, "additional_data", None),
             )
+            for entry in entries
+        ]
 
-        return {
-            "entries": log_entries,
-            "total": total_count,
-            "offset": pagination.offset,
-            "limit": pagination.limit,
-            "has_more": pagination.offset + len(log_entries) < total_count,
-            "filters": {
-                "action": action_filter,
-                "user_type": user_type_filter,
-                "success": success_filter,
-                "days_back": days_back,
-            },
-            "timestamp": datetime.utcnow(),
-        }
+        return AuditLogPage(
+            entries=log_entries,
+            total=total_count,
+            offset=pagination.offset,
+            limit=pagination.limit,
+            has_more=pagination.offset + len(log_entries) < total_count,
+            filters=AuditLogFilters(
+                action=action_filter,
+                user_type=user_type_filter,
+                success=success_filter,
+                days_back=days_back,
+            ),
+            timestamp=datetime.utcnow(),
+        )
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving audit log: {e}")
@@ -471,13 +490,13 @@ async def get_audit_log(
         ) from e
 
 
-@router.get("/usage", response_model=dict[str, Any])
+@router.get("/usage", response_model=UsageResponse)
 async def get_usage(
     days_back: int = Query(30, ge=1, le=90, description="Number of days of history to return"),
     current_user: dict[str, Any] = Depends(require_admin),
     usage_repo: UsageRepository = Depends(get_usage_repository),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
-) -> dict[str, Any]:
+) -> UsageResponse:
     """
     Get today's per-model LLM spend, the daily history, and today's spend
     vs the daily budget cap, for the admin cost dashboard.
@@ -510,13 +529,13 @@ async def get_usage(
         override = config_repo.get("daily_budget_eur")
         effective_cap = float(override.value) if override is not None else settings.daily_budget_eur
 
-        return {
-            "today_by_model": today_by_model,
-            "history": history,
-            "spent_today_eur": ledger.spent_eur if ledger else 0.0,
-            "daily_budget_eur": effective_cap,
-            "timestamp": datetime.utcnow(),
-        }
+        return UsageResponse(
+            today_by_model=[ModelUsageToday(**row) for row in today_by_model],
+            history=[DailyModelUsage(**row) for row in history],
+            spent_today_eur=ledger.spent_eur if ledger else 0.0,
+            daily_budget_eur=effective_cap,
+            timestamp=datetime.utcnow(),
+        )
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error retrieving usage data: {e}")
@@ -647,14 +666,14 @@ async def test_email_service(
 # Document endpoints added for frontend consistency
 
 
-@router.get("/documents", response_model=dict[str, Any])
+@router.get("/documents", response_model=AdminDocumentList)
 async def admin_list_documents(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=100, description="Items per page"),
     status_filter: str | None = Query(None, description="Filter by document status"),
     search: str | None = Query(None, description="Search in filenames"),
     current_user: dict[str, Any] = Depends(require_admin),
-) -> dict[str, Any]:
+) -> AdminDocumentList:
     """List documents via admin interface."""
     # Import here to avoid circular imports
     from src.database.repository import DocumentRepository
@@ -675,31 +694,31 @@ async def admin_list_documents(
         # Count total (simple approximation)
         total = len(doc_repo.get_all())
 
-        return {
-            "documents": [
-                {
-                    "id": doc.id,
-                    "filename": doc.filename,
-                    "status": doc.status,
-                    "created_at": doc.created_at.isoformat() if doc.created_at else None,
-                    "file_size": getattr(doc, "file_size", 0),
-                    "preserve": getattr(doc, "preserve", False),
-                }
+        return AdminDocumentList(
+            documents=[
+                AdminDocumentSummary(
+                    id=doc.id,
+                    filename=doc.filename,
+                    status=doc.status,
+                    created_at=doc.created_at.isoformat() if doc.created_at else None,
+                    file_size=getattr(doc, "file_size", 0),
+                    preserve=getattr(doc, "preserve", False),
+                )
                 for doc in documents
             ],
-            "total": total,
-            "page": page,
-            "limit": limit,
-            "total_pages": (total + limit - 1) // limit if total > 0 else 0,
-        }
+            total=total,
+            page=page,
+            limit=limit,
+            total_pages=(total + limit - 1) // limit if total > 0 else 0,
+        )
     finally:
         db.close()
 
 
-@router.get("/documents/stats", response_model=dict[str, Any])
+@router.get("/documents/stats", response_model=AdminDocumentStats)
 async def admin_document_stats(
     current_user: dict[str, Any] = Depends(require_admin),
-) -> dict[str, Any]:
+) -> AdminDocumentStats:
     """Get document statistics via admin interface."""
     from src.database.repository import DocumentRepository
     from src.database.connection import get_db_session
@@ -709,27 +728,28 @@ async def admin_document_stats(
 
     try:
         stats = doc_repo.get_statistics()
-        return {
-            "total_documents": stats.get("total_documents", 0),
-            "by_status": {
-                "pending": stats.get("count_pending", 0),
-                "indexing": stats.get("count_indexing", 0),
-                "indexed": stats.get("count_indexed", 0),
-                "error": stats.get("count_error", 0),
-            },
-            "by_type": stats.get("by_type", {}),
-            "total_size_mb": stats.get("total_size_mb", 0),
-            "timestamp": datetime.utcnow(),
-        }
+        return AdminDocumentStats(
+            total_documents=stats.get("total_documents", 0),
+            by_status=DocumentStatusCounts(
+                pending=stats.get("count_pending", 0),
+                indexing=stats.get("count_indexing", 0),
+                indexed=stats.get("count_indexed", 0),
+                error=stats.get("count_error", 0),
+            ),
+            by_type=stats.get("by_type", {}),
+            total_size_mb=stats.get("total_size_mb", 0),
+            timestamp=datetime.utcnow(),
+        )
     finally:
         db.close()
 
 
-@router.post("/documents/upload", response_model=dict[str, Any])
+@router.post("/documents/upload", response_model=AdminUploadResponse)
 # Same upload limit as /documents/upload: this duplicated admin
 # route would otherwise be a trivial bypass of the upload rate limit.
 # `request` is required by slowapi (import-time error without it) and
-# `response` is required because the return value is a plain dict.
+# `response` lets slowapi inject the X-RateLimit-* headers on the returned
+# model (it only adds them itself to a Response object).
 @limiter.limit(
     lambda: f"{settings.rate_limit_upload_per_minute}/minute", key_func=get_client_identifier
 )
@@ -740,7 +760,7 @@ async def admin_upload_document(
     preserve: bool = Form(False),
     current_user: dict[str, Any] = Depends(require_admin),
     ingestion_processor=Depends(get_ingestion_processor),
-) -> dict[str, Any]:
+) -> AdminUploadResponse:
     """Upload document via admin interface.
 
     Shares the /documents/upload pipeline, but accepts any extension, writes
@@ -760,17 +780,17 @@ async def admin_upload_document(
     doc_repo = DocumentRepository(db)
     try:
         document = await upload.run(doc_repo, ingestion_processor, preserve, current_user)
-        return {
-            "success": True,
-            "message": "Document uploaded successfully",
-            "document": {
-                "id": document.id,
-                "filename": document.filename,
-                "status": document.status,
-                "created_at": document.created_at.isoformat() if document.created_at else None,
-            },
-            "timestamp": datetime.utcnow(),
-        }
+        return AdminUploadResponse(
+            success=True,
+            message="Document uploaded successfully",
+            document=UploadedDocument(
+                id=document.id,
+                filename=document.filename,
+                status=document.status,
+                created_at=document.created_at.isoformat() if document.created_at else None,
+            ),
+            timestamp=datetime.utcnow(),
+        )
     except RequestRejectedError as e:
         # Intentional client errors (e.g. 409 duplicate) keep their status
         raise rejection_to_http(e) from e
@@ -797,11 +817,11 @@ def _admin_upload_policy() -> UploadPolicy:
 # Aliases for frontend consistency
 
 
-@router.get("/config", response_model=dict[str, Any])
+@router.get("/config", response_model=AdminConfigurationResponse)
 async def get_config_alias(
     current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
-) -> dict[str, Any]:
+) -> AdminConfigurationResponse:
     """Alias for /configuration - for frontend consistency."""
     return await get_configuration(current_user, config_repo)
 

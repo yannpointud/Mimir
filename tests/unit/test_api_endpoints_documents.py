@@ -846,14 +846,14 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
         )
 
         # Assertions
-        assert result["total_documents"] == 25
-        assert result["by_status"]["indexed"] == 20
-        assert result["by_status"]["indexing"] == 3
-        assert result["by_status"]["error"] == 2
-        assert result["total_chunks"] == 150
-        assert result["preserved_documents"] == 5
-        assert result["storage_info"]["upload_directory"] == "/uploads"
-        assert result["storage_info"]["max_file_size_mb"] == 10
+        assert result.total_documents == 25
+        assert result.by_status.indexed == 20
+        assert result.by_status.indexing == 3
+        assert result.by_status.error == 2
+        assert result.total_chunks == 150
+        assert result.preserved_documents == 5
+        assert result.storage_info.upload_directory == "/uploads"
+        assert result.storage_info.max_file_size_mb == 10
 
     def test_get_document_stats_exception_handling(self, mock_doc_repo):
         """Test exception handling in statistics."""
@@ -990,10 +990,10 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             )
 
         # Assertions
-        assert stats_result["total_documents"] == 1
-        assert stats_result["by_status"]["pending"] == 1
-        assert stats_result["total_chunks"] == 0
-        assert stats_result["storage_info"]["max_file_size_mb"] == 10
+        assert stats_result.total_documents == 1
+        assert stats_result.by_status.pending == 1
+        assert stats_result.total_chunks == 0
+        assert stats_result.storage_info.max_file_size_mb == 10
 
     def test_simple_document_operations(self, mock_doc_repo):
         """Simple tests to improve coverage."""

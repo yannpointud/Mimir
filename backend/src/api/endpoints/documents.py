@@ -38,11 +38,16 @@ from src.api.dependencies import (
 )
 from src.api.responses import rejection_to_http
 from src.shared.models import (
+    ConsistencyValidationResponse,
     DocumentResponse,
     DocumentListResponse,
+    DocumentStatsOverview,
+    DocumentStatusCounts,
     BaseResponse,
     DocumentWithChunksResponse,
     PaginationModel,
+    StorageInfo,
+    VectorStoreOverview,
 )
 from src.services import index_maintenance
 from src.services.document_deletion import delete_document_everywhere
@@ -495,11 +500,11 @@ async def reprocess_document(
         ) from e
 
 
-@router.get("/stats/overview", response_model=dict[str, Any])
+@router.get("/stats/overview", response_model=DocumentStatsOverview)
 async def get_document_stats(
     doc_repo: DocumentRepository = Depends(get_document_repository),
     vector_store=Depends(get_vector_store),
-) -> dict[str, Any]:
+) -> DocumentStatsOverview:
     """
     Get document statistics overview with vector store health.
 
@@ -520,31 +525,31 @@ async def get_document_stats(
         vector_stats = await asyncio.to_thread(vector_store.get_stats)
         health_status = await asyncio.to_thread(vector_store.health_check)
 
-        return {
-            "total_documents": db_stats.get("total_documents", 0),
-            "by_status": {
-                "pending": db_stats.get("count_pending", 0),
-                "indexing": db_stats.get("count_indexing", 0),
-                "indexed": db_stats.get("count_indexed", 0),
-                "error": db_stats.get("count_error", 0),
-            },
-            "total_chunks": db_stats.get("total_chunks", 0),
-            "preserved_documents": db_stats.get("protected_documents", 0),
-            "vector_store": {
-                "total_vectors": vector_stats.get("total_vectors", 0),
-                "active_vectors": vector_stats.get("active_vectors", 0),
-                "deleted_vectors": vector_stats.get("deleted_vectors", 0),
-                "total_documents": vector_stats.get("total_documents", 0),
-                "memory_usage_mb": vector_stats.get("memory_usage_mb", 0),
-                "health_status": health_status,
-            },
-            "storage_info": {
-                "upload_directory": settings.upload_dir,
-                "supported_extensions": list(settings.supported_file_extensions),
-                "max_file_size_mb": settings.max_file_size_mb,
-            },
-            "timestamp": datetime.utcnow(),
-        }
+        return DocumentStatsOverview(
+            total_documents=db_stats.get("total_documents", 0),
+            by_status=DocumentStatusCounts(
+                pending=db_stats.get("count_pending", 0),
+                indexing=db_stats.get("count_indexing", 0),
+                indexed=db_stats.get("count_indexed", 0),
+                error=db_stats.get("count_error", 0),
+            ),
+            total_chunks=db_stats.get("total_chunks", 0),
+            preserved_documents=db_stats.get("protected_documents", 0),
+            vector_store=VectorStoreOverview(
+                total_vectors=vector_stats.get("total_vectors", 0),
+                active_vectors=vector_stats.get("active_vectors", 0),
+                deleted_vectors=vector_stats.get("deleted_vectors", 0),
+                total_documents=vector_stats.get("total_documents", 0),
+                memory_usage_mb=vector_stats.get("memory_usage_mb", 0),
+                health_status=health_status,
+            ),
+            storage_info=StorageInfo(
+                upload_directory=settings.upload_dir,
+                supported_extensions=list(settings.supported_file_extensions),
+                max_file_size_mb=settings.max_file_size_mb,
+            ),
+            timestamp=datetime.utcnow(),
+        )
 
     except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
         logger.error(f"Error getting document stats: {e}")
@@ -554,7 +559,7 @@ async def get_document_stats(
         ) from e
 
 
-@router.post("/maintenance/validate-consistency", response_model=dict[str, Any])
+@router.post("/maintenance/validate-consistency", response_model=ConsistencyValidationResponse)
 async def validate_vector_store_consistency(
     fix_issues: bool = Query(False, description="Automatically fix detected issues"),
     save_report: bool = Query(True, description="Save detailed report to file"),
@@ -562,7 +567,7 @@ async def validate_vector_store_consistency(
     doc_repo: DocumentRepository = Depends(get_document_repository),
     vector_store=Depends(get_vector_store),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-) -> dict[str, Any]:
+) -> ConsistencyValidationResponse:
     """
     Validate consistency between SQLite and FAISS with optional auto-fix.
 

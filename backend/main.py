@@ -18,7 +18,7 @@ from src.database.connection import init_database, db_manager
 from src.security.admin_password import resolve_admin_password
 from src.security.startup_validation import validate_production_secrets
 from src.shared.errors import BudgetExceeded, MimirError, RetrievalError
-from src.shared.models import ErrorResponse, HealthCheckResponse
+from src.shared.models import ErrorResponse, HealthCheckResponse, RootResponse
 
 # Import API endpoints
 from src.api.endpoints import health, auth, chat, documents, admin, logs
@@ -386,16 +386,16 @@ async def domain_error_handler(request: Request, exc: MimirError):
 # Base routes
 
 
-@app.get("/", response_model=dict)
-async def root():
+@app.get("/", response_model=RootResponse)
+async def root() -> RootResponse:
     """Main API entry point"""
-    return {
-        "name": "Mimir",
-        "description": "Chatbot documentaire d'entreprise",
-        "version": settings.api_version,
-        "status": "running",
-        "docs_url": "/docs" if not settings.is_production else None,
-    }
+    return RootResponse(
+        name="Mimir",
+        description="Chatbot documentaire d'entreprise",
+        version=settings.api_version,
+        status="running",
+        docs_url="/docs" if not settings.is_production else None,
+    )
 
 
 # API endpoints registration - Milestone 3

@@ -21,6 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.rag_core.implementations.validation_utils import VectorStoreValidator
 from src.shared.errors import RetrievalError
+from src.shared.models import ConsistencyValidationResponse
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ def validate_index_consistency(
     fix_issues: bool,
     report_dir: Path | None,
     initiated_by: str,
-) -> dict[str, Any]:
+) -> ConsistencyValidationResponse:
     """Compare SQLite and FAISS, optionally fix and save a report, and audit it.
 
     ``report_dir`` is None when no report is requested.
@@ -247,13 +248,13 @@ def validate_index_consistency(
             }
         },
     )
-    return {
-        "success": True,
-        "message": f"Validation completed: {total_issues} issues found (consistency score: {consistency_score:.1%})",
-        "validation_result": validation_result,
-        "report_path": str(report_path) if report_path else None,
-        "timestamp": datetime.utcnow(),
-    }
+    return ConsistencyValidationResponse(
+        success=True,
+        message=f"Validation completed: {total_issues} issues found (consistency score: {consistency_score:.1%})",
+        validation_result=validation_result,
+        report_path=str(report_path) if report_path else None,
+        timestamp=datetime.utcnow(),
+    )
 
 
 def _save_validation_report(validation_result: dict[str, Any], reports_dir: Path) -> Path | None:
