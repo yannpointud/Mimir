@@ -10,7 +10,7 @@ Consigne : `docs/cleanup/MISSION.md`. Décisions : `docs/cleanup/DECISIONS.md`.
 | 3. Architecture | réussie | 1 | `f810329` docs(cleanup): record pass 3 decisions and progress |
 | 4. Typage | réussie | 1 | `94e6946` docs(cleanup): record pass 4 decisions and progress |
 | 5. Commentaires | réussie | 1 | `7dee121` docs: remove planning references from comments and strings |
-| 6. Tests | à faire | 0 | |
+| 6. Tests | en cours | 1 | |
 | 7. Dépendances | à faire | 0 | |
 | 8. Façade | à faire | 0 | |
 
@@ -22,7 +22,7 @@ radon D+ 0, mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200.
 planning hors des libellés de `scripts/validate_milestone.sh` ; schéma OpenAPI
 identique hors descriptions (voir DECISIONS D5.1 à D5.6).
 
-Prochaine étape : passe 6 (tests).
+Prochaine étape : passe 6 (tests), en cours (tentative 1).
 
 ## Reprendre après une coupure
 
