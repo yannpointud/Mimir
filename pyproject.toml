@@ -56,3 +56,21 @@ show_error_codes = true
 [[tool.mypy.overrides]]
 module = ["faiss", "faiss.*", "bm25s", "bm25s.*", "docx", "docx.*"]
 ignore_missing_imports = true
+
+# Mutation testing of the pure retrieval/ingestion helpers: `mutmut run`, then
+# `mutmut results` (mutants are generated under mutants/, git-ignored).
+[tool.mutmut]
+source_paths = ["backend/src"]
+only_mutate = [
+    "backend/src/rag_core/fusion.py",
+    "backend/src/ingestion/chunking.py",
+    "backend/src/rag_core/tokenizer_fr.py",
+]
+also_copy = ["pytest.ini"]
+# tests/mutmut_aliases.py makes the src.* imports of the tests see the mutants.
+pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider", "-p", "tests.mutmut_aliases"]
+pytest_add_cli_args_test_selection = [
+    "tests/unit/test_fusion.py",
+    "tests/unit/test_ingestion_chunking.py",
+    "tests/unit/test_bm25_store.py",
+]
