@@ -11,7 +11,6 @@ from datetime import datetime
 from typing import Any
 from pathlib import Path
 
-from .logger import setup_logger  # noqa: F401
 
 
 def _make_json_serializable(obj):

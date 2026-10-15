@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch, mock_open
 
 from src.ingestion.extractors import (
     ExtractorFactory, TextExtractor, PDFExtractor, DOCXExtractor, TXTExtractor,
-    ExtractionError, UnsupportedFormatError  # noqa: F401
+    ExtractionError
 )
 
 

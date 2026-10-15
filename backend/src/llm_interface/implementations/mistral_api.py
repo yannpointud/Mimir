@@ -5,10 +5,8 @@ Provides integration with Mistral AI's API for text generation and embeddings
 
 import asyncio
 import aiohttp
-import logging  # noqa: F401
 import time
 from typing import Any
-from dataclasses import dataclass  # noqa: F401
 
 from ..interfaces import (
     AbstractLLMService,

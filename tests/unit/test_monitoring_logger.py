@@ -5,10 +5,8 @@ Tests unitaires pour le système de logging centralisé
 import pytest
 import json
 import logging
-import tempfile  # noqa: F401
-import os  # noqa: F401
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
+from unittest.mock import Mock, patch
 from datetime import datetime
 
 from src.monitoring.logger import (

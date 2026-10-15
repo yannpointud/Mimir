@@ -4,9 +4,8 @@ Tests unitaires pour le service de debug RAG
 
 import pytest
 import json
-import tempfile  # noqa: F401
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
+from unittest.mock import Mock, patch
 
 from src.monitoring.rag_debug_logger import RagDebugService, _make_json_serializable
 

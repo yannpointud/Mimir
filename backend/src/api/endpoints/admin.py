@@ -5,7 +5,7 @@ This module provides endpoints for system administration,
 configuration management, and monitoring.
 """
 
-from typing import Dict, Any, List, Optional  # noqa: F401
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request, Response
 from datetime import datetime, timedelta
 import asyncio
@@ -13,7 +13,7 @@ import logging
 import time
 from pathlib import Path
 
-from src.auth.middleware import require_admin, get_current_user  # noqa: F401
+from src.auth.middleware import require_admin
 from src.database.repository import ConfigurationRepository, AuditLogRepository, UsageRepository, DocumentRepository
 from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor, get_bm25_store, get_document_repository
 from src.api.middleware.rate_limit import limiter, get_client_identifier
@@ -58,7 +58,6 @@ async def get_system_info(
         import psutil
         import platform
         import sys
-        from pathlib import Path  # noqa: F401
 
         # System information
         system_info = {
@@ -637,7 +636,6 @@ async def admin_list_documents(
     """List documents via admin interface."""
     # Import here to avoid circular imports
     from src.database.repository import DocumentRepository
-    from src.api.dependencies import get_document_repository  # noqa: F401
 
     # Use a new repository instance
     from src.database.connection import get_db_session
@@ -1172,7 +1170,7 @@ async def rebuild_vector_store(
         )
 
         # Create informative message
-        message_parts = [f"Vector index rebuilt successfully."]  # noqa: F541
+        message_parts = ["Vector index rebuilt successfully."]
         if orphans_cleaned > 0:
             message_parts.append(f"Cleaned {orphans_cleaned} orphaned chunks.")
         if deleted_removed > 0:

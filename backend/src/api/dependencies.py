@@ -5,7 +5,6 @@ This module provides dependency injection functions for accessing
 various services throughout the API endpoints.
 """
 
-from collections.abc import Generator  # noqa: F401
 from fastapi import Depends
 from sqlalchemy.orm import Session
 

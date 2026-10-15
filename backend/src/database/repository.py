@@ -6,13 +6,12 @@ Implements CRUD operations with robust error handling
 from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import and_, or_, desc, asc, func, update  # noqa: F401
+from sqlalchemy import desc, asc, func, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from datetime import datetime, timedelta
 import logging
 
 from .models import Document, Configuration, AuditLog, LlmUsage, LlmBudgetLedger
-from ..config import settings  # noqa: F401
 
 
 logger = logging.getLogger(__name__)

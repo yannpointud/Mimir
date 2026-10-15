@@ -6,7 +6,6 @@ Provides extractors for PDF, DOCX, TXT, and Markdown files
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
-import logging  # noqa: F401
 
 # Import document processing libraries
 try:

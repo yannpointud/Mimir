@@ -7,7 +7,6 @@ Replaces threading-based QueueManager with full asyncio implementation
 import asyncio
 import random
 import time
-import logging  # noqa: F401
 from typing import Any
 from collections.abc import Callable
 from datetime import datetime

@@ -5,11 +5,7 @@ Couvre la gestion de connexion, configuration SQLite et pattern Singleton
 
 import pytest
 import sqlite3
-import tempfile  # noqa: F401
-import os  # noqa: F401
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
-from sqlalchemy import text  # noqa: F401
-from sqlalchemy.exc import SQLAlchemyError  # noqa: F401
+from unittest.mock import Mock, patch
 
 from backend.src.database.connection import (
     DatabaseManager,
@@ -20,7 +16,6 @@ from backend.src.database.connection import (
     init_database,
     reset_database
 )
-from backend.src import config  # noqa: F401
 
 
 class TestConfigureSqlitePerformance:
@@ -120,7 +115,7 @@ class TestDatabaseManager:
         with patch('backend.src.database.connection.config.settings') as mock_settings:
             mock_settings.database_url_sync = "sqlite:///test.db"
 
-            manager = DatabaseManager()  # noqa: F841
+            DatabaseManager()
 
             # Vérifier la création du moteur
             mock_create_engine.assert_called_once()
@@ -196,7 +191,7 @@ class TestDatabaseManager:
 
         with patch.object(manager, 'get_session', return_value=mock_session):
             with pytest.raises(ValueError):
-                with manager.get_session_context() as session:  # noqa: F841
+                with manager.get_session_context():
                     raise ValueError("Test exception")
 
             # Vérifier rollback et close appelés
@@ -290,7 +285,7 @@ class TestUtilityFunctions:
 
         with patch.object(db_manager, 'get_session', return_value=mock_session):
             session_gen = get_db_session()
-            session = next(session_gen)  # noqa: F841
+            next(session_gen)
 
             # Simuler une exception
             try:

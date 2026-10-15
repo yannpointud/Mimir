@@ -5,14 +5,12 @@ Crée les tables et peut insérer des données de test
 """
 
 import sys
-import os  # noqa: F401
 from pathlib import Path
 
 # Ajouter le répertoire backend au PATH
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from src.config import settings  # noqa: F401
 from src.database.connection import init_database, reset_database, db_manager
 from src.database.repository import create_repositories
 

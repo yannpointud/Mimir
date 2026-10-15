@@ -8,12 +8,11 @@ import shutil
 import asyncio
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
-import numpy as np  # noqa: F401
 
 from src.ingestion.processor import IngestionProcessor, ProcessingError
 from src.ingestion.queue_manager import IngestionTask
 from src.ingestion.chunking import ChunkingConfig
-from src.llm_interface.interfaces import GenerationResponse, EmbeddingResponse, LLMException  # noqa: F401
+from src.llm_interface.interfaces import EmbeddingResponse, LLMException
 from src.rag_core.interfaces import Chunk
 from src.cost.budget_guard import BudgetReservation
 

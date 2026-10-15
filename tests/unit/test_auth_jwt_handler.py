@@ -6,7 +6,7 @@ These tests cover JWT token management and password hashing.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock  # noqa: F401
+from unittest.mock import patch
 from freezegun import freeze_time
 import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWTHandler
 from backend.src.auth.jwt_handler import JWTHandler

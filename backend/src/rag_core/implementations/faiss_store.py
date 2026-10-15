@@ -21,7 +21,6 @@ from ..interfaces import (
     AbstractVectorStore,
     Chunk,
     SearchResult,
-    VectorStoreException,  # noqa: F401
     VectorStoreConnectionError,
     VectorStoreOperationError
 )

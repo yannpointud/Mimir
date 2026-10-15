@@ -9,7 +9,7 @@ import time
 import tempfile
 import threading
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
+from unittest.mock import Mock, patch
 import pytest
 
 from backend.src.file_watcher.watcher import DocumentFileHandler, FileWatcher

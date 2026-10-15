@@ -5,7 +5,6 @@ Uses Pydantic for validation and type safety
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Optional, Dict  # noqa: F401
 import os
 from pathlib import Path
 

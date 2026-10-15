@@ -535,8 +535,7 @@ async def _process_question_with_rag_stream(
     llm_call_made = False
     try:
         # Step 1: Generate embeddings
-        logger.info(f"Generating embeddings for streaming question")  # noqa: F541
-        start_embedding = datetime.utcnow()  # noqa: F841
+        logger.info("Generating embeddings for streaming question")
         embedding_response = await llm_service.embed([question], session_id=session_id, rag_debug=rag_debug)
         question_embedding = np.array(embedding_response.embeddings[0], dtype=np.float32)
 

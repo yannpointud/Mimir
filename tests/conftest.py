@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../backend'))
 
 from src.config import Settings
 from src.database.models import Base
-from src.database.connection import DatabaseManager  # noqa: F401
 from src.database.repository import create_repositories
 
 

@@ -4,8 +4,6 @@ Tests unitaires supplémentaires pour le module cache/lru_cache.py
 Ces tests couvrent les cas d'edge et fonctionnalités avancées du cache.
 """
 
-import pytest  # noqa: F401
-from unittest.mock import Mock, patch  # noqa: F401
 import threading
 import time
 from datetime import datetime, timedelta

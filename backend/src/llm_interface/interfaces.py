@@ -4,8 +4,6 @@ Provides base classes for implementing different LLM providers
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional  # noqa: F401
-import numpy as np  # noqa: F401
 from dataclasses import dataclass
 
 @dataclass

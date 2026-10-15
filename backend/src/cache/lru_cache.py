@@ -9,7 +9,6 @@ from cachetools import LRUCache
 from typing import Any
 from collections.abc import Callable
 import hashlib
-import json  # noqa: F401
 import threading
 from datetime import datetime, timedelta
 import logging

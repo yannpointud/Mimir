@@ -7,8 +7,7 @@ import asyncio
 import hashlib
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple  # noqa: F401
-from datetime import datetime  # noqa: F401
+from typing import Any
 import numpy as np
 
 from .extractors import ExtractorFactory, ExtractionError, UnsupportedFormatError
@@ -17,9 +16,8 @@ from .async_queue_manager import AsyncQueueManager
 from .queue_manager import IngestionTask
 
 from ..llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
-from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException  # noqa: F401
+from ..rag_core.interfaces import AbstractVectorStore, Chunk
 from ..database.repository import DocumentRepository
-from ..database.models import Document  # noqa: F401
 from ..monitoring.logger import setup_logger
 from ..config import settings
 from ..cost.budget_guard import BudgetExceededError, budget_guard as default_budget_guard

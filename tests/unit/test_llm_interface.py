@@ -3,11 +3,8 @@ Tests unitaires pour l'interface LLM et l'implémentation Mistral API - Version 
 """
 
 import pytest
-import asyncio  # noqa: F401
 from unittest.mock import Mock, patch, AsyncMock
 import aiohttp
-from aiohttp import ClientTimeout, ClientError  # noqa: F401
-from typing import List  # noqa: F401
 
 from src.llm_interface.interfaces import (
     AbstractLLMService, GenerationResponse, EmbeddingResponse,
@@ -327,7 +324,7 @@ class TestMistralAPIService:
             mock_response.raise_for_status = Mock()
             mock_post.return_value.__aenter__.return_value = mock_response
 
-            response = await mistral_service.generate(  # noqa: F841
+            await mistral_service.generate(
                 prompt="User prompt",
                 system_prompt="You are a helpful assistant",
                 max_tokens=100,

@@ -29,7 +29,6 @@ from typing import Any
 import bm25s
 
 from ..interfaces import (
-    VectorStoreException,  # noqa: F401
     VectorStoreConnectionError,
     VectorStoreOperationError,
 )

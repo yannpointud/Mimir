@@ -5,7 +5,6 @@ Verifies that mask_secrets fully masks all sensitive configuration keys
 with the shared MASKED_VALUE constant, without mutating the input dict.
 """
 
-import pytest  # noqa: F401
 
 from src.shared.constants import MASKED_VALUE, SENSITIVE_CONFIG_KEYS, mask_secrets
 

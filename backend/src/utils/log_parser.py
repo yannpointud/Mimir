@@ -7,9 +7,7 @@ real-time metrics for the monitoring dashboard.
 
 import json
 import re
-import os  # noqa: F401
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple  # noqa: F401
 from pathlib import Path
 
 import logging
@@ -334,7 +332,6 @@ def get_active_sessions_estimate() -> int:
             return 0
 
         unique_ips = set()
-        fifteen_minutes_ago = datetime.utcnow() - timedelta(minutes=15)  # noqa: F841
 
         # Analyze uvicorn.log for unique IPs from recent chat requests
         if UVICORN_LOG.exists():
@@ -398,11 +395,7 @@ def get_usage_analytics() -> dict:
         Dictionary with comprehensive usage analytics
     """
     try:
-        from datetime import datetime, timedelta
-        import os  # noqa: F401
-
-        # Analysis period
-        now = datetime.utcnow()  # noqa: F841
+        from datetime import timedelta
 
         # Calculate metrics for different periods
         periods = {

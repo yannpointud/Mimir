@@ -7,14 +7,11 @@ Ces tests couvrent les modèles Pydantic et leurs validations.
 import pytest
 from pydantic import ValidationError
 from datetime import datetime
-from unittest.mock import Mock  # noqa: F401
 
 from backend.src.shared.models import (
     PaginationModel, BaseResponse, DocumentResponse, DocumentListResponse,
     DocumentStatus, UserType, ErrorResponse, HealthCheckResponse,
-    DocumentBase, DocumentCreate, DocumentUpdate,  # noqa: F401
-    ConfigurationBase, ConfigurationCreate, ConfigurationUpdate,  # noqa: F401
-    FileUploadValidation
+    DocumentBase, DocumentCreate, ConfigurationBase, FileUploadValidation
 )
 
 

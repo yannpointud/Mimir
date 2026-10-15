@@ -428,7 +428,7 @@ class TestFaissVectorStore:
         index_path = temp_dir / "mock.index"
         metadata_path = temp_dir / "mock.pkl"
 
-        store = FaissVectorStore(  # noqa: F841
+        FaissVectorStore(
             dimension=128,
             index_path=str(index_path),
             metadata_path=str(metadata_path)
@@ -534,7 +534,6 @@ class TestFaissIntegration:
     def test_thread_safety_basic(self, temp_dir):
         """Test basique de thread safety"""
         import threading
-        import time  # noqa: F401
 
         index_path = temp_dir / "thread.index"
         metadata_path = temp_dir / "thread.pkl"

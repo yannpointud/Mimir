@@ -5,10 +5,9 @@ This module provides endpoints for uploading, managing, and monitoring
 documents in the RAG system.
 """
 
-from typing import List, Optional, Dict, Any  # noqa: F401
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, Response
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session  # noqa: F401
 from datetime import datetime
 import asyncio
 import logging
@@ -19,7 +18,6 @@ from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
-from src.database.connection import get_db_session  # noqa: F401
 from src.database.repository import DocumentRepository, AuditLogRepository
 from src.api.dependencies import get_document_repository, get_audit_log_repository, get_ingestion_processor, get_vector_store, get_bm25_store
 from src.shared.models import (

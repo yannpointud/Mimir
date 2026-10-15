@@ -2,8 +2,6 @@
 Tests unitaires pour les modèles de tâches d'ingestion
 """
 
-import pytest  # noqa: F401
-import time  # noqa: F401
 from datetime import datetime
 
 from src.ingestion.queue_manager import IngestionTask

@@ -4,16 +4,14 @@ Unit tests for document management endpoints.
 
 import pytest
 import asyncio
-import os  # noqa: F401
 import tempfile
 from unittest.mock import Mock, patch, AsyncMock, mock_open
 from datetime import datetime
 from pathlib import Path
 from fastapi import HTTPException, status, UploadFile
-from pydantic import ValidationError  # noqa: F401
 
 from backend.src.api.endpoints.documents import (
-    router, list_documents, get_document, upload_document, delete_document,  # noqa: F401
+    list_documents, get_document, upload_document, delete_document,
     toggle_document_preservation, reprocess_document, get_document_stats
 )
 
@@ -90,7 +88,6 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
     @patch('backend.src.api.endpoints.documents.DocumentListResponse')
     def test_list_documents_success(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
         """Test successful document listing."""
-        from datetime import datetime  # noqa: F401
 
         # Configure mocks with all required attributes
         mock_doc1 = self.create_mock_document(
@@ -226,7 +223,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.get_by_id.return_value = mock_document
 
         # Call the function
-        result = asyncio.run(get_document(  # noqa: F841
+        asyncio.run(get_document(
             document_id=1,
             doc_repo=mock_doc_repo
         ))
@@ -324,8 +321,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_ingestion_processor.queue_document.return_value = True
 
         # Call the function
-        with patch('builtins.open', mock_open()) as mock_file_open:  # noqa: F841
-            result = asyncio.run(upload_document(  # noqa: F841
+        with patch('builtins.open', mock_open()):
+            asyncio.run(upload_document(
                 request=Mock(),  # required by slowapi decorator
                 response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
@@ -605,7 +602,7 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.delete.return_value = True
 
         with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:  # noqa: F841
+             patch('backend.src.api.endpoints.documents.os.remove'):
 
             mock_exists.return_value = True
 
@@ -661,7 +658,7 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
         mock_doc_repo.update_preserve_status.return_value = updated_doc
 
         # Call the function
-        result = asyncio.run(toggle_document_preservation(  # noqa: F841
+        asyncio.run(toggle_document_preservation(
             document_id=1,
             preserve=True,
             current_user=mock_current_user,
@@ -859,7 +856,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # 4. Forced deletion (because protected)
         with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:  # noqa: F841
+             patch('backend.src.api.endpoints.documents.os.remove'):
 
             mock_exists.return_value = True
             mock_document.preserve = True  # Document now protected

@@ -6,15 +6,13 @@ Focus sur l'amélioration de la couverture
 import pytest
 import numpy as np
 import faiss
-import json  # noqa: F401
 import pickle
 import tempfile
-from datetime import datetime  # noqa: F401
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
+from unittest.mock import Mock, patch
 
 from backend.src.rag_core.implementations.faiss_store import FaissVectorStore
-from backend.src.rag_core.interfaces import Chunk, SearchResult  # noqa: F401
+from backend.src.rag_core.interfaces import Chunk
 
 
 class TestFaissVectorStoreAdditional:
@@ -373,7 +371,7 @@ class TestFaissStoreFunctionality:
         for k in [1, 3, 5, 10, 15]:
             results = populated_store.query(query_vector, top_k=k)
             stats = populated_store.get_stats()
-            expected_k = min(k, stats['total_vectors'])  # noqa: F841
+            min(k, stats['total_vectors'])
             # Avec un vecteur identique, on devrait avoir au moins 1 résultat
             assert len(results) >= 1
 

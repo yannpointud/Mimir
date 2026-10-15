@@ -4,13 +4,10 @@ Application entry point with full configuration - Milestone 3: API & Services
 """
 
 from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.middleware.cors import CORSMiddleware  # noqa: F401
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.openapi.docs import get_swagger_ui_html  # noqa: F401
 from fastapi.openapi.utils import get_openapi
 import uvicorn
-import logging  # noqa: F401
 import time
 import json
 from datetime import datetime
@@ -345,7 +342,7 @@ async def root():
         "description": "Chatbot documentaire d'entreprise",
         "version": settings.api_version,
         "status": "running",
-        "docs_url": f"/docs" if not settings.is_production else None  # noqa: F541
+        "docs_url": "/docs" if not settings.is_production else None
     }
 
 
@@ -369,7 +366,6 @@ async def root_health_check(response: Response):
     try:
         # Delegate to the full health check
         from src.api.endpoints.health import health_check
-        from src.database.connection import get_db_session  # noqa: F401
 
         # Create a session for the health check; pass this route's Response
         # through so an unhealthy state is reported as HTTP 503 here too.

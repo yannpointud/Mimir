@@ -6,7 +6,7 @@ and responses based on document context.
 """
 
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request  # noqa: F401
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field

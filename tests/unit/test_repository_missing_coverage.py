@@ -6,7 +6,7 @@ Couvre la gestion d'erreurs, cas limites et fonctionnalités non testées
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError  # noqa: F401
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.src.database.repository import (
     DocumentRepository,
@@ -15,7 +15,6 @@ from backend.src.database.repository import (
     BaseRepository,
     create_repositories
 )
-from backend.src.database.models import Document, Configuration, AuditLog  # noqa: F401
 
 
 class TestBaseRepository:
@@ -295,7 +294,6 @@ class TestAuditLogRepositoryMissingCoverage:
 
         # Créer des logs anciens et récents
         old_date = datetime.utcnow() - timedelta(days=100)
-        recent_date = datetime.utcnow() - timedelta(days=10)  # noqa: F841
 
         # Créer un log récent
         repo.create_log("admin", "recent_action")
