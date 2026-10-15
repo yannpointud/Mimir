@@ -10,17 +10,17 @@ from ..monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-# Heading detection patterns (RAG-05, structure-aware chunking).
+# Heading detection patterns (structure-aware chunking).
 # PRIMARY: HTML <h1>-<h6> tags, because `.md` is ingested as HTML via
-# MarkdownExtractor(convert_to_html=True) BEFORE chunking sees it (07-RESEARCH
-# Pitfall 3). Non-greedy `(.*?)` without DOTALL keeps the scan bounded per line,
-# mitigating catastrophic backtracking on pathological markup (T-07-06-02).
+# MarkdownExtractor(convert_to_html=True) BEFORE chunking sees it. Non-greedy
+# `(.*?)` without DOTALL keeps the scan bounded per line, mitigating
+# catastrophic backtracking on pathological markup.
 _HTML_HEADING_RE = re.compile(r'<h[1-6][^>]*>(.*?)</h[1-6]>', re.IGNORECASE)
 # DEFENSIVE: raw Markdown-style headings for inputs that reach chunking as plain
 # text (e.g. a .txt carrying `#`-style headers). Anchored, line-bounded.
 _MD_HEADING_RE = re.compile(r'^#{1,6}\s+(.*)$', re.MULTILINE)
 # Strip any residual inline tags out of a captured HTML heading so the stored
-# section_title is plain-text DATA, never rendered markup (T-07-06-01).
+# section_title is plain-text DATA, never rendered markup.
 _INNER_TAG_RE = re.compile(r'<[^>]+>')
 
 
@@ -33,7 +33,7 @@ class ChunkingConfig:
     max_chunk_size: int = 3000  # Maximum chunk size before force split (increased for resumes)
     preserve_sentences: bool = True  # Try to keep sentences intact
     preserve_paragraphs: bool = True  # Try to keep paragraphs intact
-    # Structure-aware chunking (RAG-05, feature flag). When True, each chunk dict
+    # Structure-aware chunking (feature flag). When True, each chunk dict
     # gains a 'section_title' key derived from the nearest preceding heading.
     # Default False keeps chunking output byte-identical to the current splitter.
     section_title_tracking: bool = False
@@ -161,7 +161,7 @@ class ChunkingStrategy:
         with spaces and destroys line boundaries — so raw `#{1,6}` headings are
         matched reliably (a chunk-local scan would over-capture once the newline
         after the marker is gone). Scans HTML <h1>-<h6> PRIMARILY (the real shape
-        of ingested `.md`, 07-RESEARCH Pitfall 3) and raw `#{1,6}` DEFENSIVELY.
+        of ingested `.md`, converted to HTML) and raw `#{1,6}` DEFENSIVELY.
 
         Each heading is returned with a compiled "signature" that re-matches the
         heading in its MARKED form (tag- or `#`-prefixed) inside a chunk, so a
@@ -177,7 +177,7 @@ class ChunkingStrategy:
         found: List[tuple] = []  # (position, signature, title)
 
         for match in _HTML_HEADING_RE.finditer(text):
-            # Strip any inner tags so the stored title is plain data (T-07-06-01).
+            # Strip any inner tags so the stored title is plain data.
             title = _INNER_TAG_RE.sub('', match.group(1)).strip()
             if title:
                 signature = re.compile(r'<h[1-6][^>]*>\s*' + re.escape(title))

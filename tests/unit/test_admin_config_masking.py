@@ -1,5 +1,5 @@
 """
-Unit tests for the shared secret masking module (SEC-01).
+Unit tests for the shared secret masking module.
 
 Verifies that mask_secrets fully masks all sensitive configuration keys
 with the shared MASKED_VALUE constant, without mutating the input dict.
@@ -75,7 +75,7 @@ class TestMaskSecrets:
         assert result is not config, "A new dict must be returned"
 
     def test_masked_value_constant_is_exact(self):
-        """MASKED_VALUE is exactly ***MASKED*** (total mask, D-02)."""
+        """MASKED_VALUE is exactly ***MASKED*** (total mask)."""
         assert MASKED_VALUE == "***MASKED***"
 
     def test_sensitive_config_keys_contains_exactly_the_known_secrets(self):

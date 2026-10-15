@@ -1,5 +1,5 @@
 """
-Integration test for the admin "Rebuild Index" BM25 resync (RAG-06, T-06-06-01).
+Integration test for the admin "Rebuild Index" BM25 resync.
 
 Proves that the admin ``POST /admin/vector-store/rebuild`` handler resyncs the
 BM25 lexical index from the freshly-optimized FAISS snapshot, so a manual
@@ -158,7 +158,7 @@ def _docs_from_bm25(vector_store, bm25_store, term):
 async def test_admin_rebuild_resyncs_bm25_and_leaves_no_ghost(
     processor, vector_store, bm25_store, temp_dir
 ):
-    """RAG-06 / T-06-06-01: after a manual admin rebuild, the BM25 lexical index
+    """After a manual admin rebuild, the BM25 lexical index
     reflects the optimized FAISS snapshot exactly, so a ghost chunk (dropped from
     FAISS but not from BM25) no longer resolves."""
     # --- Ingest two documents through the real single-writer pipeline. ---
@@ -172,7 +172,7 @@ async def test_admin_rebuild_resyncs_bm25_and_leaves_no_ghost(
     # --- Manufacture a BM25 ghost: mark document A's chunks deleted in FAISS
     # ONLY (no paired BM25 sync), so the lexical index keeps pointing at chunks
     # FAISS will drop on its next optimize. This is exactly the stale state a
-    # FAISS-only admin rebuild leaves behind (T-06-06-01). We set the flag
+    # FAISS-only admin rebuild leaves behind. We set the flag
     # directly rather than via delete() to avoid delete()'s automatic
     # optimization compacting FAISS immediately (which would resync the mapping
     # and dissolve the ghost before the admin rebuild under test runs). ---

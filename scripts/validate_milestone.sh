@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
 # validate_milestone.sh — single replayable entrypoint for every non-unit
-# milestone acceptance proof (TEST-02).
+# milestone acceptance proof.
 #
 # It wraps (never re-implements) the existing in-repo proofs, runs each one,
 # records a per-criterion PASS/FAIL, prints a summary matrix, and exits
-# non-zero if ANY wrapped proof failed:
+# non-zero if ANY wrapped proof failed. The labels on the left are the check
+# names this script prints and records:
 #
 #   ROB-01  concurrent FAISS load       -> tests/performance/test_faiss_concurrency.py
 #   COST-01 budget cap, 10 parallel      -> tests/performance/test_budget_concurrency.py
@@ -135,7 +136,7 @@ fi
 # ---------------------------------------------------------------------------
 # OPS-01 — clean-machine Docker deploy + smoke (OPT-IN; heavy build).
 # Gated behind RUN_DEPLOY=1 so the default run stays fast. When skipped it is
-# recorded as SKIP (not FAIL); 05-05 already proved this end-to-end.
+# recorded as SKIP (not FAIL).
 # ---------------------------------------------------------------------------
 banner "OPS-01: clean-machine deploy"
 if [ "$RUN_DEPLOY" = "1" ]; then

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import DocumentModal from '../../../components/Common/DocumentModal';
 
-// Mock the API module (SEC-04 tests render the modal with controlled chunk content)
+// Mock the API module (these tests render the modal with controlled chunk content)
 vi.mock('../../../services/api', () => ({
   documentsAPI: {
     getDocumentWithChunks: vi.fn(),
@@ -42,7 +42,7 @@ describe('DocumentModal — SEC-04 escape-then-highlight', () => {
       expect(container.querySelector('.prose')).not.toBeNull();
     });
 
-    // Structural assertions (Pitfall 9: jsdom never executes injected scripts,
+    // Structural assertions (jsdom never executes injected scripts,
     // so we assert DOM structure, not execution)
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector('img')).toBeNull();

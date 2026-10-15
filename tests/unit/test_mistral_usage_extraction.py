@@ -1,7 +1,7 @@
 """
 Unit tests for Mistral gateway token usage extraction.
 
-Covers 03-02 (Coûts IA bornés): non-stream prompt/completion split on
+Covers usage extraction for cost accounting: non-stream prompt/completion split on
 generate()/embed(), and streaming usage extraction via
 stream_options.include_usage + usage_out sink. All aiohttp calls are mocked;
 zero real Mistral network calls.
@@ -26,7 +26,7 @@ def mistral_service():
 
 
 class TestNonStreamUsageSplit:
-    """Task 1: generate() and embed() split prompt/completion tokens"""
+    """generate() and embed() split prompt/completion tokens"""
 
     @pytest.mark.asyncio
     async def test_generate_splits_prompt_and_completion_tokens(self, mistral_service):
@@ -95,7 +95,7 @@ def _sse_lines(*chunks):
 
 
 class TestStreamingUsageExtraction:
-    """Task 2: generate_stream() sends stream_options.include_usage and
+    """generate_stream() sends stream_options.include_usage and
     populates usage_out from the final SSE chunk."""
 
     @pytest.mark.asyncio

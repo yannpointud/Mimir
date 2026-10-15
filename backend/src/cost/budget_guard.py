@@ -1,12 +1,12 @@
 """
 BudgetGuard: thin session-managing service wrapping UsageRepository's atomic
-reserve/finalize/release primitives (see 03-RESEARCH.md Pattern 1/2).
+reserve/finalize/release primitives.
 
 Each public method opens its OWN short-lived DB session via
 db_manager.get_session_context() rather than reusing a caller-supplied
 session. This matters for two reasons:
   - reserve() must commit the reservation BEFORE the caller issues the
-    network call to Mistral (Pitfall 3: once a StreamingResponse has been
+    network call to Mistral (once a StreamingResponse has been
     returned with an implicit 200, it is too late to turn it into a 429 --
     the reservation has to be durable first, independently of whatever
     session the endpoint itself is using).
@@ -72,8 +72,7 @@ class BudgetGuard:
                 budget_reservation_embedding_eur). Deliberately independent
                 of the price table (pricing.py), so even a model absent
                 from the price table still consumes budget at reservation
-                time (T-03-04 mitigation: no free bypass via an unpriced
-                model).
+                time (no free bypass via an unpriced model).
 
         Returns:
             A BudgetReservation if the reservation was accepted, or None if
@@ -100,7 +99,7 @@ class BudgetGuard:
         """
         Apply the real-vs-estimate delta to the ledger. No cap condition --
         the call already happened, spent_eur may end up slightly above the
-        cap (expected, see 03-RESEARCH.md Pattern 2).
+        cap (expected).
         """
         delta_eur = actual_cost_eur - reservation.estimate_eur
         with db_manager.get_session_context() as session:

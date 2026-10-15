@@ -1,7 +1,7 @@
 # Repo-root build-context excludes. The compose backend service builds with
 # `context: .`, so docker reads THIS file to prune the context. Keeping secrets,
 # runtime data and the frontend tree out of the context is the load-bearing
-# Information Disclosure mitigation (T-05-05-01) and keeps the context small.
+# Information Disclosure mitigation and keeps the context small.
 
 # Secrets AND the env template — never enter any build context / image layer.
 # The runtime env is injected via compose env_file, so no .env* is ever needed

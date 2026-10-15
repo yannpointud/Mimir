@@ -167,7 +167,7 @@ def get_rag_service() -> RagService:
     """Get RagService instance (singleton).
 
     HTTP-agnostic: RagService imports nothing from FastAPI and is safe to
-    call directly outside a request context -- notably by the Phase 6 RAGAS
+    call directly outside a request context -- notably by the RAGAS
     evaluation harness. document_repository is deliberately NOT baked in
     here (it is request-scoped, see get_document_repository()); it stays a
     per-call argument to RagService.answer()/answer_stream().

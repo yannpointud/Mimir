@@ -1,14 +1,14 @@
-"""Citation numbering + citation-map unit tests (RAG-04, plan 07-03).
+"""Citation numbering + citation-map unit tests.
 
 Three concerns are proven here:
 
 1. Numbered context: the LLM prompt built by the streaming pipeline numbers the
    retrieved sources as [1]..[N] (replacing the old `[Source: {path}]` prefix), so
-   the model can cite [N] tied to the exact context order (RESEARCH Pattern 2).
+   the model can cite [N] tied to the exact context order.
 
 2. Citation-map parity: a citations dict {"1".."N"} is derived from the SAME
    enumerate() pass that builds the context, so citations[str(i+1)]["document_id"]
-   equals sources[i]["document_id"] in answer_stream() (RESEARCH Pitfall 1 — never
+   equals sources[i]["document_id"] in answer_stream() (never
    build the map from a divergent ordering). Distinct document_ids per source make
    a mis-ordering detectable.
 

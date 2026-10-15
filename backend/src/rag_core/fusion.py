@@ -1,6 +1,6 @@
 """Reciprocal Rank Fusion (RRF) — pure, stdlib-only rank aggregation.
 
-Additive building block for hybrid retrieval (RAG-02). This module has NO I/O
+Additive building block for hybrid retrieval. This module has NO I/O
 and NO external dependency: it only merges pre-ranked chunk-id lists coming from
 independent retrievers (dense/cosine and lexical/BM25) into a single fused score
 map. It never touches the dense-only retrieval path, which keeps its cosine

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""One-off corpus ingestion for the Phase 6 RAGAS baseline (dev/ops helper).
+"""One-off corpus ingestion for the RAGAS baseline (dev/ops helper).
 
 Ingests every file under ``data/generated_documents/`` through the REAL
 IngestionProcessor pipeline (extract -> chunk -> embed -> FAISS upsert -> BM25

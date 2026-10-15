@@ -75,10 +75,10 @@ async def lifespan(app: FastAPI):
 
     try:
         # Derive the effective admin hash from ADMIN_PASSWORD first, so the
-        # SEC-02 checks below run against the hash actually used at runtime.
+        # default-secret checks below run against the hash actually used at runtime.
         resolve_admin_password(settings)
 
-        # SEC-02: fail fast on default secrets before any service initialization
+        # Fail fast on default secrets before any service initialization
         validate_production_secrets(settings)
 
         # Database initialization
@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("Email service not fully configured - escalation features will be limited")
 
-        # OPS-05: attach the fingerprinted SMTP error alerter to app_logger.
+        # Attach the fingerprinted SMTP error alerter to app_logger.
         # Idempotent and guarded internally; a failure here must not abort startup.
         from src.monitoring.alerting import setup_alerting
         setup_alerting()
@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
         global ingestion_processor
         try:
             # Create chunking configuration. section_title_tracking is defaulted
-            # from the settings flag here (single caller-side default, RAG-05):
+            # from the settings flag here (single caller-side default):
             # when structure_aware_chunking_enabled is False (current default),
             # chunking output stays byte-identical to today.
             chunking_config = ChunkingConfig(
@@ -135,7 +135,7 @@ async def lifespan(app: FastAPI):
                 await ingestion_processor.start()
                 logger.info("Ingestion processor started successfully")
 
-                # RAG-02: ensure the BM25 lexical index exists at startup. It is
+                # Ensure the BM25 lexical index exists at startup. It is
                 # a derived artifact rebuilt from the FAISS source of truth only
                 # at ingestion/deletion; on a cold start or an upgrade of an
                 # existing FAISS install it may be missing on disk. With hybrid

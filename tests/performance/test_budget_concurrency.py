@@ -1,11 +1,11 @@
 """
-Concurrency proof for COST-01: 10 parallel reserve() calls against a daily
+Concurrency proof for the daily budget cap: 10 parallel reserve() calls against a daily
 budget cap that only affords 5 must yield EXACTLY 5 acceptances -- the
 anti-TOCTOU contract implemented by UsageRepository.reserve() as a single
-conditional UPDATE ... WHERE (see 03-RESEARCH.md Pattern 1).
+conditional UPDATE ... WHERE.
 
-Mirrors the concurrency structure of tests/performance/test_faiss_concurrency.py
-(Phase 2): independent OS-level DB connections driven via asyncio.gather over
+Mirrors the concurrency structure of tests/performance/test_faiss_concurrency.py:
+independent OS-level DB connections driven via asyncio.gather over
 asyncio.to_thread, NOT the conftest.py `test_session` fixture (that fixture
 wraps everything in one rollback-only transaction on a single connection,
 which cannot exercise real multi-writer SQLite serialization).

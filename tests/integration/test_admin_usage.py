@@ -1,5 +1,5 @@
 """
-Integration tests for GET /admin/usage (phase 03, plan 03-07, COST-02).
+Integration tests for GET /admin/usage.
 
 Uses the isolated_db_manager fixture (same pattern as
 tests/performance/test_budget_concurrency.py and tests/unit/test_budget_guard.py)
@@ -94,7 +94,7 @@ def _seed_usage_and_ledger(today: str) -> None:
 
 class TestGetUsageAccessControl:
     """GET /admin/usage exposes internal cost data: it must never be
-    readable anonymously (T-03-02)."""
+    readable anonymously."""
 
     def test_get_without_auth_header_returns_403(self, test_app, isolated_db_manager):
         client = TestClient(test_app)

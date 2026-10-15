@@ -64,7 +64,7 @@ class TokenRefreshResponse(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-# Rate limit per IP (SEC-03): login is anonymous, IP is the only identity.
+# Rate limit per IP: login is anonymous, IP is the only identity.
 # Callable limit is re-evaluated on every request (configurable via .env,
 # patchable in tests without module reload).
 @limiter.limit(lambda: f"{settings.rate_limit_login_per_minute}/minute",

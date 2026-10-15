@@ -1,7 +1,7 @@
 """
-Light French tokenizer for the BM25 lexical index (RAG-02).
+Light French tokenizer for the BM25 lexical index.
 
-Locked design decision (CONTEXT.md): lowercase + accent folding (é -> e) +
+Locked design decision: lowercase + accent folding (é -> e) +
 split on non-alphanumerics, with NO stemming and NO stopword removal. The goal
 is to preserve exact terms, identifiers and acronyms (e.g. "JIRA-4521",
 "API") which the dense embedding path tends to miss -- that is precisely what

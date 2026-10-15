@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# scripts/local_ci.sh -- Mimir local CI runner (OPS-02).
+# scripts/local_ci.sh -- Mimir local CI runner.
 #
 # Single entrypoint chaining three quality gates, aborting on the first failure:
 #   1. ruff       -- static lint (config in pyproject.toml [tool.ruff])
 #   2. pytest     -- the full test suite (testpaths=tests in pytest.ini:
-#                    unit + integration + performance, incl. the phase-05
+#                    unit + integration + performance, incl. the
 #                    health/alerting/backup tests and the reused
-#                    ROB-01/COST-01/SEC-03 harnesses)
+#                    FAISS concurrency, budget cap and rate-limit harnesses)
 #   3. pip-audit  -- runtime dependency vulnerability scan against the PyPA
 #                    advisory database
 #

@@ -27,11 +27,11 @@ from src.shared.models import BaseResponse
 from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.config import settings
-# RAG pipeline lives in src.services.rag_service (DEBT-01): the stream route
+# RAG pipeline lives in src.services.rag_service: the stream route
 # delegates to RagService.answer_stream() via Depends(get_rag_service); the
 # route itself stays HTTP-pure (parse + budget gate + cache read + format).
 # Imported as a module (not `from ... import RagService`) so no pipeline symbol
-# is re-exported from this module's namespace -- the 04-03 re-import shims are
+# is re-exported from this module's namespace -- the former re-import shims are
 # fully gone; only the RagService type hint on the injected dependency remains.
 from src.services import rag_service as rag_service_module
 
@@ -93,7 +93,7 @@ class EscalationResponse(BaseModel):
 
 
 @router.post("/stream")
-# Rate limit per JWT user with IP fallback (SEC-03): behind the phase-5 nginx
+# Rate limit per JWT user with IP fallback: behind the nginx reverse
 # proxy the source IP will be the proxy's, so the JWT key is the only reliable
 # identity for authenticated routes. The limit check runs BEFORE the endpoint
 # body, so a 429 is raised before any SSE byte is streamed; a stream under the
@@ -117,7 +117,7 @@ async def chat_stream(
     """
 
     # Budget gate in the SYNCHRONOUS body, BEFORE StreamingResponse is
-    # constructed/returned (Pitfall 3): once StreamingResponse is returned
+    # constructed/returned: once StreamingResponse is returned
     # the client already has an implicit 200, so a real 429 is only possible
     # here. Do NOT move this check inside generate_sse -- that would yield a
     # 200 with an SSE error event instead of a genuine HTTP 429.
@@ -205,9 +205,8 @@ async def chat_stream(
             # Snapshot the corpus version BEFORE consulting the cache: it is
             # part of the server-derived cache key, so any ingestion/deletion
             # (which bumps FaissVectorStore.last_updated) implicitly
-            # invalidates all prior entries (COST-03, T-4-05-02). The vector
-            # store lives inside the injected RagService (the route no longer
-            # depends on it directly since 04-04).
+            # invalidates all prior entries. The vector store lives inside the
+            # injected RagService (the route does not depend on it directly).
             corpus_version = rag_service.vector_store.get_corpus_version()
 
             # Check the corpus-aware SSE cache
@@ -224,7 +223,7 @@ async def chat_stream(
                 await asyncio.to_thread(budget_guard.release, reservation)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': cached_response['answer']})}\n\n"
                 # Replay the citation event before done so a cache hit is
-                # byte-for-byte indistinguishable from a fresh stream (RAG-04):
+                # byte-for-byte indistinguishable from a fresh stream:
                 # the live pipeline yields chunk -> citation -> done, and the
                 # frontend must receive its [N] -> source map on hits too.
                 yield f"data: {json.dumps({'type': 'citation', 'citations': cached_response.get('citations', {})})}\n\n"

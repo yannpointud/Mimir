@@ -1,9 +1,9 @@
-"""Unit tests for the exact-term retrieval regression helper (RAG-02).
+"""Unit tests for the exact-term retrieval regression helper.
 
 Mock-based and offline: these tests exercise ONLY the pure comparison helper
 ``compare_exact_term_recall`` with simulated retrieval hits. They NEVER hit the
 Mistral API, the vector store, nor the network -- the "hits" are plain integer
-lists standing in for retrieved document_ids. This guards the RAG-02
+lists standing in for retrieved document_ids. This guards the
 anti-regression rule (hybrid must not degrade exact-term recall vs dense).
 """
 

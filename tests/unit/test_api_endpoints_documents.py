@@ -326,8 +326,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Call the function
         with patch('builtins.open', mock_open()) as mock_file_open:  # noqa: F841
             result = asyncio.run(upload_document(  # noqa: F841
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -352,8 +352,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -375,8 +375,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -401,8 +401,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -430,8 +430,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -460,8 +460,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -499,8 +499,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator (SEC-03)
-                response=Mock(),  # required by slowapi header injection (SEC-03)
+                request=Mock(),  # required by slowapi decorator
+                response=Mock(),  # required by slowapi header injection
                 file=mock_upload_file,
                 preserve=False,
                 current_user=mock_current_user,
@@ -1012,7 +1012,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
 
 class TestUploadQueueFullCleanup:
-    """WR-03 (it. 2): on queue-full 503, the pending DB record and the stored
+    """On queue-full 503, the pending DB record and the stored
     file must be rolled back, otherwise any retry of the same file hits 409
     (get_by_hash matches the orphaned pending record) and is never ingested."""
 
@@ -1045,8 +1045,8 @@ class TestUploadQueueFullCleanup:
 
             with pytest.raises(HTTPException) as exc_info:
                 asyncio.run(upload_document(
-                    request=Mock(),  # required by slowapi decorator (SEC-03)
-                    response=Mock(),  # required by slowapi header injection (SEC-03)
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
                     file=mock_file,
                     preserve=False,
                     current_user={"sub": "admin", "user_type": "admin"},

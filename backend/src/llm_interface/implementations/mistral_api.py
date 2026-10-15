@@ -543,7 +543,7 @@ class MistralAPIService(AbstractLLMService):
             embeddings_data = response["data"]
             embeddings = [item["embedding"] for item in embeddings_data]
 
-            # Usage information (embeddings have no completion tokens, per RESEARCH A3)
+            # Usage information (embeddings have no completion tokens)
             usage = response.get("usage", {})
             usage_tokens = usage.get("total_tokens", 0)
             prompt_tokens = usage.get("prompt_tokens", 0)

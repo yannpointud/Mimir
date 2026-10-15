@@ -1,16 +1,16 @@
-"""Hybrid retrieval unit tests (RAG-02, plan 06-05).
+"""Hybrid retrieval unit tests.
 
 Two concerns are proven here:
 
 1. Raw pool: FaissVectorStore.query(similarity_floor=0.0) returns the UNFILTERED
    candidate pool (cosine below the 0.5 threshold survives), while the default
    query() keeps its exact dense-only filtering. RRF needs the raw ranking, not a
-   subset already truncated by the cosine threshold (RESEARCH Pitfall #1).
+   subset already truncated by the cosine threshold.
 
 2. Hybrid branch of RagService: with hybrid_search_enabled=True and a bm25_store,
    dense + BM25 pools are fused via RRF and filtered with the DEDICATED
    rrf_score_threshold -- never the cosine 0.5 floor -- so a hybrid answer never
-   returns zero sources as a pure threshold artifact (RESEARCH Pitfall #2). With
+   returns zero sources as a pure threshold artifact. With
    the flag OFF the pipeline stays on the dense-only path.
 
 Mock/synthetic only: no real Mistral call, no real embeddings.
@@ -76,7 +76,7 @@ class TestSimilarityFloorRawPool:
         results = store.query(query_vec, top_k=10, similarity_floor=0.0)
 
         # Both chunks come back: the weak-cosine one is exactly what RRF must be
-        # able to re-rank via BM25 (Pitfall #1).
+        # able to re-rank via BM25.
         sources = {r.source for r in results}
         assert sources == {"hi.txt", "lo.txt"}
 
@@ -171,11 +171,11 @@ async def _drain_result(**kwargs):
 
 
 class TestHybridBranch:
-    """Hybrid retrieval branch of _process_question_with_rag_stream (RAG-02)."""
+    """Hybrid retrieval branch of _process_question_with_rag_stream."""
 
     def test_hybrid_returns_non_empty_fused_sources(self):
         """RRF fusion of dense+BM25 pools must yield sources filtered on the RRF
-        scale -- never wiped to zero by the cosine 0.5 threshold (Pitfall #2)."""
+        scale -- never wiped to zero by the cosine 0.5 threshold."""
         llm, vs, docs, dbg = _base_mocks()
 
         # Dense pool: both chunks have cosine < 0.5, so the dense path alone would
@@ -271,7 +271,7 @@ class TestHybridBranch:
         assert "similarity_floor" not in kwargs
 
     def test_hybrid_degrades_to_dense_when_bm25_unbuilt(self):
-        """CR-01 (prime directive): with hybrid enabled but the BM25 index not yet
+        """Prime directive: with hybrid enabled but the BM25 index not yet
         built, bm25_store.query() raises; the engine MUST degrade to dense-only and
         still answer, never surface the exception as a broken (confidence 0) reply."""
         from backend.src.rag_core.interfaces import VectorStoreOperationError

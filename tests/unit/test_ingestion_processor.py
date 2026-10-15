@@ -60,7 +60,7 @@ class TestIngestionProcessor:
     def mock_budget_guard(self):
         """Budget guard mocké -- accepte toujours la reservation, pour garder
         ces tests hermetiques (aucune ecriture dans la vraie DB de cout via
-        le singleton reel, 03-06)"""
+        le singleton reel)"""
         mock_guard = Mock()
         mock_guard.reserve.return_value = BudgetReservation(today="2024-01-01", estimate_eur=0.001)
         mock_guard.finalize.return_value = None
@@ -70,7 +70,7 @@ class TestIngestionProcessor:
     @pytest.fixture
     def mock_usage_tracker(self):
         """Usage tracker mocké -- evite d'ecrire des lignes llm_usage reelles
-        pendant les tests unitaires du pipeline d'ingestion (03-06)"""
+        pendant les tests unitaires du pipeline d'ingestion"""
         mock_tracker = Mock()
         mock_tracker.record.return_value = 0.001
         return mock_tracker
@@ -336,7 +336,7 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_pipeline_rebuilds_bm25_from_active_chunks(self, processor):
-        """RAG-02: a successful upsert rebuilds the BM25 index from the FAISS
+        """A successful upsert rebuilds the BM25 index from the FAISS
         active (non-deleted) chunks, through this single-writer worker."""
         # Wire a BM25 store; the active-chunk snapshot comes from the FAISS
         # store under its own lock (snapshot_active_chunks), so the worker just
@@ -369,7 +369,7 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_pipeline_bm25_rebuild_failure_is_non_fatal(self, processor):
-        """RAG-02: a BM25 rebuild that raises must NOT fail an ingestion whose
+        """A BM25 rebuild that raises must NOT fail an ingestion whose
         FAISS upsert/persist already succeeded (non-fatal, continuing anyway)."""
         processor.bm25_store = Mock()
         processor.bm25_store.rebuild.side_effect = RuntimeError("bm25 boom")
@@ -398,7 +398,7 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_bulk_load_coalesces_bm25_rebuild(self, processor):
-        """RAG-06: N documents pre-enqueued before the worker starts trigger far
+        """N documents pre-enqueued before the worker starts trigger far
         fewer than N BM25 rebuilds. The rebuild is coalesced to the queue-drain
         point (Step 8 gated on queue_manager.is_empty()), removing the measured
         quadratic bulk-load cost, while the FAISS upsert still runs once per
@@ -446,7 +446,7 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_last_doc_failure_still_rebuilds_bm25_for_earlier_docs(self, processor):
-        """WR-01 regression: in a batch of >=2 documents where the LAST document
+        """Regression: in a batch of >=2 documents where the LAST document
         fails before Step 8, the coalesced BM25 rebuild must still fire for the
         earlier successfully-upserted documents. Previously the rebuild was gated
         only on an empty queue inside the success path, so a trailing failure left
@@ -496,7 +496,7 @@ class TestIngestionProcessor:
         # The first document was upserted into FAISS...
         assert processor.vector_store.upsert.call_count == 1
         # ...and despite the last document failing, BM25 was rebuilt at drain so
-        # the earlier document is present in the lexical index (WR-01 fixed).
+        # the earlier document is present in the lexical index.
         assert processor.bm25_store.rebuild.call_count >= 1, (
             "BM25 was never rebuilt after the last doc of the batch failed; "
             "the earlier successful document would be stale vs FAISS (WR-01)"
@@ -740,7 +740,7 @@ class TestIngestionProcessorIntegration:
     def mock_budget_guard(self):
         """Budget guard mocké -- accepte toujours la reservation, pour garder
         ces tests hermetiques (aucune ecriture dans la vraie DB de cout via
-        le singleton reel, 03-06)"""
+        le singleton reel)"""
         mock_guard = Mock()
         mock_guard.reserve.return_value = BudgetReservation(today="2024-01-01", estimate_eur=0.001)
         mock_guard.finalize.return_value = None
@@ -750,7 +750,7 @@ class TestIngestionProcessorIntegration:
     @pytest.fixture
     def mock_usage_tracker(self):
         """Usage tracker mocké -- evite d'ecrire des lignes llm_usage reelles
-        pendant les tests d'integration du pipeline d'ingestion (03-06)"""
+        pendant les tests d'integration du pipeline d'ingestion"""
         mock_tracker = Mock()
         mock_tracker.record.return_value = 0.001
         return mock_tracker

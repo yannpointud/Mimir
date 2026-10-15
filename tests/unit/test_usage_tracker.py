@@ -1,6 +1,5 @@
 """
-Unit tests for UsageTracker.record(): pricing -> persisted llm_usage row
-(COST-01).
+Unit tests for UsageTracker.record(): pricing -> persisted llm_usage row.
 
 UsageTracker opens its OWN session per call via
 db_manager.get_session_context() (not the conftest.py `test_session`
@@ -119,7 +118,7 @@ class TestRecordUnpricedModel:
         """An unpriced model must be billed at the flat reservation estimate
         (NOT 0.0): finalize() applies actual - estimate, so a 0.0 cost here
         would refund the whole reservation and the daily cap would never
-        accumulate for that model (T-03-04 free-bypass)."""
+        accumulate for that model (free bypass)."""
         tracker = UsageTracker()
 
         with caplog.at_level("ERROR"):

@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import MessageBubble from '../../../components/Chat/MessageBubble';
 
 // Mock every lucide icon referenced by MessageBubble (and its children) so a
-// missing export can never blow up the render (Pitfall 6).
+// missing export can never blow up the render.
 vi.mock('lucide-react', () => {
   const Icon = ({ className }) => <span className={className} />;
   return {

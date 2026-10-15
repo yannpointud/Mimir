@@ -1,4 +1,4 @@
-"""Mock-based unit tests for the RAGAS run_pipeline harness (RAG-01, plan 06-02).
+"""Mock-based unit tests for the RAGAS run_pipeline harness.
 
 Offline and network-free: these tests exercise run_pipeline's PURE helpers --
 the golden-entry -> eval-row shaping (`_assemble_eval_row`), the JSONL boundary

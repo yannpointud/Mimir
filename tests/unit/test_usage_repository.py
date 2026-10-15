@@ -1,6 +1,6 @@
 """
 Unit tests for UsageRepository: CRUD, dashboard aggregates, and retention
-for llm_usage / llm_budget_ledger (COST-01).
+for llm_usage / llm_budget_ledger.
 
 Uses the standard conftest.py `test_repositories` fixture (single-connection,
 rollback-only transaction) -- appropriate here since these tests exercise

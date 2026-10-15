@@ -140,13 +140,13 @@ class TestResolveAdminPassword:
 
 
 class TestResolutionFeedsProductionValidation:
-    """The SEC-02 check must see the hash resolution produced (ordering)."""
+    """The default-secret check must see the hash resolution produced (ordering)."""
 
     def test_default_password_via_admin_password_is_still_rejected(self, make_settings):
-        """Setting ADMIN_PASSWORD to the known default cannot bypass SEC-02."""
+        """Setting ADMIN_PASSWORD to the known default cannot bypass the default-secret check."""
         settings = make_settings(
             # Resolution runs outside production so the strength gate only warns:
-            # this isolates the SEC-02 check, which is what the test targets.
+            # this isolates the default-secret check, which is what the test targets.
             environment="development",
             jwt_secret_key="custom-production-secret-key-well-over-32-characters",
             admin_password=DEFAULT_ADMIN_PASSWORD,

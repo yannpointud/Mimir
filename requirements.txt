@@ -20,11 +20,11 @@ mistralai==0.4.2
 faiss-cpu==1.12.0
 numpy==2.3.3
 rapidfuzz==3.14.1
-# Lexical BM25 index (hybrid search, RAG-02). Native save/load is JSON+.npy with
+# Lexical BM25 index (hybrid search). Native save/load is JSON+.npy with
 # allow_pickle=False -- no arbitrary-object deserialization (consistent with
-# ROB-02/T-02-01, the pickle vector removed from FaissVectorStore in phase 2).
-# Base package only (numpy dep): the [core] extra pulls in PyStemmer, which the
-# phase decision forbids (no stemming); tokenization is done in tokenizer_fr.py.
+# the removal of pickle from FaissVectorStore's metadata persistence).
+# Base package only (numpy dep): the [core] extra pulls in PyStemmer, but the
+# design deliberately avoids stemming; tokenization is done in tokenizer_fr.py.
 bm25s==0.3.9
 
 # Document Processing
@@ -33,7 +33,7 @@ python-docx==1.1.0
 markdown==3.8.1
 # Direct pin: pypdf's AES crypto provider needs `cryptography` at runtime.
 # It used to be pulled in transitively via the old JOSE-based auth stack;
-# pinned explicitly now that stack is removed (DEBT-02, RESEARCH Pitfall 4).
+# pinned explicitly now that stack is removed.
 cryptography==50.0.0
 
 # Cache

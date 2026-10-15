@@ -1,8 +1,7 @@
 """
-Integration tests for the corpus-aware SSE cache on /chat/stream (COST-03,
-plan 04-05).
+Integration tests for the corpus-aware SSE cache on /chat/stream.
 
-Proves the four COST-03 behaviours:
+Proves four behaviours:
   - Test 1 (hit replay): a repeated question is served from cache with an SSE
     event sequence indistinguishable from the fresh response (same event
     types in order, same concatenated answer, same sources, same final done
@@ -19,7 +18,7 @@ Proves the four COST-03 behaviours:
 All tests are hermetic: a mock LLM (zero real Mistral calls), a stub vector
 store with a controllable corpus version, and an isolated temporary SQLite
 database. The chat route reaches the pipeline exclusively through
-Depends(get_rag_service) (04-04), so the override targets get_rag_service; the
+Depends(get_rag_service), so the override targets get_rag_service; the
 route and the service share the singleton ChatCacheService so a write by the
 service is visible to the route's read.
 """
@@ -102,8 +101,8 @@ def _normalise_sequence(events):
     """Collapse consecutive chunk events into one logical 'chunk'.
 
     Returns (event_type_sequence, concatenated_answer, done_without_cached):
-    the token-by-token chunk timing is intentionally ignored (RESEARCH Open
-    Question 2), and the `cached` flag on the done event is stripped since it
+    the token-by-token chunk timing is intentionally ignored (replay sends the
+    answer as a single chunk), and the `cached` flag on the done event is stripped since it
     legitimately differs between a fresh (False) and a replayed (True) hit.
     """
     types = []

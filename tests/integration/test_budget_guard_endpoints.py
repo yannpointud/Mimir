@@ -1,7 +1,7 @@
 """
-Integration tests for budget-gated chat endpoints (COST-01, plan 03-05).
+Integration tests for budget-gated chat endpoints.
 
-Covers the two must-have truths for this plan:
+Covers two guarantees:
   - A budget-exhausted /chat/stream returns a real HTTP 429 with a body
     distinguishable from the slowapi rate-limit 429 (error_code
     "budget_exceeded" vs "HTTP_429"), BEFORE any SSE byte.
@@ -39,7 +39,7 @@ def isolated_db_manager():
     """Redirect the global db_manager singleton to a fresh temporary SQLite
     file for this test's lifetime. BudgetGuard/UsageTracker open their own
     sessions via the real db_manager singleton (own-session-per-operation
-    pattern, 03-04), so the standard test_session fixture (single
+    pattern), so the standard test_session fixture (single
     rollback-only transaction) would never see their commits -- mirrors the
     isolated_db_manager fixture in tests/unit/test_budget_guard.py /
     test_usage_tracker.py."""
@@ -132,7 +132,7 @@ def apply_mocked_llm():
     from the given mock LLM and a stub vector store, so the RAG pipeline never
     hits a real Mistral API nor a real FAISS index.
 
-    Since plan 04-04 the chat routes reach the pipeline exclusively through
+    The chat routes reach the pipeline exclusively through
     Depends(get_rag_service) (the llm_service/vector_store collaborators live
     inside the injected RagService), so overriding get_llm_service /
     get_vector_store alone no longer reaches the pipeline -- the override must
@@ -296,9 +296,9 @@ def apply_stream_rag(isolated_db_manager):
 
 
 class TestStreamCacheBudgetInteraction:
-    """COST-03 budget interaction: a /chat/stream cache hit releases the
+    """Cache/budget interaction: a /chat/stream cache hit releases the
     reservation and spends nothing (no finalize, no Mistral call), while a
-    fresh question still reserves and finalizes normally (T-4-05-04)."""
+    fresh question still reserves and finalizes normally."""
 
     def test_cache_hit_releases_without_charging(self, client, apply_stream_rag):
         mock_llm, counters = _mock_llm_counting()
@@ -329,8 +329,8 @@ class TestStreamCacheBudgetInteraction:
 
 
 class TestStreamCacheErrorNeverCached:
-    """WR-05: an error response is never cached -- the next identical question
-    re-runs the pipeline instead of being served a cached error (T-4-05-05)."""
+    """An error response is never cached -- the next identical question
+    re-runs the pipeline instead of being served a cached error."""
 
     def test_error_response_is_not_cached(self, client, apply_stream_rag):
         mock_llm, counters = _mock_llm_erroring()
@@ -356,7 +356,7 @@ class TestStreamCacheErrorNeverCached:
 
 class TestBudgetExceededGate:
     """A budget-exhausted /chat/stream returns a distinct 429
-    (error_code budget_exceeded) BEFORE any SSE byte (T-03-01)."""
+    (error_code budget_exceeded) BEFORE any SSE byte."""
 
     @pytest.fixture(autouse=True)
     def _reject_every_reservation(self, isolated_db_manager):
@@ -400,7 +400,7 @@ class TestNormalStreamUsageRecording:
     """A normal (non-cache-hit) /chat/stream call whose final SSE chunk carries
     real usage records exactly two llm_usage rows -- embedding + chat -- both
     estimated=False, and finalizes the reservation instead of leaking it
-    (T-03-12 happy path)."""
+    (exactly-one-chat-row happy path)."""
 
     def test_normal_stream_call_records_embedding_and_chat_rows(
         self, client, apply_mocked_llm
@@ -439,7 +439,7 @@ class TestNormalStreamUsageRecording:
 class TestStreamingUsageRecording:
     """A /chat/stream call whose mocked generate_stream never populates
     usage_out (simulating a disconnect / missing final usage chunk) records
-    exactly one chat row with estimated=True (T-03-12)."""
+    exactly one chat row with estimated=True."""
 
     def test_stream_without_final_usage_chunk_records_one_estimated_chat_row(
         self, client, apply_mocked_llm

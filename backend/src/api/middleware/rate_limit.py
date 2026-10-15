@@ -1,5 +1,5 @@
 """
-Rate limiting for the API (SEC-03).
+Rate limiting for the API.
 
 Rate limiting is applied EXCLUSIVELY through per-route decorators
 (@limiter.limit on login/chat/upload). There is deliberately NO ASGI

@@ -1,5 +1,5 @@
 """
-Unit tests for the fingerprinted SMTP error alerting handler (OPS-05).
+Unit tests for the fingerprinted SMTP error alerting handler.
 
 Proves the core anti-spam guarantee: repeated ERROR records sharing the same
 fingerprint (exception type + module + function + line) within the throttle

@@ -493,7 +493,7 @@ class UsageRepository(BaseRepository):
     Two distinct concerns live here:
       - CRUD/aggregates for llm_usage (dashboard-facing, cost accounting log)
       - Atomic reservation primitives for llm_budget_ledger (reserve/finalize/
-        release), which make the daily cap race-free (anti-TOCTOU, COST-01)
+        release), which make the daily cap race-free (anti-TOCTOU)
     """
 
     def create_usage_entry(self, call_type: str, model: str, prompt_tokens: int,

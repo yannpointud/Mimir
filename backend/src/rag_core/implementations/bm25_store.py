@@ -1,5 +1,5 @@
 """
-BM25 lexical store implementation (RAG-02).
+BM25 lexical store implementation.
 
 Second retrieval index living beside FaissVectorStore: a lexical BM25 index that
 recovers exact terms (identifiers, acronyms) the dense embedding path tends to
@@ -9,8 +9,8 @@ FaissVectorStore.optimize() rebuilds from non-deleted metadata.
 
 Design constraints (locked):
 - Persistence uses the native bm25s save/load API (JSON + .npy, allow_pickle=False):
-  NO arbitrary-object deserialization, consistent with ROB-02/T-02-01 (the pickle
-  vector removed from FaissVectorStore in phase 2).
+  NO arbitrary-object deserialization, consistent with the removal of pickle
+  from FaissVectorStore's metadata persistence.
 - Atomic writes: bm25s.save() writes a directory; we save into a temp directory on
   the same filesystem then os.replace() it onto the target (atomic directory
   rename), mirroring the crash-safety intent of FaissVectorStore._atomic_write.
@@ -219,7 +219,7 @@ class Bm25LexicalStore:
         """Move a freshly-built temp directory onto the target, crash-safely.
 
         A plain rmtree(target)+os.replace(tmp) leaves a long window with NO index
-        on disk if the process dies mid-rmtree (WR-02). Instead move the old
+        on disk if the process dies mid-rmtree. Instead move the old
         directory aside first, then atomically move the new one in, then delete
         the backup. The only window with a missing target is the microsecond
         between the two os.replace() calls; a crash there is further covered by

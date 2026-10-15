@@ -1,5 +1,5 @@
 """
-Tests for the rate limiting module (SEC-03).
+Tests for the rate limiting module.
 """
 
 import pytest  # noqa: F401
@@ -88,7 +88,7 @@ class TestConfigureRateLimiting:
     """Tests for the configure_rate_limiting setup function."""
 
     def test_no_asgi_middleware_registered(self):
-        """configure_rate_limiting must NOT register any ASGI middleware (D-10)."""
+        """configure_rate_limiting must NOT register any ASGI middleware."""
         app = FastAPI()
         middleware_count_before = len(app.user_middleware)
 

@@ -297,7 +297,7 @@ async def update_configuration(
     """
     try:
         # Drop any masked value resubmitted by the frontend: a mask must never
-        # overwrite the real secret nor trigger the allow-list validation (D-03)
+        # overwrite the real secret nor trigger the allow-list validation
         config_updates = {k: v for k, v in config_updates.items() if v != MASKED_VALUE}
 
         # Validate configuration keys (only allow certain keys to be updated)
@@ -309,7 +309,7 @@ async def update_configuration(
             "chat_rate_limit_per_minute",
             "auto_delete_failed_documents",
             "vector_search_threshold",
-            # Hot-reloadable daily spend cap (COST-02): BudgetGuard._effective_cap
+            # Hot-reloadable daily spend cap: BudgetGuard._effective_cap
             # reads this key from the configuration table before falling back
             # to settings.daily_budget_eur.
             "daily_budget_eur"
@@ -458,7 +458,7 @@ async def get_usage(
 ) -> Dict[str, Any]:
     """
     Get today's per-model LLM spend, the daily history, and today's spend
-    vs the daily budget cap, for the admin cost dashboard (COST-02).
+    vs the daily budget cap, for the admin cost dashboard.
 
     Internal cost data must never be readable anonymously (explicit guard
     kept in addition to the router-level default-deny, same convention as
@@ -706,7 +706,7 @@ async def admin_document_stats(
 
 
 @router.post("/documents/upload", response_model=Dict[str, Any])
-# Same upload limit as /documents/upload (SEC-03): this duplicated admin
+# Same upload limit as /documents/upload: this duplicated admin
 # route would otherwise be a trivial bypass of the upload rate limit.
 # `request` is required by slowapi (import-time error without it) and
 # `response` is required because the return value is a plain dict.
@@ -1090,7 +1090,7 @@ async def rebuild_vector_store(
             threading.RLock)
         bm25_store: Shared BM25 lexical store singleton; resynced from the
             optimized FAISS snapshot so a manual rebuild leaves no ghost/orphan
-            chunk in the lexical index (anti-ghost, T-06-06-01)
+            chunk in the lexical index (anti-ghost)
         document_repo: Request-scoped document repository, the source of truth
             for which documents still exist during orphan cleanup
 
@@ -1125,12 +1125,12 @@ async def rebuild_vector_store(
         )
 
         # Resync the BM25 lexical index from the freshly-optimized FAISS
-        # snapshot (anti-ghost, T-06-06-01). Rebuilding FAISS alone would leave
+        # snapshot (anti-ghost). Rebuilding FAISS alone would leave
         # the lexical index with ghost/orphan chunks that FAISS just dropped;
         # snapshotting the active chunks and rebuilding BM25 from them keeps both
         # indexes consistent. Both blocking calls are offloaded via
         # asyncio.to_thread (same convention as every FAISS call here) so the
-        # event loop is never stalled (T-07-07-02).
+        # event loop is never stalled.
         active_chunks = await asyncio.to_thread(vector_store.snapshot_active_chunks)
         await asyncio.to_thread(bm25_store.rebuild, active_chunks)
 

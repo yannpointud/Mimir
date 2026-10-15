@@ -1,5 +1,5 @@
 """
-Integration tests for the liveness/readiness split (OPS-04).
+Integration tests for the liveness/readiness split.
 
 Proves that:
   - GET /api/v1/health/live is a pure process probe: it stays 200 even when a

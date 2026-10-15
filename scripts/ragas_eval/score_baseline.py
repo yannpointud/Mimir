@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""RAGAS pipeline stage 2/2 (RAG-01, venv SÉPARÉ): scores the baseline.
+"""RAGAS pipeline stage 2/2 (venv SÉPARÉ): scores the baseline.
 
 Why this exists: this is the SEPARATE-venv half of the two-stage RAGAS harness.
 It reads ONLY ``eval_input.jsonl`` (produced by ``run_pipeline.py`` in the main
@@ -19,7 +19,7 @@ Rate-limit safety (Mistral free tier = 1 request/second HARD):
     makes a run slow-but-safe.
   - ``temperature=0`` on the judge maximizes real determinism WITHOUT a ragas
     cache: a cache would make two "identical" runs trivially equal and falsify
-    the inter-run stability proof (Pitfall #4). No ``cache=`` is passed.
+    the inter-run stability proof. No ``cache=`` is passed.
 
 Security:
   - ``MISTRAL_API_KEY`` is read from the environment by ChatMistralAI /
@@ -226,8 +226,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     metrics = _resolve_metrics(metric_names)
     dataset = EvaluationDataset.from_list(clean_rows)
 
-    # temperature=0: real determinism, NO ragas cache (Pitfall #4 -- a cache
-    # would fake inter-run stability). The key is read from the environment.
+    # temperature=0: real determinism, NO ragas cache (a cache would fake
+    # inter-run stability). The key is read from the environment.
     judge_llm = LangchainLLMWrapper(ChatMistralAI(model=args.model, temperature=0))
     judge_embeddings = LangchainEmbeddingsWrapper(MistralAIEmbeddings(model=args.embedding_model))
 

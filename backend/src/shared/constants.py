@@ -7,11 +7,11 @@ by API endpoints without creating circular imports (same role as shared/models.p
 
 __all__ = ["MASKED_VALUE", "SENSITIVE_CONFIG_KEYS", "mask_secrets"]
 
-# Total mask applied to every secret value in admin responses (D-02):
+# Total mask applied to every secret value in admin responses:
 # no character of the real secret is ever revealed.
 MASKED_VALUE = "***MASKED***"
 
-# Configuration keys whose values must never leave the backend in clear text (D-01).
+# Configuration keys whose values must never leave the backend in clear text.
 SENSITIVE_CONFIG_KEYS = frozenset({
     "mistral_api_key",
     "smtp_password",

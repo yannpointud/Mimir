@@ -72,7 +72,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, filename, searchQuery = ''
     }
   }, [isOpen, documentId, loadDocument]);
 
-  // Highlight searched text in content (escape-then-highlight, SEC-04).
+  // Highlight searched text in content (escape-then-highlight).
   // The document text is ALWAYS HTML-escaped before insertion so malicious
   // content renders as inert literal text; the query is escaped the same way
   // so matches still line up with the escaped text. Only <mark> tags may

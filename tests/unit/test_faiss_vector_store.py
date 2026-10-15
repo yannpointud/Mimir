@@ -181,7 +181,7 @@ class TestFaissVectorStore:
         assert success is True
 
     def test_optimize_remaps_document_mapping_without_cross_document_corruption(self, temp_dir):
-        """CR-01 regression: optimize() must remap document_to_chunks to the new
+        """Regression: optimize() must remap document_to_chunks to the new
         compacted positions. The stored ids double as direct indices into
         self.metadata in delete(), so a stale mapping would make a document own
         another document's chunks and delete() would corrupt the wrong ones."""
@@ -227,7 +227,7 @@ class TestFaissVectorStore:
 
     def test_snapshot_active_chunks_excludes_deleted(self, temp_dir):
         """snapshot_active_chunks returns lock-safe copies of non-deleted chunk
-        metadata only (WR-01 source for the BM25 rebuild)."""
+        metadata only (source for the BM25 rebuild)."""
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "snap.index"),
@@ -340,7 +340,7 @@ class TestFaissVectorStore:
 
     def test_atomic_persist_crash_order(self, temp_dir, sample_chunks):
         """A crash between index replace and metadata replace leaves the index
-        ahead of the metadata, never the reverse (RESEARCH.md Pattern 3 / Pitfall 3)"""
+        ahead of the metadata, never the reverse"""
         index_path = temp_dir / "crash.index"
         metadata_path = temp_dir / "crash.metadata"
 
