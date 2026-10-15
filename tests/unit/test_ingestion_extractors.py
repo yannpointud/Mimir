@@ -8,9 +8,6 @@ import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
 
-from docx.opc.exceptions import PackageNotFoundError
-from pypdf.errors import FileNotDecryptedError, PdfReadError
-
 from src.ingestion.extractors import (
     ExtractorFactory,
     TextExtractor,
@@ -233,7 +230,7 @@ class TestPDFExtractor:
         mock_reader = Mock()
         mock_reader.pages = []
         mock_reader.is_encrypted = True
-        mock_reader.decrypt = Mock(side_effect=FileNotDecryptedError("Cannot decrypt"))
+        mock_reader.decrypt = Mock(side_effect=Exception("Cannot decrypt"))
         mock_pdf_reader.return_value = mock_reader
 
         extractor = PDFExtractor()
@@ -251,7 +248,7 @@ class TestPDFExtractor:
     @patch("pypdf.PdfReader")
     def test_pdf_extraction_error(self, mock_pdf_reader):
         """Test d'erreur lors de l'extraction PDF"""
-        mock_pdf_reader.side_effect = PdfReadError("PDF parsing error")
+        mock_pdf_reader.side_effect = Exception("PDF parsing error")
 
         extractor = PDFExtractor()
 
@@ -316,7 +313,7 @@ class TestDOCXExtractor:
     @patch("src.ingestion.extractors.DocxDocument")
     def test_docx_extraction_error(self, mock_document):
         """Test d'erreur lors de l'extraction DOCX"""
-        mock_document.side_effect = PackageNotFoundError("DOCX parsing error")
+        mock_document.side_effect = Exception("DOCX parsing error")
 
         extractor = DOCXExtractor()
 

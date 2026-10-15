@@ -404,7 +404,7 @@ class TestFileWatcher:
     def test_start_observer_error(self, mock_observer_class, temp_dir):
         """Test de gestion d'erreur au démarrage de l'observer."""
         mock_observer = Mock()
-        mock_observer.start.side_effect = RuntimeError("Start failed")
+        mock_observer.start.side_effect = Exception("Start failed")
         mock_observer_class.return_value = mock_observer
 
         watcher = FileWatcher([temp_dir], {".txt"}, Mock())
@@ -443,7 +443,7 @@ class TestFileWatcher:
     def test_stop_error(self, mock_observer_class, temp_dir):
         """Test de gestion d'erreur à l'arrêt."""
         mock_observer = Mock()
-        mock_observer.stop.side_effect = RuntimeError("Stop failed")
+        mock_observer.stop.side_effect = Exception("Stop failed")
         mock_observer_class.return_value = mock_observer
 
         watcher = FileWatcher([temp_dir], {".txt"}, Mock())
@@ -522,7 +522,7 @@ class TestFileWatcher:
 
         # Passer un objet qui lèvera une erreur lors de Path()
         with patch("backend.src.file_watcher.watcher.Path") as mock_path:
-            mock_path.side_effect = OSError("Path error")
+            mock_path.side_effect = Exception("Path error")
 
             result = watcher.add_directory("some_path")
 
@@ -550,7 +550,7 @@ class TestFileWatcher:
         watcher = FileWatcher([temp_dir], {".txt"}, Mock())
 
         with patch("backend.src.file_watcher.watcher.Path") as mock_path:
-            mock_path.side_effect = OSError("Path error")
+            mock_path.side_effect = Exception("Path error")
 
             result = watcher.remove_directory("some_path")
 
@@ -602,7 +602,7 @@ class TestFileWatcher:
         """Test de gestion d'erreur lors du scan."""
         watcher = FileWatcher([temp_dir], {".txt"}, Mock())
 
-        with patch.object(Path, "glob", side_effect=OSError("Glob error")):
+        with patch.object(Path, "glob", side_effect=Exception("Glob error")):
             existing_files = watcher.scan_existing_files()
 
             assert existing_files == []
