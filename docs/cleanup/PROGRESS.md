@@ -24,7 +24,7 @@ mot de passe admin retiré du README et de CLAUDE.md, promesse d'implémentation
 interchangeables remplacée par un constat, 5 ADR dans `docs/adr/`.
 Voir DECISIONS D8.1 à D8.8.
 
-Prochaine étape : FIN, en cours. Étape 1 : revue du diff pre-cleanup..cleanup/qualite par un sous-agent neuf (rapport dans le scratchpad), puis corrections bloquantes, porte, REPORT.md, suppression de PROGRESS.md, PR.
+Prochaine étape : FIN, en cours. Revue faite (`docs/cleanup/REVIEW.md` : 3 bloquants, 5 importants, 8 mineurs ; cause commune : `except` rétrécis en passe 2 sur des chemins « best effort »). En cours : corrections B1-B3, I1-I5, M2-M6 et docs M7 (tentative 1), puis porte, REPORT.md, suppression de PROGRESS.md, PR.
 
 ## Reprendre après une coupure
 
