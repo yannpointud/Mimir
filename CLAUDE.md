@@ -14,7 +14,7 @@ stop_servers.sh
 
 
 ## Stack
-- **Backend**: Python 3.11, FastAPI, SQLite (WAL), FAISS, Mistral API
+- **Backend**: Python 3.13, FastAPI, SQLite (WAL), FAISS, Mistral API
 - **Frontend**: React 18, Vite, Tailwind CSS, Axios
 - **Auth**: JWT (PyJWT) + Argon2 (pwdlib, bcrypt legacy)
 - **Tests**: pytest (backend), vitest (frontend)

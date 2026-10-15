@@ -1,7 +1,7 @@
 # Mimir backend production image.
 # glibc-based slim (NOT alpine): faiss-cpu / numpy ship manylinux wheels that
 # require glibc; alpine (musl) would force a slow source build.
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Create a non-root system user/group up front (Elevation-of-Privilege
 # mitigation). Source stays root-owned/read-only; only the writable

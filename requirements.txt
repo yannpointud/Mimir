@@ -1,5 +1,5 @@
 # Mimir - Dependencies
-# Python 3.11 required
+# Python 3.13 required
 
 # Core
 fastapi==0.133.0

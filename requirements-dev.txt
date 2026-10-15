@@ -1,5 +1,5 @@
 # Mimir - Development / CI tooling
-# Python 3.11 required
+# Python 3.13 required
 #
 # These are dev/CI-only tools, NOT runtime dependencies (do not add to requirements.txt).
 # Used by scripts/local_ci.sh: ruff (lint) + pip-audit (dependency vulnerability scan).
