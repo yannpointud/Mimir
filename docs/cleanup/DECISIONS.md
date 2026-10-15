@@ -566,3 +566,115 @@ Nouveau job `mypy` bloquant dans `.github/workflows/ci.yml` (installe
 `requirements.txt` et `requirements-dev.txt`, car mypy lit les types intégrés
 de FastAPI, Pydantic et SQLAlchemy, puis lance `mypy backend/src`) et étape
 `mypy backend/src` dans `scripts/local_ci.sh`, entre ruff et pytest.
+
+## Passe 5 : commentaires
+
+### D5.1 Règle appliquée aux docstrings
+
+Périmètre : `backend/src` (hors migrations, voir D5.6), `backend/main.py`,
+`backend/scripts`, `scripts/`. Les 794 docstrings du périmètre ont été
+inventoriées (AST : signature, décorateurs, texte) et examinées une à une ;
+325 sont modifiées (environ 1 600 lignes en moins) :
+
+- **supprimées (120)** quand elles ne disent rien de plus que le nom et la
+  signature, sur : fonctions et méthodes privées, `__init__` et méthodes
+  spéciales, fournisseurs de dépendances FastAPI (`get_*` de
+  `dependencies.py`, dont « Get document repository instance. »), DTO
+  Pydantic dont la docstring répète le nom de la classe (« Request model for
+  login »), utilitaires triviaux des modèles ORM (`to_dict`, `is_*`,
+  `has_error`, fabriques d'`AuditLog`) et `Settings.is_production` ;
+- **raccourcies (149)** sur les API publiques (routes FastAPI, classes et
+  méthodes publiques des services et des dépôts, interfaces abstraites) : le
+  résumé reste, les sections `Args`, `Returns`, `Raises` (et « Query
+  Parameters ») disparaissent quand elles ne font que paraphraser noms et
+  types ;
+- **réécrites (56)** quand une section paraphrasait mais portait une
+  information réelle (format, contrainte, effet de bord, pourquoi) : cette
+  information est gardée en une phrase (`usage_out`, `similarity_floor`,
+  clés de `filters` de l'audit, `order_by`, `index_type`...).
+
+Gardées telles quelles : les docstrings qui expliquent un pourquoi, les
+docstrings de module, celles des exceptions (souvent seul corps de la classe)
+et, même brèves, celles des méthodes publiques des services et des interfaces
+(option conservatrice). Les commentaires `#` ne sont modifiés que s'ils citent
+un document de planning ou sont en français : la consigne vise les
+docstrings, les commentaires « quoi » restent en place.
+
+### D5.2 Docstrings inexactes corrigées
+
+Sans toucher au code, des docstrings qui décrivaient mal le comportement sont
+rectifiées : `_check_llm_health` (annonçait un test de connectivité, alors
+qu'il ne vérifie que la présence de la clé), `IngestionProcessor.__init__`
+(BM25 reconstruit « après chaque upsert » alors que la reconstruction est
+regroupée à la vidange de la file), `DocumentRepository.delete` (renvoie
+`False` si absent, lève `ValueError` si protégé),
+`DocumentRepository.get_all_paginated` (seul le filtre `status` est appliqué).
+Les sections fausses sans information utile sont simplement retirées
+(`metadata_path` « pickle » de `FaissVectorStore`, `source` « for logging »
+de `chunk_text`, qui part aussi dans les métadonnées).
+
+### D5.3 Effets observables
+
+- La docstring d'une route ou d'un modèle Pydantic devient la `description`
+  OpenAPI : ces textes changent, l'oracle (a) les exclut. Vérification
+  supplémentaire : le schéma OpenAPI complet, privé de ses clés
+  `description`, est strictement identique avant et après la passe.
+- Aucun `__doc__` n'est lu à l'exécution (pas de `description=__doc__` dans
+  les scripts), aucun test ne lit une docstring.
+- Log de démarrage : « Starting Mimir application - Jalon 3: API &
+  Services... » devient « Starting Mimir application - API & Services... »
+  (aucun test ni handler ne le lit).
+- Aucun texte de réponse JSON ou d'événement SSE, aucune chaîne de prompt
+  (`MIMIR_SYSTEM_PROMPT`, `NO_CONTEXT_SYSTEM_PROMPT`) n'est modifié.
+
+### D5.4 Références à des documents de planning
+
+Nettoyées en gardant le sens :
+
+- `config.py`, descriptions `Field` (`06-07`, `07-06`, `ROADMAP`, `OPS-05`) :
+  « adoptée après mesure RAGAS sur le golden set », « fixée à 60, valeur
+  standard de la RRF »... Elles ne sont exposées par aucune route : aucun code
+  ne lit `model_fields` ni `model_json_schema`, `Settings` n'est le modèle
+  d'aucune route, et le schéma OpenAPI est inchangé hors descriptions ;
+- `main.py` (« Milestone 3 », « Jalon 3 » : docstrings, commentaires, log),
+  `shared/models.py` (« ready for Milestone 2-3 »), `rag_service.py`
+  (« milestone prime directive », « Option A »), `usage_tracker.py`
+  (`03-PATTERNS.md`), `models.py` et `connection.py` (renvois au « LLD » et
+  aux « specs », absents du dépôt), « locked decision » de `tokenizer_fr.py`,
+  `bm25_store.py` et `golden_set_schema.py` ;
+- `scripts/ragas_eval` : aide argparse (`RAG-01`, `RAG-02`, `RAG-05`), `print`
+  (`plan 06-01`, `plan 06-07 Task 3`), message d'évaluation (`Pitfall #2`),
+  commentaire « success criteria », titre généré par `measure_chunking.py`,
+  documents `*.md` (`RAG-0x`, `07-0x`, `ROADMAP critère 2`, `phase 6`,
+  blocker `STATE`, `RESEARCH Pitfall #2`) ;
+- tests : message d'assertion `(WR-01)` de `test_ingestion_processor.py`,
+  describe vitest `SEC-04` de `DocumentModal.test.jsx`, docstring de
+  `tests/performance/test_faiss_concurrency.py` ;
+- `validate_milestone.sh` : les libellés de contrôles (`ROB-01`, `COST-01`,
+  `SEC-03`, `OPS-03`, `OPS-01`) et les commentaires qui les décrivent sont
+  conservés ; l'en-tête « milestone acceptance proof » devient « acceptance
+  proof » et la bannière « Milestone validation summary (TEST-02) » devient
+  « Validation summary » (`TEST-02` n'est pas un libellé de contrôle).
+
+Restent volontairement : le nom de fichier `validate_milestone.sh` et ses
+mentions, et les entrées `.planning/` de `.gitignore` et `.dockerignore` (elles
+empêchent de versionner ou d'embarquer un dossier local ; les retirer pourrait
+le faire fuiter). Faux positifs du grep : dates (`freeze_time`,
+`today="2024-01-01"`), exemples `COVID-19` et `API-42`. Bilan : 0 référence de
+planning hors `validate_milestone.sh`.
+
+### D5.5 Commentaires en français
+
+`CLAUDE.md` exige des commentaires en anglais : les docstrings et commentaires
+français du périmètre sont traduits (`backend/scripts/init_db.py`,
+`scripts/generate_test_documents.py`, `scripts/test_log_levels.py`, « venv
+principal » et « venv SÉPARÉ » des docstrings de `scripts/ragas_eval`). Les
+chaînes en français (descriptions `Field`, aide argparse, `print`, documents
+`.md`, prompts) ne sont pas des commentaires et restent en français.
+`start-servers.sh` et `stop-servers.sh`, hors périmètre, ne sont pas touchés.
+
+### D5.6 Migrations Alembic non modifiées
+
+Les docstrings de `backend/src/database/migrations` (gabarit Alembic :
+« Upgrade schema. », en-têtes de révision) restent telles quelles : fichiers
+générés, exclus de ruff, et l'en-tête de révision suit la convention Alembic.
