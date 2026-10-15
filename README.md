@@ -1,7 +1,7 @@
 # Mimir - Chatbot Documentaire d'Entreprise
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.11+-green.svg)
+![Python](https://img.shields.io/badge/python-3.13+-green.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-teal.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -57,7 +57,7 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 ### Stack Technologique
 
 #### Backend
-- **Framework** : Python 3.11+, FastAPI, Uvicorn
+- **Framework** : Python 3.13+, FastAPI, Uvicorn
 - **Base de données** : SQLite (mode WAL)
 - **Index vectoriel** : FAISS (local)
 - **LLM** : Mistral API (mistral-small-latest)
@@ -127,7 +127,7 @@ frontend/
 ## 🚀 Installation et Déploiement
 
 ### Prérequis
-- Python 3.11+
+- Python 3.13+
 - Node.js 18+
 - Clé API Mistral
 - Minimum 4GB RAM

@@ -1,5 +1,5 @@
 # RAGAS scoring harness dependencies -- installed in a SEPARATE
-# Python 3.11 virtualenv, NEVER in the main project venv.
+# Python 3.13 virtualenv, NEVER in the main project venv.
 #
 # Rationale: ragas pulls heavy / conflicting transitive dependencies
 # (langchain, datasets, pandas) that must not collide with the main venv's
@@ -20,7 +20,7 @@
 #                            (ChatMistralAI, MistralAIEmbeddings) = RAGAS judge.
 #
 # Install (separate venv only):
-#   python3.11 -m venv .venv-ragas
+#   python3.13 -m venv .venv-ragas
 #   .venv-ragas/bin/pip install -r scripts/ragas_eval/requirements-ragas.txt
 #   # Verify the legacy metric import:
 #   .venv-ragas/bin/python -c "from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall; print('legacy API OK')"

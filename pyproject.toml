@@ -4,7 +4,7 @@
 # NEW violations fail going forward (pre-existing ones are baselined with inline noqa).
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 line-length = 100
 
 # Non-source / generated paths must never be linted.
