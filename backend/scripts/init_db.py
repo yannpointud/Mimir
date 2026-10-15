@@ -8,7 +8,7 @@ import contextlib
 import sys
 from pathlib import Path
 
-# Ajouter le répertoire backend au PATH
+# Add the backend directory to the import path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
@@ -48,7 +48,7 @@ def main():
             insert_test_data()
             print("✅ Test data inserted")
 
-        # Vérification finale
+        # Final check
         if db_manager.health_check():
             print("✅ Database health check passed")
         else:
@@ -64,7 +64,7 @@ def insert_test_data():
     with db_manager.get_session_context() as session:
         repos = create_repositories(session)
 
-        # Configuration de test
+        # Test configuration
         configs = [
             ("app_name", "Mimir Test Instance"),
             ("max_file_size_mb", "100"),
@@ -77,7 +77,7 @@ def insert_test_data():
 
         print(f"   - Inserted {len(configs)} configuration entries")
 
-        # Documents de test
+        # Test documents
         test_docs = [
             (
                 "sample1.pdf",
@@ -105,7 +105,7 @@ def insert_test_data():
 
         print(f"   - Inserted {len(test_docs)} test documents")
 
-        # Logs d'audit de test
+        # Test audit logs
         repos["audit"].create_log("system", "database_init", "Test data inserted")
         repos["audit"].create_log("admin", "system_config", "Initial configuration set")
 

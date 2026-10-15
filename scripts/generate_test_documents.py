@@ -28,7 +28,7 @@ NUM_DOCUMENTS = 50  # Number of documents to generate
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "generated_documents")
 PAUSE_BETWEEN_FILES = 1
 
-# --- Thèmes et Sujets (Listes étendues pour plus de diversité) ---
+# --- Themes and subjects (extended lists for more diversity) ---
 COMPANY_NAME = "Innovatech Solutions"
 PROJECT_NAMES = [
     "Project Phoenix",
@@ -194,7 +194,7 @@ def main():
 
     for i in range(NUM_DOCUMENTS):
         doc_type = random.choice(DOC_TYPES)
-        subject = f"{random.choice(DEPARTMENTS)} - {random.choice(PROJECT_NAMES)}"  # Logique de sujet plus simple et variée
+        subject = f"{random.choice(DEPARTMENTS)} - {random.choice(PROJECT_NAMES)}"  # Simpler, more varied subject logic
 
         print(f"\n--- Génération du document {i + 1}/{NUM_DOCUMENTS} ---")
         content = generate_long_content(doc_type, subject)
@@ -205,7 +205,7 @@ def main():
 
         base_filename = f"{doc_type}_{subject}".replace(" ", "_").replace("/", "_").replace(":", "")
 
-        # --- Choix aléatoire du format de sortie ---
+        # --- Random choice of the output format ---
         output_format = random.choice(["docx", "pdf"])
 
         if output_format == "docx":

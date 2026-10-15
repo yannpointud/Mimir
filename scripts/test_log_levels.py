@@ -8,7 +8,7 @@ import os
 import sys
 import logging
 
-# Ajouter le backend au path
+# Add the backend directory to the import path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from src.config import settings
