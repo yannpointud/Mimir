@@ -191,6 +191,10 @@ suppression, liste des documents avant un rebuild, journal d'audit des
 sauvegarde avant nettoyage des orphelins (`tests/integration/test_orphan_cleanup.py`
 injecte une `Exception` brute).
 
+> Note (FIN) : ce décompte est dépassé. La revue a montré que plusieurs
+> rétrécissements changeaient un repli ; ces sites sont de nouveau en
+> `except Exception` (180 dans le backend, voir DF.1 à DF.6).
+
 ### D2.4 Exceptions précises ailleurs
 
 Les modules internes capturent désormais des types précis : erreurs
@@ -202,6 +206,12 @@ bibliothèques (`pypdf.errors.PyPdfError`, `docx.opc.exceptions.OpcError`,
 chemins qui relançaient en enveloppant une exception métier le font toujours
 (mêmes messages), et `raise ... from e` est systématique.
 
+> Note (FIN) : ces listes surestimaient ce qu'un site peut recevoir (pypdf,
+> bm25s, `np.load` lèvent aussi `ZeroDivisionError`, `EOFError`,
+> `AssertionError`...). Les sites concernés sont revenus à `except Exception`
+> et les tuples `INDEX_BACKEND_ERRORS`, `_PARSER_ERRORS`, `_PAYLOAD_ERRORS`,
+> `_READ_ERRORS`, `_ENTRY_ERRORS` et `_SOURCE_ERRORS` sont retirés (DF.1).
+
 ### D2.5 Code mort retiré au passage
 
 Trois fonctions sans aucun appelant, dont la seule raison d'être des
@@ -209,6 +219,10 @@ Trois fonctions sans aucun appelant, dont la seule raison d'être des
 (`validation_utils.py`), `get_performance_status` (`log_parser.py`) et les
 `try/except` des agrégateurs de `log_parser.py` et `logs_reader.py` dont le
 corps ne peut pas lever (calculs sur des valeurs déjà protégées).
+
+> Note (FIN) : faux pour les agrégateurs, dont les appelés avaient été
+> rétrécis (une ligne JSON qui n'est pas un objet donnait un 500) ; leurs
+> `try/except` sont rétablis (DF.4). Les deux fonctions mortes restent supprimées.
 
 ### D2.6 Tests unitaires adaptés
 
@@ -221,6 +235,9 @@ exists »). Un test importait `VectorStoreOperationError` via le chemin
 `backend.src` (double import du même module) : il passe par `src`. Deux tests
 qui n'affirmaient rien (`assert True` dans les deux branches, `pytest.fail` dans
 un `except`) affirment désormais le comportement attendu.
+
+> Note (FIN) : ces adaptations masquaient des changements de comportement.
+> Les injections d'origine (`Exception`, `RuntimeError`) sont rétablies (DF.7).
 
 ### D2.7 Correction autorisée
 
@@ -1250,3 +1267,201 @@ Tentative 1 : porte franchie, métriques identiques à la passe 7 (1010 tests,
 mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200 depuis un venv
 vierge, tests gelés et sommes de l'oracle OK). Attendu : la passe ne touche
 que du Markdown. Aucun nouvel avis pip-audit pendant la passe.
+
+## FIN : corrections après la revue
+
+Revue : `docs/cleanup/REVIEW.md` (3 bloquants, 5 importants, 8 mineurs). Cause
+commune : la passe 2 avait rétréci des `except Exception` qui garantissaient un
+repli. Base de comparaison : `pre-cleanup` (`b1e18e6`).
+
+### DF.1 Règle appliquée
+
+Pour chaque `except Exception` de `pre-cleanup` dont le handler continuait,
+renvoyait une valeur par défaut, convertissait en erreur ou en message précis,
+ou journalisait avant de relancer, le code actuel doit donner le même résultat
+pour une exception quelconque (`RuntimeError`, `ZeroDivisionError`,
+`EOFError`...). Là où ce n'était plus le cas, le `except Exception` est rétabli
+avec `# noqa: BLE001 - <raison>` et le corps d'origine : même repli, même log,
+même exception levée. Restent de la passe 2 ce qui ne change pas le
+comportement : exceptions métier (le validateur lève `RetrievalError`, même
+message, au lieu d'une `Exception` nue), `raise ... from e`, logs ajoutés.
+Devenus inutiles, les tuples `INDEX_BACKEND_ERRORS` (`rag_core/interfaces.py`),
+`_PARSER_ERRORS`, `_PAYLOAD_ERRORS`, `_READ_ERRORS`, `_ENTRY_ERRORS`,
+`_SOURCE_ERRORS` et les imports associés sont retirés.
+
+Décompte (analyse AST des handlers `except Exception`) :
+
+| | `backend/src` | avec `main.py` |
+| --- | ---: | ---: |
+| `pre-cleanup` | 179 | 186 |
+| après la passe 2 | 59 | 66 |
+| après FIN | 173 | 180 |
+
+### DF.2 Bloquants
+
+- **B1** `IngestionProcessor._maybe_rebuild_bm25_on_drain` : au mieux, FAISS
+  tient déjà les chunks ; `_bm25_dirty` reste levé pour la vidange suivante.
+- **B2** `get_bm25_store` (`api/dependencies.py`) et `_ensure_bm25_index`
+  (`main.py`) : frontières de démarrage, un index BM25 illisible donne un store
+  vide. `Bm25LexicalStore.load` enveloppe de nouveau toute erreur (dont
+  l'`EOFError` d'un `.npy` tronqué) en `VectorStoreConnectionError`, comme avant.
+- **B3** `extractors.py` : boucle par page (page ignorée), déchiffrement,
+  handlers externes PDF, DOCX et Markdown (toute erreur devient
+  `ExtractionError`), lecture TXT (encodage suivant).
+
+### DF.3 Importants (I1 à I4)
+
+- **I1** `rag_service._hybrid_retrieve` : tout échec de la requête BM25 se
+  replie sur le dense seul.
+- **I2** `index_maintenance` : `_clean_orphans_if_fragmented` et la resync BM25
+  de `remove_document_from_indexes` sont de nouveau deux blocs « au mieux »
+  indépendants.
+- **I3** `DocumentUpload._reject_queue_full` : nettoyage au mieux, le client
+  reçoit toujours le 503.
+- **I4** `smtp_client` : `send_escalation_email`, `send_notification_email`
+  (`try/except` rétabli), `_send_email`, `_add_attachment`. `/admin/test-email`
+  répond de nouveau 200 `success: false` et `/chat/escalate` « Impossible
+  d'envoyer votre demande pour le moment... ».
+
+### DF.4 Mineurs restaurés (M2 à M6)
+
+- **M2** `log_parser.py` (28 sites) : handlers par ligne et par fonction, et
+  les `try/except` des agrégateurs (`get_chat_metrics`, `get_usage_analytics`,
+  `_get_avg_daily_requests`, `_calculate_growth_rate`, `_get_avg_tokens_per_day`,
+  `_estimate_monthly_tokens`, `_get_error_rate_period`, `_calculate_health_score`)
+  avec leurs valeurs par défaut ; `_parse_timestamp`,
+  `_count_recent_error_log_entries`, `_is_recent_error_entry`.
+  `logs_reader.py` (6) : `_parse_backend_log_line`, `_parse_frontend_log_line`,
+  `_read_log_file`, `get_logs`, `get_available_modules`, `get_logs_summary`
+  (`try/except` rétabli). `/admin/analytics/usage` et `/admin/logs` ne
+  répondent plus 500 sur une ligne JSON qui n'est pas un objet.
+- **M3** `health.disk_usage` : erreur par répertoire.
+- **M4** `faiss_store.py` (20 sites) : `_initialize_index`, `_create_new_index`,
+  `upsert`, `query`, `delete` (et son `optimize` au mieux), `health_check`,
+  `_atomic_write`, `persist`, `load`, `clean_orphans` (persistance, handler
+  externe), `_optimize_after_cleanup`, `_create_backup`, `_rotate_backups`,
+  `_get_existing_document_ids`, `optimize`, `rebuild_vector_store` (nettoyage au
+  mieux, handler externe), `get_document_chunks` ; plus
+  `index_maintenance.record_rebuild_failure`. `load` enveloppe de nouveau aussi
+  l'`ImportError` d'un pickle hérité : le constructeur repart d'un index vide
+  comme avant. Ce comportement d'origine est discutable (la persistance suivante
+  écrase l'ancien index) mais il est conservé : aucun changement fonctionnel.
+- **M5** `mistral_api.py` : `_make_request`, `generate`, `generate_stream`,
+  `_embed_batch` relancent les trois erreurs LLM et enveloppent le reste en
+  `LLMAPIError` ; boucle de lots de `embed` ; `health_check`.
+- **M6** `jwt_handler.py` : `verify_token` (401 sur toute erreur),
+  `verify_password` (`False` : `/auth/change-password` répond de nouveau 400 et
+  non 500), `create_access_token` (log puis relance).
+
+### DF.5 Autres sites restaurés par le balayage
+
+`git diff pre-cleanup..HEAD -- backend/src backend/main.py`, chaque
+`except Exception` retiré comparé au code actuel :
+
+- `processor.queue_document` (doublon « already exists », relecture du
+  document, handler externe : renvoie `False`), `_process_task` (deux
+  écritures du statut d'erreur) ;
+- `auth.change_password` : 500 « Erreur lors de la mise à jour du fichier de
+  configuration » pour toute erreur d'écriture ;
+- `config.py` : chargement des settings ;
+- `database/connection.py` : `_initialize_database`, `create_tables`,
+  `create_tables_async`, `drop_tables`, `init_database` (log puis relance),
+  `health_check` (`False`) ;
+- `file_watcher/watcher.py` : `_wait_for_file_stability` (`try` externe
+  rétabli), `start`, `stop`, `add_directory`, `remove_directory`,
+  `scan_existing_files` ;
+- `bm25_store.py` : `rebuild`, `query`, `_swap_dir_into_place`, `_persist`,
+  `_persist_empty` ;
+- `validation_utils.py` : `validate_consistency`, `_get_database_documents`,
+  `_get_vector_store_documents`, `_apply_fixes` ;
+- services : `rag_service._load_source_documents`,
+  `document_reader._read_stored_file`, `document_deletion._remove_stored_file`,
+  `index_maintenance._save_validation_report`.
+
+### DF.6 Laissés tels quels (comportement identique)
+
+- `log_parser._get_success_rate_period` et `_get_peak_usage_time` : le corps
+  est un `return` de constante, il ne peut pas lever ;
+- `get_performance_status` et `create_validation_report` : code mort sans
+  appelant, supprimé en D2.5 ;
+- les handlers en double des deux routes d'upload : un seul exemplaire dans
+  `DocumentUpload` depuis la fusion (D3.4) ;
+- équivalences : `asyncio.TimeoutError` devenu `TimeoutError` (alias depuis
+  3.11), `except asyncio.CancelledError: pass` devenu `contextlib.suppress`,
+  `(OSError, FileNotFoundError)` devenu `OSError`, `BudgetExceededError` devenu
+  `BudgetExceeded` (alias), `HTTPException` devenu `RequestRejectedError`
+  (traduit à l'identique, D3.3), handlers déplacés dans `_parse_stream_line`,
+  `_uvicorn_line_time` et `_filter_since` avec les mêmes types ;
+- les `except Exception` gardés par la passe 2 (frontières, sondes, flux SSE,
+  transactions) n'avaient pas changé.
+
+### DF.7 Tests
+
+- Injections d'origine rétablies (I5) : `test_auth_jwt_handler.py`
+  (`Exception` au lieu d'`InvalidKeyError` et de `ValueError`),
+  `test_database_connection.py` (`Exception` au lieu d'`OperationalError`),
+  `test_email_service.py` (`_send_email` qui lève `Exception("SMTP Error")`,
+  scénario d'origine, et `Exception` au lieu de `SMTPConnectError`),
+  `test_file_watcher.py` (5 `Exception` au lieu de `RuntimeError`/`OSError`),
+  `test_ingestion_extractors.py` (3 `Exception` au lieu des erreurs pypdf et
+  python-docx), `test_ingestion_processor.py` (`RuntimeError("bm25 boom")` et
+  `Exception("already exists")`). Aucun autre test de `tests/unit`,
+  `tests/performance` ou `tests/conftest.py` n'avait changé d'injection ou de
+  chemin d'échec ; les tests supprimés en passe 6 (D6.2) restent supprimés.
+- Ajout de `tests/unit/test_failure_fallbacks.py` (26 tests), tirés des scripts
+  de reproduction de la revue : B1 (2), B2 (5 : `.npy` tronqué, store renvoyé
+  et reconstructible, `_ensure_bm25_index` ne lève pas, `_start_ingestion`
+  installe le processeur), B3 (3 : page en `ZeroDivisionError` ignorée,
+  `AssertionError` et `OverflowError` converties en `ExtractionError`), M2 (5),
+  I1 à I4 (4), M3 à M5 (7). Vérifié sur une copie de `5491ed2` : ces tests et
+  les injections rétablies échouent tous sauf un (40 échecs), et passent après
+  correction.
+- Scripts de reproduction de la revue, lancés sur `backend/` corrigé : B1
+  `pipeline success: True`, B2 `get_bm25_store returned a store (degraded
+  gracefully)`, B3 `extracted OK (bad page skipped)`, M2 `get_chat_metrics OK`
+  et `get_usage_analytics OK` : mêmes sorties que `pre-cleanup`.
+
+### DF.8 M1 : verrou FAISS pris sur la boucle d'événements, non modifié
+
+`_merge_and_attach_rrf_scores` appelle `snapshot_active_chunks()` (verrou
+FAISS) depuis la boucle. Mesuré par la revue sur 20 000 chunks : pendant un
+`persist()` la fusion bloque la boucle 1,29 s contre environ 1,0 s avec
+l'ancien code (le GIL bloquait déjà) ; pendant un rebuild admin, 1,78 s contre
+1,96 s. Impact marginal : laissé tel quel (option conservatrice, pas de
+nouveau refactor).
+
+### DF.9 M7 : documentation corrigée, code mort conservé
+
+- `CLAUDE.md` et `README.md` : `file_watcher/` est décrit comme non branché
+  dans l'application, `WATCH_ENABLED` sans effet (D2.8). Le bloc
+  « **critical** » de `CLAUDE.md` n'est pas touché.
+- `shared/models.py` : les titres de section signalent les modèles qu'aucune
+  route n'utilise ; le titre « Health check and error models » couvre
+  `HealthCheckResponse` et `ErrorResponse`, qui sont utilisés.
+- `admin.py` : la docstring de `/admin/metrics/chat` n'annonce plus
+  « Performance status assessment ».
+- `processor.py` : les commentaires citent `BudgetExceeded` au lieu de l'alias.
+- Code mort connu, laissé en place (option conservatrice) : modèles Pydantic
+  inutilisés (`DocumentUpdate`, `DocumentStatsResponse`, `Configuration*`,
+  `AuditLog*`, `DatabaseStatsResponse`, `FileUploadValidation`) ;
+  `chat._generate_cache_key`, `ChatResponse`, `SourceReference` (seuls des
+  tests unitaires les utilisent) ; `lru_cache` : `get_or_set`,
+  `invalidate_pattern`, `get_chat_response`, `set_chat_response` ;
+  `monitoring.logger` : fonctions `log_*` ; `password_utils` :
+  `generate_secure_password`, `is_password_compromised`,
+  `sanitize_password_error_message` ; `database/models.py` :
+  `create_*_action`, `get_typed_value` ; `MistralAPIService.health_check` (sans
+  appelant) ; le module `file_watcher` et le réglage `watch_enabled`.
+
+### DF.10 M8 : base du diff
+
+Le tag `pre-cleanup` reste local (D0.1) : la description de la PR nomme
+explicitement `b1e18e6` comme base.
+
+### DF.11 Porte de qualité
+
+Tentative 1 : porte franchie. 1036 tests (1036 réussis, 0 ignoré ; +26 par
+rapport à la passe 8), couverture 88,22 % (contre 86,23 %), ruff 0, format OK,
+radon D+ 0, mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200
+depuis un venv vierge, tests gelés et sommes de l'oracle OK. Les chiffres du
+README (tests, couverture, pygount) et de `CLAUDE.md` (tests) sont mis à jour.
