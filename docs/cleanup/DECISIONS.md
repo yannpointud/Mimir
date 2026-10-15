@@ -86,3 +86,59 @@ figés tels quels par l'oracle :
 La porte de qualité est automatisée dans `docs/cleanup/quality_gate.sh` pour
 être rejouable par un relecteur. Les exclusions pip-audit sont lues dans
 `scripts/local_ci.sh`, déjà synchronisé avec la CI.
+
+## Passe 1 : lint
+
+### D1.1 Dossiers gelés hors de ruff
+
+`tests/oracle` et `tests/integration` sont dans `extend-exclude`, avec
+`force-exclude = true` : ni `ruff check`, ni `--fix`, ni `ruff format` ne les
+touchent, même passés explicitement en argument. Conséquence : l'une des
+4 F401 initiales (`AsyncMock` inutilisé dans
+`tests/integration/test_hybrid_delete_sync.py`) reste en place, ce fichier
+étant gelé par `ORACLE.sha256` depuis la passe 0. Les trois autres sont
+corrigées.
+
+### D1.2 Règles ignorées
+
+- `B008` (appels dans les valeurs par défaut) : idiome `Depends()`/`Query()`
+  de FastAPI, conformément à la consigne.
+- `UP042` (`(str, Enum)` vers `StrEnum`) : ce n'est pas une simple mise à jour
+  de syntaxe, `str()` et `format()` des membres changent (« DocumentStatus.PENDING »
+  devient « pending »), ce qui modifierait des messages de log.
+
+### D1.3 Suppressions `noqa` existantes nettoyées
+
+Le code contenait 122 `# noqa: F401` et quelques `F541`, `F841`, `F811` qui
+masquaient des imports morts, des f-strings sans variable et des variables
+inutilisées. Les commentaires ont été retirés et les corrections appliquées ;
+aucun test ne dépendait de ces imports. Les expressions sans effet laissées
+par l'autofix F841 (`datetime.utcnow()` seul, etc.) ont été supprimées.
+
+### D1.4 B904 corrigé dès la passe 1
+
+Seuls C901 et BLE001 peuvent être mis en baseline ; les 56 `raise` sans `from`
+dans un `except` reçoivent donc `from <exception>` (le handler est nommé `exc`
+quand il ne l'était pas). Effet limité à `__cause__` : aucune réponse HTTP ne
+change.
+
+### D1.5 Choix conservateurs pour les autres règles
+
+- `B905` : `zip(..., strict=False)`, comportement identique (`strict=True`
+  lèverait une exception sur des longueurs différentes).
+- `SIM117` : les `with` imbriqués deviennent un `with (...)` parenthésé.
+- `SIM102`, `SIM103`, `SIM105`, `SIM114`, `SIM118`, `B007`, `B017` : réécritures
+  équivalentes ; `B017` remplace `pytest.raises(Exception)` par
+  `pytest.raises(HTTPException)` dans un test unitaire.
+
+### D1.6 Baseline BLE001 et C901
+
+Après B904, les handlers qui relancent l'exception ne sont plus signalés par
+BLE001 : 118 `noqa: BLE001` (et non 170) et 5 `noqa: C901`
+(`clean_orphans` est repassé sous le seuil après la fusion SIM102). Les
+passes 2 et 3 les retirent.
+
+### D1.7 CI
+
+Nouveau job `ruff` bloquant (`ruff check .` et `ruff format --check .`) ;
+`scripts/local_ci.sh` exécute aussi `ruff format --check .`.
