@@ -10,8 +10,9 @@
 #                    unit + integration + performance, incl. the
 #                    health/alerting/backup tests and the reused
 #                    FAISS concurrency, budget cap and rate-limit harnesses)
-#   4. pip-audit  -- runtime dependency vulnerability scan against the PyPA
-#                    advisory database
+#   4. pip-audit  -- dependency vulnerability scan against the PyPA advisory
+#                    database, of the hash-pinned requirements-dev.lock and of
+#                    requirements.txt
 #
 # The GitHub Actions workflow (.github/workflows/ci.yml) runs the same steps
 # on every pull request.
@@ -39,6 +40,7 @@ PIP_AUDIT_IGNORES=(
     # fix requires migrating the Mistral SDK.
     --ignore-vuln PYSEC-2026-107
 )
+pip-audit -r requirements-dev.lock --require-hashes --disable-pip "${PIP_AUDIT_IGNORES[@]}"
 pip-audit -r requirements.txt "${PIP_AUDIT_IGNORES[@]}"
 
 echo "Local CI green."
