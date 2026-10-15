@@ -32,7 +32,6 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 # sys.path bootstrap (same discipline as scripts/backup_sqlite.py): make the
 # project root and the backend package importable whether this file is run as a
@@ -67,7 +66,7 @@ _SCHEMA_HINT = (
 )
 
 
-def _build_generation_prompt(chunk_texts: List[str], adversarial: bool) -> str:
+def _build_generation_prompt(chunk_texts: list[str], adversarial: bool) -> str:
     """Build the Mistral generation prompt (pure, no network).
 
     The document passages are embedded between explicit delimiters and framed
@@ -152,7 +151,7 @@ def _extract_json_payload(raw: str):
     return None
 
 
-def _parse_generation_response(raw: str, adversarial: bool = False) -> List[GoldenSetEntry]:
+def _parse_generation_response(raw: str, adversarial: bool = False) -> list[GoldenSetEntry]:
     """Parse a Mistral response into ``GoldenSetEntry`` items (pure, no network).
 
     The response is treated strictly as data. Malformed entries are dropped
@@ -183,7 +182,7 @@ def _parse_generation_response(raw: str, adversarial: bool = False) -> List[Gold
     if not isinstance(payload, list):
         return []
 
-    entries: List[GoldenSetEntry] = []
+    entries: list[GoldenSetEntry] = []
     for item in payload:
         if not isinstance(item, dict):
             continue
@@ -222,9 +221,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _sample_active_chunk_texts(vector_store) -> List[str]:
+def _sample_active_chunk_texts(vector_store) -> list[str]:
     """Return the text of active (non-deleted) chunks from the vector store."""
-    texts: List[str] = []
+    texts: list[str] = []
     for meta in vector_store.metadata:
         if meta.get("deleted", False):
             continue
@@ -240,7 +239,7 @@ async def _generate_entries(
     llm_service,
     budget_guard,
     usage_tracker,
-) -> List[GoldenSetEntry]:
+) -> list[GoldenSetEntry]:
     """Run the throttled, budget-reserved generation loop over `prompts`.
 
     For each prompt: reserve the budget BEFORE the network call (fail-closed if
@@ -249,7 +248,7 @@ async def _generate_entries(
     """
     import asyncio
 
-    entries: List[GoldenSetEntry] = []
+    entries: list[GoldenSetEntry] = []
     for index, (prompt, is_adversarial) in enumerate(prompts):
         # Throttle to stay under the Mistral free-tier 1 req/s ceiling.
         if index > 0:
@@ -308,7 +307,7 @@ _FALLBACK_ADVERSARIAL_QUESTIONS = [
 ]
 
 
-def _fallback_adversarial_entries(count: int) -> List[GoldenSetEntry]:
+def _fallback_adversarial_entries(count: int) -> list[GoldenSetEntry]:
     """Build `count` deterministic out-of-corpus adversarial entries."""
     picks = _FALLBACK_ADVERSARIAL_QUESTIONS[:max(1, count)]
     return [
@@ -322,7 +321,7 @@ def _fallback_adversarial_entries(count: int) -> List[GoldenSetEntry]:
     ]
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Heavy service imports are deferred past argument parsing
     so ``--help`` never imports FastAPI nor touches any secret."""
     args = _build_arg_parser().parse_args(argv)
@@ -355,7 +354,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     corpus_calls = max(1, -(-num_corpus // args.questions_per_call))  # ceil
     adversarial_calls = max(1, -(-num_adversarial // args.questions_per_call))
 
-    def _sample() -> List[str]:
+    def _sample() -> list[str]:
         k = min(args.chunks_per_call, len(chunk_texts))
         return rng.sample(chunk_texts, k)
 

@@ -12,7 +12,6 @@ import asyncio
 import hashlib
 import logging
 import time
-from typing import Dict
 
 from src.config import settings
 
@@ -33,9 +32,9 @@ class FingerprintAlertHandler(logging.Handler):
         super().__init__(level=level)
         self._throttle_seconds = throttle_seconds
         # Last time (epoch seconds) an alert was sent per fingerprint.
-        self._last_sent: Dict[str, float] = {}
+        self._last_sent: dict[str, float] = {}
         # Occurrence counter per fingerprint since the last sent alert.
-        self._counts: Dict[str, int] = {}
+        self._counts: dict[str, int] = {}
         # Strong references to in-flight send tasks. asyncio only holds a WEAK
         # reference to a task from create_task(), so without this an alert
         # coroutine can be garbage-collected mid-flight before it sends. Each

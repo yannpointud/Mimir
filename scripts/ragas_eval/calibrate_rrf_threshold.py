@@ -35,7 +35,8 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
+from collections.abc import Sequence
 
 # sys.path bootstrap (same discipline as generate_golden_set.py): make the
 # project root and the backend package importable whether this file is run as a
@@ -86,7 +87,7 @@ def _percentile(sorted_values: Sequence[float], pct: float) -> float:
     return float(sorted_values[low]) * (1.0 - frac) + float(sorted_values[high]) * frac
 
 
-def summarize_rrf_scores(scores: Sequence[float]) -> Dict[str, Any]:
+def summarize_rrf_scores(scores: Sequence[float]) -> dict[str, Any]:
     """Aggregate a flat list of RRF hit scores into a distribution summary (pure).
 
     Args:
@@ -141,7 +142,7 @@ def assess_starting_value(
     starting_value: float,
     per_query_top_scores: Sequence[float],
     all_scores: Sequence[float],
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Judge whether ``starting_value`` is coherent with the observed scores (pure).
 
     Two failure modes:
@@ -190,7 +191,7 @@ def build_distribution_report(
     starting_value: float,
     rrf_k: int,
     num_queries: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Assemble the full rrf_score_distribution report (pure, no I/O).
 
     Combines the flat-score distribution, the per-query top scores, the
@@ -281,7 +282,7 @@ async def _embed_question(
 
 
 def _fused_scores_for_query(question: str, embedding, vector_store, bm25_store,
-                            *, top_k: int, rrf_k: int) -> List[float]:
+                            *, top_k: int, rrf_k: int) -> list[float]:
     """Compute the RRF fused scores for one query WITHOUT the threshold filter.
 
     Mirrors ``_hybrid_retrieve`` (raw dense pool at similarity_floor=0.0 + BM25
@@ -306,14 +307,14 @@ def _fused_scores_for_query(question: str, embedding, vector_store, bm25_store,
     return list(fused_scores.values())
 
 
-async def _run(entries: List[str], *, llm_service, vector_store, bm25_store,
-               budget_guard, usage_tracker, top_k: int, rrf_k: int) -> Dict[str, Any]:
+async def _run(entries: list[str], *, llm_service, vector_store, bm25_store,
+               budget_guard, usage_tracker, top_k: int, rrf_k: int) -> dict[str, Any]:
     """Run the throttled fusion loop and assemble the distribution report.
 
     One embedding call per question, throttled to <= 1 call/sec.
     """
-    all_scores: List[float] = []
-    per_query_top_scores: List[float] = []
+    all_scores: list[float] = []
+    per_query_top_scores: list[float] = []
     processed = 0
 
     for index, question in enumerate(entries):
@@ -349,7 +350,7 @@ async def _run(entries: List[str], *, llm_service, vector_store, bm25_store,
     )
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Heavy service imports are deferred past argument parsing
     so ``--help`` never imports FastAPI nor touches any secret."""
     args = _build_arg_parser().parse_args(argv)

@@ -41,7 +41,7 @@ class IngestionProcessor:
                  llm_service: AbstractLLMService,
                  vector_store: AbstractVectorStore,
                  document_repository: DocumentRepository,
-                 chunking_config: Optional[ChunkingConfig] = None,
+                 chunking_config: ChunkingConfig | None = None,
                  max_file_size_mb: int = 100,
                  max_chunks_per_doc: int = 2000,
                  budget_guard=None,
@@ -113,9 +113,9 @@ class IngestionProcessor:
 
     def queue_document(self,
                       file_path: str,
-                      document_id: Optional[str] = None,
+                      document_id: str | None = None,
                       preserve: bool = False,
-                      metadata: Optional[Dict[str, Any]] = None) -> bool:
+                      metadata: dict[str, Any] | None = None) -> bool:
         """
         Queue a document for processing
 
@@ -528,7 +528,7 @@ class IngestionProcessor:
         except (ExtractionError, UnsupportedFormatError) as e:
             raise ProcessingError(f"Text extraction failed: {str(e)}")
 
-    async def _generate_embeddings(self, chunks_data: List[Dict[str, Any]]) -> EmbeddingResponse:
+    async def _generate_embeddings(self, chunks_data: list[dict[str, Any]]) -> EmbeddingResponse:
         """
         Generate embeddings for chunks
 
@@ -553,11 +553,11 @@ class IngestionProcessor:
             raise ProcessingError(f"Embedding generation failed: {str(e)}")
 
     def _create_chunks(self,
-                      chunks_data: List[Dict[str, Any]],
-                      embeddings: List[List[float]],
+                      chunks_data: list[dict[str, Any]],
+                      embeddings: list[list[float]],
                       document_id: str,
                       source: str,
-                      metadata: Dict[str, Any]) -> List[Chunk]:
+                      metadata: dict[str, Any]) -> list[Chunk]:
         """
         Create Chunk objects from data
 
@@ -612,7 +612,7 @@ class IngestionProcessor:
         timestamp = int(time.time())
         return f"{file_path_obj.stem}_{timestamp}"
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get processing statistics"""
         queue_stats = self.queue_manager.get_stats()
 

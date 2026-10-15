@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from email.utils import formatdate
-from typing import List, Optional, Dict, Any
+from typing import Any
 from datetime import datetime
 import logging
 import aiosmtplib
@@ -43,9 +43,9 @@ class EmailService:
     async def send_escalation_email(
         self,
         user_question: str,
-        chat_history: List[Dict[str, Any]],
-        user_info: Optional[Dict[str, str]] = None,
-        context_sources: Optional[List[str]] = None
+        chat_history: list[dict[str, Any]],
+        user_info: dict[str, str] | None = None,
+        context_sources: list[str] | None = None
     ) -> bool:
         """
         Send escalation email to support team.
@@ -139,11 +139,11 @@ class EmailService:
 
     async def _send_email(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
-        text_content: Optional[str] = None,
-        html_content: Optional[str] = None,
-        attachments: Optional[List[Dict[str, Any]]] = None
+        text_content: str | None = None,
+        html_content: str | None = None,
+        attachments: list[dict[str, Any]] | None = None
     ) -> bool:
         """
         Internal method to send email via SMTP.
@@ -202,7 +202,7 @@ class EmailService:
             logger.error(f"SMTP send error: {e}")
             return False
 
-    def _add_attachment(self, message: MIMEMultipart, attachment: Dict[str, Any]):
+    def _add_attachment(self, message: MIMEMultipart, attachment: dict[str, Any]):
         """
         Add attachment to email message.
 
@@ -225,9 +225,9 @@ class EmailService:
     def _generate_escalation_html(
         self,
         user_question: str,
-        chat_history: List[Dict[str, Any]],
-        user_info: Optional[Dict[str, str]],
-        context_sources: Optional[List[str]]
+        chat_history: list[dict[str, Any]],
+        user_info: dict[str, str] | None,
+        context_sources: list[str] | None
     ) -> str:
         """Generate HTML content for escalation email."""
         template_str = """
@@ -332,9 +332,9 @@ class EmailService:
     def _generate_escalation_text(
         self,
         user_question: str,
-        chat_history: List[Dict[str, Any]],
-        user_info: Optional[Dict[str, str]],
-        context_sources: Optional[List[str]]
+        chat_history: list[dict[str, Any]],
+        user_info: dict[str, str] | None,
+        context_sources: list[str] | None
     ) -> str:
         """Generate plain text content for escalation email."""
         content = []
@@ -390,7 +390,7 @@ class EmailService:
             self.escalation_email
         )
 
-    def get_configuration_status(self) -> Dict[str, Any]:
+    def get_configuration_status(self) -> dict[str, Any]:
         """
         Get email service configuration status.
 

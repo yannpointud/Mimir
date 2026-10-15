@@ -4,7 +4,7 @@ Provides base classes for implementing different vector store providers
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import Any
 from dataclasses import dataclass
 from datetime import datetime  # noqa: F401
 import numpy as np
@@ -18,7 +18,7 @@ class Chunk:
     chunk_index: int
     total_chunks: int
     source: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     preserve: bool = False
 
 @dataclass
@@ -31,7 +31,7 @@ class SearchResult:
     similarity_score: float
     chunk_index: int
     total_chunks: int
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 class VectorStoreException(Exception):
     """Base exception for vector store operations"""
@@ -52,7 +52,7 @@ class AbstractVectorStore(ABC):
     """
 
     @abstractmethod
-    def upsert(self, chunks: List[Chunk]) -> bool:
+    def upsert(self, chunks: list[Chunk]) -> bool:
         """
         Insert or update chunks in the vector store
 
@@ -71,7 +71,7 @@ class AbstractVectorStore(ABC):
     def query(self,
               vector: np.ndarray,
               top_k: int = 5,
-              filter_dict: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
+              filter_dict: dict[str, Any] | None = None) -> list[SearchResult]:
         """
         Search for similar vectors
 
@@ -105,7 +105,7 @@ class AbstractVectorStore(ABC):
         pass
 
     @abstractmethod
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get vector store statistics
 

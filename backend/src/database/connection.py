@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from contextlib import contextmanager, asynccontextmanager
-from typing import Generator, AsyncGenerator
+from collections.abc import Generator, AsyncGenerator
 import sqlite3
 import logging
 
@@ -144,7 +144,7 @@ class DatabaseManager:
         return self._async_session_factory()
     
     @contextmanager
-    def get_session_context(self) -> Generator[Session, None, None]:
+    def get_session_context(self) -> Generator[Session]:
         """
         Context manager for synchronous sessions with automatic management
         Usage: with db_manager.get_session_context() as session: ...
@@ -161,7 +161,7 @@ class DatabaseManager:
             session.close()
 
     @asynccontextmanager
-    async def get_async_session_context(self) -> AsyncGenerator[AsyncSession, None]:
+    async def get_async_session_context(self) -> AsyncGenerator[AsyncSession]:
         """
         Context manager for asynchronous sessions with automatic management
         Usage: async with db_manager.get_async_session_context() as session: ...
@@ -225,7 +225,7 @@ db_manager = DatabaseManager()
 
 # Utility functions for FastAPI dependency injection
 
-def get_db_session() -> Generator[Session, None, None]:
+def get_db_session() -> Generator[Session]:
     """
     Dependency function for FastAPI (synchronous version)
     Usage: def endpoint(db: Session = Depends(get_db_session)): ...
@@ -241,7 +241,7 @@ def get_db_session() -> Generator[Session, None, None]:
         session.close()
 
 
-async def get_async_db_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_db_session() -> AsyncGenerator[AsyncSession]:
     """
     Dependency function for FastAPI (asynchronous version)
     Usage: async def endpoint(db: AsyncSession = Depends(get_async_db_session)): ...

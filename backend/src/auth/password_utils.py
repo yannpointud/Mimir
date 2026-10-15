@@ -8,13 +8,12 @@ strength checking, and secure generation.
 import re
 import secrets
 import string
-from typing import Dict, List
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def validate_password_strength(password: str) -> Dict[str, any]:
+def validate_password_strength(password: str) -> dict[str, any]:
     """
     Validate password strength against security requirements.
 
@@ -216,7 +215,7 @@ def is_password_compromised(password: str) -> bool:
     return password.lower() in very_common_passwords
 
 
-def sanitize_password_error_message(error_messages: List[str]) -> str:
+def sanitize_password_error_message(error_messages: list[str]) -> str:
     """
     Create a user-friendly error message from password validation errors.
 

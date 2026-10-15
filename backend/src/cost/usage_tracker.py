@@ -10,7 +10,6 @@ coupling -- both directions of the layering boundary are enforced.
 """
 
 import logging
-from typing import Optional
 
 from src.config import settings
 from src.cost.pricing import compute_cost_eur
@@ -30,7 +29,7 @@ class UsageTracker:
         prompt_tokens: int,
         completion_tokens: int,
         estimated: bool = False,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
     ) -> float:
         """
         Price and persist one LLM call's usage.

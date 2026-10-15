@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import datetime, timedelta  # noqa: F401
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 import re  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ FRONTEND_LOG = Path("./logs/frontend.log")
 class LogEntry:
     """Unified log entry model"""
     def __init__(self, timestamp: str, level: str, source: str, module: str,
-                 message: str, details: Optional[Dict[str, Any]] = None):
+                 message: str, details: dict[str, Any] | None = None):
         self.timestamp = timestamp
         self.level = level
         self.source = source
@@ -27,7 +27,7 @@ class LogEntry:
         self.message = message
         self.details = details or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response"""
         return {
             "timestamp": self.timestamp,
@@ -49,7 +49,7 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
         # Fallback to current time if parsing fails
         return datetime.utcnow()
 
-def _parse_backend_log_line(line: str) -> Optional[LogEntry]:
+def _parse_backend_log_line(line: str) -> LogEntry | None:
     """Parse a single line from backend app.log"""
     try:
         log_data = json.loads(line.strip())
@@ -76,7 +76,7 @@ def _parse_backend_log_line(line: str) -> Optional[LogEntry]:
         logger.debug(f"Failed to parse backend log line: {e}")
         return None
 
-def _parse_frontend_log_line(line: str) -> Optional[LogEntry]:
+def _parse_frontend_log_line(line: str) -> LogEntry | None:
     """Parse a single line from frontend.log"""
     try:
         log_data = json.loads(line.strip())
@@ -118,14 +118,14 @@ def _parse_frontend_log_line(line: str) -> Optional[LogEntry]:
         logger.debug(f"Failed to parse frontend log line: {e}")
         return None
 
-def _read_log_file(file_path: Path, max_lines: int = 1000) -> List[str]:
+def _read_log_file(file_path: Path, max_lines: int = 1000) -> list[str]:
     """Read last N lines from log file efficiently"""
     try:
         if not file_path.exists():
             return []
 
         lines = []
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             # Read all lines for now, optimize later if needed
             all_lines = f.readlines()
             # Take last max_lines
@@ -136,12 +136,12 @@ def _read_log_file(file_path: Path, max_lines: int = 1000) -> List[str]:
         logger.error(f"Failed to read log file {file_path}: {e}")
         return []
 
-def _apply_filters(logs: List[LogEntry],
-                  level: Optional[str] = None,
-                  source: Optional[str] = None,
-                  module: Optional[str] = None,
-                  search: Optional[str] = None,
-                  since: Optional[str] = None) -> List[LogEntry]:
+def _apply_filters(logs: list[LogEntry],
+                  level: str | None = None,
+                  source: str | None = None,
+                  module: str | None = None,
+                  search: str | None = None,
+                  since: str | None = None) -> list[LogEntry]:
     """Apply filters to log entries"""
     filtered_logs = logs
 
@@ -180,12 +180,12 @@ def _apply_filters(logs: List[LogEntry],
 
     return filtered_logs
 
-def get_logs(level: Optional[str] = None,
-            source: Optional[str] = None,
-            module: Optional[str] = None,
-            search: Optional[str] = None,
-            since: Optional[str] = None,
-            limit: int = 50) -> Tuple[List[Dict[str, Any]], int]:
+def get_logs(level: str | None = None,
+            source: str | None = None,
+            module: str | None = None,
+            search: str | None = None,
+            since: str | None = None,
+            limit: int = 50) -> tuple[list[dict[str, Any]], int]:
     """
     Get filtered logs from backend and frontend sources.
 
@@ -242,7 +242,7 @@ def get_logs(level: Optional[str] = None,
         logger.error(f"Error retrieving logs: {e}")
         return [], 0
 
-def get_available_modules() -> List[str]:
+def get_available_modules() -> list[str]:
     """Get list of available modules from recent logs"""
     try:
         modules = set()
@@ -267,7 +267,7 @@ def get_available_modules() -> List[str]:
         logger.error(f"Error getting available modules: {e}")
         return []
 
-def get_logs_summary() -> Dict[str, Any]:
+def get_logs_summary() -> dict[str, Any]:
     """Get summary statistics about available logs"""
     try:
         # Count recent logs by level and source

@@ -58,8 +58,8 @@ reader_router = APIRouter(
 @router.get("/", response_model=DocumentListResponse)
 async def list_documents(
     pagination: PaginationModel = Depends(),
-    status_filter: Optional[str] = Query(None, description="Filter by document status"),
-    search: Optional[str] = Query(None, description="Search in filenames"),
+    status_filter: str | None = Query(None, description="Filter by document status"),
+    search: str | None = Query(None, description="Search in filenames"),
     doc_repo: DocumentRepository = Depends(get_document_repository)
 ) -> DocumentListResponse:
     """
@@ -314,7 +314,7 @@ async def upload_document(
     response: Response,
     file: UploadFile = File(...),
     preserve: bool = Form(False, description="Protect document from automatic deletion"),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
     ingestion_processor = Depends(get_ingestion_processor)
@@ -487,7 +487,7 @@ async def upload_document(
 async def delete_document(
     document_id: int,
     force: bool = Query(False, description="Force delete protected documents"),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
     vector_store = Depends(get_vector_store),
@@ -626,7 +626,7 @@ async def delete_document(
 async def toggle_document_preservation(
     document_id: int,
     preserve: bool = Query(..., description="New preservation status"),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> DocumentResponse:
@@ -685,7 +685,7 @@ async def toggle_document_preservation(
 @router.post("/{document_id}/reprocess", response_model=BaseResponse)
 async def reprocess_document(
     document_id: int,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
     ingestion_processor = Depends(get_ingestion_processor)
@@ -782,11 +782,11 @@ async def reprocess_document(
         )
 
 
-@router.get("/stats/overview", response_model=Dict[str, Any])
+@router.get("/stats/overview", response_model=dict[str, Any])
 async def get_document_stats(
     doc_repo: DocumentRepository = Depends(get_document_repository),
     vector_store = Depends(get_vector_store)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get document statistics overview with vector store health.
 
@@ -841,15 +841,15 @@ async def get_document_stats(
         )
 
 
-@router.post("/maintenance/validate-consistency", response_model=Dict[str, Any])
+@router.post("/maintenance/validate-consistency", response_model=dict[str, Any])
 async def validate_vector_store_consistency(
     fix_issues: bool = Query(False, description="Automatically fix detected issues"),
     save_report: bool = Query(True, description="Save detailed report to file"),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     vector_store = Depends(get_vector_store),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Validate consistency between SQLite and FAISS with optional auto-fix.
 

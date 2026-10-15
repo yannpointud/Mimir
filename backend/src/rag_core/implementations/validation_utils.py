@@ -27,7 +27,7 @@ class VectorStoreValidator:
         self.doc_repo = document_repository
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
-    def validate_consistency(self, fix_issues: bool = False) -> Dict[str, Any]:
+    def validate_consistency(self, fix_issues: bool = False) -> dict[str, Any]:
         """
         Validate consistency between SQLite and FAISS.
 
@@ -94,7 +94,7 @@ class VectorStoreValidator:
             self.logger.error(error_msg)
             raise Exception(error_msg)
     
-    def _get_database_documents(self) -> Dict[str, Dict[str, Any]]:
+    def _get_database_documents(self) -> dict[str, dict[str, Any]]:
         """Retrieve documents from SQLite."""
         try:
             documents = self.doc_repo.get_all()
@@ -115,7 +115,7 @@ class VectorStoreValidator:
             self.logger.error(f"Failed to get database documents: {e}")
             raise
     
-    def _get_vector_store_documents(self) -> Dict[str, List[Dict[str, Any]]]:
+    def _get_vector_store_documents(self) -> dict[str, list[dict[str, Any]]]:
         """Retrieve documents from FAISS."""
         try:
             with self.vector_store._lock:
@@ -144,7 +144,7 @@ class VectorStoreValidator:
             self.logger.error(f"Failed to get vector store documents: {e}")
             raise
     
-    def _analyze_inconsistencies(self, db_docs: Dict, vector_docs: Dict) -> Dict[str, Any]:
+    def _analyze_inconsistencies(self, db_docs: dict, vector_docs: dict) -> dict[str, Any]:
         """Analyze inconsistencies between the two sources."""
         issues = {
             'orphaned_chunks': [],      # Chunks in FAISS without a document in DB
@@ -247,7 +247,7 @@ class VectorStoreValidator:
         
         return issues
     
-    def _apply_fixes(self, issues: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _apply_fixes(self, issues: dict[str, Any]) -> list[dict[str, Any]]:
         """Apply possible automatic fixes."""
         fixes = []
         
@@ -318,7 +318,7 @@ class VectorStoreValidator:
         
         return fixes
     
-    def _calculate_consistency_score(self, issues: Dict[str, Any]) -> float:
+    def _calculate_consistency_score(self, issues: dict[str, Any]) -> float:
         """Calculate a consistency score (0.0 = inconsistent, 1.0 = perfect)."""
         total_issues = issues.get('total_issues', 0)  # noqa: F841
         
@@ -341,7 +341,7 @@ class VectorStoreValidator:
         
         return base_score
     
-    def _generate_recommendations(self, issues: Dict[str, Any]) -> List[str]:
+    def _generate_recommendations(self, issues: dict[str, Any]) -> list[str]:
         """Generate recommendations based on found issues."""
         recommendations = []
         
@@ -387,7 +387,7 @@ class VectorStoreValidator:
 
 
 def create_validation_report(vector_store, document_repository,
-                           output_path: str = None) -> Dict[str, Any]:
+                           output_path: str = None) -> dict[str, Any]:
     """
     Create a comprehensive validation report and optionally save it.
 

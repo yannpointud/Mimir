@@ -7,7 +7,7 @@ legacy verification-only hasher for pre-migration credentials).
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any
 import logging
 import jwt  # PyJWT
 from pwdlib import PasswordHash
@@ -36,8 +36,8 @@ class JWTHandler:
 
     def create_access_token(
         self,
-        data: Dict[str, Any],
-        expires_delta: Optional[timedelta] = None
+        data: dict[str, Any],
+        expires_delta: timedelta | None = None
     ) -> str:
         """
         Create a JWT access token.
@@ -71,7 +71,7 @@ class JWTHandler:
             logger.error(f"Failed to create JWT token: {e}")
             raise
 
-    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
+    def verify_token(self, token: str) -> dict[str, Any] | None:
         """
         Verify and decode a JWT token.
 
@@ -147,7 +147,7 @@ class JWTHandler:
             logger.error(f"Password verification error: {e}")
             return False
 
-    def get_token_expiry(self, token: str) -> Optional[datetime]:
+    def get_token_expiry(self, token: str) -> datetime | None:
         """
         Get the expiration time of a token.
 

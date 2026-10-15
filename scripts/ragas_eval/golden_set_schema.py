@@ -14,7 +14,6 @@ script (venv principal) and the evaluation harness.
 
 import json
 from pathlib import Path
-from typing import List, Union
 
 from pydantic import BaseModel, ValidationError, field_validator
 
@@ -49,7 +48,7 @@ class GoldenSetEntry(BaseModel):
 
     user_input: str
     reference: str
-    reference_contexts: List[str]
+    reference_contexts: list[str]
     is_adversarial: bool
 
     @field_validator("user_input")
@@ -61,7 +60,7 @@ class GoldenSetEntry(BaseModel):
         return value
 
 
-def load_golden_set(path: Union[str, Path]) -> List[GoldenSetEntry]:
+def load_golden_set(path: str | Path) -> list[GoldenSetEntry]:
     """Parse a JSONL golden set file, one ``GoldenSetEntry`` per line.
 
     Blank lines are tolerated. Any line that is not valid JSON, or that does
@@ -79,8 +78,8 @@ def load_golden_set(path: Union[str, Path]) -> List[GoldenSetEntry]:
         ValueError: On any malformed or schema-violating line.
     """
     path = Path(path)
-    entries: List[GoldenSetEntry] = []
-    with open(path, "r", encoding="utf-8") as handle:
+    entries: list[GoldenSetEntry] = []
+    with open(path, encoding="utf-8") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
             stripped = raw_line.strip()
             if not stripped:
@@ -100,7 +99,7 @@ def load_golden_set(path: Union[str, Path]) -> List[GoldenSetEntry]:
     return entries
 
 
-def validate_golden_set(entries: List[GoldenSetEntry]) -> List[GoldenSetEntry]:
+def validate_golden_set(entries: list[GoldenSetEntry]) -> list[GoldenSetEntry]:
     """Enforce the golden set invariants required before any baseline run.
 
     Invariants:
@@ -127,7 +126,7 @@ def validate_golden_set(entries: List[GoldenSetEntry]) -> List[GoldenSetEntry]:
     return entries
 
 
-def write_golden_set(entries: List[GoldenSetEntry], path: Union[str, Path]) -> None:
+def write_golden_set(entries: list[GoldenSetEntry], path: str | Path) -> None:
     """Write entries to a JSONL file, one entry per line (UTF-8).
 
     Creates the parent directory if needed. Used by the generation script to

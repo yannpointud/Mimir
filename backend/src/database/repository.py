@@ -3,7 +3,7 @@ Repository pattern for persistence abstraction
 Implements CRUD operations with robust error handling
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import and_, or_, desc, asc, func, update  # noqa: F401
@@ -76,7 +76,7 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"create document {filename}")
             raise
     
-    def get_by_id(self, doc_id: int) -> Optional[Document]:
+    def get_by_id(self, doc_id: int) -> Document | None:
         """Retrieve a document by its ID"""
         try:
             return self.session.query(Document).filter_by(id=doc_id).first()
@@ -84,7 +84,7 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"get document by id {doc_id}")
             raise
     
-    def get_by_ids(self, doc_ids: List[int]) -> Dict[int, Document]:
+    def get_by_ids(self, doc_ids: list[int]) -> dict[int, Document]:
         """Retrieve multiple documents by ID in a single query.
 
         Returns a {id: Document} mapping so a caller can resolve many document
@@ -102,7 +102,7 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"get documents by ids {doc_ids}")
             raise
 
-    def get_by_hash(self, file_hash: str) -> Optional[Document]:
+    def get_by_hash(self, file_hash: str) -> Document | None:
         """Retrieve a document by its hash (to detect duplicates)"""
         try:
             return self.session.query(Document).filter_by(file_hash=file_hash).first()
@@ -110,7 +110,7 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"get document by hash {file_hash}")
             raise
     
-    def get_by_status(self, status: str) -> List[Document]:
+    def get_by_status(self, status: str) -> list[Document]:
         """Retrieve all documents with a given status"""
         try:
             return self.session.query(Document).filter_by(status=status).all()
@@ -119,7 +119,7 @@ class DocumentRepository(BaseRepository):
             raise
     
     def get_all(self, limit: int = None, offset: int = 0, 
-                order_by: str = 'created_at', desc_order: bool = True) -> List[Document]:
+                order_by: str = 'created_at', desc_order: bool = True) -> list[Document]:
         """
         Retrieve all documents with pagination and sorting
 
@@ -152,7 +152,7 @@ class DocumentRepository(BaseRepository):
             raise
 
     def get_all_paginated(self, offset: int = 0, limit: int = 50,
-                         filters: dict = None, search: str = None) -> tuple[List['Document'], int]:
+                         filters: dict = None, search: str = None) -> tuple[list['Document'], int]:
         """
         Retrieve all documents with pagination and total count
 
@@ -258,7 +258,7 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"delete document {doc_id}")
             raise
     
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Return statistics about documents"""
         try:
             stats = {}
@@ -292,7 +292,7 @@ class DocumentRepository(BaseRepository):
 class ConfigurationRepository(BaseRepository):
     """Repository for system configuration"""
     
-    def get(self, key: str) -> Optional[Configuration]:
+    def get(self, key: str) -> Configuration | None:
         """Retrieve a configuration by key"""
         try:
             return self.session.query(Configuration).filter_by(key=key).first()
@@ -300,7 +300,7 @@ class ConfigurationRepository(BaseRepository):
             self._handle_db_error(e, f"get configuration {key}")
             raise
     
-    def get_value(self, key: str, default: str = None) -> Optional[str]:
+    def get_value(self, key: str, default: str = None) -> str | None:
         """Retrieve the value of a configuration"""
         config = self.get(key)
         return config.value if config else default
@@ -341,7 +341,7 @@ class ConfigurationRepository(BaseRepository):
             self._handle_db_error(e, f"delete configuration {key}")
             raise
     
-    def get_all(self) -> List[Configuration]:
+    def get_all(self) -> list[Configuration]:
         """Retrieve all configurations"""
         try:
             return self.session.query(Configuration).order_by(Configuration.key).all()
@@ -380,7 +380,7 @@ class AuditLogRepository(BaseRepository):
             raise
     
     def get_logs(self, user_type: str = None, action: str = None,
-                 limit: int = 100, offset: int = 0) -> List[AuditLog]:
+                 limit: int = 100, offset: int = 0) -> list[AuditLog]:
         """
         Retrieve audit logs with filters
 
@@ -411,7 +411,7 @@ class AuditLogRepository(BaseRepository):
             raise
     
     def get_logs_paginated(self, offset: int = 0, limit: int = 100,
-                           filters: dict = None) -> tuple[List[AuditLog], int]:
+                           filters: dict = None) -> tuple[list[AuditLog], int]:
         """
         Retrieve audit logs with pagination and total count
 
@@ -498,7 +498,7 @@ class UsageRepository(BaseRepository):
 
     def create_usage_entry(self, call_type: str, model: str, prompt_tokens: int,
                             completion_tokens: int, total_tokens: int, cost_eur: float,
-                            estimated: bool = False, session_id: Optional[str] = None) -> LlmUsage:
+                            estimated: bool = False, session_id: str | None = None) -> LlmUsage:
         """
         Create a new per-call usage log entry.
 
@@ -537,7 +537,7 @@ class UsageRepository(BaseRepository):
             self._handle_db_error(e, f"create usage entry {call_type}/{model}")
             raise
 
-    def get_today_by_model(self) -> List[Dict[str, Any]]:
+    def get_today_by_model(self) -> list[dict[str, Any]]:
         """
         Aggregate today's usage by model (dashboard "today by model" table).
 
@@ -577,7 +577,7 @@ class UsageRepository(BaseRepository):
             self._handle_db_error(e, "get today usage by model")
             raise
 
-    def get_daily_history(self, days_back: int = 30) -> List[Dict[str, Any]]:
+    def get_daily_history(self, days_back: int = 30) -> list[dict[str, Any]]:
         """
         Aggregate usage per day (and model) for the last `days_back` days,
         ordered by date (dashboard "30 day history" section).
@@ -621,7 +621,7 @@ class UsageRepository(BaseRepository):
             self._handle_db_error(e, "get daily usage history")
             raise
 
-    def get_today_ledger(self) -> Optional[LlmBudgetLedger]:
+    def get_today_ledger(self) -> LlmBudgetLedger | None:
         """Retrieve today's budget ledger row, or None if it does not exist yet."""
         try:
             today = datetime.utcnow().strftime('%Y-%m-%d')
@@ -749,7 +749,7 @@ class UsageRepository(BaseRepository):
 
 # Factory function to create repositories with a session
 
-def create_repositories(session: Session) -> Dict[str, Any]:
+def create_repositories(session: Session) -> dict[str, Any]:
     """
     Factory to create all repositories with a given session
 

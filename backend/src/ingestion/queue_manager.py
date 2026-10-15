@@ -5,7 +5,7 @@ Provides data structures for document processing
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 @dataclass
 class IngestionTask:
@@ -15,7 +15,7 @@ class IngestionTask:
     retry_count: int = 0
     max_retries: int = 3
     created_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def can_retry(self) -> bool:
         """Check if task can be retried"""

@@ -5,7 +5,7 @@ Provides extractors for PDF, DOCX, TXT, and Markdown files
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 import logging  # noqa: F401
 
 # Import document processing libraries
@@ -68,7 +68,7 @@ class TextExtractor(ABC):
         """
         pass
 
-    def get_metadata(self, file_path: str) -> Dict[str, Any]:
+    def get_metadata(self, file_path: str) -> dict[str, Any]:
         """
         Extract metadata from file (optional override)
 
@@ -233,7 +233,7 @@ class TXTExtractor(TextExtractor):
         # Try different encodings
         for encoding in self.SUPPORTED_ENCODINGS:
             try:
-                with open(file_path, 'r', encoding=encoding) as file:
+                with open(file_path, encoding=encoding) as file:
                     content = file.read()
 
                 logger.info(
@@ -286,7 +286,7 @@ class MarkdownExtractor(TextExtractor):
 
         try:
             # First, read the raw markdown
-            with open(file_path, 'r', encoding='utf-8') as file:
+            with open(file_path, encoding='utf-8') as file:
                 content = file.read()
 
             if self.convert_to_html and markdown is not None:
@@ -349,7 +349,7 @@ class ExtractorFactory:
 
         logger.info(f"Initialized {len(self._extractors)} text extractors")
 
-    def get_extractor(self, file_path: str) -> Optional[TextExtractor]:
+    def get_extractor(self, file_path: str) -> TextExtractor | None:
         """
         Get appropriate extractor for file
 

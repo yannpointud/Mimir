@@ -80,10 +80,10 @@ class TestMaskSecrets:
 
     def test_sensitive_config_keys_contains_exactly_the_known_secrets(self):
         """SENSITIVE_CONFIG_KEYS covers exactly the known secret keys."""
-        assert SENSITIVE_CONFIG_KEYS == frozenset({
+        assert frozenset({
             "mistral_api_key",
             "smtp_password",
             "jwt_secret_key",
             "admin_password_hash",
             "admin_password",
-        })
+        }) == SENSITIVE_CONFIG_KEYS

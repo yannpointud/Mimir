@@ -62,7 +62,7 @@ def get_chat_requests_last_hour() -> int:
             return 0
 
         chat_requests = 0
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -102,7 +102,7 @@ def get_average_response_time() -> float:
             return 0.0
 
         response_times = []
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -155,7 +155,7 @@ def get_average_tokens_per_request() -> int:
         # Retrieve chat requests to estimate input tokens
         chat_requests = []
         if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
+            with open(UVICORN_LOG, encoding='utf-8') as f:
                 for line in f:
                     if 'POST /api/v1/chat/' in line and ' 200 OK' in line:
                         chat_requests.append(line)
@@ -165,7 +165,7 @@ def get_average_tokens_per_request() -> int:
         avg_input_chars = 150  # Conservative estimate
         avg_input_tokens = avg_input_chars // 4  # 1 token ~ 4 characters
 
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -214,7 +214,7 @@ def get_success_rate() -> float:
         successful_requests = 0
         one_hour_ago = datetime.utcnow() - timedelta(hours=1)
 
-        with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
+        with open(UVICORN_LOG, encoding='utf-8') as f:
             for line in f:
                 # Look for POST chat requests
                 if 'POST /api/v1/chat/' in line:
@@ -253,7 +253,7 @@ def get_errors_last_hour() -> int:
 
         # Count HTTP errors in uvicorn.log (with time filter)
         if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
+            with open(UVICORN_LOG, encoding='utf-8') as f:
                 for line in f:
                     if 'POST /api/v1/chat/' in line and (' 4' in line or ' 5' in line):
                         # Extract timestamp from uvicorn log (format: YYYY-MM-DD HH:MM:SS)
@@ -270,7 +270,7 @@ def get_errors_last_hour() -> int:
         # Count errors in error.log (with time filter)
         if ERROR_LOG.exists():
             try:
-                with open(ERROR_LOG, 'r', encoding='utf-8') as f:
+                with open(ERROR_LOG, encoding='utf-8') as f:
                     for line in f:
                         try:
                             if line.strip():
@@ -309,13 +309,9 @@ def get_performance_status(avg_response_time: float, success_rate: float, errors
         # Performance criteria
         if errors_count > 10:
             return 'poor'
-        elif avg_response_time > 3000:  # > 3 seconds
+        elif avg_response_time > 3000 or success_rate < 90:  # > 3 seconds
             return 'degraded'
-        elif success_rate < 90:
-            return 'degraded'
-        elif avg_response_time > 1500:  # > 1.5 seconds
-            return 'good'
-        elif success_rate < 95:
+        elif avg_response_time > 1500 or success_rate < 95:  # > 1.5 seconds
             return 'good'
         else:
             return 'excellent'
@@ -342,7 +338,7 @@ def get_active_sessions_estimate() -> int:
 
         # Analyze uvicorn.log for unique IPs from recent chat requests
         if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, 'r', encoding='utf-8') as f:
+            with open(UVICORN_LOG, encoding='utf-8') as f:
                 for line in f:
                     if 'POST /api/v1/chat/' in line:
                         # Extract the IP
@@ -358,7 +354,7 @@ def get_active_sessions_estimate() -> int:
         return 0
 
 
-def get_chat_metrics() -> Dict:
+def get_chat_metrics() -> dict:
     """
     Get all chat metrics in one call.
 
@@ -394,7 +390,7 @@ def get_chat_metrics() -> Dict:
         }
 
 
-def get_usage_analytics() -> Dict:
+def get_usage_analytics() -> dict:
     """
     Get comprehensive usage analytics covering multiple time periods and metrics.
 
@@ -473,7 +469,7 @@ def _count_requests_in_period(period: timedelta) -> int:
         # Initialize cutoff_time, will be set to match log timezone
         cutoff_time = None
 
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -504,7 +500,7 @@ def _count_requests_in_timeframe(start_time: datetime, end_time: datetime) -> in
             return 0
 
         count = 0
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -568,7 +564,7 @@ def _calculate_growth_rate(current_period: timedelta, previous_period: timedelta
         return 0
 
 
-def _get_hourly_distribution() -> Dict[str, int]:
+def _get_hourly_distribution() -> dict[str, int]:
     """Get request distribution by hour from real logs."""
     try:
         if not APP_LOG.exists():
@@ -581,7 +577,7 @@ def _get_hourly_distribution() -> Dict[str, int]:
         from datetime import datetime, timedelta
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -602,7 +598,7 @@ def _get_hourly_distribution() -> Dict[str, int]:
         return {}
 
 
-def _get_daily_distribution() -> Dict[str, int]:
+def _get_daily_distribution() -> dict[str, int]:
     """Get request distribution by day of week from real logs."""
     try:
         if not APP_LOG.exists():
@@ -616,7 +612,7 @@ def _get_daily_distribution() -> Dict[str, int]:
         from datetime import datetime, timedelta
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
 
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -646,7 +642,7 @@ def _get_avg_response_time_period(period: timedelta) -> float:
             return 0.0
 
         response_times = []
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -696,7 +692,7 @@ def _get_total_tokens_period(period: timedelta) -> int:
             return 0
 
         total_tokens = 0
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
@@ -740,7 +736,7 @@ def _estimate_monthly_tokens() -> int:
         return 0
 
 
-def _get_log_file_sizes() -> Dict[str, str]:
+def _get_log_file_sizes() -> dict[str, str]:
     """Get log file sizes."""
     try:
         sizes = {}
@@ -778,7 +774,7 @@ def _estimate_system_uptime() -> str:
             return "N/A"
 
         # Find the last startup in the logs
-        with open(APP_LOG, 'r', encoding='utf-8') as f:
+        with open(APP_LOG, encoding='utf-8') as f:
             for line in reversed(list(f)):
                 try:
                     log_entry = json.loads(line.strip())

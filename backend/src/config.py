@@ -325,7 +325,7 @@ class Settings(BaseSettings):
         default=20.0,
         description="Plafond quotidien de dépense IA en euros"
     )
-    llm_price_table: Dict[str, Dict[str, float]] = Field(
+    llm_price_table: dict[str, dict[str, float]] = Field(
         default={
             "mistral-small-latest": {"input": 0.10, "output": 0.30},
             "ministral-14b-latest": {"input": 0.20, "output": 0.20},

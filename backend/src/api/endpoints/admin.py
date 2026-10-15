@@ -41,10 +41,10 @@ router = APIRouter(
 )
 
 
-@router.get("/system-info", response_model=Dict[str, Any])
+@router.get("/system-info", response_model=dict[str, Any])
 async def get_system_info(
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """
     Get comprehensive system information.
 
@@ -114,10 +114,10 @@ async def get_system_info(
         )
 
 
-@router.get("/cache/stats", response_model=Dict[str, Any])
+@router.get("/cache/stats", response_model=dict[str, Any])
 async def get_cache_stats(
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """
     Get cache service statistics.
 
@@ -166,7 +166,7 @@ async def get_cache_stats(
 @router.post("/cache/clear", response_model=BaseResponse)
 async def clear_cache(
     cache_type: str = Query("all", description="Cache type to clear (all, main, chat)"),
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
     """
@@ -224,11 +224,11 @@ async def clear_cache(
         )
 
 
-@router.get("/configuration", response_model=Dict[str, Any])
+@router.get("/configuration", response_model=dict[str, Any])
 async def get_configuration(
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get system configuration settings.
 
@@ -278,8 +278,8 @@ async def get_configuration(
 
 @router.put("/configuration", response_model=BaseResponse)
 async def update_configuration(
-    config_updates: Dict[str, str],
-    current_user: Dict[str, Any] = Depends(require_admin),
+    config_updates: dict[str, str],
+    current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
@@ -359,16 +359,16 @@ async def update_configuration(
         )
 
 
-@router.get("/audit-log", response_model=Dict[str, Any])
+@router.get("/audit-log", response_model=dict[str, Any])
 async def get_audit_log(
     pagination: PaginationModel = Depends(),
-    action_filter: Optional[str] = Query(None, description="Filter by action type"),
-    user_type_filter: Optional[str] = Query(None, description="Filter by user type"),
-    success_filter: Optional[bool] = Query(None, description="Filter by success status"),
+    action_filter: str | None = Query(None, description="Filter by action type"),
+    user_type_filter: str | None = Query(None, description="Filter by user type"),
+    success_filter: bool | None = Query(None, description="Filter by success status"),
     days_back: int = Query(7, ge=1, le=90, description="Number of days to look back"),
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get audit log entries with filtering.
 
@@ -449,13 +449,13 @@ async def get_audit_log(
         )
 
 
-@router.get("/usage", response_model=Dict[str, Any])
+@router.get("/usage", response_model=dict[str, Any])
 async def get_usage(
     days_back: int = Query(30, ge=1, le=90, description="Number of days of history to return"),
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     usage_repo: UsageRepository = Depends(get_usage_repository),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get today's per-model LLM spend, the daily history, and today's spend
     vs the daily budget cap, for the admin cost dashboard.
@@ -507,8 +507,8 @@ async def get_usage(
 @router.post("/maintenance", response_model=BaseResponse)
 async def toggle_maintenance_mode(
     enabled: bool = Query(..., description="Enable or disable maintenance mode"),
-    message: Optional[str] = Query(None, description="Optional maintenance message"),
-    current_user: Dict[str, Any] = Depends(require_admin),
+    message: str | None = Query(None, description="Optional maintenance message"),
+    current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
@@ -566,7 +566,7 @@ async def toggle_maintenance_mode(
 @router.post("/test-email", response_model=BaseResponse)
 async def test_email_service(
     test_email: str = Query(..., description="Email address to send test message to"),
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
     """
@@ -626,14 +626,14 @@ async def test_email_service(
 # ============= DOCUMENT MANAGEMENT ENDPOINTS =============
 # Document endpoints added for frontend consistency
 
-@router.get("/documents", response_model=Dict[str, Any])
+@router.get("/documents", response_model=dict[str, Any])
 async def admin_list_documents(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(10, ge=1, le=100, description="Items per page"),
-    status_filter: Optional[str] = Query(None, description="Filter by document status"),
-    search: Optional[str] = Query(None, description="Search in filenames"),
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    status_filter: str | None = Query(None, description="Filter by document status"),
+    search: str | None = Query(None, description="Search in filenames"),
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """List documents via admin interface."""
     # Import here to avoid circular imports
     from src.database.repository import DocumentRepository
@@ -676,10 +676,10 @@ async def admin_list_documents(
         db.close()
 
 
-@router.get("/documents/stats", response_model=Dict[str, Any])
+@router.get("/documents/stats", response_model=dict[str, Any])
 async def admin_document_stats(
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """Get document statistics via admin interface."""
     from src.database.repository import DocumentRepository
     from src.database.connection import get_db_session
@@ -705,7 +705,7 @@ async def admin_document_stats(
         db.close()
 
 
-@router.post("/documents/upload", response_model=Dict[str, Any])
+@router.post("/documents/upload", response_model=dict[str, Any])
 # Same upload limit as /documents/upload: this duplicated admin
 # route would otherwise be a trivial bypass of the upload rate limit.
 # `request` is required by slowapi (import-time error without it) and
@@ -717,9 +717,9 @@ async def admin_upload_document(
     response: Response,
     file: UploadFile = File(...),
     preserve: bool = Form(False),
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     ingestion_processor = Depends(get_ingestion_processor)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Upload document via admin interface."""
     from src.database.repository import DocumentRepository
     from src.database.connection import get_db_session
@@ -879,19 +879,19 @@ async def admin_upload_document(
 # ============= CONFIG ALIAS ENDPOINTS =============
 # Aliases for frontend consistency
 
-@router.get("/config", response_model=Dict[str, Any])
+@router.get("/config", response_model=dict[str, Any])
 async def get_config_alias(
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Alias for /configuration - for frontend consistency."""
     return await get_configuration(current_user, config_repo)
 
 
 @router.put("/config", response_model=BaseResponse)
 async def update_config_alias(
-    config_updates: Dict[str, str],
-    current_user: Dict[str, Any] = Depends(require_admin),
+    config_updates: dict[str, str],
+    current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> BaseResponse:
@@ -899,10 +899,10 @@ async def update_config_alias(
     return await update_configuration(config_updates, current_user, config_repo, audit_repo)
 
 
-@router.get("/metrics/chat", response_model=Dict[str, Any])
+@router.get("/metrics/chat", response_model=dict[str, Any])
 async def get_chat_metrics(
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """
     Get chat system metrics for monitoring dashboard.
 
@@ -945,10 +945,10 @@ async def get_chat_metrics(
         )
 
 
-@router.get("/analytics/usage", response_model=Dict[str, Any])
+@router.get("/analytics/usage", response_model=dict[str, Any])
 async def get_usage_analytics(
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """
     Get comprehensive usage analytics for dashboard.
 
@@ -989,16 +989,16 @@ async def get_usage_analytics(
         )
 
 
-@router.get("/logs", response_model=Dict[str, Any])
+@router.get("/logs", response_model=dict[str, Any])
 async def get_system_logs(
-    level: Optional[str] = Query(None, description="Log level filter (ALL, DEBUG, INFO, WARN, ERROR)"),
-    source: Optional[str] = Query(None, description="Source filter (ALL, backend, frontend)"),
-    module: Optional[str] = Query(None, description="Module name filter"),
-    search: Optional[str] = Query(None, description="Text search in message"),
-    since: Optional[str] = Query(None, description="ISO timestamp to filter logs since"),
+    level: str | None = Query(None, description="Log level filter (ALL, DEBUG, INFO, WARN, ERROR)"),
+    source: str | None = Query(None, description="Source filter (ALL, backend, frontend)"),
+    module: str | None = Query(None, description="Module name filter"),
+    search: str | None = Query(None, description="Text search in message"),
+    since: str | None = Query(None, description="ISO timestamp to filter logs since"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of logs to return"),
-    current_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, Any]:
     """
     Get filtered system logs from backend and frontend sources.
 
@@ -1066,7 +1066,7 @@ async def get_system_logs(
 
 @router.post("/vector-store/rebuild", response_model=BaseResponse)
 async def rebuild_vector_store(
-    current_user: Dict[str, Any] = Depends(require_admin),
+    current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
     vector_store: FaissVectorStore = Depends(get_vector_store),
     bm25_store: Bm25LexicalStore = Depends(get_bm25_store),

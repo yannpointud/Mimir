@@ -6,7 +6,7 @@ checking the status of various system components.
 """
 
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -99,10 +99,10 @@ async def health_check(
         )
 
 
-@router.get("/database", response_model=Dict[str, Any])
+@router.get("/database", response_model=dict[str, Any])
 async def database_health(
     db: Session = Depends(get_db_session)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Database-specific health check.
 
@@ -112,8 +112,8 @@ async def database_health(
     return await _check_database_health(db)
 
 
-@router.get("/cache", response_model=Dict[str, Any])
-async def cache_health() -> Dict[str, Any]:
+@router.get("/cache", response_model=dict[str, Any])
+async def cache_health() -> dict[str, Any]:
     """
     Cache service health check.
 
@@ -123,8 +123,8 @@ async def cache_health() -> Dict[str, Any]:
     return await _check_cache_health()
 
 
-@router.get("/disk-usage", response_model=Dict[str, Any])
-async def disk_usage() -> Dict[str, Any]:
+@router.get("/disk-usage", response_model=dict[str, Any])
+async def disk_usage() -> dict[str, Any]:
     """
     Disk usage information for data directories.
 
@@ -180,7 +180,7 @@ async def disk_usage() -> Dict[str, Any]:
         }
 
 
-async def _check_database_health(db: Session) -> Dict[str, Any]:
+async def _check_database_health(db: Session) -> dict[str, Any]:
     """Check database connectivity and basic operations."""
     try:
         # Test basic query
@@ -210,7 +210,7 @@ async def _check_database_health(db: Session) -> Dict[str, Any]:
         }
 
 
-async def _check_vector_store_health() -> Dict[str, Any]:
+async def _check_vector_store_health() -> dict[str, Any]:
     """Check vector store (FAISS) health."""
     try:
         # This would check if FAISS index is accessible
@@ -261,7 +261,7 @@ async def _check_vector_store_health() -> Dict[str, Any]:
         }
 
 
-async def _check_llm_health() -> Dict[str, Any]:
+async def _check_llm_health() -> dict[str, Any]:
     """Check LLM API connectivity."""
     try:
         # This would test actual LLM API connection
@@ -284,7 +284,7 @@ async def _check_llm_health() -> Dict[str, Any]:
         }
 
 
-async def _check_cache_health() -> Dict[str, Any]:
+async def _check_cache_health() -> dict[str, Any]:
     """Check cache service health."""
     try:
         from src.cache.lru_cache import cache_service, chat_cache_service
@@ -321,7 +321,7 @@ async def _check_cache_health() -> Dict[str, Any]:
         }
 
 
-async def _check_email_health() -> Dict[str, Any]:
+async def _check_email_health() -> dict[str, Any]:
     """Check email service configuration."""
     try:
         from src.email_service.smtp_client import email_service
@@ -343,7 +343,7 @@ async def _check_email_health() -> Dict[str, Any]:
 
 
 @router.get("/live")
-async def liveness() -> Dict[str, str]:
+async def liveness() -> dict[str, str]:
     """
     Liveness probe.
 
@@ -362,7 +362,7 @@ async def liveness() -> Dict[str, str]:
 async def readiness(
     response: Response,
     db: Session = Depends(get_db_session)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Readiness probe.
 

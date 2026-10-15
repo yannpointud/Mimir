@@ -6,7 +6,8 @@ for efficient storage and retrieval of frequently accessed data.
 """
 
 from cachetools import LRUCache
-from typing import Any, Optional, Dict, Callable
+from typing import Any
+from collections.abc import Callable
 import hashlib
 import json  # noqa: F401
 import threading
@@ -74,7 +75,7 @@ class CacheService:
 
         return datetime.now() > self._expiry_times[key]
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Get value from cache with TTL check.
 
@@ -106,7 +107,7 @@ class CacheService:
             logger.debug(f"Cache miss: {key}")
             return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None):
+    def set(self, key: str, value: Any, ttl: int | None = None):
         """
         Set value in cache with TTL.
 
@@ -132,7 +133,7 @@ class CacheService:
         self,
         key: str,
         factory: Callable[[], Any],
-        ttl: Optional[int] = None
+        ttl: int | None = None
     ) -> Any:
         """
         Get value from cache or compute and set it.
@@ -223,7 +224,7 @@ class CacheService:
 
             return len(expired_keys)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get cache statistics for monitoring.
 
@@ -277,7 +278,7 @@ class ChatCacheService(CacheService):
         super().__init__(max_size, ttl_seconds)
         logger.info("ChatCacheService initialized for chat response caching")
 
-    def get_chat_response(self, question: str, context_hash: str = "") -> Optional[Dict[str, Any]]:
+    def get_chat_response(self, question: str, context_hash: str = "") -> dict[str, Any] | None:
         """
         Get cached chat response.
 
@@ -294,9 +295,9 @@ class ChatCacheService(CacheService):
     def set_chat_response(
         self,
         question: str,
-        response: Dict[str, Any],
+        response: dict[str, Any],
         context_hash: str = "",
-        ttl: Optional[int] = None
+        ttl: int | None = None
     ):
         """
         Cache a chat response.
@@ -333,7 +334,7 @@ class ChatCacheService(CacheService):
 
     def get_stream_response(
         self, question: str, corpus_version: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Get a cached streamed chat response for the current corpus version.
 
@@ -351,8 +352,8 @@ class ChatCacheService(CacheService):
         self,
         question: str,
         corpus_version: str,
-        payload: Dict[str, Any],
-        ttl: Optional[int] = None
+        payload: dict[str, Any],
+        ttl: int | None = None
     ):
         """
         Cache a streamed chat response scoped to the current corpus version.

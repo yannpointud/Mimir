@@ -16,7 +16,6 @@ session. This matters for two reasons:
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from src.config import settings
 from src.database.connection import db_manager
@@ -62,7 +61,7 @@ class BudgetGuard:
             return float(override.value)
         return settings.daily_budget_eur
 
-    def reserve(self, call_type: str) -> Optional[BudgetReservation]:
+    def reserve(self, call_type: str) -> BudgetReservation | None:
         """
         Attempt to reserve today's flat per-type budget estimate.
 

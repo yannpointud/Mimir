@@ -32,7 +32,8 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
+from typing import Any
+from collections.abc import Awaitable, Callable, Sequence
 
 # sys.path bootstrap (same discipline as scripts/backup_sqlite.py and
 # generate_golden_set.py): make the project root and the backend package
@@ -61,7 +62,7 @@ _DEFAULT_OUT = _SCRIPT_DIR / "eval_input.jsonl"
 # Type of the injected answer function: (question, session_id) -> result dict,
 # or None to signal budget exhaustion (stop the loop). Decoupling the loop from
 # RagService/budget_guard keeps it unit-testable with a mocked async callable.
-AnswerFn = Callable[[str, str], Awaitable[Optional[Dict[str, Any]]]]
+AnswerFn = Callable[[str, str], Awaitable[dict[str, Any] | None]]
 
 
 async def answer_via_stream(
@@ -72,7 +73,7 @@ async def answer_via_stream(
     document_repository,
     reservation,
     context_limit: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Drain ``RagService.answer_stream()`` into an ``answer()``-shaped result dict.
 
     The runtime serves answers as SSE events, but the eval harness needs the
@@ -99,8 +100,8 @@ async def answer_via_stream(
     Returns:
         A ``RagService.answer()``-shaped result dict.
     """
-    answer_parts: List[str] = []
-    sources: List[Dict[str, Any]] = []
+    answer_parts: list[str] = []
+    sources: list[dict[str, Any]] = []
     confidence_score = 0.0
     async for event in rag_service.answer_stream(
         question=question,
@@ -126,7 +127,7 @@ async def answer_via_stream(
     }
 
 
-def _assemble_eval_row(entry: GoldenSetEntry, result: Dict[str, Any]) -> Dict[str, Any]:
+def _assemble_eval_row(entry: GoldenSetEntry, result: dict[str, Any]) -> dict[str, Any]:
     """Map a golden set entry + a RagService result to a ragas eval row (pure).
 
     The output shape is the JSONL boundary contract consumed by
@@ -158,7 +159,7 @@ def _assemble_eval_row(entry: GoldenSetEntry, result: Dict[str, Any]) -> Dict[st
     }
 
 
-def _write_eval_rows(rows: Sequence[Dict[str, Any]], path: Path) -> None:
+def _write_eval_rows(rows: Sequence[dict[str, Any]], path: Path) -> None:
     """Write eval rows as newline-delimited JSON (the venv boundary file).
 
     One compact JSON object per line, UTF-8, ``ensure_ascii=False`` so French
@@ -180,7 +181,7 @@ async def _collect_eval_rows(
     answer_fn: AnswerFn,
     *,
     throttle_seconds: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Replay each entry through ``answer_fn``, throttled, assembling eval rows.
 
     Throttles to <= 1 call/sec between questions (never before the first) so a
@@ -196,7 +197,7 @@ async def _collect_eval_rows(
     Returns:
         The assembled eval rows, in entry order.
     """
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for index, entry in enumerate(entries):
         if index > 0 and throttle_seconds > 0:
             await asyncio.sleep(throttle_seconds)
@@ -238,7 +239,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
 
     Heavy backend imports (and the settings singleton, which reads the Mistral
@@ -286,7 +287,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     rag_service = get_rag_service()
     budget_guard = get_budget_guard()
 
-    async def _run() -> List[Dict[str, Any]]:
+    async def _run() -> list[dict[str, Any]]:
         # One synchronous session for the whole run: document_repository is
         # request-scoped in the API but here a single script-scoped session is
         # fine (read-only lookups of document filenames).

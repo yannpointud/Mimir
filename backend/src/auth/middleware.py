@@ -5,7 +5,6 @@ This module provides middleware and dependency functions for protecting routes
 with JWT authentication.
 """
 
-from typing import Optional
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
@@ -33,7 +32,7 @@ class JWTBearer(HTTPBearer):
             detail="Not authenticated"
         )
 
-    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
+    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
         """
         Extract and validate JWT token from Authorization header.
 
@@ -140,8 +139,8 @@ optional_security = JWTBearer(auto_error=False)
 
 async def get_optional_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)
-) -> Optional[dict]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
+) -> dict | None:
     """
     Optional dependency to get user info if authenticated.
 

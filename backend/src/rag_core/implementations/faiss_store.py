@@ -12,7 +12,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -90,9 +90,9 @@ class FaissVectorStore(AbstractVectorStore):
         self._lock = threading.RLock()
 
         # FAISS index and metadata storage
-        self.index: Optional[faiss.Index] = None
-        self.metadata: List[Dict[str, Any]] = []
-        self.document_to_chunks: Dict[str, List[int]] = {}  # document_id -> chunk_ids
+        self.index: faiss.Index | None = None
+        self.metadata: list[dict[str, Any]] = []
+        self.document_to_chunks: dict[str, list[int]] = {}  # document_id -> chunk_ids
 
         # Statistics
         self._stats = {
@@ -158,7 +158,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.error(error_msg)
                 raise VectorStoreConnectionError(error_msg)
 
-    def upsert(self, chunks: List[Chunk]) -> bool:
+    def upsert(self, chunks: list[Chunk]) -> bool:
         """
         Insert or update chunks in the vector store
 
@@ -263,8 +263,8 @@ class FaissVectorStore(AbstractVectorStore):
     def query(self,
               vector: np.ndarray,
               top_k: int = 5,
-              filter_dict: Optional[Dict[str, Any]] = None,
-              similarity_floor: Optional[float] = None) -> List[SearchResult]:
+              filter_dict: dict[str, Any] | None = None,
+              similarity_floor: float | None = None) -> list[SearchResult]:
         """
         Search for similar vectors
 
@@ -383,7 +383,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg)
 
-    def _matches_filter(self, metadata: Dict[str, Any], filter_dict: Dict[str, Any]) -> bool:
+    def _matches_filter(self, metadata: dict[str, Any], filter_dict: dict[str, Any]) -> bool:
         """Check if metadata matches filter conditions"""
         for key, value in filter_dict.items():
             if key not in metadata:
@@ -455,7 +455,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get vector store statistics"""
         with self._lock:
             active_vectors = sum(1 for meta in self.metadata if not meta.get('deleted', False))
@@ -489,7 +489,7 @@ class FaissVectorStore(AbstractVectorStore):
         with self._lock:
             return self._stats.get('last_updated') or 'none'
 
-    def snapshot_active_chunks(self) -> List[Dict[str, Any]]:
+    def snapshot_active_chunks(self) -> list[dict[str, Any]]:
         """Return a lock-safe snapshot of the non-deleted chunk metadata.
 
         Used by the BM25 lexical store to rebuild itself from the FAISS
@@ -666,7 +666,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 # Load metadata: JSON-first, legacy pickle fallback
                 if self.metadata_path.exists():
-                    with open(self.metadata_path, 'r', encoding='utf-8') as f:
+                    with open(self.metadata_path, encoding='utf-8') as f:
                         raw = json.load(f)
                     payload = MetadataPayload.model_validate(raw)
                 elif self.legacy_metadata_path.exists():
@@ -726,7 +726,7 @@ class FaissVectorStore(AbstractVectorStore):
             'last_updated': datetime.utcnow().isoformat()
         })
 
-    def clean_orphans(self, existing_document_ids: set = None, create_backup: bool = True) -> Dict[str, Any]:
+    def clean_orphans(self, existing_document_ids: set = None, create_backup: bool = True) -> dict[str, Any]:
         """
         Clean orphaned chunks whose documents no longer exist in the database.
 
@@ -1036,7 +1036,7 @@ class FaissVectorStore(AbstractVectorStore):
                 raise VectorStoreOperationError(f"Index optimization save failed: {e}")
 
     def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True,
-                             existing_document_ids: Optional[set] = None) -> Dict[str, Any]:
+                             existing_document_ids: set | None = None) -> dict[str, Any]:
         """
         Completely rebuild the vector store with optional orphan cleanup.
 
@@ -1122,7 +1122,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg)
 
-    def get_document_chunks(self, document_id: str) -> List[Chunk]:
+    def get_document_chunks(self, document_id: str) -> list[Chunk]:
         """
         Get all chunks for a specific document
 

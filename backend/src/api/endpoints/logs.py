@@ -7,7 +7,7 @@ frontend application logs for debugging and monitoring.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -22,10 +22,10 @@ class FrontendLogEntry(BaseModel):
     level: str = Field(..., max_length=16, description="Log level (DEBUG, INFO, WARN, ERROR)")
     module: str = Field(..., max_length=128, description="Frontend module name")
     message: str = Field(..., max_length=4000, description="Log message")
-    url: Optional[str] = Field(None, max_length=2048, description="Current page URL")
-    userAgent: Optional[str] = Field(None, max_length=512, description="Browser user agent")
-    timeSinceStart: Optional[str] = Field(None, max_length=32, description="Time since app start")
-    extra_data: Optional[Dict[str, Any]] = Field(None, description="Additional log data")
+    url: str | None = Field(None, max_length=2048, description="Current page URL")
+    userAgent: str | None = Field(None, max_length=512, description="Browser user agent")
+    timeSinceStart: str | None = Field(None, max_length=32, description="Time since app start")
+    extra_data: dict[str, Any] | None = Field(None, description="Additional log data")
 
 class LogResponse(BaseModel):
     """Response model for log submission"""
@@ -112,7 +112,7 @@ async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
         )
 
 @router.get("/frontend/health")
-async def frontend_logging_health() -> Dict[str, Any]:
+async def frontend_logging_health() -> dict[str, Any]:
     """
     Health check for frontend logging system.
     

@@ -4,7 +4,7 @@ Provides intelligent text segmentation for optimal RAG performance
 """
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
 from dataclasses import dataclass
 from ..monitoring.logger import setup_logger
 
@@ -41,7 +41,7 @@ class ChunkingConfig:
 class ChunkingStrategy:
     """Smart text chunking with sentence and paragraph boundaries"""
 
-    def __init__(self, config: Optional[ChunkingConfig] = None):
+    def __init__(self, config: ChunkingConfig | None = None):
         """
         Initialize chunking strategy
 
@@ -51,7 +51,7 @@ class ChunkingStrategy:
         self.config = config or ChunkingConfig()
         logger.debug(f"Chunking strategy initialized: {self.config}")
 
-    def chunk_text(self, text: str, source: str = "") -> List[Dict[str, Any]]:
+    def chunk_text(self, text: str, source: str = "") -> list[dict[str, Any]]:
         """
         Chunk text into smaller segments with overlap
 
@@ -153,7 +153,7 @@ class ChunkingStrategy:
 
         return result
 
-    def _detect_headings(self, text: str) -> List[tuple]:
+    def _detect_headings(self, text: str) -> list[tuple]:
         """
         Detect document headings in reading order from the (line-intact) text.
 
@@ -174,7 +174,7 @@ class ChunkingStrategy:
         Returns:
             List of (signature_regex, title) in order of appearance
         """
-        found: List[tuple] = []  # (position, signature, title)
+        found: list[tuple] = []  # (position, signature, title)
 
         for match in _HTML_HEADING_RE.finditer(text):
             # Strip any inner tags so the stored title is plain data.
@@ -193,7 +193,7 @@ class ChunkingStrategy:
         return [(signature, title) for _, signature, title in found]
 
     def _assign_section_titles(
-        self, chunks: List[Dict[str, Any]], headings: List[tuple]
+        self, chunks: list[dict[str, Any]], headings: list[tuple]
     ) -> None:
         """
         Tag each chunk with its section title by consuming headings in order.
@@ -210,7 +210,7 @@ class ChunkingStrategy:
             headings: Ordered (signature_regex, title) list from
                 ``_detect_headings``.
         """
-        current_section: Optional[str] = None
+        current_section: str | None = None
         index = 0
         for chunk in chunks:
             text = chunk['text']
@@ -223,7 +223,7 @@ class ChunkingStrategy:
                     break
             chunk['section_title'] = current_section
 
-    def _chunk_by_paragraphs(self, text: str) -> List[Dict[str, Any]]:
+    def _chunk_by_paragraphs(self, text: str) -> list[dict[str, Any]]:
         """
         Chunk text by paragraphs with sentence awareness
 
@@ -284,7 +284,7 @@ class ChunkingStrategy:
 
         return final_chunks
 
-    def _chunk_by_sentences(self, text: str, start_offset: int = 0) -> List[Dict[str, Any]]:
+    def _chunk_by_sentences(self, text: str, start_offset: int = 0) -> list[dict[str, Any]]:
         """
         Chunk text by sentences
 
@@ -351,7 +351,7 @@ class ChunkingStrategy:
 
         return chunks
 
-    def _split_sentences(self, text: str) -> List[str]:
+    def _split_sentences(self, text: str) -> list[str]:
         """
         Split text into sentences using regex patterns
 
@@ -434,7 +434,7 @@ class ChunkingStrategy:
         else:
             return text[-overlap_size:] + " "
 
-    def get_chunk_statistics(self, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def get_chunk_statistics(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Calculate statistics for chunked text
 

@@ -327,7 +327,7 @@ class TestFaissVectorStore:
 
         # metadata.json exists, parses as JSON, and carries schema_version
         assert store.metadata_path.exists()
-        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+        with open(store.metadata_path, encoding='utf-8') as f:
             raw = json.load(f)
         assert raw['schema_version'] == 1
         assert 'metadata' in raw
@@ -355,7 +355,7 @@ class TestFaissVectorStore:
         assert store.persist() is True
 
         v1_ntotal = store.index.ntotal
-        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+        with open(store.metadata_path, encoding='utf-8') as f:
             v1_metadata_raw = json.load(f)
 
         # v2: add more chunks, then simulate a crash on the SECOND os.replace
@@ -374,9 +374,8 @@ class TestFaissVectorStore:
         with patch(
             'backend.src.rag_core.implementations.faiss_store.os.replace',
             side_effect=flaky_replace
-        ):
-            with pytest.raises(VectorStoreConnectionError):
-                store.persist()
+        ), pytest.raises(VectorStoreConnectionError):
+            store.persist()
 
         # Index on disk reflects v2 (already replaced); metadata.json on
         # disk still reflects v1 (never replaced) -- read directly, not via
@@ -385,7 +384,7 @@ class TestFaissVectorStore:
         assert reread_index.ntotal == store.index.ntotal
         assert reread_index.ntotal > v1_ntotal
 
-        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+        with open(store.metadata_path, encoding='utf-8') as f:
             reread_metadata_raw = json.load(f)
         assert reread_metadata_raw == v1_metadata_raw
 

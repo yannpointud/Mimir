@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 import logging  # noqa: F401
 import time
-from typing import List, Optional, Dict, Any
+from typing import Any
 from dataclasses import dataclass  # noqa: F401
 
 from ..interfaces import (
@@ -53,7 +53,7 @@ class MistralAPIService(AbstractLLMService):
         self.retry_delay = retry_delay
 
         # Session will be created when needed
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
         logger.info(f"Mistral API service initialized with model: {model}")
 
@@ -72,7 +72,7 @@ class MistralAPIService(AbstractLLMService):
 
     async def _make_request(self,
                            endpoint: str,
-                           payload: Dict[str, Any]) -> Dict[str, Any]:
+                           payload: dict[str, Any]) -> dict[str, Any]:
         """
         Make HTTP request with retry logic and comprehensive error handling
 
@@ -181,10 +181,10 @@ class MistralAPIService(AbstractLLMService):
 
     async def generate(self,
                       prompt: str,
-                      system_prompt: Optional[str] = None,
-                      max_tokens: Optional[int] = None,
+                      system_prompt: str | None = None,
+                      max_tokens: int | None = None,
                       temperature: float = 0.1,
-                      session_id: Optional[str] = None,
+                      session_id: str | None = None,
                       rag_debug = None,
                       **kwargs) -> GenerationResponse:
         """
@@ -295,12 +295,12 @@ class MistralAPIService(AbstractLLMService):
 
     async def generate_stream(self,
                              prompt: str,
-                             system_prompt: Optional[str] = None,
-                             max_tokens: Optional[int] = None,
+                             system_prompt: str | None = None,
+                             max_tokens: int | None = None,
                              temperature: float = 0.1,
-                             session_id: Optional[str] = None,
+                             session_id: str | None = None,
                              rag_debug = None,
-                             usage_out: Optional[Dict[str, Any]] = None,
+                             usage_out: dict[str, Any] | None = None,
                              **kwargs):
         """
         Generate text using Mistral API with streaming support.
@@ -439,7 +439,7 @@ class MistralAPIService(AbstractLLMService):
             logger.error(error_msg)
             raise LLMAPIError(error_msg)
 
-    async def embed(self, texts: List[str], session_id: Optional[str] = None, rag_debug = None) -> EmbeddingResponse:
+    async def embed(self, texts: list[str], session_id: str | None = None, rag_debug = None) -> EmbeddingResponse:
         """
         Generate embeddings using Mistral API with batching support
 
@@ -516,7 +516,7 @@ class MistralAPIService(AbstractLLMService):
             completion_tokens=0
         )
 
-    async def _embed_batch(self, texts: List[str], start_time: float = None, session_id: Optional[str] = None, rag_debug = None) -> EmbeddingResponse:
+    async def _embed_batch(self, texts: list[str], start_time: float = None, session_id: str | None = None, rag_debug = None) -> EmbeddingResponse:
         """
         Generate embeddings for a single batch of texts
 

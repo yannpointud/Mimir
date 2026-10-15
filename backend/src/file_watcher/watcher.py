@@ -8,7 +8,8 @@ queues new or modified documents for ingestion processing.
 import os
 import time
 from pathlib import Path
-from typing import Set, Optional, Callable, Dict, Any, List
+from typing import Any
+from collections.abc import Callable
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 import threading
@@ -22,9 +23,9 @@ class DocumentFileHandler(FileSystemEventHandler):
 
     def __init__(
         self,
-        supported_extensions: Set[str],
+        supported_extensions: set[str],
         on_file_added: Callable[[str], None],
-        on_file_modified: Optional[Callable[[str], None]] = None,
+        on_file_modified: Callable[[str], None] | None = None,
         ignore_hidden: bool = True,
         ignore_temp: bool = True
     ):
@@ -201,10 +202,10 @@ class FileWatcher:
 
     def __init__(
         self,
-        watch_directories: List[str],
-        supported_extensions: Set[str],
+        watch_directories: list[str],
+        supported_extensions: set[str],
         on_file_added: Callable[[str], None],
-        on_file_modified: Optional[Callable[[str], None]] = None,
+        on_file_modified: Callable[[str], None] | None = None,
         recursive: bool = True
     ):
         """
@@ -312,7 +313,7 @@ class FileWatcher:
             logger.error(f"Error stopping FileWatcher: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get file watcher statistics.
 
@@ -396,7 +397,7 @@ class FileWatcher:
             logger.error(f"Failed to remove directory {directory}: {e}")
             return False
 
-    def scan_existing_files(self) -> List[str]:
+    def scan_existing_files(self) -> list[str]:
         """
         Scan existing files in watched directories.
 

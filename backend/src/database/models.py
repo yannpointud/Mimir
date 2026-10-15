@@ -48,7 +48,7 @@ class Document(Base):
         Index('idx_document_status_created', 'status', 'created_at'),
     )
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dictionary for serialization"""
         return {
             'id': self.id,
@@ -96,7 +96,7 @@ class Configuration(Base):
         index=True
     )
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dictionary"""
         return {
             'key': self.key,
@@ -148,7 +148,7 @@ class AuditLog(Base):
         Index('idx_audit_user_action_date', 'user_type', 'action', 'created_at'),
     )
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dictionary"""
         return {
             'id': self.id,
@@ -228,7 +228,7 @@ class LlmUsage(Base):
         Index('idx_usage_created_model', 'created_at', 'model'),
     )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dictionary for serialization"""
         return {
             'id': self.id,
@@ -259,7 +259,7 @@ class LlmBudgetLedger(Base):
     date = Column(String(10), primary_key=True)  # YYYY-MM-DD
     spent_eur = Column(Float, nullable=False, default=0.0)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dictionary"""
         return {
             'date': self.date,

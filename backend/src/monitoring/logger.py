@@ -9,7 +9,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
-from typing import Dict, Any, Optional
+from typing import Any
 
 # Import settings for dynamic log level configuration
 from src.config import settings
@@ -181,9 +181,9 @@ frontend_logger = setup_frontend_logger(level=settings.log_level.upper())
 
 def log_api_request(endpoint: str,
                    method: str,
-                   duration_ms: Optional[float] = None,
-                   status_code: Optional[int] = None,
-                   user_type: Optional[str] = None,
+                   duration_ms: float | None = None,
+                   status_code: int | None = None,
+                   user_type: str | None = None,
                    **kwargs):
     """
     Helper to log API requests consistently
@@ -224,9 +224,9 @@ def log_api_request(endpoint: str,
 
 def log_ingestion_event(document: str,
                        status: str,
-                       duration_ms: Optional[float] = None,
-                       chunk_count: Optional[int] = None,
-                       file_size_mb: Optional[float] = None,
+                       duration_ms: float | None = None,
+                       chunk_count: int | None = None,
+                       file_size_mb: float | None = None,
                        **kwargs):
     """
     Helper to log ingestion events
@@ -264,8 +264,8 @@ def log_ingestion_event(document: str,
 def log_search_query(query: str,
                     results_count: int,
                     duration_ms: float,
-                    user_type: Optional[str] = None,
-                    similarity_threshold: Optional[float] = None,
+                    user_type: str | None = None,
+                    similarity_threshold: float | None = None,
                     **kwargs):
     """
     Helper to log search queries
@@ -304,7 +304,7 @@ def log_llm_request(model: str,
                    tokens: int,
                    duration_ms: float,
                    success: bool = True,
-                   error: Optional[str] = None,
+                   error: str | None = None,
                    **kwargs):
     """
     Helper to log LLM API requests
@@ -342,7 +342,7 @@ def log_vector_operation(operation: str,
                         vector_count: int,
                         duration_ms: float,
                         success: bool = True,
-                        error: Optional[str] = None,
+                        error: str | None = None,
                         **kwargs):
     """
     Helper to log vector store operations
@@ -375,10 +375,10 @@ def log_vector_operation(operation: str,
     app_logger.log(level, message, extra={'extra_fields': extra_fields})
 
 def log_auth_event(event: str,
-                  user_type: Optional[str] = None,
-                  ip_address: Optional[str] = None,
+                  user_type: str | None = None,
+                  ip_address: str | None = None,
                   success: bool = True,
-                  reason: Optional[str] = None,
+                  reason: str | None = None,
                   **kwargs):
     """
     Helper to log authentication events
@@ -416,8 +416,8 @@ def log_auth_event(event: str,
 
 def log_health_check(component: str,
                     status: str,
-                    duration_ms: Optional[float] = None,
-                    details: Optional[Dict[str, Any]] = None,
+                    duration_ms: float | None = None,
+                    details: dict[str, Any] | None = None,
                     **kwargs):
     """
     Helper to log health check events
@@ -450,7 +450,7 @@ def log_health_check(component: str,
 
 def log_system_event(event: str,
                     severity: str = "info",
-                    details: Optional[Dict[str, Any]] = None,
+                    details: dict[str, Any] | None = None,
                     **kwargs):
     """
     Helper to log system-level events

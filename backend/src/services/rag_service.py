@@ -11,7 +11,7 @@ harness -- without going through HTTP. This module imports NOTHING from
 FastAPI.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
 from datetime import datetime
 import asyncio
 import logging
@@ -81,7 +81,7 @@ def _clean_filename(filename: str) -> str:
     return filename.strip()
 
 
-def _find_documents_by_fuzzy_match(question: str, document_repository, threshold: int = 70) -> List[tuple]:
+def _find_documents_by_fuzzy_match(question: str, document_repository, threshold: int = 70) -> list[tuple]:
     """
     Find documents whose filename matches the question via fuzzy matching.
 
@@ -114,13 +114,13 @@ def _find_documents_by_fuzzy_match(question: str, document_repository, threshold
 
 
 async def _pre_include_document_chunks(
-    document_ids: List[int],
-    question_embedding: List[float],
+    document_ids: list[int],
+    question_embedding: list[float],
     vector_store,
     document_repository,
     boost_factor: float,
-    filename_similarities: Dict[int, float]
-) -> List[Any]:
+    filename_similarities: dict[int, float]
+) -> list[Any]:
     """
     Retrieve all chunks from specified documents and apply the boost.
 
@@ -174,7 +174,7 @@ async def _pre_include_document_chunks(
     return pre_included_chunks
 
 
-def _calculate_rrf_confidence(search_results: List[Any], rrf_k: int = 60) -> float:
+def _calculate_rrf_confidence(search_results: list[Any], rrf_k: int = 60) -> float:
     """Confidence for hybrid (RRF) mode -- rank/consensus based (Option A).
 
     RRF scores are NOT cosine similarities, so the weighted-magnitude formula
@@ -211,11 +211,11 @@ def _calculate_rrf_confidence(search_results: List[Any], rrf_k: int = 60) -> flo
 
 
 def _merge_and_attach_rrf_scores(
-    dense_pool: List[Any],
-    extra_results: List[Any],
-    fused_scores: Dict[int, float],
+    dense_pool: list[Any],
+    extra_results: list[Any],
+    fused_scores: dict[int, float],
     vector_store: Any,
-) -> List[Any]:
+) -> list[Any]:
     """Build a unified SearchResult list carrying fused RRF scores.
 
     Dense hits are already SearchResult objects; chunk_ids known only to BM25
@@ -234,19 +234,19 @@ def _merge_and_attach_rrf_scores(
     Returns:
         SearchResult list sorted by descending fused score.
     """
-    by_id: Dict[int, Any] = {}
+    by_id: dict[int, Any] = {}
     for r in dense_pool:
         by_id.setdefault(r.chunk_id, r)
     for r in (extra_results or []):
         by_id.setdefault(r.chunk_id, r)
 
     # chunk_id -> metadata dict, restricted to non-deleted FAISS entries.
-    meta_by_id: Dict[int, Dict[str, Any]] = {}
+    meta_by_id: dict[int, dict[str, Any]] = {}
     for meta in (getattr(vector_store, "metadata", None) or []):
         if isinstance(meta, dict) and not meta.get("deleted", False):
             meta_by_id[meta["chunk_id"]] = meta
 
-    merged: List[Any] = []
+    merged: list[Any] = []
     for chunk_id, rrf_score in fused_scores.items():
         existing = by_id.get(chunk_id)
         if existing is not None:
@@ -274,7 +274,7 @@ def _merge_and_attach_rrf_scores(
 
 
 def _calculate_weighted_confidence(
-    search_results: List[Any],
+    search_results: list[Any],
     algorithm: str = "weighted",
     mode: str = "dense",
     rrf_k: int = 60,
@@ -363,8 +363,8 @@ def _calculate_weighted_confidence(
         return _calculate_weighted_confidence(search_results, "simple")
 
 
-def _filter_dynamic_sources(search_results: List[Any], config: Any, question: str = "",
-                            mode: str = "dense") -> List[Any]:
+def _filter_dynamic_sources(search_results: list[Any], config: Any, question: str = "",
+                            mode: str = "dense") -> list[Any]:
     """
     Dynamically filter sources based on relevance with gap detection.
 
@@ -431,11 +431,11 @@ async def _hybrid_retrieve(
     question_embedding: np.ndarray,
     vector_store: Any,
     bm25_store: Any,
-    pre_included_chunks: List[Any],
+    pre_included_chunks: list[Any],
     rag_debug: RagDebugService,
     session_id: str,
     embedding_tokens: Any,
-) -> List[Any]:
+) -> list[Any]:
     """Run the hybrid retrieval branch: dense raw pool + BM25, fused via RRF.
 
     The dense pool is fetched with similarity_floor=0.0 (raw ranking, so the
@@ -515,9 +515,9 @@ async def _process_question_with_rag_stream(
     budget_guard: Optional["BudgetGuard"] = None,
     usage_tracker: Optional["UsageTracker"] = None,
     reservation: Optional["BudgetReservation"] = None,
-    chat_cache: Optional[Any] = None,
-    corpus_version: Optional[str] = None,
-    bm25_store: Optional[Any] = None
+    chat_cache: Any | None = None,
+    corpus_version: str | None = None,
+    bm25_store: Any | None = None
 ):
     """
     Process question using RAG pipeline with streaming.
@@ -682,7 +682,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
         # Step 5: Stream LLM generation
         logger.info("Starting streaming LLM generation...")
         full_answer = ""
-        usage_out: Dict[str, Any] = {}
+        usage_out: dict[str, Any] = {}
         chat_usage_recorded = False
 
         try:
@@ -829,10 +829,10 @@ class RagService:
         llm_service: MistralAPIService,
         vector_store: FaissVectorStore,
         rag_debug: RagDebugService,
-        budget_guard: Optional[BudgetGuard] = None,
-        usage_tracker: Optional[UsageTracker] = None,
-        chat_cache: Optional[Any] = None,
-        bm25_store: Optional[Any] = None,
+        budget_guard: BudgetGuard | None = None,
+        usage_tracker: UsageTracker | None = None,
+        chat_cache: Any | None = None,
+        bm25_store: Any | None = None,
     ):
         self.llm_service = llm_service
         self.vector_store = vector_store
@@ -851,8 +851,8 @@ class RagService:
         include_sources: bool,
         session_id: str,
         document_repository: DocumentRepository,
-        reservation: Optional[BudgetReservation] = None,
-        corpus_version: Optional[str] = None,
+        reservation: BudgetReservation | None = None,
+        corpus_version: str | None = None,
     ):
         """
         Run the streaming RAG pipeline for a single question, yielding the

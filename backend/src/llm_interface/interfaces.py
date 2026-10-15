@@ -24,7 +24,7 @@ class GenerationResponse:
 @dataclass
 class EmbeddingResponse:
     """Response from embedding generation"""
-    embeddings: List[List[float]]
+    embeddings: list[list[float]]
     model: str
     usage_tokens: int
     # Split token counts for cost accounting. Embeddings have no completion
@@ -57,8 +57,8 @@ class AbstractLLMService(ABC):
     @abstractmethod
     async def generate(self,
                       prompt: str,
-                      system_prompt: Optional[str] = None,
-                      max_tokens: Optional[int] = None,
+                      system_prompt: str | None = None,
+                      max_tokens: int | None = None,
                       temperature: float = 0.1,
                       **kwargs) -> GenerationResponse:
         """
@@ -82,7 +82,7 @@ class AbstractLLMService(ABC):
         pass
 
     @abstractmethod
-    async def embed(self, texts: List[str]) -> EmbeddingResponse:
+    async def embed(self, texts: list[str]) -> EmbeddingResponse:
         """
         Generate embeddings for list of texts
 

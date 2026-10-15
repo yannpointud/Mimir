@@ -58,9 +58,9 @@ import json
 import os
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # sys.path bootstrap (same discipline as run_pipeline.py / ingest_corpus.py):
 # make the project root and the backend package importable whether this file is
@@ -88,7 +88,7 @@ def _eval_input_path(mode: str) -> Path:
     return _SCRIPT_DIR / f"eval_input_chunk_{mode}.jsonl"
 
 
-def _isolated_env(mode: str) -> Dict[str, str]:
+def _isolated_env(mode: str) -> dict[str, str]:
     """Environment overrides isolating a mode's data dir + toggling the flag.
 
     Every persistent path is redirected under ``.measure/{mode}/`` so the run
@@ -185,7 +185,7 @@ def _dry_run() -> int:
 # --------------------------------------------------------------------------- #
 # Answer stage: run inside a child process with the mode's env already set.
 # --------------------------------------------------------------------------- #
-def _list_corpus() -> List[Path]:
+def _list_corpus() -> list[Path]:
     return sorted(
         p for p in _SOURCE_DIR.iterdir()
         if p.suffix.lower() in _INGESTABLE_SUFFIXES
@@ -275,7 +275,7 @@ async def _ingest_corpus_isolated() -> int:
     return 0
 
 
-async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
+async def _answer_golden_set(mode: str, limit: int | None) -> int:
     """Answer the frozen golden set through the real pipeline -> eval_input file.
 
     Reuses run_pipeline.py's pure building blocks (no edit to that module) for
@@ -338,7 +338,7 @@ async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
     return 0
 
 
-def _answer_stage(mode: str, limit: Optional[int]) -> int:
+def _answer_stage(mode: str, limit: int | None) -> int:
     """Child-process entry: ingest (honoring the flag) then answer the golden set."""
     rc = asyncio.run(_ingest_corpus_isolated())
     if rc != 0:
@@ -349,7 +349,7 @@ def _answer_stage(mode: str, limit: Optional[int]) -> int:
 # --------------------------------------------------------------------------- #
 # Orchestrate: one isolated child process per mode.
 # --------------------------------------------------------------------------- #
-def _orchestrate(limit: Optional[int], modes: List[str]) -> int:
+def _orchestrate(limit: int | None, modes: list[str]) -> int:
     """Run each mode in its own process (fresh config import with the flag set)."""
     import subprocess
 
@@ -380,11 +380,11 @@ def _orchestrate(limit: Optional[int], modes: List[str]) -> int:
 # --------------------------------------------------------------------------- #
 # Summarize: two score JSONs -> chunking_adoption_decision.md with a verdict.
 # --------------------------------------------------------------------------- #
-def _metric(payload: Dict[str, Any], name: str) -> Dict[str, Any]:
+def _metric(payload: dict[str, Any], name: str) -> dict[str, Any]:
     return payload.get("per_metric", {}).get(name, {}) or {}
 
 
-def _fmt(value: Optional[float]) -> str:
+def _fmt(value: float | None) -> str:
     return f"{value:.4f}" if isinstance(value, (int, float)) else "NaN"
 
 
@@ -419,7 +419,7 @@ def _summarize(baseline_json: Path, structure_json: Path, out_path: Path) -> int
     lines = [
         "# Décision d'adoption — Chunking structure-aware (RAG-05, 07-06)",
         "",
-        f"**Date:** {datetime.now(timezone.utc).date().isoformat()}",
+        f"**Date:** {datetime.now(UTC).date().isoformat()}",
         f"**Décision:** **{verdict}** — "
         + ("`structure_aware_chunking_enabled` passe à `True`."
            if adopt else "`structure_aware_chunking_enabled` reste `False`."),
@@ -502,7 +502,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
     if args.dry_run:

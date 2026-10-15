@@ -31,9 +31,9 @@ import json
 import math
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # The four legacy metrics required by the success criteria. context_recall and
 # context_precision are the mandatory pair; faithfulness and answer_relevancy
@@ -49,10 +49,10 @@ _DEFAULT_IN = Path(__file__).resolve().parent / "eval_input.jsonl"
 _DEFAULT_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
-def _read_eval_rows(path: Path) -> List[Dict[str, Any]]:
+def _read_eval_rows(path: Path) -> list[dict[str, Any]]:
     """Read the newline-delimited JSON boundary file (blank lines tolerated)."""
-    rows: List[Dict[str, Any]] = []
-    with open(path, "r", encoding="utf-8") as handle:
+    rows: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8") as handle:
         for line_number, raw in enumerate(handle, start=1):
             stripped = raw.strip()
             if not stripped:
@@ -64,7 +64,7 @@ def _read_eval_rows(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
-def _resolve_metrics(names: List[str]):
+def _resolve_metrics(names: list[str]):
     """Map metric names to ragas metric objects (imported lazily).
 
     Import is deferred so ``--help`` works without ragas installed. Raises a
@@ -93,7 +93,7 @@ def _resolve_metrics(names: List[str]):
     return resolved
 
 
-def _mean_ignoring_nan(values: List[float]) -> Optional[float]:
+def _mean_ignoring_nan(values: list[float]) -> float | None:
     """Mean of the non-NaN values, or None when every value is NaN."""
     clean = [v for v in values if v is not None and not (isinstance(v, float) and math.isnan(v))]
     if not clean:
@@ -101,7 +101,7 @@ def _mean_ignoring_nan(values: List[float]) -> Optional[float]:
     return sum(clean) / len(clean)
 
 
-def _nan_rate(values: List[float]) -> float:
+def _nan_rate(values: list[float]) -> float:
     """Fraction of NaN (or missing) entries in a column."""
     if not values:
         return 0.0
@@ -110,8 +110,8 @@ def _nan_rate(values: List[float]) -> float:
 
 
 def _summarize(
-    df, metric_names: List[str], is_adversarial: List[bool]
-) -> Dict[str, Any]:
+    df, metric_names: list[str], is_adversarial: list[bool]
+) -> dict[str, Any]:
     """Compute per-metric mean + NaN rate (overall / corpus / adversarial).
 
     Splitting the NaN rate on adversarial vs corpus questions is what lets a
@@ -130,7 +130,7 @@ def _summarize(
     corpus_idx = [i for i, adv in enumerate(is_adversarial) if not adv]
     adv_idx = [i for i, adv in enumerate(is_adversarial) if adv]
 
-    per_metric: Dict[str, Any] = {}
+    per_metric: dict[str, Any] = {}
     for name in metric_names:
         col = [float(v) for v in df[name].tolist()]
         corpus_col = [col[i] for i in corpus_idx]
@@ -169,7 +169,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point (separate venv). Heavy ragas/langchain imports deferred
     past argument parsing so ``--help`` works without the ragas venv."""
     args = _build_arg_parser().parse_args(argv)
@@ -254,7 +254,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     payload = {
         "run": args.run,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "judge_model": args.model,
         "embedding_model": args.embedding_model,
         "run_config": {"max_workers": 1, "cache": False, "temperature": 0},

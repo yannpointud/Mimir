@@ -6,7 +6,7 @@ and token management.
 """
 
 from datetime import timedelta
-from typing import Dict, Any
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm  # noqa: F401
 from pydantic import BaseModel
@@ -164,9 +164,9 @@ async def login(
 @router.post("/logout")
 async def logout(
     request: Request,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Logout current user (invalidate session).
 
@@ -206,7 +206,7 @@ async def logout(
 @router.post("/refresh", response_model=TokenRefreshResponse)
 async def refresh_token(
     request: Request,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
 ) -> TokenRefreshResponse:
     """
@@ -273,8 +273,8 @@ async def refresh_token(
 
 @router.get("/me")
 async def get_current_user_info(
-    current_user: Dict[str, Any] = Depends(get_current_user)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] = Depends(get_current_user)
+) -> dict[str, Any]:
     """
     Get current authenticated user information.
 
@@ -294,8 +294,8 @@ async def get_current_user_info(
 
 @router.post("/verify-admin")
 async def verify_admin_access(
-    admin_user: Dict[str, Any] = Depends(require_admin)
-) -> Dict[str, str]:
+    admin_user: dict[str, Any] = Depends(require_admin)
+) -> dict[str, str]:
     """
     Verify admin access (protected endpoint for testing admin auth).
 
@@ -315,9 +315,9 @@ async def verify_admin_access(
 async def change_password(
     request: Request,
     data: ChangePasswordRequest,
-    admin_user: Dict[str, Any] = Depends(require_admin),
+    admin_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Change admin password.
 

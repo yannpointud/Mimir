@@ -8,7 +8,8 @@ import asyncio
 import random
 import time
 import logging  # noqa: F401
-from typing import Callable, Optional, Dict, Any
+from typing import Any
+from collections.abc import Callable
 from datetime import datetime
 
 from .queue_manager import IngestionTask
@@ -48,9 +49,9 @@ class AsyncQueueManager:
         self.queue: asyncio.Queue[IngestionTask] = asyncio.Queue(maxsize=max_size)
 
         # Worker task management
-        self.worker_task: Optional[asyncio.Task] = None
+        self.worker_task: asyncio.Task | None = None
         self.stop_event = asyncio.Event()
-        self.processing_callback: Optional[Callable[[IngestionTask], bool]] = None
+        self.processing_callback: Callable[[IngestionTask], bool] | None = None
 
         # Statistics and monitoring
         self.stats = {
@@ -116,7 +117,7 @@ class AsyncQueueManager:
         # Wait for worker to finish
         try:
             await asyncio.wait_for(self.worker_task, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Worker task did not stop within {timeout}s, cancelling...")
             self.worker_task.cancel()
             try:
@@ -221,7 +222,7 @@ class AsyncQueueManager:
                 # Log statistics periodically
                 self._maybe_log_stats()
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Timeout waiting for task - normal, continue
                 continue
             except Exception as e:
@@ -339,7 +340,7 @@ class AsyncQueueManager:
             }}
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get current queue statistics
 

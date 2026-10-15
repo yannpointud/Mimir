@@ -35,7 +35,8 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
+from collections.abc import Sequence
 
 # sys.path bootstrap (same discipline as generate_golden_set.py): make the
 # project root and the backend package importable whether this file is run as a
@@ -60,7 +61,7 @@ def compare_exact_term_recall(
     dense_hits: Sequence[Sequence[int]],
     hybrid_hits: Sequence[Sequence[int]],
     expected_doc_ids: Sequence[int],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Compare dense vs hybrid exact-term recall (pure, no network).
 
     For each exact-term query, the query "hits" if its expected document_id is
@@ -96,7 +97,7 @@ def compare_exact_term_recall(
             f"{len(expected_doc_ids)})"
         )
 
-    per_query: List[Dict[str, Any]] = []
+    per_query: list[dict[str, Any]] = []
     dense_hit_count = 0
     hybrid_hit_count = 0
 
@@ -154,7 +155,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_exact_term_queries(path: Path) -> List[Dict[str, Any]]:
+def _load_exact_term_queries(path: Path) -> list[dict[str, Any]]:
     """Load exact-term queries from a JSON file (file I/O only, no network).
 
     Each item must carry a non-empty ``query`` string and an integer
@@ -166,7 +167,7 @@ def _load_exact_term_queries(path: Path) -> List[Dict[str, Any]]:
         raise ValueError(
             f"Exact-term queries file {path} must be a non-empty JSON list"
         )
-    queries: List[Dict[str, Any]] = []
+    queries: list[dict[str, Any]] = []
     for index, item in enumerate(data):
         if not isinstance(item, dict) or "query" not in item or "expected_doc_id" not in item:
             raise ValueError(
@@ -221,7 +222,7 @@ async def _embed_question(
     return np.array(response.embeddings[0], dtype=np.float32)
 
 
-def _dense_document_ids(question: str, embedding, vector_store, settings) -> List[int]:
+def _dense_document_ids(question: str, embedding, vector_store, settings) -> list[int]:
     """Retrieve document_ids in DENSE mode, reusing the production filter.
 
     Mirrors the dense branch of ``_process_question_with_rag_stream`` (top_k = max
@@ -240,7 +241,7 @@ def _dense_document_ids(question: str, embedding, vector_store, settings) -> Lis
     return [int(r.document_id) for r in search_results]
 
 
-def _hybrid_document_ids(question: str, embedding, vector_store, bm25_store, settings) -> List[int]:
+def _hybrid_document_ids(question: str, embedding, vector_store, bm25_store, settings) -> list[int]:
     """Retrieve document_ids in HYBRID mode, reusing the production fusion+filter.
 
     Mirrors ``_hybrid_retrieve`` (raw dense pool at similarity_floor=0.0 + BM25
@@ -274,17 +275,17 @@ def _hybrid_document_ids(question: str, embedding, vector_store, bm25_store, set
     return [int(r.document_id) for r in search_results]
 
 
-async def _run(queries: List[Dict[str, Any]], *, llm_service, vector_store,
-               bm25_store, budget_guard, usage_tracker, settings) -> Optional[Dict[str, Any]]:
+async def _run(queries: list[dict[str, Any]], *, llm_service, vector_store,
+               bm25_store, budget_guard, usage_tracker, settings) -> dict[str, Any] | None:
     """Run the throttled dense+hybrid retrieval loop and compare recall.
 
     One embedding call per query (shared by both modes), throttled to
     <= 1 call/sec. Returns the comparison dict, or None if the budget cap was
     hit before any query completed.
     """
-    dense_hits: List[List[int]] = []
-    hybrid_hits: List[List[int]] = []
-    expected_doc_ids: List[int] = []
+    dense_hits: list[list[int]] = []
+    hybrid_hits: list[list[int]] = []
+    expected_doc_ids: list[int] = []
 
     for index, item in enumerate(queries):
         # Throttle to stay under the Mistral free-tier 1 req/s ceiling.
@@ -315,7 +316,7 @@ async def _run(queries: List[Dict[str, Any]], *, llm_service, vector_store,
     return compare_exact_term_recall(dense_hits, hybrid_hits, expected_doc_ids)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Heavy service imports are deferred past argument parsing
     so ``--help`` never imports FastAPI nor touches any secret."""
     args = _build_arg_parser().parse_args(argv)

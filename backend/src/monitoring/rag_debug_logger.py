@@ -8,7 +8,7 @@ Includes all details: user query, vector search, context, LLM calls, and final r
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any
 from pathlib import Path
 
 from .logger import setup_logger  # noqa: F401
@@ -93,15 +93,15 @@ class RagDebugService:
                 }
             }))
 
-    def _format_log(self, data: Dict[str, Any]) -> str:
+    def _format_log(self, data: dict[str, Any]) -> str:
         """Format log data as JSON with proper serialization."""
         # Clean data for JSON serialization
         clean_data = _make_json_serializable(data)
         return json.dumps(clean_data, ensure_ascii=False, indent=None)
 
     def log_user_request(self, session_id: str, question: str,
-                        user_context: Optional[Dict[str, Any]] = None,
-                        context_limit: Optional[int] = None):
+                        user_context: dict[str, Any] | None = None,
+                        context_limit: int | None = None):
         """Log incoming user request."""
         if not self.enabled:
             return
@@ -118,7 +118,7 @@ class RagDebugService:
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_vector_search(self, session_id: str, search_results: List[Any],
+    def log_vector_search(self, session_id: str, search_results: list[Any],
                          embedding_tokens: int, search_time_ms: float):
         """Log vector search results with details."""
         if not self.enabled:
@@ -153,7 +153,7 @@ class RagDebugService:
 
     def log_context_building(self, session_id: str, system_prompt: str,
                            context_text: str, context_chunks: int,
-                           filtered_sources: List[Dict[str, Any]]):
+                           filtered_sources: list[dict[str, Any]]):
         """Log context building with prompt and sources."""
         if not self.enabled:
             return
@@ -181,7 +181,7 @@ class RagDebugService:
         self.logger.debug(self._format_log(log_data))
 
     def log_llm_request(self, session_id: str, model: str, full_prompt: str,
-                       user_question: str, parameters: Dict[str, Any]):
+                       user_question: str, parameters: dict[str, Any]):
         """Log LLM request with full prompt."""
         if not self.enabled:
             return
@@ -229,7 +229,7 @@ class RagDebugService:
         self.logger.debug(self._format_log(log_data))
 
     def log_final_response(self, session_id: str, confidence_score: float,
-                          sources_count: int, final_sources: List[Dict[str, Any]],
+                          sources_count: int, final_sources: list[dict[str, Any]],
                           total_processing_time_ms: float, cached: bool = False):
         """Log final response with confidence and sources."""
         if not self.enabled:
@@ -249,7 +249,7 @@ class RagDebugService:
         self.logger.debug(self._format_log(log_data))
 
     def log_error(self, session_id: str, error_type: str, error_message: str,
-                  stage: str, traceback_info: Optional[str] = None):
+                  stage: str, traceback_info: str | None = None):
         """Log errors in RAG pipeline."""
         if not self.enabled:
             return

@@ -4,7 +4,7 @@ Used by APIs to ensure data consistency
 """
 
 from pydantic import BaseModel, Field, validator, ConfigDict
-from typing import List, Optional, Dict, Any
+from typing import Any
 from datetime import datetime
 from enum import Enum
 
@@ -31,7 +31,7 @@ class BaseResponse(BaseModel):
     model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
 
     success: bool = True
-    message: Optional[str] = None
+    message: str | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -48,7 +48,7 @@ class PaginationModel(BaseModel):
 class DocumentBase(BaseModel):
     """Base model for documents"""
     filename: str = Field(..., min_length=1, max_length=255)
-    path: Optional[str] = Field(None, max_length=500)
+    path: str | None = Field(None, max_length=500)
     preserve: bool = Field(default=False)
 
 
@@ -65,10 +65,10 @@ class DocumentCreate(DocumentBase):
 
 class DocumentUpdate(BaseModel):
     """Model for updating a document"""
-    status: Optional[DocumentStatus] = None
-    error_message: Optional[str] = Field(None, max_length=1000)
-    chunk_count: Optional[int] = Field(None, ge=0)
-    preserve: Optional[bool] = None
+    status: DocumentStatus | None = None
+    error_message: str | None = Field(None, max_length=1000)
+    chunk_count: int | None = Field(None, ge=0)
+    preserve: bool | None = None
 
 
 class DocumentResponse(DocumentBase):
@@ -76,10 +76,10 @@ class DocumentResponse(DocumentBase):
     id: int
     file_hash: str
     status: DocumentStatus
-    error_message: Optional[str] = None
+    error_message: str | None = None
     chunk_count: int
     created_at: datetime
-    indexed_at: Optional[datetime] = None
+    indexed_at: datetime | None = None
     
     class Config:
         from_attributes = True  # For SQLAlchemy compatibility
@@ -91,7 +91,7 @@ class ChunkResponse(BaseModel):
     document_id: int
     chunk_index: int
     text: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     class Config:
         from_attributes = True
@@ -102,14 +102,14 @@ class DocumentWithChunksResponse(DocumentBase):
     id: int
     file_hash: str
     status: DocumentStatus
-    error_message: Optional[str] = None
+    error_message: str | None = None
     chunk_count: int
     created_at: datetime
-    indexed_at: Optional[datetime] = None
-    chunks: List[ChunkResponse] = []
-    content: Optional[str] = None  # Original content if available
-    file_size: Optional[int] = None
-    mime_type: Optional[str] = None
+    indexed_at: datetime | None = None
+    chunks: list[ChunkResponse] = []
+    content: str | None = None  # Original content if available
+    file_size: int | None = None
+    mime_type: str | None = None
 
     class Config:
         from_attributes = True
@@ -117,14 +117,14 @@ class DocumentWithChunksResponse(DocumentBase):
 
 class DocumentListResponse(BaseResponse):
     """Response for the document list"""
-    documents: List[DocumentResponse]
+    documents: list[DocumentResponse]
     total_count: int
-    pagination: Dict[str, Any]
+    pagination: dict[str, Any]
 
 
 class DocumentStatsResponse(BaseResponse):
     """Response for document statistics"""
-    stats: Dict[str, Any]
+    stats: dict[str, Any]
 
 
 # Configuration models
@@ -155,7 +155,7 @@ class ConfigurationResponse(ConfigurationBase):
 
 class ConfigurationListResponse(BaseResponse):
     """Response for the configuration list"""
-    configurations: List[ConfigurationResponse]
+    configurations: list[ConfigurationResponse]
 
 
 # Audit models
@@ -164,9 +164,9 @@ class AuditLogBase(BaseModel):
     """Base model for audit logs"""
     user_type: UserType
     action: str = Field(..., min_length=1, max_length=100)
-    details: Optional[str] = Field(None, max_length=1000)
-    ip_address: Optional[str] = Field(None, max_length=45)
-    user_agent: Optional[str] = None
+    details: str | None = Field(None, max_length=1000)
+    ip_address: str | None = Field(None, max_length=45)
+    user_agent: str | None = None
     success: bool = True
 
 
@@ -186,7 +186,7 @@ class AuditLogResponse(AuditLogBase):
 
 class AuditLogListResponse(BaseResponse):
     """Response for the audit log list"""
-    logs: List[AuditLogResponse]
+    logs: list[AuditLogResponse]
     total_count: int
 
 
@@ -195,9 +195,9 @@ class AuditLogListResponse(BaseResponse):
 class HealthCheckResponse(BaseResponse):
     """Health check response"""
     status: str = Field(default="healthy")
-    checks: Dict[str, Any] = Field(default_factory=dict)
-    uptime_seconds: Optional[float] = None
-    version: Optional[str] = None
+    checks: dict[str, Any] = Field(default_factory=dict)
+    uptime_seconds: float | None = None
+    version: str | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -205,7 +205,7 @@ class ErrorResponse(BaseModel):
     success: bool = False
     error_code: str
     error_message: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -214,7 +214,7 @@ class ErrorResponse(BaseModel):
 class FileUploadValidation(BaseModel):
     """Validation for file uploads"""
     max_size_mb: int = Field(default=100, ge=1, le=1000)
-    allowed_extensions: List[str] = Field(
+    allowed_extensions: list[str] = Field(
         default=['.pdf', '.docx', '.txt', '.md'],
         min_items=1
     )
@@ -229,9 +229,9 @@ class FileUploadValidation(BaseModel):
 
 class DatabaseStatsResponse(BaseResponse):
     """Database statistics"""
-    table_counts: Dict[str, int]
-    database_size_mb: Optional[float] = None
-    last_backup: Optional[datetime] = None
+    table_counts: dict[str, int]
+    database_size_mb: float | None = None
+    last_backup: datetime | None = None
 
 
 # Validation utilities

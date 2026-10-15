@@ -24,7 +24,7 @@ import shutil
 import tempfile
 import threading
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 
 import bm25s
 
@@ -55,9 +55,9 @@ class Bm25LexicalStore:
             index_path: Directory path where the bm25s index is persisted.
         """
         self.index_path = Path(index_path)
-        self._retriever: Optional[bm25s.BM25] = None
+        self._retriever: bm25s.BM25 | None = None
         # Corpus index position i -> real chunk_id (from FaissVectorStore metadata).
-        self._chunk_ids: List[int] = []
+        self._chunk_ids: list[int] = []
         # True once rebuilt or loaded (distinguishes "never built" from
         # "built empty" so query() can raise only in the former case).
         self._built: bool = False
@@ -65,7 +65,7 @@ class Bm25LexicalStore:
         # Thread safety (reentrant, like FaissVectorStore._lock).
         self._lock = threading.RLock()
 
-    def rebuild(self, active_chunks: List[Dict[str, Any]]) -> None:
+    def rebuild(self, active_chunks: list[dict[str, Any]]) -> None:
         """Rebuild the whole index from the currently active chunks.
 
         The corpus is expected to be modest in size (out of scope for HNSW /
@@ -111,7 +111,7 @@ class Bm25LexicalStore:
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg)
 
-    def query(self, question: str, top_k: int = 50) -> List[Tuple[int, float]]:
+    def query(self, question: str, top_k: int = 50) -> list[tuple[int, float]]:
         """Query the lexical index for the most relevant chunks.
 
         Args:

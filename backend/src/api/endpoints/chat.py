@@ -5,7 +5,7 @@ This module provides the main chat endpoint for user questions
 and responses based on document context.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request  # noqa: F401
 from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.background import BackgroundTask
@@ -50,8 +50,8 @@ router = APIRouter(
 class ChatRequest(BaseModel):
     """Request model for chat questions."""
     question: str = Field(..., min_length=1, max_length=1000, description="User question")
-    session_id: Optional[str] = Field(None, description="Optional session ID for tracking")
-    context_limit: Optional[int] = Field(5, ge=1, le=10, description="Maximum context documents")
+    session_id: str | None = Field(None, description="Optional session ID for tracking")
+    context_limit: int | None = Field(5, ge=1, le=10, description="Maximum context documents")
     include_sources: bool = Field(True, description="Whether to include source references")
 
 
@@ -68,7 +68,7 @@ class SourceReference(BaseModel):
 class ChatResponse(BaseModel):
     """Response model for chat answers."""
     answer: str
-    sources: List[SourceReference] = []
+    sources: list[SourceReference] = []
     confidence_score: float = Field(ge=0.0, le=1.0)
     session_id: str
     response_time_ms: int
@@ -79,17 +79,17 @@ class ChatResponse(BaseModel):
 class EscalationRequest(BaseModel):
     """Request model for escalating chat to human."""
     question: str
-    session_id: Optional[str] = None
-    chat_history: List[Dict[str, Any]] = []
-    user_email: Optional[str] = None
-    additional_context: Optional[str] = None
+    session_id: str | None = None
+    chat_history: list[dict[str, Any]] = []
+    user_email: str | None = None
+    additional_context: str | None = None
 
 
 class EscalationResponse(BaseModel):
     """Response model for escalation requests."""
     success: bool
     message: str
-    escalation_id: Optional[str] = None
+    escalation_id: str | None = None
 
 
 @router.post("/stream")
@@ -104,7 +104,7 @@ class EscalationResponse(BaseModel):
 async def chat_stream(
     request: Request,
     chat_request: ChatRequest,
-    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    current_user: dict[str, Any] | None = Depends(get_optional_user),
     chat_cache: ChatCacheService = Depends(get_chat_cache_service),
     document_repository: DocumentRepository = Depends(get_document_repository),
     rag_debug: RagDebugService = Depends(get_rag_debug_service),
@@ -130,7 +130,7 @@ async def chat_stream(
     #
     # asyncio.to_thread: reserve() is a blocking SQLite write -- keep it off
     # the event loop.
-    reservation: Optional[BudgetReservation] = await asyncio.to_thread(
+    reservation: BudgetReservation | None = await asyncio.to_thread(
         budget_guard.reserve, "chat"
     )
     if reservation is None:
@@ -296,7 +296,7 @@ async def chat_stream(
 async def escalate_to_human(
     request: Request,
     escalation_request: EscalationRequest,
-    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user),
+    current_user: dict[str, Any] | None = Depends(get_optional_user),
     email_service: EmailService = Depends(get_email_service)
 ) -> EscalationResponse:
     """
@@ -363,8 +363,8 @@ async def escalate_to_human(
 @router.get("/sessions/{session_id}/history")
 async def get_session_history(
     session_id: str,
-    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
-) -> Dict[str, Any]:
+    current_user: dict[str, Any] | None = Depends(get_optional_user)
+) -> dict[str, Any]:
     """
     Get chat history for a session.
 
@@ -385,7 +385,7 @@ async def get_session_history(
 @router.delete("/sessions/{session_id}")
 async def clear_session_history(
     session_id: str,
-    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
+    current_user: dict[str, Any] | None = Depends(get_optional_user)
 ) -> BaseResponse:
     """
     Clear chat history for a session.
@@ -436,7 +436,7 @@ def _generate_escalation_id() -> str:
     return f"ESC-{timestamp}-{random_suffix.upper()}"
 
 
-def _extract_sources_from_history(chat_history: List[Dict[str, Any]]) -> List[str]:
+def _extract_sources_from_history(chat_history: list[dict[str, Any]]) -> list[str]:
     """Extract source references from chat history."""
     sources = set()
 

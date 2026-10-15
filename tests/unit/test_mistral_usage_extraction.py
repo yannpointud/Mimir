@@ -84,7 +84,7 @@ def _sse_lines(*chunks):
     """Build an async iterator of raw SSE byte lines from a list of chunk dicts."""
     lines = []
     for chunk in chunks:
-        lines.append(f"data: {json.dumps(chunk)}".encode('utf-8'))
+        lines.append(f"data: {json.dumps(chunk)}".encode())
     lines.append(b"data: [DONE]")
 
     async def _aiter():
