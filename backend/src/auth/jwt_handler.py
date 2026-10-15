@@ -102,7 +102,7 @@ class JWTHandler:
         except jwt.InvalidTokenError as e:
             logger.warning(f"JWT token validation failed: {e}")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Unexpected error during token verification: {e}")
             return None
 
@@ -137,7 +137,7 @@ class JWTHandler:
 
         try:
             return self.pwd_context.verify(plain_password, hashed_password)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Password verification error: {e}")
             return False
 

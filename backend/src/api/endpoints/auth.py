@@ -195,7 +195,7 @@ async def logout(
 
         return {"message": "Successfully logged out"}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Logout error: {e}")
         return {"message": "Logged out (with errors)"}
 
@@ -424,7 +424,7 @@ def _authenticate_admin(username: str, password: str) -> bool:
         # Verify password against hash
         return jwt_handler.verify_password(password, expected_password_hash)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Authentication error: {e}")
         return False
 
@@ -480,6 +480,6 @@ async def _log_auth_event(
             success=success,
             additional_data={"username": username, "timestamp": "auto"},
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to log auth event: {e}")
         # Don't raise exception - logging failures shouldn't break auth flow

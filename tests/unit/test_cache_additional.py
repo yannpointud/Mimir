@@ -253,7 +253,7 @@ class TestCacheServiceAdvanced:
                         contains(cache, key)
                     if i % 20 == 0:
                         cache.get_stats()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 errors.append(f"Worker {worker_id}: {e}")
 
         # Lancer plusieurs workers

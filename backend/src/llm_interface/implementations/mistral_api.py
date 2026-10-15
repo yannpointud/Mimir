@@ -292,7 +292,7 @@ class MistralAPIService(AbstractLLMService):
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
 
-    async def generate_stream(
+    async def generate_stream(  # noqa: C901
         self,
         prompt: str,
         system_prompt: str | None = None,
@@ -626,7 +626,7 @@ class MistralAPIService(AbstractLLMService):
             logger.debug("Mistral API health check passed")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Mistral API health check failed: {str(e)}")
             return False
 

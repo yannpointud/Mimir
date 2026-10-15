@@ -178,7 +178,7 @@ class IngestionProcessor:
                     logger.info(
                         f"Reprocessing existing document: {document.filename} (ID: {document_id})"
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.error(
                         f"Failed to retrieve document {document_id} for reprocessing: {str(e)}"
                     )
@@ -210,7 +210,7 @@ class IngestionProcessor:
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to queue document {file_path}: {str(e)}")
             return False
 
@@ -268,13 +268,13 @@ class IngestionProcessor:
                 self.document_repository.update_status(
                     int(task.document_id), "error", error_message="Daily budget exceeded"
                 )
-            except Exception as db_error:
+            except Exception as db_error:  # noqa: BLE001
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             task.retry_count = task.max_retries
             return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             error_msg = f"Task processing failed: {str(e)}"
             logger.error(error_msg)
 
@@ -285,7 +285,7 @@ class IngestionProcessor:
                     "error",
                     error_message=error_msg[:500],  # Limit error message length
                 )
-            except Exception as db_error:
+            except Exception as db_error:  # noqa: BLE001
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             return False
@@ -299,7 +299,7 @@ class IngestionProcessor:
             # _bm25_dirty guard; never allowed to mask the task result.
             try:
                 await self._maybe_rebuild_bm25_on_drain()
-            except Exception as drain_error:
+            except Exception as drain_error:  # noqa: BLE001
                 logger.warning(f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}")
 
     async def _process_document_pipeline(self, task: IngestionTask) -> bool:
@@ -446,7 +446,7 @@ class IngestionProcessor:
             # retry loop entirely (a retry cannot succeed before the next reset).
             raise
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             processing_time = time.time() - start_time
             logger.error(
                 f"Document processing pipeline failed after {processing_time:.2f}s: {str(e)}",
@@ -503,7 +503,7 @@ class IngestionProcessor:
             active_chunks = self.vector_store.snapshot_active_chunks()
             await asyncio.to_thread(self.bm25_store.rebuild, active_chunks)
             self._bm25_dirty = False
-        except Exception as bm25_error:
+        except Exception as bm25_error:  # noqa: BLE001
             logger.warning(f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}")
 
     def _extract_text(self, file_path: str) -> str:

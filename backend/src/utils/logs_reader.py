@@ -85,7 +85,7 @@ def _parse_backend_log_line(line: str) -> LogEntry | None:
             message=message,
             details=details,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug(f"Failed to parse backend log line: {e}")
         return None
 
@@ -132,7 +132,7 @@ def _parse_frontend_log_line(line: str) -> LogEntry | None:
             message=message,
             details=details,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.debug(f"Failed to parse frontend log line: {e}")
         return None
 
@@ -151,7 +151,7 @@ def _read_log_file(file_path: Path, max_lines: int = 1000) -> list[str]:
             lines = all_lines[-max_lines:] if len(all_lines) > max_lines else all_lines
 
         return lines
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to read log file {file_path}: {e}")
         return []
 
@@ -267,7 +267,7 @@ def get_logs(
 
         return result_logs, len(filtered_logs)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error retrieving logs: {e}")
         return [], 0
 
@@ -293,7 +293,7 @@ def get_available_modules() -> list[str]:
 
         return sorted(list(modules))
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error getting available modules: {e}")
         return []
 
@@ -317,7 +317,7 @@ def get_logs_summary() -> dict[str, Any]:
 
         return summary
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error getting logs summary: {e}")
         return {
             "backend_logs_count": 0,

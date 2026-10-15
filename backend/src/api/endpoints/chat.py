@@ -266,7 +266,7 @@ async def chat_stream(
             response_time_ms = int((end_time - start_time).total_seconds() * 1000)
             logger.info(f"Streaming completed - session: {session_id}, time: {response_time_ms}ms")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Streaming error: {type(e).__name__} - {str(e)}")
             # Never leak raw exception details to the client (info disclosure);
             # the full error is kept in the server logs above.
@@ -361,7 +361,7 @@ async def escalate_to_human(
                 escalation_id=None,
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Escalation error: {e}")
         return EscalationResponse(
             success=False,

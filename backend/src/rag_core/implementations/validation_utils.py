@@ -150,7 +150,7 @@ class VectorStoreValidator:
             self.logger.error(f"Failed to get vector store documents: {e}")
             raise
 
-    def _analyze_inconsistencies(self, db_docs: dict, vector_docs: dict) -> dict[str, Any]:
+    def _analyze_inconsistencies(self, db_docs: dict, vector_docs: dict) -> dict[str, Any]:  # noqa: C901
         """Analyze inconsistencies between the two sources."""
         issues = {
             "orphaned_chunks": [],  # Chunks in FAISS without a document in DB
@@ -334,7 +334,7 @@ class VectorStoreValidator:
             if fixes:
                 self.vector_store.persist()
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to apply fixes: {e}")
             fixes.append(
                 {
@@ -438,7 +438,7 @@ def create_validation_report(
 
             logger.info(f"Validation report saved to {output_path}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to save validation report: {e}")
 
     return report

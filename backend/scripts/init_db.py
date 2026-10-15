@@ -55,7 +55,7 @@ def main():
         else:
             print("❌ Database health check failed")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Error: {e}")
         sys.exit(1)
 

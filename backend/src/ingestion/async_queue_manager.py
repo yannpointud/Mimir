@@ -231,7 +231,7 @@ class AsyncQueueManager:
             except TimeoutError:
                 # Timeout waiting for task - normal, continue
                 continue
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Worker loop error: {str(e)}")
                 await asyncio.sleep(1.0)  # Brief pause to prevent tight error loop
 
@@ -309,7 +309,7 @@ class AsyncQueueManager:
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             processing_time = time.time() - start_time
             logger.error(
                 f"Task processing failed after {processing_time:.2f}s: {task.file_path} - {str(e)}",

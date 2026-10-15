@@ -68,7 +68,7 @@ class CustomJSONResponse(JSONResponse):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # noqa: C901
     """
     Application lifespan manager - Milestone 3
     Initialization at startup, cleanup at shutdown
@@ -163,7 +163,7 @@ async def lifespan(app: FastAPI):
                             logger.info(
                                 f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
                             )
-                except Exception as bm25_startup_error:
+                except Exception as bm25_startup_error:  # noqa: BLE001
                     logger.warning(
                         f"BM25 startup rebuild failed - hybrid queries will degrade to "
                         f"dense-only until next ingestion: {bm25_startup_error}"
@@ -189,7 +189,7 @@ async def lifespan(app: FastAPI):
                         else:
                             logger.warning(f"Document file not found: {doc.path}")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to initialize ingestion processor: {e}")
             # Continue without ingestion processor (non-blocking)
 
@@ -218,7 +218,7 @@ async def lifespan(app: FastAPI):
                     logger.info("Ingestion processor stopped gracefully")
                 else:
                     logger.warning("Ingestion processor stop timeout")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Error stopping ingestion processor: {e}")
 
         # Graceful LLM service shutdown to avoid "Event loop is closed"
@@ -228,11 +228,11 @@ async def lifespan(app: FastAPI):
             if _llm_service is not None:
                 await _llm_service.close()
                 logger.info("LLM service closed gracefully")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error closing LLM service: {e}")
 
         logger.info("Application shutdown completed")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Error during shutdown: {e}")
 
 
@@ -390,7 +390,7 @@ async def root_health_check(response: Response):
         with db_manager.get_session_context() as session:
             return await health_check(response=response, db=session)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Root health check failed: {e}")
         return CustomJSONResponse(
             status_code=503,

@@ -512,7 +512,7 @@ async def _hybrid_retrieve(
     return search_results
 
 
-async def _process_question_with_rag_stream(
+async def _process_question_with_rag_stream(  # noqa: C901
     question: str,
     context_limit: int,
     include_sources: bool,
@@ -643,7 +643,7 @@ async def _process_question_with_rag_stream(
                     documents_by_id = document_repository.get_by_ids(
                         list({int(r.document_id) for r in search_results})
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     documents_by_id = {}
 
             # Single enumerate() pass: numbered [N] context + sources built from

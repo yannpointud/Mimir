@@ -838,7 +838,7 @@ async def admin_upload_document(
                 try:
                     doc_repo.delete(document.id, force=True)
                     file_path.unlink(missing_ok=True)
-                except Exception as cleanup_error:
+                except Exception as cleanup_error:  # noqa: BLE001
                     logger.warning(
                         f"Failed to clean up after queue-full rejection "
                         f"(document_id={document.id}): {cleanup_error}"
@@ -1118,7 +1118,7 @@ async def rebuild_vector_store(
         # lookup and fallback, as before.
         try:
             existing_document_ids = {str(doc.id) for doc in document_repo.get_all()}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to list documents for orphan cleanup: {str(e)}")
             existing_document_ids = None
 
@@ -1210,7 +1210,7 @@ async def rebuild_vector_store(
                 success=False,
                 additional_data={"error": str(e), "admin_user": current_user["sub"]},
             )
-        except Exception as audit_error:
+        except Exception as audit_error:  # noqa: BLE001
             # Do not fail the request on audit log error, but never
             # silence it either (admin traceability requirement).
             logger.warning(f"Failed to write audit log for rebuild failure: {audit_error}")

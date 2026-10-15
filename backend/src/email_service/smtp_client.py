@@ -86,7 +86,7 @@ class EmailService:
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error sending escalation email: {e}")
             return False
 
@@ -125,7 +125,7 @@ class EmailService:
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error sending notification email: {e}")
             return False
 
@@ -188,7 +188,7 @@ class EmailService:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"SMTP send error: {e}")
             return False
 
@@ -208,7 +208,7 @@ class EmailService:
                 "Content-Disposition", f"attachment; filename= {attachment['filename']}"
             )
             message.attach(part)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error adding attachment: {e}")
 
     def _generate_escalation_html(

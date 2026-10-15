@@ -208,7 +208,7 @@ async def get_document_with_chunks(
             )
         else:
             logger.warning(f"Document {document_id}: No chunks found in vector store")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"Could not retrieve chunks for document {document_id}: {e}")
         # Continue without chunks on error
 
@@ -240,11 +240,11 @@ async def get_document_with_chunks(
                 logger.debug(
                     f"Successfully extracted text from {document.path} ({len(content) if content else 0} characters)"
                 )
-            except Exception as extraction_error:
+            except Exception as extraction_error:  # noqa: BLE001
                 logger.warning(f"Could not extract text from {document.path}: {extraction_error}")
                 content = None
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Could not read file metadata for document {document_id}: {e}")
 
     # Build the response with all details
@@ -457,7 +457,7 @@ async def upload_document(
                 try:
                     doc_repo.delete(document.id, force=True)
                     file_path.unlink(missing_ok=True)
-                except Exception as cleanup_error:
+                except Exception as cleanup_error:  # noqa: BLE001
                     logger.warning(
                         f"Failed to clean up after queue-full rejection "
                         f"(document_id={document.id}): {cleanup_error}"
@@ -549,7 +549,7 @@ async def delete_document(
             try:
                 os.remove(file_path)
                 logger.debug(f"Deleted file: {file_path}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to delete file {file_path}: {e}")
                 # Continue - database deletion was successful
 
@@ -582,7 +582,7 @@ async def delete_document(
                         logger.info(
                             f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed"
                         )
-                except Exception as cleanup_error:
+                except Exception as cleanup_error:  # noqa: BLE001
                     logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
                     # Do not fail the deletion if cleanup fails
 
@@ -597,14 +597,14 @@ async def delete_document(
                     # Snapshot active chunks UNDER the FAISS lock.
                     active_chunks = vector_store.snapshot_active_chunks()
                     await asyncio.to_thread(bm25_store.rebuild, active_chunks)
-                except Exception as bm25_error:
+                except Exception as bm25_error:  # noqa: BLE001
                     logger.warning(
                         f"BM25 rebuild after deletion failed - continuing anyway: {bm25_error}"
                     )
 
             else:
                 logger.warning(f"Failed to remove document chunks from vector store: {filename}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error removing document from vector store: {e}")
             # Continue with deletion even if vector store removal fails
 
@@ -912,7 +912,7 @@ async def validate_vector_store_consistency(
 
                 logger.info(f"Validation report saved to {report_path}")
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(f"Failed to save validation report: {e}")
                 # Do not fail the validation if saving the report fails
 

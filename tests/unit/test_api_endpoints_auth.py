@@ -279,7 +279,7 @@ class TestAuthHelperFunctions:
                     details="Login failed",
                 )
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pytest.fail("Exception should be handled silently")
 
 

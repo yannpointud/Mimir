@@ -138,7 +138,7 @@ class DocumentFileHandler(FileSystemEventHandler):
             logger.info(f"New file detected: {file_path}")
             try:
                 self.on_file_added(file_path)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Error processing new file {file_path}: {e}")
 
     def on_modified(self, event: FileSystemEvent):
@@ -164,7 +164,7 @@ class DocumentFileHandler(FileSystemEventHandler):
             logger.info(f"File modified: {file_path}")
             try:
                 self.on_file_modified(file_path)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"Error processing modified file {file_path}: {e}")
 
     def _wait_for_file_stability(self, file_path: str, max_wait: int = 5):
@@ -194,7 +194,7 @@ class DocumentFileHandler(FileSystemEventHandler):
                     # File might be locked or deleted
                     break
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"Error waiting for file stability: {e}")
 
 
@@ -280,7 +280,7 @@ class FileWatcher:
             logger.info("FileWatcher started successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to start FileWatcher: {e}")
             return False
 
@@ -306,7 +306,7 @@ class FileWatcher:
             logger.info("FileWatcher stopped")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error stopping FileWatcher: {e}")
             return False
 
@@ -356,7 +356,7 @@ class FileWatcher:
             logger.info(f"Added directory to watch list: {directory}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to add directory {directory}: {e}")
             return False
 
@@ -386,7 +386,7 @@ class FileWatcher:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to remove directory {directory}: {e}")
             return False
 
@@ -415,7 +415,7 @@ class FileWatcher:
 
             logger.info(f"Found {len(existing_files)} existing files")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Error scanning existing files: {e}")
 
         return existing_files

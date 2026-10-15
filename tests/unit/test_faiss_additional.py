@@ -85,7 +85,7 @@ class TestFaissVectorStoreAdditional:
         try:
             temp_store.upsert(chunks)
             success = True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Error: {e}")
             success = False
 
@@ -332,7 +332,7 @@ class TestFaissStoreFunctionality:
                 store.upsert([invalid_chunk])
                 # Si aucune exception, c'est que le store gère la validation
                 assert True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Exception attendue pour dimension incorrecte
                 assert True
 

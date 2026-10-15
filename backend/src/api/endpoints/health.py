@@ -154,12 +154,12 @@ async def disk_usage() -> dict[str, Any]:
                     }
                 else:
                     usage_info[name] = {"path": path, "error": "Directory does not exist"}
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 usage_info[name] = {"path": path, "error": str(e)}
 
         return {"healthy": True, "disk_usage": usage_info, "timestamp": datetime.utcnow()}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Disk usage check error: {e}")
         return {"healthy": False, "error": str(e), "timestamp": datetime.utcnow()}
 
@@ -186,7 +186,7 @@ async def _check_database_health(db: Session) -> dict[str, Any]:
             "response_time_ms": 0,  # Could measure actual response time
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Database health check failed: {e}")
         return {"healthy": False, "connection": "failed", "error": str(e)}
 
@@ -229,7 +229,7 @@ async def _check_vector_store_health() -> dict[str, Any]:
                 "error": "Inconsistent vector store state",
             }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Vector store health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 
@@ -249,7 +249,7 @@ async def _check_llm_health() -> dict[str, Any]:
             "note": "API key configured" if llm_configured else "API key not configured",
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"LLM health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 
@@ -283,7 +283,7 @@ async def _check_cache_health() -> dict[str, Any]:
             "chat_cache": chat_cache_stats,
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Cache health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 
@@ -303,7 +303,7 @@ async def _check_email_health() -> dict[str, Any]:
             else "Email service not configured",
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"Email health check failed: {e}")
         return {"healthy": False, "error": str(e)}
 

@@ -134,7 +134,7 @@ async def frontend_logging_health() -> dict[str, Any]:
             "timestamp": datetime.utcnow().isoformat() + "Z",
         }
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "status": "unhealthy",
             "error": str(e),

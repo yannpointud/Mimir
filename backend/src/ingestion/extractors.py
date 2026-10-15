@@ -131,7 +131,7 @@ class PDFExtractor(TextExtractor):
                         page_text = page.extract_text()
                         if page_text.strip():  # Only add non-empty pages
                             text_parts.append(page_text)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.warning(
                             f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}"
                         )
@@ -269,7 +269,7 @@ class TXTExtractor(TextExtractor):
 
             except UnicodeDecodeError:
                 continue
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 error_msg = (
                     f"Failed to read text file {file_path} with encoding {encoding}: {str(e)}"
                 )

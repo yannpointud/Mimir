@@ -123,7 +123,7 @@ def _run_iteration(iteration: int, index_path: str, metadata_path: str) -> tuple
             index_path=index_path,
             metadata_path=metadata_path,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return False, f"iteration {iteration}: reload raised {e!r}"
 
     metadata_len = len(reloaded.metadata)

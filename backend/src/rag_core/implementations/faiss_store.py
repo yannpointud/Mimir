@@ -129,7 +129,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.info(f"Creating new FAISS index: {self.index_type}")
                 self._create_new_index()
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to initialize FAISS index: {str(e)}")
             # Fallback: create new index
             self._create_new_index()
@@ -452,7 +452,7 @@ class FaissVectorStore(AbstractVectorStore):
                     )
                     try:
                         self.optimize()
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.warning(f"Automatic optimization failed: {e}")
                         # Don't fail the delete operation if optimization fails
 
@@ -539,7 +539,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Vector store health check failed: {str(e)}")
             return False
 
@@ -774,7 +774,7 @@ class FaissVectorStore(AbstractVectorStore):
                     try:
                         self._create_backup(backup_timestamp)
                         logger.info(f"Backup created: {backup_timestamp}")
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.warning(f"Backup creation failed: {e}")
                         # Continue despite backup failure
 
@@ -842,7 +842,7 @@ class FaissVectorStore(AbstractVectorStore):
                     try:
                         self.optimize()
                         optimization_triggered = True
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.warning(f"Optimization failed after cleanup: {e}")
                         # Don't fail the cleanup if optimization fails
 
@@ -955,7 +955,7 @@ class FaissVectorStore(AbstractVectorStore):
                     f"Backup rotation: removed {removed} old backup files (max_backups={max_backups})"
                 )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(f"Backup rotation failed: {e}")
 
     def _get_existing_document_ids(self) -> set:
@@ -975,7 +975,7 @@ class FaissVectorStore(AbstractVectorStore):
             finally:
                 session.close()
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get existing document IDs from database: {e}")
             # Fallback: use IDs present in the FAISS mapping
             return set(self.document_to_chunks.keys())
@@ -1101,7 +1101,7 @@ class FaissVectorStore(AbstractVectorStore):
                         logger.info(
                             f"Orphan cleanup completed: {cleanup_result['cleaned_chunks']} chunks cleaned"
                         )
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         logger.warning(f"Orphan cleanup failed during rebuild: {e}")
                         # Continue rebuild even if cleanup fails
 
@@ -1199,6 +1199,6 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.debug(f"Retrieved {len(chunks)} chunks for document {document_id}")
                 return chunks
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to get chunks for document {document_id}: {e}")
             return []
