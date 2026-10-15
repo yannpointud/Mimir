@@ -1036,13 +1036,17 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.error(f"Failed to save optimized index: {e}")
                 raise VectorStoreOperationError(f"Index optimization save failed: {e}")
 
-    def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True) -> Dict[str, Any]:
+    def rebuild_vector_store(self, force_rebuild: bool = False, cleanup_orphans: bool = True,
+                             existing_document_ids: Optional[set] = None) -> Dict[str, Any]:
         """
         Completely rebuild the vector store with optional orphan cleanup.
 
         Args:
             force_rebuild: Force rebuild even without deleted chunks
             cleanup_orphans: Clean orphaned chunks before rebuild
+            existing_document_ids: Document ids known to the database, forwarded
+                to clean_orphans(). When None, clean_orphans() queries the
+                database itself.
 
         Returns:
             Dict with rebuild statistics
@@ -1060,7 +1064,10 @@ class FaissVectorStore(AbstractVectorStore):
                 cleanup_result = None
                 if cleanup_orphans:
                     try:
-                        cleanup_result = self.clean_orphans(create_backup=True)
+                        cleanup_result = self.clean_orphans(
+                            existing_document_ids=existing_document_ids,
+                            create_backup=True
+                        )
                         logger.info(f"Orphan cleanup completed: {cleanup_result['cleaned_chunks']} chunks cleaned")
                     except Exception as e:
                         logger.warning(f"Orphan cleanup failed during rebuild: {e}")

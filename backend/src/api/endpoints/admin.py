@@ -14,8 +14,8 @@ import time
 from pathlib import Path
 
 from src.auth.middleware import require_admin, get_current_user  # noqa: F401
-from src.database.repository import ConfigurationRepository, AuditLogRepository, UsageRepository
-from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor, get_bm25_store
+from src.database.repository import ConfigurationRepository, AuditLogRepository, UsageRepository, DocumentRepository
+from src.api.dependencies import get_configuration_repository, get_audit_log_repository, get_usage_repository, get_vector_store, get_ingestion_processor, get_bm25_store, get_document_repository
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
@@ -1069,7 +1069,8 @@ async def rebuild_vector_store(
     current_user: Dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
     vector_store: FaissVectorStore = Depends(get_vector_store),
-    bm25_store: Bm25LexicalStore = Depends(get_bm25_store)
+    bm25_store: Bm25LexicalStore = Depends(get_bm25_store),
+    document_repo: DocumentRepository = Depends(get_document_repository)
 ) -> BaseResponse:
     """
     Force complete rebuild of the FAISS vector index.
@@ -1090,6 +1091,8 @@ async def rebuild_vector_store(
         bm25_store: Shared BM25 lexical store singleton; resynced from the
             optimized FAISS snapshot so a manual rebuild leaves no ghost/orphan
             chunk in the lexical index (anti-ghost, T-06-06-01)
+        document_repo: Request-scoped document repository, the source of truth
+            for which documents still exist during orphan cleanup
 
     Returns:
         BaseResponse: Operation result with statistics
@@ -1102,9 +1105,23 @@ async def rebuild_vector_store(
         stats_before = await asyncio.to_thread(vector_store.get_stats)
         start_time = time.time()
 
+        # Resolve the existing document ids through the injected repository so
+        # orphan cleanup uses the same database as this request, instead of the
+        # vector store opening its own global DatabaseManager connection. On a
+        # database error, fall back to None: the store then applies its own
+        # lookup and fallback, as before.
+        try:
+            existing_document_ids = {str(doc.id) for doc in document_repo.get_all()}
+        except Exception as e:
+            logger.error(f"Failed to list documents for orphan cleanup: {str(e)}")
+            existing_document_ids = None
+
         # Force rebuild with orphan cleanup (blocking FAISS call offloaded to a worker thread)
         rebuild_result = await asyncio.to_thread(
-            vector_store.rebuild_vector_store, force_rebuild=True, cleanup_orphans=True
+            vector_store.rebuild_vector_store,
+            force_rebuild=True,
+            cleanup_orphans=True,
+            existing_document_ids=existing_document_ids,
         )
 
         # Resync the BM25 lexical index from the freshly-optimized FAISS
