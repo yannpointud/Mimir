@@ -274,10 +274,10 @@ class VectorStoreValidator:
                     doc_id = ghost['document_id']
                     chunk_id = ghost['chunk_id']
                     
-                    if doc_id in self.vector_store.document_to_chunks:
-                        if chunk_id in self.vector_store.document_to_chunks[doc_id]:
-                            self.vector_store.document_to_chunks[doc_id].remove(chunk_id)
-                            ghost_count += 1
+                    doc_chunks = self.vector_store.document_to_chunks
+                    if doc_id in doc_chunks and chunk_id in doc_chunks[doc_id]:
+                        doc_chunks[doc_id].remove(chunk_id)
+                        ghost_count += 1
                 
                 if ghost_count > 0:
                     fixes.append({

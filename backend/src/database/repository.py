@@ -168,9 +168,8 @@ class DocumentRepository(BaseRepository):
             query = self.session.query(Document)
 
             # Apply filters
-            if filters:
-                if "status" in filters:
-                    query = query.filter(Document.status == filters["status"])
+            if filters and "status" in filters:
+                query = query.filter(Document.status == filters["status"])
 
             # Apply search
             if search:

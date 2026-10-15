@@ -81,10 +81,7 @@ class DocumentFileHandler(FileSystemEventHandler):
 
         # Check file extension
         file_ext = os.path.splitext(file_path)[1].lower()
-        if file_ext not in self.supported_extensions:
-            return True
-
-        return False
+        return file_ext not in self.supported_extensions
 
     def _is_recently_processed(self, file_path: str, event_type: str) -> bool:
         """

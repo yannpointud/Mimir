@@ -571,7 +571,7 @@ class IngestionProcessor:
         """
         chunks = []
 
-        for i, (chunk_data, embedding) in enumerate(zip(chunks_data, embeddings)):
+        for chunk_data, embedding in zip(chunks_data, embeddings, strict=False):
             chunk = Chunk(
                 text=chunk_data['text'],
                 embedding=np.array(embedding, dtype=np.float32),

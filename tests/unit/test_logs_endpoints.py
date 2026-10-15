@@ -5,6 +5,8 @@ Tests pour les endpoints de logs frontend.
 import pytest
 from unittest.mock import patch, MagicMock
 
+from fastapi import HTTPException
+
 from src.api.endpoints.logs import (
     FrontendLogEntry,
     LogResponse,
@@ -213,7 +215,7 @@ class TestReceiveFrontendLog:
             message="Test message"
         )
 
-        with pytest.raises(Exception):  # HTTPException
+        with pytest.raises(HTTPException):
             await receive_frontend_log(log_entry)
 
         # Vérifier que l'erreur a été loggée

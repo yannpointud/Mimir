@@ -517,7 +517,7 @@ class TestStructureAwareChunking:
         # On-vs-off: identical text and character boundaries, only an extra key.
         on = ChunkingStrategy(self._structure_config(True)).chunk_text(html)
         assert len(on) == len(off)
-        for chunk_on, chunk_off in zip(on, off):
+        for chunk_on, chunk_off in zip(on, off, strict=False):
             assert chunk_on["text"] == chunk_off["text"]
             assert chunk_on["start_char"] == chunk_off["start_char"]
             assert chunk_on["end_char"] == chunk_off["end_char"]

@@ -101,7 +101,7 @@ def compare_exact_term_recall(
     dense_hit_count = 0
     hybrid_hit_count = 0
 
-    for dense_ids, hybrid_ids, expected in zip(dense_hits, hybrid_hits, expected_doc_ids):
+    for dense_ids, hybrid_ids, expected in zip(dense_hits, hybrid_hits, expected_doc_ids, strict=False):
         dense_ids_list = [int(x) for x in dense_ids]
         hybrid_ids_list = [int(x) for x in hybrid_ids]
         expected_id = int(expected)

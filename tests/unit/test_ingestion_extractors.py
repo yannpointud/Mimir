@@ -227,9 +227,11 @@ class TestPDFExtractor:
 
         extractor = PDFExtractor()
 
-        with patch('builtins.open', mock_open(read_data=b'encrypted pdf data')):
-            with pytest.raises(ExtractionError) as exc_info:
-                extractor.extract("encrypted.pdf")
+        with (
+            patch('builtins.open', mock_open(read_data=b'encrypted pdf data')),
+            pytest.raises(ExtractionError) as exc_info,
+        ):
+            extractor.extract("encrypted.pdf")
 
         assert "encrypted" in str(exc_info.value).lower() or "decrypt" in str(exc_info.value).lower()
 
@@ -240,9 +242,11 @@ class TestPDFExtractor:
 
         extractor = PDFExtractor()
 
-        with patch('builtins.open', mock_open(read_data=b'bad pdf data')):
-            with pytest.raises(ExtractionError) as exc_info:
-                extractor.extract("bad.pdf")
+        with (
+            patch('builtins.open', mock_open(read_data=b'bad pdf data')),
+            pytest.raises(ExtractionError) as exc_info,
+        ):
+            extractor.extract("bad.pdf")
 
         assert "PDF parsing error" in str(exc_info.value)
 

@@ -189,34 +189,38 @@ class TestConfigureCorsMiddleware:
         """Test du logging en mode production."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
-            with patch('backend.src.api.middleware.cors.logger') as mock_logger:
-                mock_settings.is_production = True
-                mock_settings.allowed_origins = None
+        with (
+            patch('backend.src.api.middleware.cors.settings') as mock_settings,
+            patch('backend.src.api.middleware.cors.logger') as mock_logger,
+        ):
+            mock_settings.is_production = True
+            mock_settings.allowed_origins = None
 
-                configure_cors_middleware(mock_app)
+            configure_cors_middleware(mock_app)
 
-                # Vérifier que le message de production a été loggé
-                mock_logger.info.assert_called_once()
-                log_message = mock_logger.info.call_args[0][0]
-                assert "CORS configured for production" in log_message
-                assert "allowed origins" in log_message
+            # Vérifier que le message de production a été loggé
+            mock_logger.info.assert_called_once()
+            log_message = mock_logger.info.call_args[0][0]
+            assert "CORS configured for production" in log_message
+            assert "allowed origins" in log_message
 
     def test_configure_cors_logging_development(self):
         """Test du logging en mode développement."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
-            with patch('backend.src.api.middleware.cors.logger') as mock_logger:
-                mock_settings.is_production = False
+        with (
+            patch('backend.src.api.middleware.cors.settings') as mock_settings,
+            patch('backend.src.api.middleware.cors.logger') as mock_logger,
+        ):
+            mock_settings.is_production = False
 
-                configure_cors_middleware(mock_app)
+            configure_cors_middleware(mock_app)
 
-                # Vérifier que le message de développement a été loggé
-                mock_logger.info.assert_called_once()
-                log_message = mock_logger.info.call_args[0][0]
-                assert "CORS configured for development" in log_message
-                assert "permissive settings" in log_message
+            # Vérifier que le message de développement a été loggé
+            mock_logger.info.assert_called_once()
+            log_message = mock_logger.info.call_args[0][0]
+            assert "CORS configured for development" in log_message
+            assert "permissive settings" in log_message
 
     def test_configure_cors_custom_origins_parsing(self):
         """Test du parsing des origines personnalisées."""

@@ -310,28 +310,30 @@ class TestIngestionProcessor:
         )
 
         # Mock des étapes du pipeline
-        with patch.object(processor, '_extract_text', return_value="Sample text for chunking test") as mock_extract:
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [
-                    {
-                        "text": "Sample text",
-                        "chunk_index": 0,
-                        "total_chunks": 1,
-                        "start_char": 0,
-                        "end_char": 11,
-                        "word_count": 2,
-                        "char_count": 11
-                    }
-                ]
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text for chunking test") as mock_extract,
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
+                    "text": "Sample text",
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": 11,
+                    "word_count": 2,
+                    "char_count": 11
+                }
+            ]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
-                assert success is True
-                mock_extract.assert_called_once_with(task.file_path)
-                mock_chunk.assert_called_once()
-                processor.llm_service.embed.assert_called_once()
-                processor.vector_store.upsert.assert_called_once()
-                processor.vector_store.persist.assert_called_once()
+            assert success is True
+            mock_extract.assert_called_once_with(task.file_path)
+            mock_chunk.assert_called_once()
+            processor.llm_service.embed.assert_called_once()
+            processor.vector_store.upsert.assert_called_once()
+            processor.vector_store.persist.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_pipeline_rebuilds_bm25_from_active_chunks(self, processor):
@@ -351,14 +353,16 @@ class TestIngestionProcessor:
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text"),
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [{
+                "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+            }]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
         assert success is True
         processor.vector_store.snapshot_active_chunks.assert_called_once()
@@ -381,14 +385,16 @@ class TestIngestionProcessor:
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text"),
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [{
+                "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+            }]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
         # FAISS upsert succeeded, so the pipeline reports success despite BM25.
         assert success is True
@@ -412,26 +418,28 @@ class TestIngestionProcessor:
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text"),
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [{
+                "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+            }]
 
-                # Pre-enqueue N documents BEFORE the worker starts: this is the
-                # realistic bulk-upload scenario where the queue is already full
-                # when the single-writer worker begins draining it.
-                for i in range(n_docs):
-                    task = IngestionTask(
-                        file_path=f"dummy_{i}", document_id=str(100 + i), metadata={}
-                    )
-                    assert processor.queue_manager.add_task(task) is True
+            # Pre-enqueue N documents BEFORE the worker starts: this is the
+            # realistic bulk-upload scenario where the queue is already full
+            # when the single-writer worker begins draining it.
+            for i in range(n_docs):
+                task = IngestionTask(
+                    file_path=f"dummy_{i}", document_id=str(100 + i), metadata={}
+                )
+                assert processor.queue_manager.add_task(task) is True
 
-                await processor.start()
-                # Wait for the whole batch to drain (task_done for every item).
-                await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
-                await processor.stop()
+            await processor.start()
+            # Wait for the whole batch to drain (task_done for every item).
+            await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
+            await processor.stop()
 
         # FAISS upsert ran once per document (dense index authoritative)...
         assert processor.vector_store.upsert.call_count == n_docs
@@ -470,27 +478,29 @@ class TestIngestionProcessor:
                 raise ProcessingError("simulated extraction failure on last doc")
             return "Sample text"
 
-        with patch.object(processor, '_extract_text', side_effect=_extract_side_effect):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, '_extract_text', side_effect=_extract_side_effect),
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [{
+                "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
+                "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
+            }]
 
-                ok_task = IngestionTask(
-                    file_path="dummy_ok", document_id="100", metadata={}
-                )
-                fail_task = IngestionTask(
-                    file_path="dummy_fail", document_id="101", metadata={},
-                )
-                # No retries for the failing task so the batch drains promptly.
-                fail_task.max_retries = 0
-                assert processor.queue_manager.add_task(ok_task) is True
-                assert processor.queue_manager.add_task(fail_task) is True
+            ok_task = IngestionTask(
+                file_path="dummy_ok", document_id="100", metadata={}
+            )
+            fail_task = IngestionTask(
+                file_path="dummy_fail", document_id="101", metadata={},
+            )
+            # No retries for the failing task so the batch drains promptly.
+            fail_task.max_retries = 0
+            assert processor.queue_manager.add_task(ok_task) is True
+            assert processor.queue_manager.add_task(fail_task) is True
 
-                await processor.start()
-                await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
-                await processor.stop()
+            await processor.start()
+            await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
+            await processor.stop()
 
         # The first document was upserted into FAISS...
         assert processor.vector_store.upsert.call_count == 1
@@ -516,11 +526,13 @@ class TestIngestionProcessor:
         """Test sans chunks créés"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text', return_value=[]):
-                success = await processor._process_document_pipeline(task)
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text"),
+            patch.object(processor.chunking_strategy, 'chunk_text', return_value=[]),
+        ):
+            success = await processor._process_document_pipeline(task)
 
-                assert success is False
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_too_many_chunks(self, processor):
@@ -547,15 +559,17 @@ class TestIngestionProcessor:
             usage_tokens=100
         )
 
-        with patch.object(processor, '_extract_text', return_value="Long text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text', return_value=many_chunks):
-                success = await processor._process_document_pipeline(task)
+        with (
+            patch.object(processor, '_extract_text', return_value="Long text"),
+            patch.object(processor.chunking_strategy, 'chunk_text', return_value=many_chunks),
+        ):
+            success = await processor._process_document_pipeline(task)
 
-                # Doit réussir mais tronquer les chunks
-                assert success is True
-                # Vérifier que seulement max_chunks_per_doc chunks ont été traités
-                call_args = processor.llm_service.embed.call_args[0][0]
-                assert len(call_args) == processor.max_chunks_per_doc
+            # Doit réussir mais tronquer les chunks
+            assert success is True
+            # Vérifier que seulement max_chunks_per_doc chunks ont été traités
+            call_args = processor.llm_service.embed.call_args[0][0]
+            assert len(call_args) == processor.max_chunks_per_doc
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_embedding_mismatch(self, processor, mock_llm_service):
@@ -569,16 +583,18 @@ class TestIngestionProcessor:
             usage_tokens=5
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [
-                    {"text": "Chunk 1", "chunk_index": 0, "total_chunks": 2},
-                    {"text": "Chunk 2", "chunk_index": 1, "total_chunks": 2}
-                ]  # Deux chunks mais un seul embedding
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text"),
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {"text": "Chunk 1", "chunk_index": 0, "total_chunks": 2},
+                {"text": "Chunk 2", "chunk_index": 1, "total_chunks": 2}
+            ]  # Deux chunks mais un seul embedding
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
-                assert success is False
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_vector_store_failure(self, processor, mock_vector_store):
@@ -586,21 +602,23 @@ class TestIngestionProcessor:
         task = IngestionTask(file_path="dummy", document_id="123")
         mock_vector_store.upsert.return_value = False
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text",
-                    "chunk_index": 0,
-                    "total_chunks": 1,
-                    "start_char": 0,
-                    "end_char": 11,
-                    "word_count": 2,
-                    "char_count": 11
-                }]
+        with (
+            patch.object(processor, '_extract_text', return_value="Sample text"),
+            patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk,
+        ):
+            mock_chunk.return_value = [{
+                "text": "Sample text",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "start_char": 0,
+                "end_char": 11,
+                "word_count": 2,
+                "char_count": 11
+            }]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
-                assert success is False
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_process_task_success(self, processor, mock_document_repository):

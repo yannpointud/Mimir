@@ -310,7 +310,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 # Process results
                 results = []
-                for dist, idx in zip(distances[0], indices[0]):
+                for dist, idx in zip(distances[0], indices[0], strict=False):
                     # Skip invalid indices
                     if idx < 0 or idx >= len(self.metadata):
                         continue
@@ -773,10 +773,11 @@ class FaissVectorStore(AbstractVectorStore):
                 
                 for meta in self.metadata:
                     doc_id = meta.get('document_id')
-                    if doc_id and doc_id not in existing_document_ids:
-                        if not meta.get('deleted', False):  # Not yet marked as deleted
-                            orphaned_chunks.append(meta)
-                            orphaned_docs.add(doc_id)
+                    # Skip chunks already marked as deleted
+                    if (doc_id and doc_id not in existing_document_ids
+                            and not meta.get('deleted', False)):
+                        orphaned_chunks.append(meta)
+                        orphaned_docs.add(doc_id)
                 
                 if not orphaned_chunks:
                     logger.info("No orphaned chunks found")

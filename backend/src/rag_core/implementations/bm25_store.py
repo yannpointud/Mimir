@@ -151,7 +151,7 @@ class Bm25LexicalStore:
                 # the real chunk_id.
                 return [
                     (self._resolve_chunk_id(doc), float(score))
-                    for doc, score in zip(results[0], scores[0])
+                    for doc, score in zip(results[0], scores[0], strict=False)
                 ]
             except Exception as e:
                 error_msg = f"Failed to query BM25 lexical index: {str(e)}"

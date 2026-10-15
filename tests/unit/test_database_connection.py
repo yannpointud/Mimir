@@ -16,6 +16,7 @@ from backend.src.database.connection import (
     init_database,
     reset_database
 )
+import contextlib
 
 
 class TestConfigureSqlitePerformance:
@@ -190,9 +191,8 @@ class TestDatabaseManager:
         mock_session = Mock()
 
         with patch.object(manager, 'get_session', return_value=mock_session):
-            with pytest.raises(ValueError):
-                with manager.get_session_context():
-                    raise ValueError("Test exception")
+            with pytest.raises(ValueError), manager.get_session_context():
+                raise ValueError("Test exception")
 
             # Vérifier rollback et close appelés
             mock_session.rollback.assert_called_once()
@@ -271,10 +271,8 @@ class TestUtilityFunctions:
             assert session is mock_session
 
             # Fermer le générateur normalement
-            try:
+            with contextlib.suppress(StopIteration):
                 next(session_gen)
-            except StopIteration:
-                pass
 
             mock_session.commit.assert_called_once()
             mock_session.close.assert_called_once()
@@ -288,10 +286,8 @@ class TestUtilityFunctions:
             next(session_gen)
 
             # Simuler une exception
-            try:
+            with contextlib.suppress(ValueError):
                 session_gen.throw(ValueError("Test error"))
-            except ValueError:
-                pass
 
             mock_session.rollback.assert_called_once()
             mock_session.close.assert_called_once()
@@ -334,11 +330,13 @@ class TestInitializationFunctions:
 
     def test_init_database_no_settings(self):
         """Test initialisation sans settings configuré"""
-        with patch('backend.src.database.connection.config.settings', None):
-            with patch.object(db_manager, 'create_tables'):
-                with patch.object(db_manager, 'health_check', return_value=True):
-                    # Ne devrait pas lever d'erreur
-                    init_database()
+        with (
+            patch('backend.src.database.connection.config.settings', None),
+            patch.object(db_manager, 'create_tables'),
+            patch.object(db_manager, 'health_check', return_value=True),
+        ):
+            # Ne devrait pas lever d'erreur
+            init_database()
 
     @patch.object(db_manager, 'drop_tables')
     @patch.object(db_manager, 'create_tables')
@@ -362,8 +360,10 @@ class TestInitializationFunctions:
 
     def test_reset_database_no_settings(self):
         """Test reset sans settings configuré"""
-        with patch('backend.src.database.connection.config.settings', None):
-            with patch.object(db_manager, 'drop_tables'):
-                with patch.object(db_manager, 'create_tables'):
-                    # Ne devrait pas lever d'erreur
-                    reset_database()
+        with (
+            patch('backend.src.database.connection.config.settings', None),
+            patch.object(db_manager, 'drop_tables'),
+            patch.object(db_manager, 'create_tables'),
+        ):
+            # Ne devrait pas lever d'erreur
+            reset_database()

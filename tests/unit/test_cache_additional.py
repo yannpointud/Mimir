@@ -93,7 +93,7 @@ class TestCacheServiceAdvanced:
             thread.join()
 
         # Vérifier que toutes les opérations ont réussi
-        for key, original_value, retrieved_value in results:
+        for _key, original_value, retrieved_value in results:
             assert original_value == retrieved_value
 
     def test_cache_service_update_existing_key(self):
@@ -310,7 +310,7 @@ class TestCacheServiceIntegration:
         ]
 
         # Première passe - cache misses
-        for i, question in enumerate(questions):
+        for _i, question in enumerate(questions):
             key = cache._generate_key(question)
             result = cache.get(key)
             if result is None:

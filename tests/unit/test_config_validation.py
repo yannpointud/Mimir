@@ -209,11 +209,13 @@ class TestStartupFailFast:
         main_logger = logging.getLogger("main")
         main_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.INFO, logger="main"):
-                # Entering the context runs the lifespan and propagates the error
-                with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
-                    with TestClient(app):
-                        pass
+            # Entering the TestClient context runs the lifespan and propagates the error
+            with (
+                caplog.at_level(logging.INFO, logger="main"),
+                pytest.raises(RuntimeError, match="JWT_SECRET_KEY"),
+                TestClient(app),
+            ):
+                pass
         finally:
             main_logger.removeHandler(caplog.handler)
 

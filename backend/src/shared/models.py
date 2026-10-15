@@ -251,10 +251,7 @@ def validate_filename(filename: str) -> bool:
         return False
     
     # Reasonable length
-    if len(filename) == 0 or len(filename) > 255:
-        return False
-    
-    return True
+    return 0 < len(filename) <= 255
 
 
 def sanitize_filename(filename: str) -> str:

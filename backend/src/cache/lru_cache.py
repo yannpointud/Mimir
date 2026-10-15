@@ -183,7 +183,7 @@ class CacheService:
             pattern: Pattern to match (simple string contains)
         """
         with self._lock:
-            keys_to_delete = [key for key in self._cache.keys() if pattern in key]
+            keys_to_delete = [key for key in self._cache if pattern in key]
             for key in keys_to_delete:
                 del self._cache[key]
                 if key in self._expiry_times:
@@ -209,7 +209,7 @@ class CacheService:
         """
         with self._lock:
             expired_keys = [
-                key for key in self._cache.keys()
+                key for key in self._cache
                 if self._is_expired(key)
             ]
 
@@ -244,7 +244,7 @@ class CacheService:
                 "hits": self._stats["hits"],
                 "misses": self._stats["misses"],
                 "evictions": self._stats["evictions"],
-                "expired_entries": len([k for k in self._expiry_times.keys() if self._is_expired(k)])
+                "expired_entries": len([k for k in self._expiry_times if self._is_expired(k)])
             }
 
     def reset_stats(self):

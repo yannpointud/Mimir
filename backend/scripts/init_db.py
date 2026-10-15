@@ -4,6 +4,7 @@ Script d'initialisation de la base de données
 Crée les tables et peut insérer des données de test
 """
 
+import contextlib
 import sys
 from pathlib import Path
 
@@ -83,10 +84,8 @@ def insert_test_data():
         ]
         
         for filename, file_hash, path, preserve in test_docs:
-            try:
+            with contextlib.suppress(ValueError):  # document already exists
                 repos['document'].create(filename, file_hash, path, preserve)
-            except ValueError:
-                pass  # Document déjà existant
         
         print(f"   - Inserted {len(test_docs)} test documents")
         

@@ -5,6 +5,7 @@ Replaces threading-based QueueManager with full asyncio implementation
 """
 
 import asyncio
+import contextlib
 import random
 import time
 from typing import Any
@@ -119,10 +120,8 @@ class AsyncQueueManager:
         except TimeoutError:
             logger.error(f"Worker task did not stop within {timeout}s, cancelling...")
             self.worker_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self.worker_task
-            except asyncio.CancelledError:
-                pass
 
         self.stats['worker_active'] = False
         logger.info("Async queue manager stopped successfully")
