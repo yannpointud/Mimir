@@ -18,6 +18,7 @@ import logging
 
 import numpy as np
 from rapidfuzz import fuzz
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.database.repository import DocumentRepository
 from src.llm_interface.implementations.mistral_api import MistralAPIService
@@ -28,6 +29,7 @@ from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.cost.usage_tracker import UsageTracker
 from src.config import settings
+from src.shared.errors import RetrievalError
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +480,7 @@ async def _hybrid_retrieve(
     # this query rather than let the exception break an otherwise-working engine.
     try:
         lexical_pool = await asyncio.to_thread(bm25_store.query, question, _HYBRID_POOL_SIZE)
-    except Exception as e:  # noqa: BLE001 -- any lexical-store failure degrades to dense-only
+    except RetrievalError as e:
         logger.warning(
             f"BM25 lexical retrieval unavailable ({e}); degrading to dense-only for this query"
         )
@@ -643,7 +645,7 @@ async def _process_question_with_rag_stream(  # noqa: C901
                     documents_by_id = document_repository.get_by_ids(
                         list({int(r.document_id) for r in search_results})
                     )
-                except Exception:  # noqa: BLE001
+                except (ValueError, SQLAlchemyError):
                     documents_by_id = {}
 
             # Single enumerate() pass: numbered [N] context + sources built from
@@ -792,7 +794,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                 },
             )
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event
         logger.error(f"Streaming RAG pipeline failed: {str(e)}", exc_info=True)
         rag_debug.log_error(
             session_id=session_id,

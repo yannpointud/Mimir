@@ -3,6 +3,7 @@ Text extraction from various document formats
 Provides extractors for PDF, DOCX, TXT, and Markdown files
 """
 
+import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -10,10 +11,12 @@ from typing import Any
 # Import document processing libraries
 try:
     import pypdf
+    import pypdf.errors
 except ImportError:
     pypdf = None
 
 try:
+    import docx
     from docx import Document as DocxDocument
 except ImportError:
     DocxDocument = None
@@ -24,11 +27,28 @@ except ImportError:
     markdown = None
 
 from ..monitoring.logger import setup_logger
+from ..shared.errors import IngestionError
 
 logger = setup_logger(__name__)
 
+# What a parser raises on an unreadable or malformed file: disk errors,
+# decoding errors (ValueError), broken structures (KeyError, IndexError,
+# TypeError, AttributeError), invalid XML inside DOCX (lxml SyntaxError),
+# corrupt archives, unsupported features or runaway recursion (RuntimeError).
+_PARSER_ERRORS = (
+    OSError,
+    ValueError,
+    TypeError,
+    KeyError,
+    IndexError,
+    AttributeError,
+    SyntaxError,
+    RuntimeError,
+    zipfile.BadZipFile,
+)
 
-class ExtractionError(Exception):
+
+class ExtractionError(IngestionError):
     """Base exception for text extraction errors"""
 
     pass
@@ -122,7 +142,7 @@ class PDFExtractor(TextExtractor):
                     logger.warning(f"PDF is encrypted, attempting to decrypt: {file_path}")
                     try:
                         reader.decrypt("")  # Try empty password
-                    except Exception as exc:
+                    except (pypdf.errors.PyPdfError, *_PARSER_ERRORS) as exc:
                         raise ExtractionError(f"Cannot decrypt encrypted PDF: {file_path}") from exc
 
                 # Extract text from each page
@@ -131,7 +151,7 @@ class PDFExtractor(TextExtractor):
                         page_text = page.extract_text()
                         if page_text.strip():  # Only add non-empty pages
                             text_parts.append(page_text)
-                    except Exception as e:  # noqa: BLE001
+                    except (pypdf.errors.PyPdfError, *_PARSER_ERRORS) as e:
                         logger.warning(
                             f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}"
                         )
@@ -162,7 +182,7 @@ class PDFExtractor(TextExtractor):
 
             return extracted_text
 
-        except Exception as e:
+        except (ExtractionError, pypdf.errors.PyPdfError, *_PARSER_ERRORS) as e:
             error_msg = f"Failed to extract text from PDF {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
@@ -226,7 +246,7 @@ class DOCXExtractor(TextExtractor):
 
             return extracted_text
 
-        except Exception as e:
+        except (docx.opc.exceptions.OpcError, *_PARSER_ERRORS) as e:
             error_msg = f"Failed to extract text from DOCX {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
@@ -269,7 +289,7 @@ class TXTExtractor(TextExtractor):
 
             except UnicodeDecodeError:
                 continue
-            except Exception as e:  # noqa: BLE001
+            except OSError as e:
                 error_msg = (
                     f"Failed to read text file {file_path} with encoding {encoding}: {str(e)}"
                 )
@@ -333,7 +353,7 @@ class MarkdownExtractor(TextExtractor):
 
             return content
 
-        except Exception as e:
+        except _PARSER_ERRORS as e:
             error_msg = f"Failed to extract text from Markdown {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e

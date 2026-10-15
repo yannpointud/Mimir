@@ -14,7 +14,7 @@ from typing import Any
 from datetime import datetime
 import logging
 import aiosmtplib
-from jinja2 import Template
+from jinja2 import Template, TemplateError
 
 from src.config import settings
 
@@ -86,7 +86,8 @@ class EmailService:
 
             return success
 
-        except Exception as e:  # noqa: BLE001
+        except (TemplateError, TypeError, KeyError, AttributeError, ValueError) as e:
+            # Rendering failure on unexpected chat history or user info values
             logger.error(f"Error sending escalation email: {e}")
             return False
 
@@ -105,29 +106,22 @@ class EmailService:
         Returns:
             bool: True if sent successfully
         """
-        try:
-            if not self._is_configured():
-                logger.error("Email service not configured")
-                return False
-
-            content_kwargs = {}
-            if is_html:
-                content_kwargs["html_content"] = message
-            else:
-                content_kwargs["text_content"] = message
-
-            success = await self._send_email(
-                to_emails=[to_email], subject=subject, **content_kwargs
-            )
-
-            if success:
-                logger.info(f"Notification email sent to {to_email}")
-
-            return success
-
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Error sending notification email: {e}")
+        if not self._is_configured():
+            logger.error("Email service not configured")
             return False
+
+        content_kwargs = {}
+        if is_html:
+            content_kwargs["html_content"] = message
+        else:
+            content_kwargs["text_content"] = message
+
+        success = await self._send_email(to_emails=[to_email], subject=subject, **content_kwargs)
+
+        if success:
+            logger.info(f"Notification email sent to {to_email}")
+
+        return success
 
     async def _send_email(
         self,
@@ -188,7 +182,8 @@ class EmailService:
 
             return True
 
-        except Exception as e:  # noqa: BLE001
+        except (aiosmtplib.SMTPException, OSError, TimeoutError, ValueError, TypeError) as e:
+            # SMTP protocol or network failure, or a header/body MIME rejects
             logger.error(f"SMTP send error: {e}")
             return False
 
@@ -208,7 +203,7 @@ class EmailService:
                 "Content-Disposition", f"attachment; filename= {attachment['filename']}"
             )
             message.attach(part)
-        except Exception as e:  # noqa: BLE001
+        except (KeyError, TypeError, ValueError) as e:
             logger.error(f"Error adding attachment: {e}")
 
     def _generate_escalation_html(

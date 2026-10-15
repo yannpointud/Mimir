@@ -517,7 +517,7 @@ def log_performance(operation: str):
 
                 return result
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - transparent decorator: log any failure, then re-raise
                 duration_ms = (time.time() - start_time) * 1000
 
                 app_logger.error(

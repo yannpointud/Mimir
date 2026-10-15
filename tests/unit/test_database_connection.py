@@ -3,9 +3,13 @@ Tests pour le module database/connection.py
 Couvre la gestion de connexion, configuration SQLite et pattern Singleton
 """
 
-import pytest
+import contextlib
 import sqlite3
+
+import pytest
 from unittest.mock import Mock, patch
+
+from sqlalchemy.exc import OperationalError
 
 from backend.src.database.connection import (
     DatabaseManager,
@@ -16,7 +20,6 @@ from backend.src.database.connection import (
     init_database,
     reset_database,
 )
-import contextlib
 
 
 class TestConfigureSqlitePerformance:
@@ -253,7 +256,9 @@ class TestDatabaseManager:
         manager = DatabaseManager()
 
         with patch.object(manager, "get_session_context") as mock_context:
-            mock_context.side_effect = Exception("Database unreachable")
+            mock_context.side_effect = OperationalError(
+                "SELECT 1", {}, Exception("Database unreachable")
+            )
 
             result = manager.health_check()
 

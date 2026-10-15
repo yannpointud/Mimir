@@ -17,11 +17,15 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from ..interfaces import (
+    INDEX_BACKEND_ERRORS,
     AbstractVectorStore,
     Chunk,
     SearchResult,
     VectorStoreConnectionError,
+    VectorStoreException,
     VectorStoreOperationError,
 )
 from ...monitoring.logger import setup_logger
@@ -129,7 +133,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.info(f"Creating new FAISS index: {self.index_type}")
                 self._create_new_index()
 
-        except Exception as e:  # noqa: BLE001
+        except VectorStoreException as e:
             logger.error(f"Failed to initialize FAISS index: {str(e)}")
             # Fallback: create new index
             self._create_new_index()
@@ -151,7 +155,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 logger.info(f"Created new {self.index_type} index with dimension {self.dimension}")
 
-            except Exception as e:
+            except (RuntimeError, TypeError, ValueError) as e:
                 error_msg = f"Failed to create FAISS index: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreConnectionError(error_msg) from e
@@ -257,7 +261,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return True
 
-            except Exception as e:
+            except INDEX_BACKEND_ERRORS as e:
                 error_msg = f"Failed to upsert chunks: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -382,7 +386,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return results
 
-            except Exception as e:
+            except INDEX_BACKEND_ERRORS as e:
                 error_msg = f"Failed to query vectors: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -452,13 +456,13 @@ class FaissVectorStore(AbstractVectorStore):
                     )
                     try:
                         self.optimize()
-                    except Exception as e:  # noqa: BLE001
+                    except INDEX_BACKEND_ERRORS as e:
                         logger.warning(f"Automatic optimization failed: {e}")
                         # Don't fail the delete operation if optimization fails
 
                 return True
 
-            except Exception as e:
+            except INDEX_BACKEND_ERRORS as e:
                 error_msg = f"Failed to delete document {document_id}: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -539,7 +543,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return True
 
-        except Exception as e:  # noqa: BLE001
+        except INDEX_BACKEND_ERRORS as e:
             logger.error(f"Vector store health check failed: {str(e)}")
             return False
 
@@ -582,7 +586,7 @@ class FaissVectorStore(AbstractVectorStore):
                 os.fsync(dir_fd)
             finally:
                 os.close(dir_fd)
-        except Exception:
+        except (OSError, RuntimeError, ValueError, TypeError):
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
             raise
@@ -646,7 +650,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return True
 
-        except Exception as e:
+        except INDEX_BACKEND_ERRORS as e:
             error_msg = f"Failed to persist vector store: {str(e)}"
             logger.error(error_msg)
             raise VectorStoreConnectionError(error_msg) from e
@@ -719,7 +723,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return True
 
-        except Exception as e:
+        except (*INDEX_BACKEND_ERRORS, pickle.UnpicklingError, EOFError) as e:
             error_msg = f"Failed to load vector store: {str(e)}"
             logger.error(error_msg)
             raise VectorStoreConnectionError(error_msg) from e
@@ -774,7 +778,7 @@ class FaissVectorStore(AbstractVectorStore):
                     try:
                         self._create_backup(backup_timestamp)
                         logger.info(f"Backup created: {backup_timestamp}")
-                    except Exception as e:  # noqa: BLE001
+                    except Exception as e:  # noqa: BLE001 - best effort: no backup failure may block the cleanup
                         logger.warning(f"Backup creation failed: {e}")
                         # Continue despite backup failure
 
@@ -842,7 +846,7 @@ class FaissVectorStore(AbstractVectorStore):
                     try:
                         self.optimize()
                         optimization_triggered = True
-                    except Exception as e:  # noqa: BLE001
+                    except INDEX_BACKEND_ERRORS as e:
                         logger.warning(f"Optimization failed after cleanup: {e}")
                         # Don't fail the cleanup if optimization fails
 
@@ -850,7 +854,7 @@ class FaissVectorStore(AbstractVectorStore):
                 try:
                     self.persist()
                     logger.info("Orphan cleanup changes persisted successfully")
-                except Exception as e:
+                except VectorStoreException as e:
                     logger.error(f"Failed to persist cleanup changes: {e}")
                     raise VectorStoreOperationError(f"Cleanup persistence failed: {e}") from e
 
@@ -886,7 +890,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return result
 
-            except Exception as e:
+            except INDEX_BACKEND_ERRORS as e:
                 error_msg = f"Orphan cleanup failed: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -918,7 +922,7 @@ class FaissVectorStore(AbstractVectorStore):
             # Rotate old backups
             self._rotate_backups()
 
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Backup creation failed: {e}")
             raise
 
@@ -955,7 +959,7 @@ class FaissVectorStore(AbstractVectorStore):
                     f"Backup rotation: removed {removed} old backup files (max_backups={max_backups})"
                 )
 
-        except Exception as e:  # noqa: BLE001
+        except OSError as e:
             logger.warning(f"Backup rotation failed: {e}")
 
     def _get_existing_document_ids(self) -> set:
@@ -975,7 +979,7 @@ class FaissVectorStore(AbstractVectorStore):
             finally:
                 session.close()
 
-        except Exception as e:  # noqa: BLE001
+        except SQLAlchemyError as e:
             logger.error(f"Failed to get existing document IDs from database: {e}")
             # Fallback: use IDs present in the FAISS mapping
             return set(self.document_to_chunks.keys())
@@ -1057,7 +1061,7 @@ class FaissVectorStore(AbstractVectorStore):
                     f"Index optimization completed: {old_total} → {self.index.ntotal} vectors "
                     f"({deleted_count} deleted vectors removed)"
                 )
-            except Exception as e:
+            except VectorStoreException as e:
                 logger.error(f"Failed to save optimized index: {e}")
                 raise VectorStoreOperationError(f"Index optimization save failed: {e}") from e
 
@@ -1101,7 +1105,7 @@ class FaissVectorStore(AbstractVectorStore):
                         logger.info(
                             f"Orphan cleanup completed: {cleanup_result['cleaned_chunks']} chunks cleaned"
                         )
-                    except Exception as e:  # noqa: BLE001
+                    except VectorStoreException as e:
                         logger.warning(f"Orphan cleanup failed during rebuild: {e}")
                         # Continue rebuild even if cleanup fails
 
@@ -1147,7 +1151,7 @@ class FaissVectorStore(AbstractVectorStore):
 
                 return result
 
-            except Exception as e:
+            except INDEX_BACKEND_ERRORS as e:
                 error_msg = f"Vector store rebuild failed: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -1199,6 +1203,6 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.debug(f"Retrieved {len(chunks)} chunks for document {document_id}")
                 return chunks
 
-        except Exception as e:  # noqa: BLE001
+        except INDEX_BACKEND_ERRORS as e:
             logger.error(f"Failed to get chunks for document {document_id}: {e}")
             return []

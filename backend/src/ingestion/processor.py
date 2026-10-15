@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 import numpy as np
+from sqlalchemy.exc import SQLAlchemyError
 
 from .extractors import ExtractorFactory, ExtractionError, UnsupportedFormatError
 from .chunking import ChunkingStrategy, ChunkingConfig
@@ -16,17 +17,18 @@ from .async_queue_manager import AsyncQueueManager
 from .queue_manager import IngestionTask
 
 from ..llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
-from ..rag_core.interfaces import AbstractVectorStore, Chunk
+from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException
 from ..database.repository import DocumentRepository
 from ..monitoring.logger import setup_logger
 from ..config import settings
-from ..cost.budget_guard import BudgetExceededError, budget_guard as default_budget_guard
+from ..cost.budget_guard import budget_guard as default_budget_guard
 from ..cost.usage_tracker import usage_tracker as default_usage_tracker
+from ..shared.errors import BudgetExceeded, IngestionError
 
 logger = setup_logger(__name__)
 
 
-class ProcessingError(Exception):
+class ProcessingError(IngestionError):
     """Base exception for processing errors"""
 
     pass
@@ -163,7 +165,7 @@ class IngestionProcessor:
                         preserve=preserve,
                     )
                     document_id = str(document.id)
-                except Exception as e:
+                except ValueError as e:
                     if "already exists" in str(e).lower():
                         logger.warning(f"Document already exists with hash: {file_hash}")
                         return False
@@ -178,7 +180,7 @@ class IngestionProcessor:
                     logger.info(
                         f"Reprocessing existing document: {document.filename} (ID: {document_id})"
                     )
-                except Exception as e:  # noqa: BLE001
+                except (ValueError, SQLAlchemyError) as e:
                     logger.error(
                         f"Failed to retrieve document {document_id} for reprocessing: {str(e)}"
                     )
@@ -212,7 +214,7 @@ class IngestionProcessor:
 
             return success
 
-        except Exception as e:  # noqa: BLE001
+        except (OSError, ValueError, SQLAlchemyError) as e:
             logger.error(f"Failed to queue document {file_path}: {str(e)}")
             return False
 
@@ -250,7 +252,7 @@ class IngestionProcessor:
 
             return success
 
-        except BudgetExceededError:
+        except BudgetExceeded:
             # Fail-closed, non-retriable: budget exhaustion is not a
             # transient failure and a retry cannot succeed before the next
             # day's ledger reset. Exhaust the task's retry
@@ -270,13 +272,13 @@ class IngestionProcessor:
                 self.document_repository.update_status(
                     int(task.document_id), "error", error_message="Daily budget exceeded"
                 )
-            except Exception as db_error:  # noqa: BLE001
+            except (ValueError, SQLAlchemyError) as db_error:
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             task.retry_count = task.max_retries
             return False
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - worker boundary: a failing document must not stop the worker
             error_msg = f"Task processing failed: {str(e)}"
             logger.error(error_msg)
 
@@ -287,7 +289,7 @@ class IngestionProcessor:
                     "error",
                     error_message=error_msg[:500],  # Limit error message length
                 )
-            except Exception as db_error:  # noqa: BLE001
+            except (ValueError, SQLAlchemyError) as db_error:
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             return False
@@ -301,7 +303,7 @@ class IngestionProcessor:
             # _bm25_dirty guard; never allowed to mask the task result.
             try:
                 await self._maybe_rebuild_bm25_on_drain()
-            except Exception as drain_error:  # noqa: BLE001
+            except Exception as drain_error:  # noqa: BLE001 - worker boundary: never mask the task result
                 logger.warning(f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}")
 
     async def _process_document_pipeline(self, task: IngestionTask) -> bool:
@@ -353,12 +355,12 @@ class IngestionProcessor:
             # rationale as the vector_store.upsert/persist wrapping.
             reservation = await asyncio.to_thread(self.budget_guard.reserve, "embedding")
             if reservation is None:
-                raise BudgetExceededError("Daily budget exceeded")
+                raise BudgetExceeded("Daily budget exceeded")
 
             logger.debug(f"Generating embeddings for {len(chunks_data)} chunks")
             try:
                 embedding_response = await self._generate_embeddings(chunks_data)
-            except Exception:
+            except Exception:  # noqa: BLE001 - refund on any failure, then re-raise unchanged
                 # No embedding call actually succeeded -- refund the
                 # reservation and let the original error propagate to the
                 # outer except blocks below.
@@ -442,13 +444,13 @@ class IngestionProcessor:
 
             return True
 
-        except BudgetExceededError:
+        except BudgetExceeded:
             # Non-retriable fail-closed stop: propagate to _process_task's
             # dedicated except BudgetExceededError branch, bypassing the
             # retry loop entirely (a retry cannot succeed before the next reset).
             raise
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - worker boundary: any failure marks the document as failed
             processing_time = time.time() - start_time
             logger.error(
                 f"Document processing pipeline failed after {processing_time:.2f}s: {str(e)}",
@@ -505,7 +507,7 @@ class IngestionProcessor:
             active_chunks = self.vector_store.snapshot_active_chunks()
             await asyncio.to_thread(self.bm25_store.rebuild, active_chunks)
             self._bm25_dirty = False
-        except Exception as bm25_error:  # noqa: BLE001
+        except VectorStoreException as bm25_error:
             logger.warning(f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}")
 
     def _extract_text(self, file_path: str) -> str:

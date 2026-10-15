@@ -13,7 +13,7 @@ from src.ingestion.processor import IngestionProcessor, ProcessingError
 from src.ingestion.queue_manager import IngestionTask
 from src.ingestion.chunking import ChunkingConfig
 from src.llm_interface.interfaces import EmbeddingResponse, LLMException
-from src.rag_core.interfaces import Chunk
+from src.rag_core.interfaces import Chunk, VectorStoreOperationError
 from src.cost.budget_guard import BudgetReservation
 
 
@@ -192,7 +192,9 @@ class TestIngestionProcessor:
     ):
         """Test avec hash de fichier dupliqué"""
         # Simuler une exception de duplication
-        mock_document_repository.create.side_effect = Exception("already exists")
+        mock_document_repository.create.side_effect = ValueError(
+            "Document with hash abc already exists"
+        )
 
         success = processor.queue_document(str(sample_text_file))
 
@@ -382,7 +384,7 @@ class TestIngestionProcessor:
         """A BM25 rebuild that raises must NOT fail an ingestion whose
         FAISS upsert/persist already succeeded (non-fatal, continuing anyway)."""
         processor.bm25_store = Mock()
-        processor.bm25_store.rebuild.side_effect = RuntimeError("bm25 boom")
+        processor.bm25_store.rebuild.side_effect = VectorStoreOperationError("bm25 boom")
         processor.vector_store.metadata = [
             {"chunk_id": 0, "text": "active", "deleted": False},
         ]

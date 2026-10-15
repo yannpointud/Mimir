@@ -8,6 +8,9 @@ et notifications du système Mimir.
 import pytest
 from unittest.mock import patch, AsyncMock
 
+import aiosmtplib
+from jinja2 import TemplateError
+
 from backend.src.email_service.smtp_client import EmailService
 
 
@@ -173,7 +176,9 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_exception(self, email_service):
         """Test de gestion d'exception."""
-        with patch.object(email_service, "_send_email", side_effect=Exception("SMTP Error")):
+        with patch.object(
+            email_service, "_generate_escalation_html", side_effect=TemplateError("Render error")
+        ):
             result = await email_service.send_escalation_email(
                 user_question="How do I reset my password?", chat_history=[]
             )
@@ -248,7 +253,7 @@ class TestSendEmail:
     async def test_send_email_exception(self, email_service):
         """Test de gestion d'exception."""
         with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
-            mock_smtp_class.side_effect = Exception("Connection failed")
+            mock_smtp_class.side_effect = aiosmtplib.SMTPConnectError("Connection failed")
 
             result = await email_service._send_email(
                 to_emails=["recipient@example.com"],

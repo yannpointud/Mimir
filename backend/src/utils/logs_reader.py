@@ -11,6 +11,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# A log line or parsed entry without the expected JSON object shape.
+_ENTRY_ERRORS = (ValueError, TypeError, AttributeError)
+
 # Log file paths
 BACKEND_LOG = Path("./logs/app.log")
 FRONTEND_LOG = Path("./logs/frontend.log")
@@ -85,7 +88,7 @@ def _parse_backend_log_line(line: str) -> LogEntry | None:
             message=message,
             details=details,
         )
-    except Exception as e:  # noqa: BLE001
+    except _ENTRY_ERRORS as e:
         logger.debug(f"Failed to parse backend log line: {e}")
         return None
 
@@ -132,7 +135,7 @@ def _parse_frontend_log_line(line: str) -> LogEntry | None:
             message=message,
             details=details,
         )
-    except Exception as e:  # noqa: BLE001
+    except _ENTRY_ERRORS as e:
         logger.debug(f"Failed to parse frontend log line: {e}")
         return None
 
@@ -151,7 +154,7 @@ def _read_log_file(file_path: Path, max_lines: int = 1000) -> list[str]:
             lines = all_lines[-max_lines:] if len(all_lines) > max_lines else all_lines
 
         return lines
-    except Exception as e:  # noqa: BLE001
+    except (OSError, UnicodeDecodeError) as e:
         logger.error(f"Failed to read log file {file_path}: {e}")
         return []
 
@@ -267,7 +270,8 @@ def get_logs(
 
         return result_logs, len(filtered_logs)
 
-    except Exception as e:  # noqa: BLE001
+    except _ENTRY_ERRORS as e:
+        # A parsed entry with unexpected field types (e.g. a numeric module)
         logger.error(f"Error retrieving logs: {e}")
         return [], 0
 
@@ -293,38 +297,26 @@ def get_available_modules() -> list[str]:
 
         return sorted(list(modules))
 
-    except Exception as e:  # noqa: BLE001
+    except _ENTRY_ERRORS as e:
+        # Unhashable or mutually unsortable module values
         logger.error(f"Error getting available modules: {e}")
         return []
 
 
 def get_logs_summary() -> dict[str, Any]:
     """Get summary statistics about available logs"""
-    try:
-        # Count recent logs by level and source
-        backend_lines = _read_log_file(BACKEND_LOG, max_lines=1000)
-        frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=500)
+    # Count recent logs by level and source
+    backend_lines = _read_log_file(BACKEND_LOG, max_lines=1000)
+    frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=500)
 
-        summary = {
-            "backend_logs_count": len(backend_lines),
-            "frontend_logs_count": len(frontend_lines),
-            "total_logs_count": len(backend_lines) + len(frontend_lines),
-            "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
-            "sources_available": ["ALL", "backend", "frontend"],
-            "modules_available": get_available_modules()[:10],  # Top 10 modules
-            "last_updated": datetime.utcnow().isoformat() + "Z",
-        }
+    summary = {
+        "backend_logs_count": len(backend_lines),
+        "frontend_logs_count": len(frontend_lines),
+        "total_logs_count": len(backend_lines) + len(frontend_lines),
+        "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
+        "sources_available": ["ALL", "backend", "frontend"],
+        "modules_available": get_available_modules()[:10],  # Top 10 modules
+        "last_updated": datetime.utcnow().isoformat() + "Z",
+    }
 
-        return summary
-
-    except Exception as e:  # noqa: BLE001
-        logger.error(f"Error getting logs summary: {e}")
-        return {
-            "backend_logs_count": 0,
-            "frontend_logs_count": 0,
-            "total_logs_count": 0,
-            "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
-            "sources_available": ["ALL", "backend", "frontend"],
-            "modules_available": [],
-            "last_updated": datetime.utcnow().isoformat() + "Z",
-        }
+    return summary

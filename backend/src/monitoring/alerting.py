@@ -119,9 +119,9 @@ class FingerprintAlertHandler(logging.Handler):
                 subject=subject,
                 message=message,
             )
-        except Exception as e:  # noqa: BLE001
-            # Follow the existing try-except-log convention; an alert failure
-            # must never propagate back into the logging subsystem.
+        except Exception as e:  # noqa: BLE001 - logging boundary: an alert failure must not reach the logger
+            # An alert failure must never propagate back into the logging
+            # subsystem.
             logger.error(f"Failed to send fingerprinted error alert {fingerprint}: {e}")
 
 

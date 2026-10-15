@@ -324,7 +324,7 @@ class TestHybridBranch:
         """Prime directive: with hybrid enabled but the BM25 index not yet
         built, bm25_store.query() raises; the engine MUST degrade to dense-only and
         still answer, never surface the exception as a broken (confidence 0) reply."""
-        from backend.src.rag_core.interfaces import VectorStoreOperationError
+        from src.rag_core.interfaces import VectorStoreOperationError
 
         llm, vs, docs, dbg = _base_mocks()
 

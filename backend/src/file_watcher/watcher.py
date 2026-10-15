@@ -138,7 +138,7 @@ class DocumentFileHandler(FileSystemEventHandler):
             logger.info(f"New file detected: {file_path}")
             try:
                 self.on_file_added(file_path)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 - observer thread boundary: a failing callback must not stop the watcher
                 logger.error(f"Error processing new file {file_path}: {e}")
 
     def on_modified(self, event: FileSystemEvent):
@@ -164,7 +164,7 @@ class DocumentFileHandler(FileSystemEventHandler):
             logger.info(f"File modified: {file_path}")
             try:
                 self.on_file_modified(file_path)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 - observer thread boundary: a failing callback must not stop the watcher
                 logger.error(f"Error processing modified file {file_path}: {e}")
 
     def _wait_for_file_stability(self, file_path: str, max_wait: int = 5):
@@ -175,27 +175,23 @@ class DocumentFileHandler(FileSystemEventHandler):
             file_path: Path to the file
             max_wait: Maximum time to wait in seconds
         """
-        try:
-            if not os.path.exists(file_path):
-                return
+        if not os.path.exists(file_path):
+            return
 
-            previous_size = -1
-            waited = 0
+        previous_size = -1
+        waited = 0
 
-            while waited < max_wait:
-                try:
-                    current_size = os.path.getsize(file_path)
-                    if current_size == previous_size and current_size > 0:
-                        break
-                    previous_size = current_size
-                    time.sleep(0.5)
-                    waited += 0.5
-                except (OSError, FileNotFoundError):
-                    # File might be locked or deleted
+        while waited < max_wait:
+            try:
+                current_size = os.path.getsize(file_path)
+                if current_size == previous_size and current_size > 0:
                     break
-
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"Error waiting for file stability: {e}")
+                previous_size = current_size
+                time.sleep(0.5)
+                waited += 0.5
+            except OSError:
+                # File might be locked or deleted
+                break
 
 
 class FileWatcher:
@@ -280,7 +276,8 @@ class FileWatcher:
             logger.info("FileWatcher started successfully")
             return True
 
-        except Exception as e:  # noqa: BLE001
+        except (OSError, RuntimeError) as e:
+            # OSError: inotify watch limit; RuntimeError: observer thread state
             logger.error(f"Failed to start FileWatcher: {e}")
             return False
 
@@ -306,7 +303,7 @@ class FileWatcher:
             logger.info("FileWatcher stopped")
             return True
 
-        except Exception as e:  # noqa: BLE001
+        except RuntimeError as e:
             logger.error(f"Error stopping FileWatcher: {e}")
             return False
 
@@ -356,7 +353,7 @@ class FileWatcher:
             logger.info(f"Added directory to watch list: {directory}")
             return True
 
-        except Exception as e:  # noqa: BLE001
+        except (OSError, RuntimeError) as e:
             logger.error(f"Failed to add directory {directory}: {e}")
             return False
 
@@ -386,7 +383,8 @@ class FileWatcher:
 
             return True
 
-        except Exception as e:  # noqa: BLE001
+        except (OSError, RuntimeError) as e:
+            # Path.resolve() raises RuntimeError on a symlink loop
             logger.error(f"Failed to remove directory {directory}: {e}")
             return False
 
@@ -415,7 +413,7 @@ class FileWatcher:
 
             logger.info(f"Found {len(existing_files)} existing files")
 
-        except Exception as e:  # noqa: BLE001
+        except OSError as e:
             logger.error(f"Error scanning existing files: {e}")
 
         return existing_files

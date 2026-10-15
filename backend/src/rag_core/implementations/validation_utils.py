@@ -5,9 +5,17 @@ Validation utilities for detecting inconsistencies between SQLite and FAISS
 from typing import Any
 from datetime import datetime
 import logging
-from pathlib import Path
+
+from sqlalchemy.exc import SQLAlchemyError
+
+from ...shared.errors import RetrievalError
+from ..interfaces import INDEX_BACKEND_ERRORS
 
 logger = logging.getLogger(__name__)
+
+# Failures of either source: SQLite through SQLAlchemy, the vector index
+# through its own backend errors.
+_SOURCE_ERRORS = (SQLAlchemyError, *INDEX_BACKEND_ERRORS)
 
 
 class VectorStoreValidator:
@@ -95,10 +103,10 @@ class VectorStoreValidator:
 
             return validation_report
 
-        except Exception as e:
+        except _SOURCE_ERRORS as e:
             error_msg = f"Validation failed: {str(e)}"
             self.logger.error(error_msg)
-            raise Exception(error_msg) from e
+            raise RetrievalError(error_msg) from e
 
     def _get_database_documents(self) -> dict[str, dict[str, Any]]:
         """Retrieve documents from SQLite."""
@@ -117,7 +125,7 @@ class VectorStoreValidator:
                 }
                 for doc in documents
             }
-        except Exception as e:
+        except SQLAlchemyError as e:
             self.logger.error(f"Failed to get database documents: {e}")
             raise
 
@@ -146,7 +154,7 @@ class VectorStoreValidator:
 
                 return vector_docs
 
-        except Exception as e:
+        except INDEX_BACKEND_ERRORS as e:
             self.logger.error(f"Failed to get vector store documents: {e}")
             raise
 
@@ -334,7 +342,7 @@ class VectorStoreValidator:
             if fixes:
                 self.vector_store.persist()
 
-        except Exception as e:  # noqa: BLE001
+        except _SOURCE_ERRORS as e:
             self.logger.error(f"Failed to apply fixes: {e}")
             fixes.append(
                 {
@@ -407,38 +415,3 @@ class VectorStoreValidator:
             recommendations.append("System consistency is good - no immediate action required")
 
         return recommendations
-
-
-def create_validation_report(
-    vector_store, document_repository, output_path: str = None
-) -> dict[str, Any]:
-    """
-    Create a comprehensive validation report and optionally save it.
-
-    Args:
-        vector_store: FaissVectorStore instance
-        document_repository: DocumentRepository instance
-        output_path: Optional path to save the report
-
-    Returns:
-        Dict: Complete validation report
-    """
-    validator = VectorStoreValidator(vector_store, document_repository)
-    report = validator.validate_consistency(fix_issues=False)
-
-    if output_path:
-        try:
-            import json
-
-            output_file = Path(output_path)
-            output_file.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(report, f, indent=2, default=str)
-
-            logger.info(f"Validation report saved to {output_path}")
-
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Failed to save validation report: {e}")
-
-    return report

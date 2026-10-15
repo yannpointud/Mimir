@@ -219,7 +219,7 @@ class TestVerifyToken:
     @patch("backend.src.auth.jwt_handler.jwt.decode")
     def test_verify_token_unexpected_error(self, mock_decode, jwt_handler):
         """Test unexpected error handling during verification."""
-        mock_decode.side_effect = Exception("Unexpected error")
+        mock_decode.side_effect = jwt.InvalidKeyError("Unexpected error")
 
         payload = jwt_handler.verify_token("some_token")
 
@@ -301,7 +301,7 @@ class TestPasswordOperations:
     @patch("backend.src.auth.jwt_handler.PasswordHash.verify")
     def test_verify_password_exception(self, mock_verify, jwt_handler):
         """Test exception handling during verification."""
-        mock_verify.side_effect = Exception("Verification failed")
+        mock_verify.side_effect = ValueError("Verification failed")
 
         is_valid = jwt_handler.verify_password("password", "hash")
 

@@ -336,7 +336,9 @@ class Settings(BaseSettings):
 # AttributeError on a None settings object.
 try:
     settings = Settings()
-except Exception as config_error:
+except (ValueError, OSError) as config_error:
+    # pydantic validation errors are ValueErrors; OSError comes from creating
+    # the data directories.
     import sys
 
     if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
