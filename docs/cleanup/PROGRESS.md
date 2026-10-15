@@ -12,7 +12,7 @@ Consigne : `docs/cleanup/MISSION.md`. Décisions : `docs/cleanup/DECISIONS.md`.
 | 5. Commentaires | réussie | 1 | `7dee121` docs: remove planning references from comments and strings |
 | 6. Tests | réussie | 1 | `feea00c` test: kill surviving mutants in chunking and fusion |
 | 7. Dépendances | réussie | 1 | `5220999` ci: add dependabot config |
-| 8. Façade | à faire | 0 | |
+| 8. Façade | en cours | 1 | |
 
 ## Dernière porte franchie (passe 7)
 
@@ -23,7 +23,7 @@ Python 3.13) utilisés par la CI ; Dependabot (pip, npm, actions) ; aiosqlite
 en runtime ; pytest 9.1.1 et pytest-asyncio 1.4.0, exclusion pip-audit de
 pytest retirée. Voir DECISIONS D7.1 à D7.6.
 
-Prochaine étape : passe 8 (façade).
+Prochaine étape : passe 8 (façade), en cours (tentative 1). Brouillons d'ADR prêts (scratchpad/adr_drafts, non persistants).
 
 ## Reprendre après une coupure
 
