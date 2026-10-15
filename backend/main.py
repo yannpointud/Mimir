@@ -17,6 +17,7 @@ from src.config import settings
 from src.database.connection import init_database, db_manager
 from src.security.admin_password import resolve_admin_password
 from src.security.startup_validation import validate_production_secrets
+from src.shared.errors import BudgetExceeded, MimirError, RetrievalError
 from src.shared.models import ErrorResponse, HealthCheckResponse
 
 # Import API endpoints
@@ -25,6 +26,7 @@ from src.api.endpoints import health, auth, chat, documents, admin, logs
 # Import middleware
 from src.api.middleware.cors import configure_cors_middleware
 from src.api.middleware.rate_limit import configure_rate_limiting
+from src.api.responses import budget_exceeded_response
 
 # Import services
 from src.cache.lru_cache import cache_service, chat_cache_service
@@ -163,7 +165,7 @@ async def lifespan(app: FastAPI):  # noqa: C901
                             logger.info(
                                 f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
                             )
-                except Exception as bm25_startup_error:  # noqa: BLE001
+                except RetrievalError as bm25_startup_error:
                     logger.warning(
                         f"BM25 startup rebuild failed - hybrid queries will degrade to "
                         f"dense-only until next ingestion: {bm25_startup_error}"
@@ -189,13 +191,13 @@ async def lifespan(app: FastAPI):  # noqa: C901
                         else:
                             logger.warning(f"Document file not found: {doc.path}")
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - startup boundary: the API starts even if ingestion cannot
             logger.error(f"Failed to initialize ingestion processor: {e}")
             # Continue without ingestion processor (non-blocking)
 
         logger.info("Application startup completed successfully")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - startup boundary: log any failure, then re-raise
         logger.error(f"Failed to initialize application: {e}")
         raise
 
@@ -218,7 +220,7 @@ async def lifespan(app: FastAPI):  # noqa: C901
                     logger.info("Ingestion processor stopped gracefully")
                 else:
                     logger.warning("Ingestion processor stop timeout")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
                 logger.error(f"Error stopping ingestion processor: {e}")
 
         # Graceful LLM service shutdown to avoid "Event loop is closed"
@@ -228,11 +230,11 @@ async def lifespan(app: FastAPI):  # noqa: C901
             if _llm_service is not None:
                 await _llm_service.close()
                 logger.info("LLM service closed gracefully")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
             logger.error(f"Error closing LLM service: {e}")
 
         logger.info("Application shutdown completed")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - shutdown boundary: never fail the server stop
         logger.error(f"Error during shutdown: {e}")
 
 
@@ -349,6 +351,19 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+@app.exception_handler(BudgetExceeded)
+async def budget_exceeded_handler(request: Request, exc: BudgetExceeded):
+    """Daily AI budget exhausted: the same 429 as the chat route."""
+    logger.warning(f"Daily budget exceeded on {request.url.path}: {exc}")
+    return budget_exceeded_response()
+
+
+@app.exception_handler(MimirError)
+async def domain_error_handler(request: Request, exc: MimirError):
+    """Domain error escaping a route: the same 500 payload as an unexpected error."""
+    return await general_exception_handler(request, exc)
+
+
 # Base routes
 
 
@@ -390,7 +405,7 @@ async def root_health_check(response: Response):
         with db_manager.get_session_context() as session:
             return await health_check(response=response, db=session)
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as a 503
         logger.error(f"Root health check failed: {e}")
         return CustomJSONResponse(
             status_code=503,

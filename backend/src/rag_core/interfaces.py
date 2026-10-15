@@ -8,6 +8,8 @@ from typing import Any
 from dataclasses import dataclass
 import numpy as np
 
+from ..shared.errors import RetrievalError
+
 
 @dataclass
 class Chunk:
@@ -37,7 +39,7 @@ class SearchResult:
     metadata: dict[str, Any]
 
 
-class VectorStoreException(Exception):
+class VectorStoreException(RetrievalError):
     """Base exception for vector store operations"""
 
     pass
@@ -53,6 +55,24 @@ class VectorStoreOperationError(VectorStoreException):
     """Vector store operation errors"""
 
     pass
+
+
+# Low-level failures that index implementations translate into
+# VectorStoreException subclasses: FAISS reports its C++ errors as
+# RuntimeError, numpy, json and pydantic raise ValueError or TypeError,
+# metadata bookkeeping raises KeyError, IndexError or AttributeError (no
+# index loaded) and disk access raises OSError. A VectorStoreException raised
+# by a nested call is wrapped again with the context of the outer operation.
+INDEX_BACKEND_ERRORS = (
+    VectorStoreException,
+    RuntimeError,
+    ValueError,
+    TypeError,
+    KeyError,
+    IndexError,
+    AttributeError,
+    OSError,
+)
 
 
 class AbstractVectorStore(ABC):

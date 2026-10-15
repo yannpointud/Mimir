@@ -6,6 +6,8 @@ Provides base classes for implementing different LLM providers
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from ..shared.errors import LLMError
+
 
 @dataclass
 class GenerationResponse:
@@ -35,7 +37,7 @@ class EmbeddingResponse:
     completion_tokens: int = 0
 
 
-class LLMException(Exception):
+class LLMException(LLMError):
     """Base exception for LLM operations"""
 
     pass

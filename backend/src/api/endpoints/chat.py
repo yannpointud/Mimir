@@ -7,7 +7,7 @@ and responses based on document context.
 
 from typing import Any
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -19,6 +19,7 @@ import numpy as np
 
 from src.auth.middleware import get_optional_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
+from src.api.responses import budget_exceeded_response
 from src.cache.lru_cache import ChatCacheService
 from src.email_service.smtp_client import EmailService
 from src.api.dependencies import (
@@ -136,23 +137,14 @@ async def chat_stream(
     # here. Do NOT move this check inside generate_sse -- that would yield a
     # 200 with an SSE error event instead of a genuine HTTP 429.
     #
-    # JSONResponse (not `raise HTTPException`): main.py's global HTTPException
-    # handler would rewrite the body to the generic "HTTP_429" shape (or crash
-    # outright on a dict detail), defeating the distinct budget_exceeded
-    # error_code -- returning a Response instance bypasses that handler and the
-    # response_model machinery entirely, exactly like the slowapi 429 handler.
+    # A returned Response (not a raised exception) also lets slowapi add its
+    # rate-limit headers, exactly like the slowapi 429 handler.
     #
     # asyncio.to_thread: reserve() is a blocking SQLite write -- keep it off
     # the event loop.
     reservation: BudgetReservation | None = await asyncio.to_thread(budget_guard.reserve, "chat")
     if reservation is None:
-        return JSONResponse(
-            status_code=429,
-            content={
-                "error_code": "budget_exceeded",
-                "error_message": "Plafond quotidien de dépense IA atteint.",
-            },
-        )
+        return budget_exceeded_response()
 
     # Idempotent settle guard shared between generate_sse() below and the
     # StreamingResponse background task. An async generator that is never
@@ -266,7 +258,7 @@ async def chat_stream(
             response_time_ms = int((end_time - start_time).total_seconds() * 1000)
             logger.info(f"Streaming completed - session: {session_id}, time: {response_time_ms}ms")
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event
             logger.error(f"Streaming error: {type(e).__name__} - {str(e)}")
             # Never leak raw exception details to the client (info disclosure);
             # the full error is kept in the server logs above.
@@ -361,7 +353,7 @@ async def escalate_to_human(
                 escalation_id=None,
             )
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - API boundary: any failure becomes a failed escalation
         logger.error(f"Escalation error: {e}")
         return EscalationResponse(
             success=False,

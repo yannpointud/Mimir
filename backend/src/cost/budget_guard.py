@@ -20,18 +20,10 @@ from datetime import datetime
 from src.config import settings
 from src.database.connection import db_manager
 from src.database.repository import ConfigurationRepository, UsageRepository
+from src.shared.errors import BudgetExceeded
 
-
-class BudgetExceededError(Exception):
-    """
-    Raised by callers (e.g. the ingestion fail-closed path in processor.py)
-    to signal a budget-exhausted rejection. BudgetGuard.reserve() itself
-    never raises this -- it returns None on rejection so HTTP call sites can
-    turn that into a 429 response; only non-HTTP call sites (ingestion)
-    raise this exception to short-circuit their own retry logic.
-    """
-
-    pass
+# Historical name of the budget-exhausted error, still imported by callers.
+BudgetExceededError = BudgetExceeded
 
 
 @dataclass
