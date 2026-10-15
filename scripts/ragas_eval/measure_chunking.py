@@ -432,7 +432,7 @@ def _summarize(baseline_json: Path, structure_json: Path, out_path: Path) -> int
     verdict = "ADOPT" if adopt else "DO-NOT-ADOPT"
 
     lines = [
-        "# Décision d'adoption — Chunking structure-aware (RAG-05, 07-06)",
+        "# Décision d'adoption — Chunking structure-aware",
         "",
         f"**Date:** {datetime.now(UTC).date().isoformat()}",
         f"**Décision:** **{verdict}** — "
@@ -493,7 +493,7 @@ def _summarize(baseline_json: Path, structure_json: Path, out_path: Path) -> int
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Mesure le delta RAGAS du chunking structure-aware (RAG-05) sur le "
+            "Mesure le delta RAGAS du chunking structure-aware sur le "
             "corpus gelé. --dry-run ne dépense aucun token. Le run complet est "
             "gated opérateur (ré-ingestion + réponses = tokens Mistral)."
         )

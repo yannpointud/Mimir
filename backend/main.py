@@ -70,7 +70,7 @@ class CustomJSONResponse(JSONResponse):
 async def lifespan(app: FastAPI):
     """Application lifespan manager: initialization at startup, cleanup at shutdown."""
     # Startup
-    logger.info("Starting Mimir application - Jalon 3: API & Services...")
+    logger.info("Starting Mimir application - API & Services...")
 
     try:
         # Derive the effective admin hash from ADMIN_PASSWORD first, so the
@@ -263,7 +263,7 @@ app = FastAPI(
 )
 
 
-# Middleware configuration - Milestone 3
+# Middleware configuration
 
 # CORS middleware (advanced configuration)
 configure_cors_middleware(app)
@@ -392,7 +392,7 @@ async def root() -> RootResponse:
     )
 
 
-# API endpoints registration - Milestone 3
+# API endpoints registration
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")

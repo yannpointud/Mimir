@@ -540,7 +540,7 @@ class TestIngestionProcessor:
         # the earlier document is present in the lexical index.
         assert processor.bm25_store.rebuild.call_count >= 1, (
             "BM25 was never rebuilt after the last doc of the batch failed; "
-            "the earlier successful document would be stale vs FAISS (WR-01)"
+            "the earlier successful document would be stale vs FAISS"
         )
 
     @pytest.mark.asyncio

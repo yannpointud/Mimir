@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Exact-term retrieval regression check: dense vs hybrid (venv principal).
+"""Exact-term retrieval regression check: dense vs hybrid (main venv).
 
 Why this exists: the hybrid adoption gate may only flip
 ``hybrid_search_enabled`` on if, among other conditions, hybrid retrieval does
@@ -141,7 +141,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Vérifie l'absence de régression retrieval sur les requêtes à terme "
-            "exact (dense vs hybride, RAG-02). Un appel embedding Mistral par "
+            "exact (dense vs hybride). Un appel embedding Mistral par "
             "requête, throttlé <= 1/s. N'affiche jamais MISTRAL_API_KEY."
         )
     )

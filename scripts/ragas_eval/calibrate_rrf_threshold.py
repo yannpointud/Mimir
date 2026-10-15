@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Calibrate rrf_score_threshold on the REAL RRF score distribution (venv principal).
+"""Calibrate rrf_score_threshold on the REAL RRF score distribution (main venv).
 
 Why this exists: ``settings.rrf_score_threshold`` starts at 0.015, an
 ASSUMED value. Before the hybrid-vs-baseline comparative run,
@@ -177,7 +177,7 @@ def assess_starting_value(
         return False, (
             f"Valeur de départ {starting_value} TROP HAUTE: au moins une requête a "
             f"un meilleur score RRF de {min_top:.5f}, elle serait vidée de toute "
-            "source en mode hybride (Pitfall #2)."
+            "source en mode hybride."
         )
     if starting_value <= overall_min:
         return False, (
@@ -228,7 +228,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Calibre rrf_score_threshold sur la distribution réelle des scores "
-            "RRF du golden set gelé (RAG-02). Un appel embedding Mistral par "
+            "RRF du golden set gelé. Un appel embedding Mistral par "
             "question, throttlé <= 1/s. N'affiche jamais MISTRAL_API_KEY."
         )
     )
@@ -382,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     if not Path(args.golden_set).exists():
         print(
             f"Golden set introuvable: {args.golden_set}\n"
-            "Geler d'abord golden_set_v1.jsonl (plan 06-01) puis relancer.",
+            "Geler d'abord golden_set_v1.jsonl (generate_golden_set.py) puis relancer.",
             file=sys.stderr,
         )
         return 1
@@ -439,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:
     if not report["starting_value_coherent"]:
         print(
             "ACTION: mettre à jour settings.rrf_score_threshold (config.py) avec la "
-            "valeur recommandée AVANT le run comparatif (plan 06-07 Task 3).",
+            "valeur recommandée AVANT le run comparatif dense vs hybride.",
             file=sys.stderr,
         )
     return 0

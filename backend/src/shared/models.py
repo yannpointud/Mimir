@@ -177,7 +177,7 @@ class AuditLogListResponse(BaseResponse):
     total_count: int
 
 
-# Models for future features (ready for Milestone 2-3)
+# Health check and error models
 
 
 class HealthCheckResponse(BaseResponse):

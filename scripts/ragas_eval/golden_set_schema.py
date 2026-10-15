@@ -9,7 +9,7 @@ number rather than silently defaulted.
 
 This module is dependency-light on purpose (pydantic + stdlib only): it imports
 nothing from the backend package so it can be reused by both the generation
-script (venv principal) and the evaluation harness.
+script (main venv) and the evaluation harness.
 """
 
 import json
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError, field_validator
 
-# Locked bounds: a versioned golden set of 50 to 200 questions, frozen
+# Fixed bounds: a versioned golden set of 50 to 200 questions, frozen
 # before any baseline measurement.
 MIN_ENTRIES = 50
 MAX_ENTRIES = 200

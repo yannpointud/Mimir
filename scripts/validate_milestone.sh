@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # validate_milestone.sh — single replayable entrypoint for every non-unit
-# milestone acceptance proof.
+# acceptance proof.
 #
 # It wraps (never re-implements) the existing in-repo proofs, runs each one,
 # records a per-criterion PASS/FAIL, prints a summary matrix, and exits
@@ -154,7 +154,7 @@ fi
 # ---------------------------------------------------------------------------
 # Summary matrix + overall result.
 # ---------------------------------------------------------------------------
-banner "Milestone validation summary (TEST-02)"
+banner "Validation summary"
 printf '  %-8s | %s\n' "CRITERION" "RESULT"
 printf '  %-8s-+-%s\n' "--------" "------"
 for i in "${!CRIT_IDS[@]}"; do

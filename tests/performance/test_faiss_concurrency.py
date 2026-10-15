@@ -11,7 +11,7 @@ simulated writer and N concurrent readers -- instantiating a separate store
 per task would mask exactly the kind of duplicate-instance bug that was
 fixed in admin.py (an endpoint building its own FaissVectorStore).
 
-This test is also the base reused by the milestone validation script
+This test is also the base reused by the acceptance validation script
 (scripts/validate_milestone.sh), so its structure (shared singleton, write contention during
 reads, fresh-reload proof) should remain stable for future extension.
 """

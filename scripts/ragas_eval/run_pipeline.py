@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""RAGAS pipeline stage 1/2 (venv PRINCIPAL): answers the golden set.
+"""RAGAS pipeline stage 1/2 (MAIN venv): answers the golden set.
 
 Why this exists: the RAGAS baseline is measured in two strictly separated
 stages joined by a JSONL boundary file. This script is the MAIN-venv stage: it

@@ -473,11 +473,11 @@ async def _hybrid_retrieve(
         filter_dict=None,
         similarity_floor=0.0,
     )
-    # Graceful degradation (milestone prime directive: never break the working
-    # engine). The BM25 index is only built at ingestion/deletion; on a cold
-    # start or an upgrade of an existing FAISS install it may not exist yet, and
-    # bm25_store.query() would raise. In that case fall back to dense-only for
-    # this query rather than let the exception break an otherwise-working engine.
+    # Graceful degradation (never break the working engine). The BM25 index is
+    # only built at ingestion/deletion; on a cold start or an upgrade of an
+    # existing FAISS install it may not exist yet, and bm25_store.query() would
+    # raise. In that case fall back to dense-only for this query rather than let
+    # the exception break an otherwise-working engine.
     try:
         lexical_pool = await asyncio.to_thread(bm25_store.query, question, _HYBRID_POOL_SIZE)
     except RetrievalError as e:

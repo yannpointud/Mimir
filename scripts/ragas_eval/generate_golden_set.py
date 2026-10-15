@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Synthetic golden set generator for the RAGAS baseline (venv principal).
+"""Synthetic golden set generator for the RAGAS baseline (main venv).
 
 Why this exists: every RAGAS measurement is gated on a frozen golden set
 of 50 to 200 questions (including out-of-corpus adversarials). This script
@@ -203,7 +203,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Génère un golden set synthétique (Mistral, budget-tracké) pour la "
-            "baseline RAGAS (RAG-01). N'affiche jamais MISTRAL_API_KEY."
+            "baseline RAGAS. N'affiche jamais MISTRAL_API_KEY."
         )
     )
     parser.add_argument(

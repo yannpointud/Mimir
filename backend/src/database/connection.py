@@ -31,7 +31,7 @@ def configure_sqlite_performance(dbapi_connection, connection_record):
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
 
-        # WAL mode to improve concurrency (spec requirement)
+        # WAL mode to improve concurrency
         if config.settings and config.settings.sqlite_wal_mode:
             cursor.execute("PRAGMA journal_mode=WAL")
             logger.info("SQLite WAL mode activated")

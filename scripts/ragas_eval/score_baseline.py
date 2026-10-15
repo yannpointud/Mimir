@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""RAGAS pipeline stage 2/2 (venv SÉPARÉ): scores the baseline.
+"""RAGAS pipeline stage 2/2 (SEPARATE venv): scores the baseline.
 
 Why this exists: this is the SEPARATE-venv half of the two-stage RAGAS harness.
 It reads ONLY ``eval_input.jsonl`` (produced by ``run_pipeline.py`` in the main
@@ -35,7 +35,7 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
-# The four legacy metrics required by the success criteria. context_recall and
+# The four legacy ragas metrics of the baseline. context_recall and
 # context_precision are the mandatory pair; faithfulness and answer_relevancy
 # are included as they come cheaply from the same evaluate() batch.
 _ALL_METRICS = ["context_recall", "context_precision", "faithfulness", "answer_relevancy"]

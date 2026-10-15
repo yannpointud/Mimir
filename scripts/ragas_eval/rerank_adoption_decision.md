@@ -1,4 +1,4 @@
-# Décision d'adoption — Reranking cross-encoder FlashRank (RAG-03, 07-05)
+# Décision d'adoption — Reranking cross-encoder FlashRank
 
 **Date:** 2026-07-14
 **Décision:** **DO-NOT-ADOPT** — `rerank_enabled` reste `False`.
@@ -21,7 +21,7 @@ Sources : `rerank_baseline_run.json`, `rerank_multibert_run.json`, `rerank_laten
 
 ## Jugement d'adoption
 
-Règle conservatrice (mirroir de l'adoption hybride, phase 6) : adopter **uniquement** si les DEUX métriques de retrieval progressent (delta net > 0), si le taux de NaN reste acceptable (<= 20 %), ET si le p95 de la latence de reranking sur la **machine cible** reste dans le budget (500 ms).
+Règle conservatrice (mirroir de l'adoption hybride) : adopter **uniquement** si les DEUX métriques de retrieval progressent (delta net > 0), si le taux de NaN reste acceptable (<= 20 %), ET si le p95 de la latence de reranking sur la **machine cible** reste dans le budget (500 ms).
 
 - Delta net positif sur les deux métriques : **False**
 - Taux de NaN acceptable : **True** (baseline 1.7%, rerank 0.0%)

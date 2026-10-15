@@ -90,17 +90,17 @@ class Settings(BaseSettings):
     # (0.579->0.661), NaN 0%, with NO exact-term regression -> flipped to True.
     hybrid_search_enabled: bool = Field(
         default=True,
-        description="Active la recherche hybride BM25 + dense (RRF). Adopté en 06-07 (gain RAGAS net et marqué, sans régression terme-exact) ; repli dense-only sûr si mis à False",
+        description="Active la recherche hybride BM25 + dense (RRF). Adoptée après mesure RAGAS sur le golden set (gain net et marqué, sans régression terme-exact) ; repli dense-only sûr si mis à False",
     )
     rrf_k: int = Field(
         default=60,
         ge=1,
-        description="Constante k de la Reciprocal Rank Fusion (fixée à 60 par le ROADMAP)",
+        description="Constante k de la Reciprocal Rank Fusion (fixée à 60, valeur standard de la RRF)",
     )
     rrf_score_threshold: float = Field(
         default=0.015,
         ge=0.0,
-        description="Seuil de score RRF dédié au mode hybride (0.015 validé empiriquement en 06-07 : contextes non vides + recall +18% sur le golden set)",
+        description="Seuil de score RRF dédié au mode hybride (0.015 validé empiriquement par mesure RAGAS : contextes non vides + recall +18% sur le golden set)",
     )
     bm25_index_path: str = Field(
         default="./data/bm25/index", description="Chemin de persistance de l'index lexical BM25"
@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # to the byte-identical current splitter by setting this back to False.
     structure_aware_chunking_enabled: bool = Field(
         default=True,
-        description="Active le chunking structure-aware (métadonnée section_title, découpe alignée sur les titres). Défaut True : adopté sur delta RAGAS net (precision +7.3%, recall +3.4%) mesuré en 07-06",
+        description="Active le chunking structure-aware (métadonnée section_title, découpe alignée sur les titres). Défaut True : adopté sur delta RAGAS net (precision +7.3%, recall +3.4%) mesuré sur le golden set",
     )
 
     # Filename Pre-inclusion (fuzzy matching)
@@ -246,7 +246,7 @@ class Settings(BaseSettings):
         default=60, description="Intervalle des health checks en secondes"
     )
     alerting_enabled: bool = Field(
-        default=True, description="Active la capture d'erreurs et l'alerte SMTP groupée (OPS-05)"
+        default=True, description="Active la capture d'erreurs et l'alerte SMTP groupée"
     )
     alert_throttle_seconds: int = Field(
         default=900, description="Fenêtre de dédup des alertes SMTP par fingerprint, en secondes"
