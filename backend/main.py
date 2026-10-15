@@ -70,7 +70,7 @@ class CustomJSONResponse(JSONResponse):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # noqa: C901
+async def lifespan(app: FastAPI):
     """
     Application lifespan manager - Milestone 3
     Initialization at startup, cleanup at shutdown
@@ -90,21 +90,7 @@ async def lifespan(app: FastAPI):  # noqa: C901
         init_database()
         logger.info("Database initialized successfully")
 
-        # Cache services initialization
-        cache_stats = cache_service.get_stats()
-        chat_cache_stats = chat_cache_service.get_stats()
-        logger.info(
-            f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries"
-        )
-
-        # Email service verification
-        email_config = email_service.get_configuration_status()
-        if email_config["configured"]:
-            logger.info("Email service configured and ready")
-        else:
-            logger.warning(
-                "Email service not fully configured - escalation features will be limited"
-            )
+        _log_services_status()
 
         # Attach the fingerprinted SMTP error alerter to app_logger.
         # Idempotent and guarded internally; a failure here must not abort startup.
@@ -112,88 +98,7 @@ async def lifespan(app: FastAPI):  # noqa: C901
 
         setup_alerting()
 
-        # Ingestion services initialization
-        global ingestion_processor
-        try:
-            # Create chunking configuration. section_title_tracking is defaulted
-            # from the settings flag here (single caller-side default):
-            # when structure_aware_chunking_enabled is False (current default),
-            # chunking output stays byte-identical to today.
-            chunking_config = ChunkingConfig(
-                chunk_size=settings.max_chunk_size,
-                overlap=settings.chunk_overlap,
-                section_title_tracking=settings.structure_aware_chunking_enabled,
-            )
-
-            # Get database session
-            from src.database.connection import db_manager
-
-            with db_manager.get_session_context() as session:
-                document_repo = get_document_repository(session)
-
-                # Initialize ingestion processor
-                ingestion_processor = IngestionProcessor(
-                    llm_service=get_llm_service(),
-                    vector_store=get_vector_store(),
-                    document_repository=document_repo,
-                    chunking_config=chunking_config,
-                    max_file_size_mb=settings.max_file_size_mb,
-                    max_chunks_per_doc=settings.max_chunks_per_doc,
-                    bm25_store=get_bm25_store(),
-                )
-
-                # Start the processor
-                await ingestion_processor.start()
-                logger.info("Ingestion processor started successfully")
-
-                # Ensure the BM25 lexical index exists at startup. It is
-                # a derived artifact rebuilt from the FAISS source of truth only
-                # at ingestion/deletion; on a cold start or an upgrade of an
-                # existing FAISS install it may be missing on disk. With hybrid
-                # search enabled by default, a missing BM25 index would otherwise
-                # force every query to degrade to dense-only until the next
-                # ingestion. Rebuild it here (non-fatal) so hybrid works
-                # immediately. The per-query dense-only fallback in RagService
-                # remains the safety net if this rebuild fails.
-                try:
-                    _vs = get_vector_store()
-                    _bm25 = get_bm25_store()
-                    if not _bm25.load():
-                        _active = _vs.snapshot_active_chunks()
-                        if _active:
-                            _bm25.rebuild(_active)
-                            logger.info(
-                                f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
-                            )
-                except RetrievalError as bm25_startup_error:
-                    logger.warning(
-                        f"BM25 startup rebuild failed - hybrid queries will degrade to "
-                        f"dense-only until next ingestion: {bm25_startup_error}"
-                    )
-
-                # Make the processor available to API endpoints
-                set_ingestion_processor(ingestion_processor)
-
-                # Process any pending documents
-                pending_documents = document_repo.get_by_status("pending")
-                if pending_documents:
-                    logger.info(
-                        f"Found {len(pending_documents)} pending documents, queuing for processing"
-                    )
-                    for doc in pending_documents:
-                        if Path(doc.path).exists():
-                            ingestion_processor.queue_document(
-                                file_path=doc.path,
-                                document_id=str(doc.id),
-                                preserve=doc.preserve,
-                                metadata={},
-                            )
-                        else:
-                            logger.warning(f"Document file not found: {doc.path}")
-
-        except Exception as e:  # noqa: BLE001 - startup boundary: the API starts even if ingestion cannot
-            logger.error(f"Failed to initialize ingestion processor: {e}")
-            # Continue without ingestion processor (non-blocking)
+        await _start_ingestion()
 
         logger.info("Application startup completed successfully")
 
@@ -212,30 +117,144 @@ async def lifespan(app: FastAPI):  # noqa: C901
         chat_cache_service.invalidate_all()
         logger.info("Cache services cleaned up")
 
-        # Graceful shutdown of ingestion services
-        if ingestion_processor:
-            try:
-                success = await ingestion_processor.stop(timeout=10.0)
-                if success:
-                    logger.info("Ingestion processor stopped gracefully")
-                else:
-                    logger.warning("Ingestion processor stop timeout")
-            except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
-                logger.error(f"Error stopping ingestion processor: {e}")
-
-        # Graceful LLM service shutdown to avoid "Event loop is closed"
-        try:
-            from src.api.dependencies import _llm_service
-
-            if _llm_service is not None:
-                await _llm_service.close()
-                logger.info("LLM service closed gracefully")
-        except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
-            logger.error(f"Error closing LLM service: {e}")
+        await _stop_ingestion()
+        await _close_llm_service()
 
         logger.info("Application shutdown completed")
     except Exception as e:  # noqa: BLE001 - shutdown boundary: never fail the server stop
         logger.error(f"Error during shutdown: {e}")
+
+
+def _log_services_status() -> None:
+    """Log the cache sizes and whether the email service is configured."""
+    cache_stats = cache_service.get_stats()
+    chat_cache_stats = chat_cache_service.get_stats()
+    logger.info(
+        f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries"
+    )
+
+    email_config = email_service.get_configuration_status()
+    if email_config["configured"]:
+        logger.info("Email service configured and ready")
+    else:
+        logger.warning("Email service not fully configured - escalation features will be limited")
+
+
+async def _start_ingestion() -> None:
+    """Start the ingestion processor and queue the pending documents.
+
+    Non-blocking: the API starts even if ingestion cannot.
+    """
+    global ingestion_processor
+    try:
+        # section_title_tracking is defaulted from the settings flag here
+        # (single caller-side default): when structure_aware_chunking_enabled
+        # is False (current default), chunking output stays byte-identical.
+        chunking_config = ChunkingConfig(
+            chunk_size=settings.max_chunk_size,
+            overlap=settings.chunk_overlap,
+            section_title_tracking=settings.structure_aware_chunking_enabled,
+        )
+
+        # Get database session
+        from src.database.connection import db_manager
+
+        with db_manager.get_session_context() as session:
+            document_repo = get_document_repository(session)
+
+            ingestion_processor = IngestionProcessor(
+                llm_service=get_llm_service(),
+                vector_store=get_vector_store(),
+                document_repository=document_repo,
+                chunking_config=chunking_config,
+                max_file_size_mb=settings.max_file_size_mb,
+                max_chunks_per_doc=settings.max_chunks_per_doc,
+                bm25_store=get_bm25_store(),
+            )
+            await ingestion_processor.start()
+            logger.info("Ingestion processor started successfully")
+
+            _ensure_bm25_index()
+
+            # Make the processor available to API endpoints
+            set_ingestion_processor(ingestion_processor)
+
+            _queue_pending_documents(document_repo, ingestion_processor)
+
+    except Exception as e:  # noqa: BLE001 - startup boundary: the API starts even if ingestion cannot
+        logger.error(f"Failed to initialize ingestion processor: {e}")
+
+
+def _ensure_bm25_index() -> None:
+    """Rebuild the BM25 lexical index at startup when it is missing on disk.
+
+    It is a derived artifact rebuilt from the FAISS source of truth only at
+    ingestion/deletion; on a cold start or an upgrade of an existing FAISS
+    install it may be missing. With hybrid search enabled by default, a
+    missing BM25 index would otherwise force every query to degrade to
+    dense-only until the next ingestion. Non-fatal: the per-query dense-only
+    fallback in RagService remains the safety net.
+    """
+    try:
+        _vs = get_vector_store()
+        _bm25 = get_bm25_store()
+        if not _bm25.load():
+            _active = _vs.snapshot_active_chunks()
+            if _active:
+                _bm25.rebuild(_active)
+                logger.info(
+                    f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
+                )
+    except RetrievalError as bm25_startup_error:
+        logger.warning(
+            f"BM25 startup rebuild failed - hybrid queries will degrade to "
+            f"dense-only until next ingestion: {bm25_startup_error}"
+        )
+
+
+def _queue_pending_documents(document_repo, processor) -> None:
+    """Queue the documents left pending by a previous run."""
+    pending_documents = document_repo.get_by_status("pending")
+    if not pending_documents:
+        return
+
+    logger.info(f"Found {len(pending_documents)} pending documents, queuing for processing")
+    for doc in pending_documents:
+        if Path(doc.path).exists():
+            processor.queue_document(
+                file_path=doc.path,
+                document_id=str(doc.id),
+                preserve=doc.preserve,
+                metadata={},
+            )
+        else:
+            logger.warning(f"Document file not found: {doc.path}")
+
+
+async def _stop_ingestion() -> None:
+    """Gracefully stop the ingestion processor, if it was started."""
+    if not ingestion_processor:
+        return
+    try:
+        success = await ingestion_processor.stop(timeout=10.0)
+        if success:
+            logger.info("Ingestion processor stopped gracefully")
+        else:
+            logger.warning("Ingestion processor stop timeout")
+    except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
+        logger.error(f"Error stopping ingestion processor: {e}")
+
+
+async def _close_llm_service() -> None:
+    """Close the LLM service's HTTP session to avoid "Event loop is closed"."""
+    try:
+        from src.api.dependencies import _llm_service
+
+        if _llm_service is not None:
+            await _llm_service.close()
+            logger.info("LLM service closed gracefully")
+    except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
+        logger.error(f"Error closing LLM service: {e}")
 
 
 # FastAPI application configuration
