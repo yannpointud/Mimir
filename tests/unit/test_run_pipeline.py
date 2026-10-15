@@ -14,7 +14,6 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, Mock, patch
 
-import pytest
 
 from scripts.ragas_eval.golden_set_schema import ADVERSARIAL_REFERENCE, GoldenSetEntry
 from scripts.ragas_eval.run_pipeline import (

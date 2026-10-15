@@ -5,9 +5,7 @@ Unit tests for chat endpoints.
 import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime
 from fastapi import HTTPException, status  # noqa: F401
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from backend.src.api.endpoints.chat import (
