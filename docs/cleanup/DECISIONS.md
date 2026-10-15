@@ -913,3 +913,127 @@ Cette passe ne modifie aucun code de production :
   plus court que `min_chunk_size` est abandonné dès qu'un chunk existe déjà, et
   la ou les dernières phrases sont perdues (rare avec les valeurs par défaut,
   le recouvrement allongeant ce reste). Non figé.
+
+## Passe 7 : dépendances
+
+### D7.1 Lockfiles
+
+`requirements.txt` et `requirements-dev.txt` restent la source. Les locks sont
+générés par `uv pip compile` (uv 0.11.32), depuis la racine du dépôt :
+
+- `requirements.lock` (98 paquets), depuis `requirements.txt` ;
+- `requirements-dev.lock` (141 paquets), depuis `requirements.txt` et
+  `requirements-dev.txt`.
+
+Options : `--generate-hashes --universal --python-version 3.13`. La commande
+exacte, à chemins relatifs, est écrite par uv en tête de chaque fichier.
+`--universal` produit une seule résolution valable sur toutes les plateformes,
+avec marqueurs (`pywin32` sous Windows, `uvloop` hors Windows et PyPy,
+`colorama` sous Windows dans `requirements.lock` mais partout dans le lock dev,
+radon en dépendant sans condition) : le même lock sert au runner Linux de la CI et aux postes de dev. Les
+deux locks ont les mêmes versions pour tous les paquets communs (vérifié). Les
+hachages couvrent toutes les distributions publiées de chaque version (wheels
+de toutes plateformes et sdist), d'où la taille des fichiers (280 et 330 Ko).
+`pip` figure dans `requirements-dev.lock` (dépendance de pip-audit via
+pip-api) : uv ne l'exclut pas, et l'installation par hachage l'accepte.
+
+Vérifié dans des venv jetables en Python 3.13.16 :
+`pip install --require-hashes -r requirements-dev.lock` et
+`-r requirements.lock` réussissent, `pip check` est propre ; dans le venv du
+lock runtime seul, les 1010 tests passent (couverture 86,23 %) ; dans celui du
+lock dev, ruff, `ruff format --check` et mypy (0 erreur) passent. Le `.venv`
+du projet correspondait déjà exactement au lock dev (installation à blanc :
+rien à changer).
+
+L'installation documentée (README) et celle du venv vierge de la porte
+restent `pip install -r requirements.txt` ; mentionner les locks dans le
+README relève de la passe 8.
+
+### D7.2 CI
+
+- **Installation.** Chaque job installe depuis un lock avec
+  `pip install --require-hashes`, sans `--no-deps` : en mode hachage, pip
+  refuse toute dépendance absente du lock, alors que `--no-deps` la ferait
+  ignorer en silence. Jobs ruff, mypy et pip-audit : `requirements-dev.lock` ;
+  job pytest : `requirements.lock` seul (la suite n'utilise aucun outil de
+  dev ; vérifié, 1010 tests). Avant, les jobs ruff et pip-audit n'installaient
+  que `requirements-dev.txt` : faute de lock dédié aux outils, ils installent
+  désormais aussi les dépendances runtime (quelques dizaines de secondes de
+  plus hors cache). Le cache pip est indexé sur le lock installé.
+- **Cohérence lock / requirements.** Les jobs mypy et pytest lancent, après
+  l'installation, `pip install -q --no-deps --no-index -r requirements.txt`
+  (et `-r requirements-dev.txt` pour mypy). Sans index, pip ne peut rien
+  télécharger : si une épingle de `requirements*.txt` n'est pas la version
+  installée depuis le lock (bump sans lock régénéré), l'étape échoue. Vérifié
+  dans les deux sens (succès sur l'état actuel, échec avec `fastapi` épinglé à
+  une autre version). Limite : un paquet retiré de `requirements.txt` mais
+  resté dans le lock n'est pas détecté. La CI ne régénère pas le lock pour le
+  comparer : la liste des hachages dépend des distributions publiées au moment
+  de la génération (une wheel ajoutée après coup à une version existante
+  changerait le fichier), ce qui rendrait une comparaison stricte instable.
+- **pip-audit.** L'audit existant de `requirements.txt` (résolution par pip,
+  même commande que la porte) est conservé. S'y ajoute l'audit de
+  `requirements-dev.lock` avec `--require-hashes --disable-pip` : exactement ce
+  que la CI installe (runtime, test et outils de dev ; 140 paquets, `pywin32`
+  écarté par son marqueur sous Linux), sans résolution. Mêmes exclusions.
+  Même ajout dans `scripts/local_ci.sh` ; la porte, qui lit les exclusions
+  dans les lignes `--ignore-vuln` de ce script, n'est pas affectée.
+
+### D7.3 Dependabot
+
+`.github/dependabot.yml` (version 2) : pip (`/`), npm (`/frontend`) et
+github-actions (`/`), hebdomadaire, 5 pull requests ouvertes au plus par
+écosystème. Pour pip, Dependabot ne met à jour que `requirements.txt` et
+`requirements-dev.txt` : il ne régénère pas les `.lock` (pour pip, il ne
+cherche que des fichiers `*.txt` et `*.in`). Sur chaque pull request
+pip, il faut donc régénérer les deux locks avec la commande de leur en-tête
+et pousser le résultat sur la branche de la pull request ; tant que ce n'est
+pas fait, l'étape de cohérence de la CI échoue, ce qui est voulu (sinon la CI
+testerait l'ancienne version du lock). Le fichier le rappelle en commentaire.
+
+Les mises à jour majeures de `mistralai` sont ignorées : la 1.x est un
+nouveau SDK, et y passer est la migration exclue par la mission. Il n'existe
+pas de version 0.x plus récente que 0.4.2, donc aucune autre mise à jour de ce
+paquet n'est masquée. orjson, dépendance transitive, n'est pas suivi par
+Dependabot (son exclusion pip-audit reste).
+
+### D7.4 aiosqlite
+
+`aiosqlite` passe de « # Testing » à « # Database » (pilote du moteur
+asynchrone de SQLAlchemy, `database/connection.py`), avec un commentaire. Les
+autres entrées de « # Testing » (pytest, pytest-asyncio, pytest-cov, httpx,
+locust, freezegun) restent dans `requirements.txt` : choix préexistant, la CI
+et la porte installant les dépendances de test depuis ce fichier, et
+`requirements-dev.txt` étant réservé aux outils de qualité. Aucune n'est
+importée par `backend/` ; les sortir changerait le contenu du venv de la porte
+et la commande d'installation documentée, sans gain pour cette mission.
+
+### D7.5 pytest 9
+
+Montées aux dernières versions publiées : pytest 7.4.3 → 9.1.1,
+pytest-asyncio 0.21.1 → 1.4.0, pytest-cov 4.1.0 → 7.1.0. Essai d'abord dans un
+venv jetable, puis dans le `.venv` du projet.
+
+- Aucun changement de tests, de `conftest.py` ni de `pytest.ini` : tous les
+  tests asynchrones portent déjà `@pytest.mark.asyncio` (le mode strict reste
+  le mode par défaut), aucun n'utilise la fixture `event_loop` supprimée en
+  1.0, et pytest-asyncio 1.4 n'avertit pas sur
+  `asyncio_default_fixture_loop_scope` non défini.
+- Résultat : 1010 tests, 1010 réussis, 0 ignoré, couverture 86,23 %
+  (identique) ; tests gelés : 186 réussis ; la sélection de tests de mutmut
+  (`-p tests.mutmut_aliases`) passe ; mutmut 3.8.0 demande `pytest>=6.2.5`.
+- pytest 9 affiche davantage d'avertissements (21 au lieu de 10) : des
+  `ResourceWarning` « unclosed database » de connexions SQLite laissées
+  ouvertes par des tests d'intégration gelés, que pytest 7 ne remontait pas.
+  Simples avertissements, préexistants ; tests gelés, non modifiés.
+- L'exclusion pip-audit PYSEC-2026-1845 (pytest) est retirée de la CI et de
+  `scripts/local_ci.sh`. Seule reste PYSEC-2026-107 (orjson 3.10.18, bloqué par
+  mistralai 0.4.2, SDK non migré).
+
+### D7.6 Porte de qualité
+
+Tentative 1 : porte franchie, métriques identiques à la passe 6 (1010 tests,
+1010 réussis, 0 ignoré, couverture 86,23 %, ruff 0, format OK, radon D+ 0,
+mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200 depuis un venv
+vierge installé depuis `requirements.txt`, tests gelés et sommes de l'oracle
+OK). Aucun nouvel avis pip-audit pendant la passe.

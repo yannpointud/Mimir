@@ -11,18 +11,19 @@ Consigne : `docs/cleanup/MISSION.md`. Décisions : `docs/cleanup/DECISIONS.md`.
 | 4. Typage | réussie | 1 | `94e6946` docs(cleanup): record pass 4 decisions and progress |
 | 5. Commentaires | réussie | 1 | `7dee121` docs: remove planning references from comments and strings |
 | 6. Tests | réussie | 1 | `feea00c` test: kill surviving mutants in chunking and fusion |
-| 7. Dépendances | en cours | 1 | |
+| 7. Dépendances | réussie | 1 | `5220999` ci: add dependabot config |
 | 8. Façade | à faire | 0 | |
 
-## Dernière porte franchie (passe 6)
+## Dernière porte franchie (passe 7)
 
 1010 tests (1010 réussis, 0 ignoré), couverture 86,23 %, ruff 0, format OK,
 radon D+ 0, mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200.
-62 tests supprimés (29 ne vérifiaient que des mocks ou rien, 33 doublons),
-27 ajoutés ; mutmut : `fusion` 17/17 et `tokenizer_fr` 15/15 tués, `chunking`
-364/403 (39 survivants non significatifs). Voir DECISIONS D6.1 à D6.6.
+Locks hachés `requirements.lock` et `requirements-dev.lock` (uv, universels,
+Python 3.13) utilisés par la CI ; Dependabot (pip, npm, actions) ; aiosqlite
+en runtime ; pytest 9.1.1 et pytest-asyncio 1.4.0, exclusion pip-audit de
+pytest retirée. Voir DECISIONS D7.1 à D7.6.
 
-Prochaine étape : passe 7 (dépendances), en cours (tentative 1).
+Prochaine étape : passe 8 (façade).
 
 ## Reprendre après une coupure
 
