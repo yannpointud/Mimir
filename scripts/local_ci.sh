@@ -10,10 +10,8 @@
 #   3. pip-audit  -- runtime dependency vulnerability scan against the PyPA
 #                    advisory database
 #
-# LOCAL-ONLY: this runner never pushes to GitHub and makes no remote calls
-# (project constraint: local git only). A committed-but-unpushed GitHub Actions
-# workflow mirroring these three steps would be acceptable, but this local
-# runner is the deliverable.
+# The GitHub Actions workflow (.github/workflows/ci.yml) runs the pytest and
+# pip-audit steps on every pull request; this script also runs ruff locally.
 #
 # Usage: bash scripts/local_ci.sh
 set -euo pipefail
@@ -25,8 +23,8 @@ echo "== pytest (full suite) =="
 pytest
 
 echo "== pip-audit =="
-# Advisories that cannot be fixed without leaving the current scope. Any other
-# advisory fails the run.
+# Advisories that cannot be fixed without leaving the current scope. Keep this
+# list in sync with .github/workflows/ci.yml. Any other advisory fails the run.
 #
 # To re-audit including these, run: pip-audit -r requirements.txt
 PIP_AUDIT_IGNORES=(
