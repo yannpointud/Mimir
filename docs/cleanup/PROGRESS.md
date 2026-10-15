@@ -10,19 +10,19 @@ Consigne : `docs/cleanup/MISSION.md`. Décisions : `docs/cleanup/DECISIONS.md`.
 | 3. Architecture | réussie | 1 | `f810329` docs(cleanup): record pass 3 decisions and progress |
 | 4. Typage | réussie | 1 | `94e6946` docs(cleanup): record pass 4 decisions and progress |
 | 5. Commentaires | réussie | 1 | `7dee121` docs: remove planning references from comments and strings |
-| 6. Tests | en cours | 1 | |
+| 6. Tests | réussie | 1 | `feea00c` test: kill surviving mutants in chunking and fusion |
 | 7. Dépendances | à faire | 0 | |
 | 8. Façade | à faire | 0 | |
 
-## Dernière porte franchie (passe 5)
+## Dernière porte franchie (passe 6)
 
-1045 tests (1042 réussis, 3 ignorés), couverture 86,21 %, ruff 0, format OK,
+1010 tests (1010 réussis, 0 ignoré), couverture 86,23 %, ruff 0, format OK,
 radon D+ 0, mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200.
-325 docstrings sur 794 supprimées, raccourcies ou réécrites ; 0 référence de
-planning hors des libellés de `scripts/validate_milestone.sh` ; schéma OpenAPI
-identique hors descriptions (voir DECISIONS D5.1 à D5.6).
+62 tests supprimés (29 ne vérifiaient que des mocks ou rien, 33 doublons),
+27 ajoutés ; mutmut : `fusion` 17/17 et `tokenizer_fr` 15/15 tués, `chunking`
+364/403 (39 survivants non significatifs). Voir DECISIONS D6.1 à D6.6.
 
-Prochaine étape : passe 6 (tests), en cours (tentative 1).
+Prochaine étape : passe 7 (dépendances).
 
 ## Reprendre après une coupure
 

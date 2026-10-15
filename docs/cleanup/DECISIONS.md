@@ -678,3 +678,238 @@ chaînes en français (descriptions `Field`, aide argparse, `print`, documents
 Les docstrings de `backend/src/database/migrations` (gabarit Alembic :
 « Upgrade schema. », en-têtes de révision) restent telles quelles : fichiers
 générés, exclus de ruff, et l'en-tête de révision suit la convention Alembic.
+
+## Passe 6 : tests
+
+### D6.1 Méthode de tri
+
+Une mesure de couverture par test (`--cov-context=test`, toute la suite) a
+d'abord repéré les tests qui ne couvrent aucune ligne de `backend/src`, ceux
+dont les lignes couvertes sont identiques à celles d'un autre test du même
+fichier et les lignes que seul un test couvre. Ces indices n'ont servi qu'à
+orienter la relecture : les 54 fichiers de test hors `tests/oracle` et
+`tests/integration` (`tests/unit`, `tests/performance`) ont été relus. Un test
+est supprimé dans deux cas seulement :
+
+1. **il ne vérifie que des mocks, ou rien** : l'assertion porte sur la valeur
+   rendue par un mock (ou sur l'attribut que le test vient lui-même de poser)
+   à travers une fonction sans logique (délégation d'une ligne, getter), ou le
+   mock n'est jamais lu par le code ; les tests vides (`pass`, toujours
+   ignorés), ceux qui ne vérifient qu'un import et ceux dont les assertions ne
+   s'exécutent jamais ou sont toujours vraies relèvent du même cas ;
+2. **il fait doublon** : même chemin de code et assertions identiques ou plus
+   faibles qu'un test conservé (souvent un copier-coller avec une valeur sans
+   effet sur le chemin suivi).
+
+Option conservatrice : un test qui exerce une branche réelle est gardé, même
+faible ou en partie redondant (D6.3). La porte interdit aussi de descendre
+sous 993 tests (5 % de 1045) : seuls les cas nets sont supprimés.
+
+### D6.2 Tests supprimés (62)
+
+Ne vérifient que des mocks, ou rien (29) :
+
+- `test_api_endpoints_auth.py` : `TestTokenRefresh::test_refresh_token_unauthorized`
+  et `TestLogout::test_logout_unauthorized`, corps `pass` marqués skip (le cas
+  sans jeton est figé par l'oracle, « logout no token ») ;
+- `test_api_endpoints_health.py` : `TestHealthModels::test_health_check_response_structure`
+  (corps `pass`, skip) ; `TestDatabaseHealthEndpoint` et `TestCacheHealthEndpoint`
+  (4 tests) : le handler délègue en une ligne au helper patché et l'assertion
+  compare le résultat au dictionnaire rendu par le mock ; les helpers restent
+  testés par `TestHealthHelperFunctions` ;
+- `test_dependencies.py` : `TestRepositoryDependencies` (3) et
+  `TestServiceDependencies` (4), getters d'une ligne dont le test patche la
+  classe ou le singleton puis vérifie qu'on lui rend son mock ;
+  `TestGlobalStateConsistency::test_multiple_services_independent` compare
+  entre eux des mocks distincts par construction et répète
+  `test_get_*_first_call` ;
+- `test_auth_middleware.py::test_middleware_module_imports` et
+  `test_api_endpoints_documents.py::test_simple_document_operations` : seuls
+  des noms importés « non `None` », ce que l'import en tête de fichier garantit
+  déjà ;
+- `test_api_middleware_cors.py` : `test_cors_configuration_immutability`
+  (relit l'attribut que le test a posé sur le mock) et
+  `test_configure_cors_production_without_custom_origins_attr` (un `MagicMock`
+  a tous les attributs : le cas annoncé n'est jamais atteint et le résultat ne
+  dépend que du `split` du mock) ;
+- `test_monitoring_logger.py::test_logger_with_extra_fields_integration` et
+  `test_database_models.py::test_configuration_update_timestamp` : relisent la
+  valeur que le test vient d'affecter ;
+- `test_main_app.py` : `test_production_mode_docs_disabled` (le patch de
+  `src.config.settings` n'est jamais lu, l'app étant construite à l'import, et
+  l'assertion accepte 404, 307 et 200), `test_request_logging_middleware`
+  (`len(caplog.records) >= 0`), `test_general_exception_handler` (logger
+  patché inutilisé, même requête que `test_root_endpoint`) ;
+- `test_config.py` : `test_env_file_loading` (écrit un `.env` jamais lu, puis
+  répète `test_custom_settings`) et `test_case_insensitive_config`
+  (`hasattr(settings, "api_version")`) ;
+- `test_faiss_additional.py::test_faiss_store_metadata_handling` : assertions
+  toujours vraies (`len(results) >= 0`, `hasattr` d'un champ de dataclass) ;
+- `test_ingestion_chunking.py` : `test_chunk_character_positions` et
+  `test_chunk_minimum_size_enforcement`, dont le texte tient en un chunk : les
+  assertions, sous `if len(chunks) > 1` ou dans une boucle sur `chunks[:-1]`,
+  ne s'exécutent jamais.
+
+Doublons (33) :
+
+- `test_auth_middleware.py` (6) : `test_call_expired_token` et
+  `test_authentication_chain_invalid_token`, copies de `test_call_invalid_token`
+  (même `verify_token -> None`) ; `test_get_current_user_expired_token` et
+  `test_get_current_user_jwt_handler_exception`, copies de
+  `test_get_current_user_invalid_token` (`jwt_payload = None`) ;
+  `test_error_propagation`, même chemin que `test_call_jwt_handler_exception`
+  (`ValueError` au lieu d'`Exception`, aucun `except`) ;
+  `test_bearer_auto_error_false`, identique à `test_call_no_credentials`
+  (`HTTPBearer.__call__` étant patché, `auto_error` n'a aucun effet) ;
+- `test_rate_limit_middleware.py::test_no_jwt_payload_in_state`, copie de
+  `test_no_jwt_payload` ;
+- `test_api_endpoints_chat.py` : `test_get_session_history_with_user` et
+  `test_clear_session_history_with_user` (les handlers ignorent `current_user`,
+  assertions incluses dans les variantes sans utilisateur) ;
+- `test_api_endpoints_auth.py::test_rate_limiting_simulation` : dix appels à
+  `_get_client_ip`, comme `test_get_client_ip_direct` ;
+- `test_email_service.py::TestEmailValidation` (4) : les deux
+  `test_validate_email_address_*` vérifient `_is_configured() is True` comme
+  `test_is_configured_true` (les méthodes annoncées n'existent pas), les deux
+  `test_sanitize_email_content*` répètent `test_generate_escalation_{html,text}_minimal` ;
+- FAISS (5) : `test_faiss_store_initialization_basic`, `test_faiss_store_properties`,
+  `test_faiss_store_different_dimensions`, `test_faiss_store_initialization_params`
+  (`test_faiss_additional.py`) et `test_faiss_store_different_index_types`
+  (boucle sur le seul `"FlatL2"`) : versions plus faibles de
+  `test_faiss_store_initialization`, la création de l'index restant vérifiée
+  par `test_faiss_store_with_mock_index` ;
+- `test_main_app.py::test_request_timing_header`
+  (`"x-process-time" in headers or status == 200`), version faible de
+  `test_timing_header_added` ;
+- `test_llm_interface.py::test_model_name_property`, assertion déjà faite par
+  `test_mistral_api_initialization` ;
+- `test_monitoring_simple.py` (12 des 14 tests, fichier « focus on code
+  coverage ») : chaque test répète, en plus faible, un test de
+  `test_monitoring_logger.py` (formateurs JSON et console, `setup_logger` :
+  nom, niveau, handlers, singleton, écriture à tous les niveaux). Les deux tests
+  sans équivalent (`test_json_formatter_no_exception_info`,
+  `test_json_formatter_ensure_ascii_false`) sont déplacés tels quels dans
+  `TestJSONFormatter` de `test_monitoring_logger.py` et le fichier est supprimé.
+
+Effet mesuré avant ajouts : 1045 → 983 tests, couverture 86,21 % → 86,18 %
+(−0,03 pt : seules les lignes 52 et 64 de `api/dependencies.py`, corps de
+`get_cache_service` et `get_jwt_handler`, ne sont plus couvertes). Les trois
+tests ignorés de la suite étaient les trois tests vides : il n'en reste aucun.
+
+### D6.3 Doublons partiels conservés
+
+Gardés faute de certitude qu'ils n'apportent rien (entrée ou assertion
+différente, branche réelle exercée), et parce qu'en les retirant aussi le
+total serait tombé sous le plancher de 993 tests :
+`test_full_auth_workflow`, `test_health_check_comprehensive_scenario`,
+`test_configure_cors_credentials`, `test_configure_cors_max_age`,
+`test_cors_different_environments`, `test_list_documents_pagination`,
+`test_document_upload_and_stats_workflow` (seul à vérifier
+`by_status.pending`), `test_404_handling`,
+`test_escalate_to_human_with_authenticated_user`, quatre tests d'envoi d'email,
+`test_log_ingestion_event_with_error`, cinq tests FAISS à assertions faibles,
+trois du processeur d'ingestion, quatre d'extracteurs, quatre de JWT et mots de passe,
+quatre de modèles partagés, quatre de dépôts, `test_field_validation_ranges`,
+`test_require_admin_malformed_user` et cinq tests de chunking qui ne passent
+que par le chemin à chunk unique.
+
+### D6.4 mutmut : configuration
+
+- mutmut 3.8.0, section `[tool.mutmut]` de `pyproject.toml` :
+  `source_paths = ["backend/src"]` (copie complète dans `mutants/`, dont
+  `tests/conftest.py` a besoin), `only_mutate` limité aux trois fichiers,
+  tests limités à `test_fusion.py`, `test_ingestion_chunking.py` et
+  `test_bm25_store.py`, `pytest.ini` copié, `--no-cov`. Lancement :
+  `mutmut run`, puis `mutmut results` (435 mutants, moins d'une minute).
+- mutmut nomme un mutant d'après le chemin du fichier
+  (`backend.src.rag_core.fusion`) et ne l'active que si le `__module__` de la
+  fonction porte exactement ce nom. Or les tests importent `src.*` (le
+  conftest met `backend/` dans `sys.path`), ce qui charge une seconde copie du
+  module, jamais mutée ; des trois fichiers retenus, seul `test_bm25_store.py`
+  importe `backend.src.*`. Plutôt que de réécrire les imports de tests
+  existants, un petit plugin pytest,
+  `tests/mutmut_aliases.py`, chargé par mutmut seulement
+  (`-p tests.mutmut_aliases`), fait pointer `src.rag_core.fusion`,
+  `src.ingestion.chunking` et `src.rag_core.tokenizer_fr` vers les modules
+  `backend.src.*` : les deux chemins d'import partagent le module muté. Le
+  fichier ne commence pas par `test_` : `pytest` ne le charge pas.
+- `mutants/` est ajouté au `.gitignore` (ruff le respecte).
+
+### D6.5 mutmut : résultats
+
+| Fichier | Mutants | Tués avant | Survivants avant | Tués après | Survivants après |
+| --- | --- | --- | --- | --- | --- |
+| `rag_core/fusion.py` | 17 | 16 | 1 | 17 | 0 |
+| `rag_core/tokenizer_fr.py` | 15 | 15 | 0 | 15 | 0 |
+| `ingestion/chunking.py` | 403 | 282 | 121 | 364 | 39 |
+
+« Tués » inclut un timeout (`_assign_section_titles`, `index += 1` →
+`index = 1` : boucle infinie, donc détecté). Mesure refaite après les
+suppressions de D6.2 et avant les ajouts : résultats identiques.
+
+Tests ajoutés (27) : `test_fusion.py::test_rrf_default_k_is_60` (seul
+survivant de `fusion.py` : tous les tests passaient `k=60`, la valeur par
+défaut n'était jamais vérifiée) et 26 tests de sortie exacte dans
+`test_ingestion_chunking.py` : nettoyage du texte ; chemin par paragraphes
+(chunk rempli jusqu'à `chunk_size` inclus, dépassement d'un caractère, chunk
+d'exactement `max_chunk_size` non redécoupé, recouvrement) ; chemin par
+phrases (`preserve_paragraphs=False` : bornes de `chunk_size` et de
+`min_chunk_size`, chunk trop petit qui absorbe la phrase suivante,
+`min_chunk_size = 0`, repli sur le texte entier, texte d'exactement
+`chunk_size`) ; `_split_sentences` (choix entre découpage regex et découpage
+simple, et sa borne) ; `_get_overlap_text` (10 cas : texte vide, taille nulle,
+frontière de phrase, fenêtre de recherche de `overlap + 100` caractères et
+ses bornes, frontière en fin de texte, recouvrement par caractères) ;
+`get_chunk_statistics` (priorité au `word_count` stocké, moyennes) ; titres
+de section (préambule sans titre, trois sections successives, balises
+internes retirées du titre). Ce sont des tests de caractérisation : ils
+figent la sortie actuelle, bizarreries comprises (D6.6), sauf les positions.
+
+Les 39 survivants de `chunking.py` sont non significatifs :
+
+- 22 ne touchent que la journalisation : messages et champs `extra` des
+  `logger.debug/info/warning` de `__init__` et de `chunk_text` (19 dans le
+  `logger.info` final), et la valeur par défaut de `source`, qui ne sert
+  qu'aux logs ;
+- 12 sont équivalents : `chunks = None` aussitôt réaffecté ;
+  `current_chunk = None` au lieu de `""` (même valeur de vérité) ;
+  `continue` → `break` sur un paragraphe ou une phrase vide, cas impossible
+  après `_clean_text` et `_split_sentences` (2) ; `or True` dans une branche où
+  `current_chunk` est toujours non vide ; 5 mutants sur `sentence_start`,
+  variable jamais lue ; `found.sort(key=None)` (positions distinctes, même
+  ordre) ; `overlap_size >= len(text)` → `>` (`text[-len(text):] == text`) ;
+- 5 tiennent au défaut de positions de D6.6 : l'arithmétique de
+  `current_start` (2 mutants par chemin) et le `start_offset` transmis au
+  redécoupage d'un paragraphe trop long, masqué parce que `start_char` vaut
+  toujours 0. Les tuer obligerait à figer des positions fausses : ils restent
+  survivants, à revoir si le défaut est corrigé.
+
+### D6.6 Anomalies révélées, non corrigées
+
+Cette passe ne modifie aucun code de production :
+
+- **positions des chunks** : `_chunk_by_paragraphs` et `_chunk_by_sentences`
+  recalculent `current_start` après avoir réaffecté `current_chunk`, si bien
+  que `len(current_chunk) - len(overlap_text) - len(paragraph)` vaut 0 :
+  `start_char` reste à 0 (ou à `start_offset`) pour tous les chunks et
+  `end_char` vaut la longueur du chunk. Ces valeurs ne sont que stockées dans
+  `Chunk.metadata` (aucun lecteur). Les tests ne vérifient que des invariants
+  vrais aujourd'hui comme après correction (premier chunk à 0, positions
+  positives, `end_char - start_char == len(text)`) ;
+- **chemin par phrases** (`preserve_paragraphs=False`, ou paragraphe de plus
+  de `max_chunk_size`) : `re.split` consomme la ponctuation de fin de phrase et
+  les phrases sont recollées par une espace (« First one here Second one
+  here ») ; faute de ponctuation, le recouvrement retombe sur une coupe par
+  caractères, souvent au milieu d'un mot. Comportement actuel, figé tel quel ;
+- **abréviations** : les lookbehinds `(?<!Dr\.)`, `(?<!etc\.)`... de
+  `_split_sentences` sont évalués avant le point et ne protègent jamais
+  l'abréviation (« Dr. Smith » est coupé). Non figé ;
+- **titres à balises internes** : le titre est nettoyé (« Intro part ») mais
+  sa signature, `<h2>\s*Intro part`, est absente du HTML
+  (`<h2><em>Intro</em> part</h2>`) : il n'est jamais consommé et, les titres
+  l'étant dans l'ordre, ceux qui suivent non plus (tous les chunks restent à
+  `None`). Non figé ;
+- **dernier segment trop court** : dans le chemin par phrases, un reste final
+  plus court que `min_chunk_size` est abandonné dès qu'un chunk existe déjà, et
+  la ou les dernières phrases sont perdues (rare avec les valeurs par défaut,
+  le recouvrement allongeant ce reste). Non figé.
