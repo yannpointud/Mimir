@@ -4,7 +4,6 @@ Defines table structure according to LLD specifications
 """
 
 from sqlalchemy import (
-    Column,
     Integer,
     String,
     Boolean,
@@ -14,12 +13,18 @@ from sqlalchemy import (
     CheckConstraint,
     Index,
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    """Declarative base of the ORM models (SQLAlchemy 2.0 typed mapping).
+
+    Every column keeps its explicit SQL type, nullability, default and index
+    flags, so the schema is the one the Alembic migrations create.
+    """
 
 
 class Document(Base):
@@ -30,16 +35,18 @@ class Document(Base):
 
     __tablename__ = "documents"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    filename = Column(String(255), nullable=False, index=True)
-    path = Column(String(500), nullable=True)
-    file_hash = Column(String(64), unique=True, nullable=False, index=True)
-    status = Column(String(20), nullable=False, default="pending", index=True)
-    error_message = Column(Text, nullable=True)
-    chunk_count = Column(Integer, default=0, nullable=False)
-    preserve = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    indexed_at = Column(DateTime, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    preserve: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
+    indexed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Constraint on valid statuses
     __table_args__ = (
@@ -88,9 +95,9 @@ class Configuration(Base):
 
     __tablename__ = "configuration"
 
-    key = Column(String(100), primary_key=True)
-    value = Column(Text, nullable=False)
-    updated_at = Column(
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, index=True
     )
 
@@ -125,14 +132,16 @@ class AuditLog(Base):
 
     __tablename__ = "audit_log"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_type = Column(String(20), nullable=False, index=True)
-    action = Column(String(100), nullable=False, index=True)
-    details = Column(Text, nullable=True)
-    ip_address = Column(String(45), nullable=True)  # Support IPv6
-    user_agent = Column(Text, nullable=True)
-    success = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)  # Support IPv6
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
 
     # Constraint on valid user types
     __table_args__ = (
@@ -155,8 +164,12 @@ class AuditLog(Base):
 
     @classmethod
     def create_admin_action(
-        cls, action: str, details: str = None, ip_address: str = None, success: bool = True
-    ):
+        cls,
+        action: str,
+        details: str | None = None,
+        ip_address: str | None = None,
+        success: bool = True,
+    ) -> Self:
         """Factory method to create admin action logs"""
         return cls(
             user_type="admin",
@@ -168,15 +181,21 @@ class AuditLog(Base):
 
     @classmethod
     def create_user_action(
-        cls, action: str, details: str = None, ip_address: str = None, success: bool = True
-    ):
+        cls,
+        action: str,
+        details: str | None = None,
+        ip_address: str | None = None,
+        success: bool = True,
+    ) -> Self:
         """Factory method to create user action logs"""
         return cls(
             user_type="user", action=action, details=details, ip_address=ip_address, success=success
         )
 
     @classmethod
-    def create_system_action(cls, action: str, details: str = None, success: bool = True):
+    def create_system_action(
+        cls, action: str, details: str | None = None, success: bool = True
+    ) -> Self:
         """Factory method to create system action logs"""
         return cls(user_type="system", action=action, details=details, success=success)
 
@@ -195,16 +214,18 @@ class LlmUsage(Base):
 
     __tablename__ = "llm_usage"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    call_type = Column(String(20), nullable=False)
-    model = Column(String(100), nullable=False)
-    prompt_tokens = Column(Integer, nullable=False)
-    completion_tokens = Column(Integer, nullable=False)
-    total_tokens = Column(Integer, nullable=False)
-    cost_eur = Column(Float, nullable=False)
-    estimated = Column(Boolean, default=False, nullable=False)
-    session_id = Column(String(255), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
+    call_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    cost_eur: Mapped[float] = mapped_column(Float, nullable=False)
+    estimated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Constraint on valid call types
     __table_args__ = (
@@ -243,8 +264,8 @@ class LlmBudgetLedger(Base):
 
     __tablename__ = "llm_budget_ledger"
 
-    date = Column(String(10), primary_key=True)  # YYYY-MM-DD
-    spent_eur = Column(Float, nullable=False, default=0.0)
+    date: Mapped[str] = mapped_column(String(10), primary_key=True)  # YYYY-MM-DD
+    spent_eur: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dictionary"""
@@ -257,11 +278,11 @@ class LlmBudgetLedger(Base):
 # Utility functions for models
 
 
-def create_tables(engine):
+def create_tables(engine: Engine) -> None:
     """Create all tables in the database"""
     Base.metadata.create_all(bind=engine)
 
 
-def drop_tables(engine):
+def drop_tables(engine: Engine) -> None:
     """Drop all tables from the database (for tests)"""
     Base.metadata.drop_all(bind=engine)
