@@ -169,45 +169,46 @@ def _apply_filters(
 ) -> list[LogEntry]:
     """Apply filters to log entries"""
     filtered_logs = logs
-
-    # Filter by level
     if level and level != "ALL":
-        # Map WARNING to WARN for consistency
-        filter_level = "WARNING" if level == "WARN" else level
-        filtered_logs = [
-            log
-            for log in filtered_logs
-            if log.level == filter_level or (level == "WARN" and log.level in ["WARN", "WARNING"])
-        ]
-
-    # Filter by source
+        filtered_logs = _filter_by_level(filtered_logs, level)
     if source and source != "ALL":
         filtered_logs = [log for log in filtered_logs if log.source == source.lower()]
-
-    # Filter by module
     if module and module != "ALL":
         filtered_logs = [log for log in filtered_logs if module.lower() in log.module.lower()]
-
-    # Filter by search text
     if search:
-        search_lower = search.lower()
-        filtered_logs = [
-            log
-            for log in filtered_logs
-            if search_lower in log.message.lower() or search_lower in log.module.lower()
-        ]
-
-    # Filter by timestamp
+        filtered_logs = _filter_by_text(filtered_logs, search)
     if since:
-        try:
-            since_dt = _parse_timestamp(since)
-            filtered_logs = [
-                log for log in filtered_logs if _parse_timestamp(log.timestamp) >= since_dt
-            ]
-        except (TypeError, ValueError):
-            logger.warning(f"Invalid since timestamp: {since}")
-
+        filtered_logs = _filter_since(filtered_logs, since)
     return filtered_logs
+
+
+def _filter_by_level(logs: list[LogEntry], level: str) -> list[LogEntry]:
+    # WARN matches both WARN and WARNING entries
+    filter_level = "WARNING" if level == "WARN" else level
+    return [
+        log
+        for log in logs
+        if log.level == filter_level or (level == "WARN" and log.level in ["WARN", "WARNING"])
+    ]
+
+
+def _filter_by_text(logs: list[LogEntry], search: str) -> list[LogEntry]:
+    search_lower = search.lower()
+    return [
+        log
+        for log in logs
+        if search_lower in log.message.lower() or search_lower in log.module.lower()
+    ]
+
+
+def _filter_since(logs: list[LogEntry], since: str) -> list[LogEntry]:
+    """Entries at or after ``since``; all entries when a timestamp is invalid."""
+    try:
+        since_dt = _parse_timestamp(since)
+        return [log for log in logs if _parse_timestamp(log.timestamp) >= since_dt]
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid since timestamp: {since}")
+        return logs
 
 
 def get_logs(

@@ -247,7 +247,7 @@ def get_success_rate() -> float:
         return 100.0
 
 
-def get_errors_last_hour() -> int:  # noqa: C901
+def get_errors_last_hour() -> int:
     """
     Count errors in the last hour from error.log and failed HTTP requests.
 
@@ -255,49 +255,69 @@ def get_errors_last_hour() -> int:  # noqa: C901
         Number of errors in the last hour
     """
     try:
-        error_count = 0
         one_hour_ago = datetime.utcnow() - timedelta(hours=1)
-
-        # Count HTTP errors in uvicorn.log (with time filter)
-        if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, encoding="utf-8") as f:
-                for line in f:
-                    if "POST /api/v1/chat/" in line and (" 4" in line or " 5" in line):
-                        # Extract timestamp from uvicorn log (format: YYYY-MM-DD HH:MM:SS)
-                        timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
-                        if timestamp_match:
-                            try:
-                                timestamp_str = timestamp_match.group(1)
-                                log_time = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                                if log_time >= one_hour_ago:
-                                    error_count += 1
-                            except ValueError:
-                                continue
-
-        # Count errors in error.log (with time filter)
-        if ERROR_LOG.exists():
-            try:
-                with open(ERROR_LOG, encoding="utf-8") as f:
-                    for line in f:
-                        try:
-                            if line.strip():
-                                log_entry = json.loads(line.strip())
-                                if "timestamp" in log_entry:
-                                    timestamp = _parse_timestamp(log_entry["timestamp"])
-                                    if _is_within_last_hour(timestamp):
-                                        error_count += 1
-                        except json.JSONDecodeError:
-                            continue
-                        except _ENTRY_ERRORS:
-                            continue
-            except _READ_ERRORS as e:
-                logger.debug(f"Error reading error.log: {e}")
-
-        return error_count
+        return _count_failed_chat_requests_since(one_hour_ago) + _count_recent_error_log_entries()
 
     except _READ_ERRORS as e:
         logger.error(f"Error counting errors: {e}")
         return 0
+
+
+def _count_failed_chat_requests_since(since: datetime) -> int:
+    """Chat requests answered with a 4xx or 5xx status in uvicorn.log since ``since``."""
+    if not UVICORN_LOG.exists():
+        return 0
+
+    count = 0
+    with open(UVICORN_LOG, encoding="utf-8") as f:
+        for line in f:
+            if "POST /api/v1/chat/" in line and (" 4" in line or " 5" in line):
+                log_time = _uvicorn_line_time(line)
+                if log_time is not None and log_time >= since:
+                    count += 1
+    return count
+
+
+def _uvicorn_line_time(line: str) -> datetime | None:
+    """Timestamp of a uvicorn.log line (format: YYYY-MM-DD HH:MM:SS), if any."""
+    timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+    if not timestamp_match:
+        return None
+    try:
+        return datetime.strptime(timestamp_match.group(1), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _count_recent_error_log_entries() -> int:
+    """Entries of error.log logged within the last hour.
+
+    A read failure is logged and keeps the entries counted so far.
+    """
+    if not ERROR_LOG.exists():
+        return 0
+
+    count = 0
+    try:
+        with open(ERROR_LOG, encoding="utf-8") as f:
+            for line in f:
+                if _is_recent_error_entry(line):
+                    count += 1
+    except _READ_ERRORS as e:
+        logger.debug(f"Error reading error.log: {e}")
+    return count
+
+
+def _is_recent_error_entry(line: str) -> bool:
+    """Whether a JSON line of error.log carries a timestamp within the last hour."""
+    try:
+        if line.strip():
+            log_entry = json.loads(line.strip())
+            if "timestamp" in log_entry:
+                return bool(_is_within_last_hour(_parse_timestamp(log_entry["timestamp"])))
+    except (json.JSONDecodeError, *_ENTRY_ERRORS):
+        pass
+    return False
 
 
 def get_active_sessions_estimate() -> int:
