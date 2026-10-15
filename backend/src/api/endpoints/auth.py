@@ -458,8 +458,8 @@ async def _log_auth_event(
     username: str,
     ip_address: str,
     success: bool,
-    details: str = None,
-):
+    details: str | None = None,
+) -> None:
     """
     Log authentication event to audit log.
 

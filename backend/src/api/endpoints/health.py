@@ -38,7 +38,7 @@ async def health_check(
         HealthCheckResponse: Overall system health status
     """
     try:
-        health_status = {
+        health_status: dict[str, Any] = {
             "status": "healthy",
             "timestamp": datetime.utcnow(),
             "version": settings.api_version,

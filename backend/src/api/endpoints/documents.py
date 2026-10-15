@@ -360,8 +360,11 @@ async def toggle_document_preservation(
                 detail=f"Document with ID {document_id} not found",
             )
 
-        # Update preservation status
-        updated_doc = doc_repo.update_preserve_status(document_id, preserve)
+        # Update preservation status.
+        # Known defect kept on purpose (docs/cleanup/DECISIONS.md, D0.4): the
+        # repository has no update_preserve_status, so this AttributeError makes
+        # the route answer 500, as pinned by the characterization oracle.
+        updated_doc = doc_repo.update_preserve_status(document_id, preserve)  # type: ignore[attr-defined]
 
         # Log the change
         audit_repo.create_log(

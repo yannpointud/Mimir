@@ -42,7 +42,7 @@ class EmailService:
         self,
         user_question: str,
         chat_history: list[dict[str, Any]],
-        user_info: dict[str, str] | None = None,
+        user_info: dict[str, Any] | None = None,
         context_sources: list[str] | None = None,
     ) -> bool:
         """
@@ -110,13 +110,14 @@ class EmailService:
             logger.error("Email service not configured")
             return False
 
-        content_kwargs = {}
         if is_html:
-            content_kwargs["html_content"] = message
+            success = await self._send_email(
+                to_emails=[to_email], subject=subject, html_content=message
+            )
         else:
-            content_kwargs["text_content"] = message
-
-        success = await self._send_email(to_emails=[to_email], subject=subject, **content_kwargs)
+            success = await self._send_email(
+                to_emails=[to_email], subject=subject, text_content=message
+            )
 
         if success:
             logger.info(f"Notification email sent to {to_email}")
@@ -210,7 +211,7 @@ class EmailService:
         self,
         user_question: str,
         chat_history: list[dict[str, Any]],
-        user_info: dict[str, str] | None,
+        user_info: dict[str, Any] | None,
         context_sources: list[str] | None,
     ) -> str:
         """Generate HTML content for escalation email."""
@@ -317,7 +318,7 @@ class EmailService:
         self,
         user_question: str,
         chat_history: list[dict[str, Any]],
-        user_info: dict[str, str] | None,
+        user_info: dict[str, Any] | None,
         context_sources: list[str] | None,
     ) -> str:
         """Generate plain text content for escalation email."""

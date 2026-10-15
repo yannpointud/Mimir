@@ -244,7 +244,7 @@ class FileUploadValidation(BaseModel):
     """Validation for file uploads"""
 
     max_size_mb: int = Field(default=100, ge=1, le=1000)
-    allowed_extensions: list[str] = Field(default=[".pdf", ".docx", ".txt", ".md"], min_items=1)
+    allowed_extensions: list[str] = Field(default=[".pdf", ".docx", ".txt", ".md"], min_length=1)
 
     @validator("allowed_extensions")
     def validate_extensions(cls, v):

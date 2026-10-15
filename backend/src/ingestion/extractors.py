@@ -13,7 +13,8 @@ try:
     import pypdf
     import pypdf.errors
 except ImportError:
-    pypdf = None
+    # Optional dependency: PDFExtractor checks for None before using it.
+    pypdf = None  # type: ignore[assignment]
 
 try:
     import docx
@@ -24,7 +25,8 @@ except ImportError:
 try:
     import markdown
 except ImportError:
-    markdown = None
+    # Optional dependency: MarkdownExtractor checks for None before using it.
+    markdown = None  # type: ignore[assignment]
 
 from ..monitoring.logger import setup_logger
 from ..shared.errors import IngestionError

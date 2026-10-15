@@ -566,7 +566,7 @@ class MistralAPIService(AbstractLLMService):
     async def _embed_batch(
         self,
         texts: list[str],
-        start_time: float = None,
+        start_time: float | None = None,
         session_id: str | None = None,
         rag_debug=None,
     ) -> EmbeddingResponse:

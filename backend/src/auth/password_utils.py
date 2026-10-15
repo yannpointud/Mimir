@@ -9,11 +9,12 @@ import re
 import secrets
 import string
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def validate_password_strength(password: str) -> dict[str, any]:
+def validate_password_strength(password: str) -> dict[str, Any]:
     """
     Validate password strength against security requirements.
 

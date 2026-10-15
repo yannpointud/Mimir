@@ -173,12 +173,12 @@ class IngestionProcessor:
             else:
                 # Reprocessing existing document - validate it exists
                 try:
-                    document = self.document_repository.get_by_id(int(document_id))
-                    if not document:
+                    existing = self.document_repository.get_by_id(int(document_id))
+                    if not existing:
                         logger.error(f"Document ID {document_id} not found for reprocessing")
                         return False
                     logger.info(
-                        f"Reprocessing existing document: {document.filename} (ID: {document_id})"
+                        f"Reprocessing existing document: {existing.filename} (ID: {document_id})"
                     )
                 except (ValueError, SQLAlchemyError) as e:
                     logger.error(

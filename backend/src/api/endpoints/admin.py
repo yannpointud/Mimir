@@ -413,7 +413,7 @@ async def get_audit_log(
     """
     try:
         # Build filters
-        filters = {}
+        filters: dict[str, Any] = {}
         if action_filter:
             filters["action"] = action_filter
         if user_type_filter:

@@ -135,7 +135,7 @@ def _find_documents_by_fuzzy_match(
 
 async def _pre_include_document_chunks(
     document_ids: list[int],
-    question_embedding: list[float],
+    question_embedding: np.ndarray,
     vector_store,
     document_repository,
     boost_factor: float,
