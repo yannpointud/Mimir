@@ -40,7 +40,7 @@ backend/
 │   │   ├── repository.py            # Repository pattern (CRUD)
 │   │   └── migrations/              # Alembic migrations
 │   ├── email_service/               # SMTP client for escalations
-│   ├── file_watcher/                # Folder monitoring for auto-ingestion
+│   ├── file_watcher/                # FileWatcher class, not wired into the app (WATCH_ENABLED has no effect)
 │   ├── ingestion/
 │   │   ├── processor.py             # Ingestion pipeline orchestrator
 │   │   ├── extractors.py            # Text extraction (PDF, DOCX, TXT, MD)
@@ -79,9 +79,9 @@ frontend/
 │   └── test/                        # vitest tests (141 tests)
 └── package.json
 
-tests/                               # pytest test suite (1010 tests, run from the repo root)
+tests/                               # pytest test suite (1036 tests, run from the repo root)
 ├── conftest.py                      # Shared fixtures
-├── unit/                            # Unit tests (812)
+├── unit/                            # Unit tests (838)
 ├── integration/                     # API + workflow tests (154, frozen)
 ├── oracle/                          # Characterization snapshots (32, frozen)
 └── performance/                     # Cleanup performance tests (12)

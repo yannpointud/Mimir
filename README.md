@@ -99,7 +99,7 @@ backend/
     │   ├── connection.py      # Gestion connexions DB
     │   └── migrations/        # Migrations Alembic
     ├── email_service/         # Service SMTP pour escalades
-    ├── file_watcher/          # Surveillance de dossier
+    ├── file_watcher/          # Observateur de dossier, non branché dans l'application (WATCH_ENABLED sans effet)
     ├── ingestion/
     │   ├── processor.py       # Pipeline d'ingestion
     │   ├── extractors.py      # Extraction multi-format
@@ -157,12 +157,12 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 
 | Périmètre | Fichiers | Lignes de code |
 | --- | ---: | ---: |
-| Backend : `backend/src`, `backend/main.py`, `backend/scripts` (Python) | 77 | 9 448 |
+| Backend : `backend/src`, `backend/main.py`, `backend/scripts` (Python) | 77 | 9 484 |
 | Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 39 | 5 152 |
-| **Code applicatif** | **116** | **14 600** |
-| Tests backend : `tests/` (Python) | 86 | 13 858 |
+| **Code applicatif** | **116** | **14 636** |
+| Tests backend : `tests/` (Python) | 87 | 14 167 |
 | Tests frontend : `frontend/src/test/`, `*.test.jsx` | 15 | 1 381 |
-| **Tests** | **101** | **15 239** |
+| **Tests** | **102** | **15 548** |
 | Outillage : `scripts/` (Python, Bash) | 16 | 2 013 |
 
 ```bash
@@ -366,7 +366,7 @@ cd frontend && npx vitest run
 
 La couverture de `backend/src` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
 
-La suite compte 1010 tests pytest (812 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 86,23 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
+La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
 
 ## 🔍 Qualité et CI
 

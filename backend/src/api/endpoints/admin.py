@@ -757,7 +757,6 @@ async def get_chat_metrics(current_user: dict[str, Any] = Depends(require_admin)
     - Error count
     - Active sessions estimate
     - Token usage statistics
-    - Performance status assessment
     """
     try:
         # Import log_parser module to extract real metrics

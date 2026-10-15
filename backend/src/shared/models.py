@@ -63,6 +63,7 @@ class DocumentCreate(DocumentBase):
         return v.lower()
 
 
+# Not used by any route (kept as is)
 class DocumentUpdate(BaseModel):
     status: DocumentStatus | None = None
     error_message: str | None = Field(None, max_length=1000)
@@ -117,11 +118,12 @@ class DocumentListResponse(BaseResponse):
     pagination: dict[str, Any]
 
 
+# Not used by any route (kept as is)
 class DocumentStatsResponse(BaseResponse):
     stats: dict[str, Any]
 
 
-# Configuration models
+# Configuration models: not used by any route (kept as is)
 
 
 class ConfigurationBase(BaseModel):
@@ -148,7 +150,8 @@ class ConfigurationListResponse(BaseResponse):
     configurations: list[ConfigurationResponse]
 
 
-# Audit models
+# Audit models: not used by any route, the audit log endpoint returns
+# AuditLogPage below (kept as is)
 
 
 class AuditLogBase(BaseModel):
@@ -177,7 +180,7 @@ class AuditLogListResponse(BaseResponse):
     total_count: int
 
 
-# Health check and error models
+# Health check and error models (used by the health endpoint and main.py)
 
 
 class HealthCheckResponse(BaseResponse):
@@ -195,7 +198,7 @@ class ErrorResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
-# Specialized validation models
+# Specialized validation models: not used by any route (kept as is)
 
 
 class FileUploadValidation(BaseModel):
