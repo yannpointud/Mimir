@@ -1465,3 +1465,23 @@ rapport à la passe 8), couverture 88,22 % (contre 86,23 %), ruff 0, format OK,
 radon D+ 0, mypy 0, pip-audit OK, vitest 141, build OK, `/health/live` 200
 depuis un venv vierge, tests gelés et sommes de l'oracle OK. Les chiffres du
 README (tests, couverture, pygount) et de `CLAUDE.md` (tests) sont mis à jour.
+
+### DF.12 Snapshots de l'oracle dépendants du CPU, exclus de la CI GitHub
+
+Premier passage de la CI sur la PR : 7 échecs, tous des écarts de snapshot dans
+`tests/oracle/test_retrieval_ranking.py` et `test_chat_stream_events.py`.
+
+Cause : FAISS choisit son noyau SIMD selon le CPU. Les snapshots ont été générés
+sur une machine AVX-512, et sur une autre architecture les arrondis de distance
+diffèrent et réordonnent des ex aequo. Vérification locale avec
+`FAISS_OPT_LEVEL=avx2` : le code de la passe 0 (`8abe5a3`, avant toute
+modification du code) échoue sur exactement les mêmes 11 tests que le code
+final, et les deux passent avec `avx512`. Ce n'est donc pas une régression,
+mais une limite de portabilité de l'oracle.
+
+Les fichiers gelés ne pouvant pas changer, le job pytest de la CI ignore ces
+deux modules (commentaire dans `ci.yml`). Ils restent exécutés par
+`docs/cleanup/quality_gate.sh` sur la machine de référence. La CI d'avant la
+mission n'exécutait aucun test d'oracle, donc elle n'est pas affaiblie.
+Commande de la CI vérifiée en local avec `FAISS_OPT_LEVEL=avx2` : 1013 tests
+réussis.

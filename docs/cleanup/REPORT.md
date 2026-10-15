@@ -7,7 +7,7 @@ le log perdu dans `IngestionProcessor.queue_document`.
 
 - **Base** : `main` au commit `b1e18e6` (tag local `pre-cleanup`, non poussé, voir D0.1).
 - **Branche** : `cleanup/qualite`.
-- **Décisions** : toutes dans `docs/cleanup/DECISIONS.md`, numérotées D0.1 à D8.8 puis DF.1 à DF.11.
+- **Décisions** : toutes dans `docs/cleanup/DECISIONS.md`, numérotées D0.1 à D8.8 puis DF.1 à DF.12.
 
 ## Avant / après
 
@@ -71,6 +71,7 @@ Corrections (DF.1 à DF.11) :
 - **Vérification** : les scripts de reproduction de la revue donnent de nouveau le résultat de `pre-cleanup`.
 - **Non corrigé** : le point M1 (verrou FAISS pris sur la boucle d'événements, impact mesuré marginal), noté en DF.8.
 - **Conservé** : le code mort recensé, listé en DF.9.
+- **CI GitHub** : les snapshots FAISS de l'oracle (classement, événements SSE) dépendent du jeu d'instructions SIMD du CPU. Ils ont été générés en AVX-512 et échouent aussi sur le code d'origine en AVX2. Ces 2 modules sont donc exclus du job pytest de la CI ; la porte de qualité locale les exécute toujours (DF.12).
 
 ## Décisions principales
 
