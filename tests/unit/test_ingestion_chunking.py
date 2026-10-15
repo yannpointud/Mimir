@@ -279,21 +279,6 @@ Third paragraph with additional content to test the chunking strategy."""
             assert chunk["chunk_index"] == i
             assert chunk["total_chunks"] == len(chunks)
 
-    def test_chunk_character_positions(self, small_chunks_strategy):
-        """Test des positions de caractères dans les chunks"""
-        text = "First part of text. Second part of text. Third part of text."
-
-        chunks = small_chunks_strategy.chunk_text(text)
-
-        if len(chunks) > 1:
-            # Vérifier que les positions sont logiques
-            for chunk in chunks:
-                assert chunk["start_char"] >= 0
-                assert chunk["end_char"] > chunk["start_char"]
-                assert (
-                    chunk["end_char"] <= len(text) + 100
-                )  # Permettre un peu de marge pour l'overlap
-
     def test_word_count_accuracy(self, default_strategy):
         """Test de précision du comptage de mots"""
         text = "One two three four five six seven eight nine ten."
@@ -305,17 +290,6 @@ Third paragraph with additional content to test the chunking strategy."""
 
         # Le compte peut être légèrement différent à cause de l'overlap
         assert total_words_counted >= actual_words
-
-    def test_chunk_minimum_size_enforcement(self, default_strategy):
-        """Test du respect de la taille minimum de chunk"""
-        # Texte avec phrases courtes
-        text = "Short. Very short. Another. Brief."
-
-        chunks = default_strategy.chunk_text(text)
-
-        # Vérifier qu'aucun chunk n'est trop petit (sauf le dernier éventuellement)
-        for chunk in chunks[:-1]:  # Tous sauf le dernier
-            assert len(chunk["text"]) >= default_strategy.config.min_chunk_size or len(chunks) == 1
 
     def test_empty_paragraphs_handling(self, default_strategy):
         """Test de gestion des paragraphes vides"""

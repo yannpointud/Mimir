@@ -29,34 +29,6 @@ class TestFaissVectorStoreAdditional:
             )
             yield store
 
-    def test_faiss_store_initialization_basic(self):
-        """Test d'initialisation de base"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            index_path = Path(temp_dir) / "test.index"
-            metadata_path = Path(temp_dir) / "test.metadata"
-
-            store = FaissVectorStore(
-                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
-            )
-
-            assert store.dimension == 128
-            assert store.index is not None
-
-    def test_faiss_store_properties(self):
-        """Test des propriétés de base"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            index_path = Path(temp_dir) / "test.index"
-            metadata_path = Path(temp_dir) / "test.metadata"
-
-            store = FaissVectorStore(
-                dimension=64, index_path=str(index_path), metadata_path=str(metadata_path)
-            )
-
-            # Test des propriétés
-            assert hasattr(store, "dimension")
-            assert hasattr(store, "index")
-            assert store.dimension == 64
-
     def test_faiss_store_add_chunks_basic(self, temp_store):
         """Test d'ajout de base de chunks"""
         # Créer des chunks de test avec la bonne signature
@@ -162,18 +134,6 @@ class TestFaissVectorStoreAdditional:
         assert stats_after["active_vectors"] == 4
         assert stats_after["total_vectors"] == initial_total  # Index pas reconstruit
 
-    def test_faiss_store_different_dimensions(self):
-        """Test avec différentes dimensions"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for dim in [64, 256, 512]:
-                index_path = Path(temp_dir) / f"test_{dim}.index"
-                metadata_path = Path(temp_dir) / f"test_{dim}.metadata"
-
-                store = FaissVectorStore(
-                    dimension=dim, index_path=str(index_path), metadata_path=str(metadata_path)
-                )
-                assert store.dimension == dim
-
     def test_faiss_store_empty_search(self, temp_store):
         """Test de recherche sur un store vide"""
         query_vector = np.random.random(128).astype(np.float32)
@@ -181,35 +141,6 @@ class TestFaissVectorStoreAdditional:
 
         assert isinstance(results, list)
         assert len(results) == 0
-
-    def test_faiss_store_metadata_handling(self, temp_store):
-        """Test de gestion des métadonnées"""
-        chunks = [
-            Chunk(
-                text="Test with metadata",
-                embedding=np.random.random(128).astype(np.float32),
-                document_id="doc_1",
-                chunk_index=0,
-                total_chunks=1,
-                source="test_source",
-                metadata={"document_id": "doc_1", "type": "test", "score": 0.9},
-            )
-        ]
-
-        temp_store.upsert(chunks)
-
-        query_vector = np.random.random(128).astype(np.float32)
-        results = temp_store.query(query_vector, top_k=1, filter_dict=None)
-
-        # Si pas de résultats à cause du seuil, diminuer le seuil
-        if len(results) == 0:
-            # Utiliser le premier vecteur ajouté comme query pour garantir un résultat
-            query_vector = chunks[0].embedding
-            results = temp_store.query(query_vector, top_k=1)
-
-        assert len(results) >= 0  # Au moins 0 résultats (peut être vide si seuil trop haut)
-        if len(results) > 0:
-            assert hasattr(results[0], "metadata")
 
     def test_faiss_store_large_batch(self, temp_store):
         """Test avec un lot important de données"""
@@ -280,23 +211,6 @@ class TestFaissStoreFunctionality:
         assert len(results1) == len(results2)
         for i in range(len(results1)):
             assert results1[i].text == results2[i].text
-
-    def test_faiss_store_initialization_params(self):
-        """Test des paramètres d'initialisation"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            index_path = Path(temp_dir) / "param_test.index"
-            metadata_path = Path(temp_dir) / "param_test.metadata"
-
-            store = FaissVectorStore(
-                dimension=256,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path),
-                similarity_threshold=0.8,
-                index_type="FlatL2",
-            )
-
-            assert store.dimension == 256
-            assert store.similarity_threshold == 0.8
 
     def test_faiss_store_vector_validation(self):
         """Test de validation des vecteurs"""

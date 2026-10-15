@@ -144,20 +144,6 @@ class TestConfigurationModel:
         # Float
         assert Configuration.get_typed_value("3.14", "float") == 3.14
 
-    def test_configuration_update_timestamp(self, test_session, sample_config_data):
-        """Test de mise à jour automatique du timestamp"""
-        config = Configuration(**sample_config_data)
-        test_session.add(config)
-        test_session.commit()
-
-        # Simulation d'une pause (dans un vrai test, on pourrait mock datetime)
-        config.value = "updated_value"
-        test_session.commit()
-
-        # Note: En test unitaire, on vérifierait que onupdate fonctionne
-        # Le timestamp pourrait ne pas changer dans le même instant
-        assert config.value == "updated_value"
-
 
 class TestAuditLogModel:
     """Tests du modèle AuditLog"""

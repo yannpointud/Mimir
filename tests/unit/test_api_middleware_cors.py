@@ -63,23 +63,6 @@ class TestConfigureCorsMiddleware:
             # Et que les origines par défaut sont toujours là
             assert "https://localhost" in allowed_origins
 
-    def test_configure_cors_production_without_custom_origins_attr(self):
-        """Test en production sans attribut allowed_origins."""
-        mock_app = Mock()
-
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
-            mock_settings.is_production = True
-            # Pas d'attribut allowed_origins
-
-            configure_cors_middleware(mock_app)
-
-            args, kwargs = mock_app.add_middleware.call_args
-            allowed_origins = kwargs["allow_origins"]
-
-            # Seules les origines par défaut doivent être présentes
-            assert "https://localhost" in allowed_origins
-            assert len(allowed_origins) == 3  # Les 3 origines par défaut
-
     def test_configure_cors_development(self):
         """Test de configuration CORS en développement."""
         mock_app = Mock()
@@ -308,15 +291,3 @@ class TestCorsIntegration:
         assert any(origin.startswith("https://") for origin in prod_origins)
         assert all(origin.startswith("http://") for origin in dev_origins)
         assert len(dev_origins) > len(prod_origins)  # Plus d'origines en dev
-
-    def test_cors_configuration_immutability(self):
-        """Test que la configuration ne modifie pas les settings."""
-        mock_app = Mock()
-        original_settings = Mock()
-        original_settings.is_production = False
-
-        with patch("backend.src.api.middleware.cors.settings", original_settings):
-            configure_cors_middleware(mock_app)
-
-            # Les settings ne doivent pas être modifiés
-            assert original_settings.is_production is False

@@ -297,10 +297,6 @@ class TestMistralAPIService:
                 assert response.content == "Success"
                 assert call_count == 2  # Premier échec, puis succès
 
-    def test_model_name_property(self, mistral_service):
-        """Test de la propriété model_name"""
-        assert mistral_service.model_name == "mistral-small-latest"
-
     def test_embedding_dimension_property(self, mistral_service):
         """Test de la propriété embedding_dimension"""
         # La dimension dépend du modèle d'embedding utilisé

@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-import logging
 
 from backend.main import app
 
@@ -106,13 +105,6 @@ class TestMainApp:
             404,
         ]
 
-    def test_request_timing_header(self, client):
-        """Test de l'ajout du header de timing"""
-        response = client.get("/")
-
-        # Le middleware de timing devrait ajouter un header
-        assert "x-process-time" in response.headers or response.status_code == 200
-
     def test_openapi_schema(self, client):
         """Test de la disponibilité du schéma OpenAPI"""
         # L'openapi est sur /api/v1/openapi.json selon la configuration
@@ -124,18 +116,6 @@ class TestMainApp:
         assert "openapi" in schema
         assert "info" in schema
         assert schema["info"]["title"] == "Mimir"
-
-    def test_production_mode_docs_disabled(self):
-        """Test que les docs sont désactivées en mode production"""
-        with patch("src.config.settings") as mock_settings:
-            mock_settings.is_production = True
-
-            # Créer un client avec les paramètres modifiés
-            test_client = TestClient(app)
-            response = test_client.get("/docs")
-
-            # En production, les docs peuvent être désactivées (404) ou redirigées
-            assert response.status_code in [404, 307, 200]  # 307 = redirect
 
 
 class TestErrorHandling:
@@ -156,22 +136,6 @@ class TestErrorHandling:
 
         assert "detail" in data or "error_message" in data
 
-    @patch("backend.main.logger")
-    def test_general_exception_handler(self, mock_logger, client):
-        """Test du gestionnaire d'exceptions générales"""
-        # Il est difficile de simuler une exception générale sans casser l'app
-        # On va simplement tester qu'une requête normale ne cause pas d'exception
-
-        response = client.get("/")
-
-        # Une requête normale ne devrait pas déclencher d'exception générale
-        assert response.status_code == 200
-
-        # Vérifier les champs du modèle racine
-        data = response.json()
-        assert data["name"] == "Mimir"
-        assert data["status"] == "running"
-
 
 class TestMiddleware:
     """Tests pour les middlewares."""
@@ -180,20 +144,6 @@ class TestMiddleware:
     def client(self):
         """Client de test FastAPI."""
         return TestClient(app)
-
-    def test_request_logging_middleware(self, caplog, client):
-        """Test du middleware de logging des requêtes"""
-        # Configurer le niveau de log pour capturer les logs de middleware
-        logging.getLogger().setLevel(logging.INFO)
-
-        with caplog.at_level(logging.INFO):
-            response = client.get("/")
-
-        assert response.status_code == 200
-
-        # Vérifier qu'il y a eu des logs (même si pas exactement comme attendu)
-        # Le middleware peut ne pas logger exactement comme prévu
-        assert len(caplog.records) >= 0  # Au moins pas d'erreur de logging
 
     def test_timing_header_added(self, client):
         """Test de l'ajout du header de timing"""

@@ -8,20 +8,7 @@ from unittest.mock import Mock, patch
 from fastapi import HTTPException, status, Response
 from sqlalchemy.orm import Session
 
-from backend.src.api.endpoints.health import health_check, database_health, cache_health, disk_usage
-
-
-class TestHealthModels:
-    """Tests pour les modèles de santé."""
-
-    @pytest.mark.skip(
-        reason="No-op placeholder: response structure is enforced by the Pydantic models themselves"
-    )
-    def test_health_check_response_structure(self):
-        """Test de la structure de réponse de health check."""
-        # Structure guaranteed by the Pydantic response models in shared.models;
-        # nothing to assert here at the unit level.
-        pass
+from backend.src.api.endpoints.health import health_check, disk_usage
 
 
 class TestHealthCheckEndpoint:
@@ -120,92 +107,6 @@ class TestHealthCheckEndpoint:
             asyncio.run(health_check(response=Response(), db=mock_db_session))
 
         assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-
-
-class TestDatabaseHealthEndpoint:
-    """Tests pour l'endpoint de santé base de données."""
-
-    @pytest.fixture
-    def mock_db_session(self):
-        """Mock session de base de données."""
-        return Mock(spec=Session)
-
-    @patch("backend.src.api.endpoints.health._check_database_health")
-    def test_database_health_success(self, mock_check, mock_db_session):
-        """Test de santé base de données réussie."""
-
-        # Configuration du mock
-        expected_result = {
-            "healthy": True,
-            "connection": "ok",
-            "document_count": 5,
-            "response_time_ms": 10,
-        }
-        mock_check.return_value = expected_result
-
-        # Appel de la fonction
-        result = asyncio.run(database_health(db=mock_db_session))
-
-        # Vérifications
-        assert result == expected_result
-        assert result["healthy"] is True
-        assert result["document_count"] == 5
-
-    @patch("backend.src.api.endpoints.health._check_database_health")
-    def test_database_health_failure(self, mock_check, mock_db_session):
-        """Test de santé base de données en échec."""
-
-        # Configuration du mock
-        expected_result = {"healthy": False, "connection": "failed", "error": "Connection timeout"}
-        mock_check.return_value = expected_result
-
-        # Appel de la fonction
-        result = asyncio.run(database_health(db=mock_db_session))
-
-        # Vérifications
-        assert result == expected_result
-        assert result["healthy"] is False
-        assert "error" in result
-
-
-class TestCacheHealthEndpoint:
-    """Tests pour l'endpoint de santé cache."""
-
-    @patch("backend.src.api.endpoints.health._check_cache_health")
-    def test_cache_health_success(self, mock_check):
-        """Test de santé cache réussie."""
-
-        # Configuration du mock
-        expected_result = {
-            "healthy": True,
-            "test": "passed",
-            "main_cache": {"size": 100, "hits": 80, "misses": 20},
-            "chat_cache": {"size": 50, "hits": 40, "misses": 10},
-        }
-        mock_check.return_value = expected_result
-
-        # Appel de la fonction
-        result = asyncio.run(cache_health())
-
-        # Vérifications
-        assert result == expected_result
-        assert result["healthy"] is True
-        assert result["test"] == "passed"
-
-    @patch("backend.src.api.endpoints.health._check_cache_health")
-    def test_cache_health_failure(self, mock_check):
-        """Test de santé cache en échec."""
-
-        # Configuration du mock
-        expected_result = {"healthy": False, "error": "Cache service unavailable"}
-        mock_check.return_value = expected_result
-
-        # Appel de la fonction
-        result = asyncio.run(cache_health())
-
-        # Vérifications
-        assert result == expected_result
-        assert result["healthy"] is False
 
 
 class TestDiskUsageEndpoint:

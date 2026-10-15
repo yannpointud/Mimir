@@ -114,6 +114,56 @@ class TestJSONFormatter:
             assert "exception" in log_data
             assert "ValueError: Test error" in log_data["exception"]
 
+    def test_json_formatter_no_exception_info(self):
+        """Without exc_info, no exception key is emitted."""
+        formatter = JSONFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="No exception",
+            args=(),
+            exc_info=None,
+        )
+        record.module = "test"
+        record.funcName = "test"
+        record.process = 1
+        record.thread = 1
+        record.threadName = "Main"
+
+        result = formatter.format(record)
+        data = json.loads(result)
+
+        assert "exception" not in data
+        assert data["message"] == "No exception"
+
+    def test_json_formatter_ensure_ascii_false(self):
+        """Non-ASCII characters are written as is (ensure_ascii=False)."""
+        formatter = JSONFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="Message avec accents: café",
+            args=(),
+            exc_info=None,
+        )
+        record.module = "test"
+        record.funcName = "test"
+        record.process = 1
+        record.thread = 1
+        record.threadName = "Main"
+
+        result = formatter.format(record)
+
+        # Must contain unicode characters directly
+        assert "café" in result
+        # And be valid JSON
+        data = json.loads(result)
+        assert data["message"] == "Message avec accents: café"
+
 
 class TestConsoleFormatter:
     """Tests pour le formateur console"""
@@ -319,17 +369,3 @@ class TestLoggerIntegration:
 
         assert logger1 is not logger2
         assert logger1.name != logger2.name
-
-    def test_logger_with_extra_fields_integration(self):
-        """Test d'intégration avec champs extra"""
-        logger = setup_logger("extra_test")
-
-        # Simuler un log avec champs extra
-        record = logger.makeRecord(
-            logger.name, logging.INFO, __file__, 1, "Test with extra fields", (), None
-        )
-        record.extra_fields = {"request_id": "req_123", "user_id": "user_456"}
-
-        # Vérifier que le record contient les champs extra
-        assert hasattr(record, "extra_fields")
-        assert record.extra_fields["request_id"] == "req_123"

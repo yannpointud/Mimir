@@ -270,18 +270,6 @@ class TestSessionHistoryEndpoints:
         assert result["messages"] == []
         assert "created_at" in result
 
-    def test_get_session_history_with_user(self):
-        """Test session history retrieval with authenticated user."""
-
-        session_id = "test_session_123"
-        current_user = {"sub": "admin", "user_type": "admin"}
-
-        # Call the function
-        result = asyncio.run(get_session_history(session_id=session_id, current_user=current_user))
-
-        # Assertions
-        assert result["session_id"] == session_id
-
     def test_clear_session_history_placeholder(self):
         """Test session history clearing (placeholder)."""
 
@@ -297,20 +285,6 @@ class TestSessionHistoryEndpoints:
         assert result.success is True
         assert session_id in result.message
         assert "cleared" in result.message
-
-    def test_clear_session_history_with_user(self):
-        """Test session history clearing with authenticated user."""
-
-        session_id = "test_session_123"
-        current_user = {"sub": "admin", "user_type": "admin"}
-
-        # Call the function
-        result = asyncio.run(
-            clear_session_history(session_id=session_id, current_user=current_user)
-        )
-
-        # Assertions
-        assert result.success is True
 
 
 class TestChatHelperFunctions:

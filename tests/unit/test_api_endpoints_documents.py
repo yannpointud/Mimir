@@ -995,20 +995,6 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         assert stats_result.total_chunks == 0
         assert stats_result.storage_info.max_file_size_mb == 10
 
-    def test_simple_document_operations(self, mock_doc_repo):
-        """Simple tests to improve coverage."""
-        # Simple test - just verify we can import the functions
-        from backend.src.api.endpoints.documents import (
-            get_document,
-            download_document,
-            get_document_stats,
-        )
-
-        # These imports prove that the modules are accessible for tests
-        assert get_document is not None
-        assert download_document is not None
-        assert get_document_stats is not None
-
     @patch("backend.src.api.endpoints.documents.FileResponse")
     def test_download_document_success(self, mock_file_response, mock_doc_repo):
         """Test successful document download."""

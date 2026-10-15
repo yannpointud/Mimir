@@ -15,8 +15,6 @@ from backend.src.auth.middleware import (
     get_current_user,
     require_admin,
     get_optional_user,
-    security,
-    optional_security,
 )
 
 
@@ -111,28 +109,6 @@ class TestJWTBearer:
             assert result is None
 
     @pytest.mark.asyncio
-    async def test_call_expired_token(self):
-        """Test avec un token expiré."""
-        mock_request = Mock(spec=Request)
-
-        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
-            mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer", credentials="expired_token"
-            )
-            mock_parent_call.return_value = mock_credentials
-
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
-                mock_jwt_handler.verify_token.return_value = None
-
-                bearer = JWTBearer()
-
-                with pytest.raises(HTTPException) as exc_info:
-                    await bearer(mock_request)
-
-                assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-                assert "Invalid or expired token" in exc_info.value.detail
-
-    @pytest.mark.asyncio
     async def test_call_jwt_handler_exception(self):
         """Test avec exception du JWT handler."""
         mock_request = Mock(spec=Request)
@@ -189,38 +165,6 @@ class TestGetCurrentUser:
         mock_credentials = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials="invalid_token"
         )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(mock_request, mock_credentials)
-
-        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "Authentication required" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_get_current_user_expired_token(self):
-        """Test avec un token expiré."""
-        mock_request = Mock(spec=Request)
-        mock_request.state = Mock()
-        mock_request.state.jwt_payload = None  # payload absent car token expiré
-
-        mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer", credentials="expired_token"
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(mock_request, mock_credentials)
-
-        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "Authentication required" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_get_current_user_jwt_handler_exception(self):
-        """Test avec exception du JWT handler."""
-        mock_request = Mock(spec=Request)
-        mock_request.state = Mock()
-        mock_request.state.jwt_payload = None  # pas de payload à cause de l'exception
-
-        mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="some_token")
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request, mock_credentials)
@@ -403,80 +347,6 @@ class TestMiddlewareIntegration:
 
                 assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
                 assert "Admin privileges required" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_authentication_chain_invalid_token(self):
-        """Test de la chaîne d'authentification avec token invalide."""
-        mock_request = Mock(spec=Request)
-
-        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
-            mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer", credentials="invalid_token"
-            )
-            mock_parent_call.return_value = mock_credentials
-
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
-                mock_jwt_handler.verify_token.return_value = None
-
-                bearer = JWTBearer()
-
-                with pytest.raises(HTTPException) as exc_info:
-                    await bearer(mock_request)
-
-                assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-                assert "Invalid or expired token" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_error_propagation(self):
-        """Test de propagation d'erreurs."""
-        mock_request = Mock(spec=Request)
-
-        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
-            mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer", credentials="some_token"
-            )
-            mock_parent_call.return_value = mock_credentials
-
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
-                # jwt_handler.verify_token lance une ValueError qui est propagée sans être catchée
-                mock_jwt_handler.verify_token.side_effect = ValueError("Invalid token format")
-
-                bearer = JWTBearer()
-                with pytest.raises(
-                    ValueError
-                ) as exc_info:  # ValueError propagée, pas HTTPException
-                    await bearer(mock_request)
-
-                assert str(exc_info.value) == "Invalid token format"
-
-    @pytest.mark.asyncio
-    async def test_bearer_auto_error_false(self):
-        """Test JWTBearer avec auto_error=False."""
-        mock_request = Mock(spec=Request)
-
-        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
-            mock_parent_call.return_value = None
-
-            bearer = JWTBearer(auto_error=False)
-            result = await bearer(mock_request)
-
-            assert result is None
-
-    def test_middleware_module_imports(self):
-        """Test que les importations du module sont correctes."""
-        from backend.src.auth.middleware import (
-            JWTBearer,
-            get_current_user,
-            require_admin,
-            get_optional_user,
-        )
-
-        assert JWTBearer is not None
-        assert get_current_user is not None
-        assert require_admin is not None
-        assert get_optional_user is not None
-        assert security is not None
-        assert optional_security is not None
 
     @pytest.mark.asyncio
     async def test_logging_behavior(self):

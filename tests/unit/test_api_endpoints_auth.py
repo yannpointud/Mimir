@@ -311,13 +311,6 @@ class TestTokenRefresh:
         assert result.access_token == "new_token"
         assert result.token_type == "bearer"
 
-    @pytest.mark.skip(reason="Unreachable: the FastAPI auth dependency runs before this handler")
-    def test_refresh_token_unauthorized(self):
-        """Test unauthorized token refresh."""
-        # The require-auth dependency rejects the request before the handler runs,
-        # so this branch is not reachable at the unit level.
-        pass
-
     @patch("backend.src.api.endpoints.auth.jwt_handler")
     @patch("backend.src.api.endpoints.auth.settings")
     @patch("backend.src.api.endpoints.auth._log_auth_event")
@@ -373,13 +366,6 @@ class TestLogout:
         # Assertions
         assert result["message"] == "Successfully logged out"
 
-    @pytest.mark.skip(reason="Unreachable: the FastAPI auth dependency runs before this handler")
-    def test_logout_unauthorized(self):
-        """Test unauthorized logout."""
-        # The require-auth dependency rejects the request before the handler runs,
-        # so this branch is not reachable at the unit level.
-        pass
-
 
 class TestAuthIntegration:
     """Integration tests for authentication."""
@@ -430,24 +416,3 @@ class TestAuthIntegration:
         )
 
         assert logout_result["message"] == "Successfully logged out"
-
-    def test_rate_limiting_simulation(self):
-        """Test rate limiting simulation."""
-        # This test simulates rate limiting behavior
-        # In a real system, there would be a rate limiting middleware
-
-        from backend.src.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client.host = "127.0.0.1"
-
-        # Simulate multiple requests from the same IP
-        ips = []
-        for _ in range(10):
-            ip = _get_client_ip(mock_request)
-            ips.append(ip)
-
-        # Verify all requests have the same IP
-        assert all(ip == "127.0.0.1" for ip in ips)
-        assert len(set(ips)) == 1  # One unique IP

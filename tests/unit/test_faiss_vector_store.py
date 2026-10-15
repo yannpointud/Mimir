@@ -427,21 +427,6 @@ class TestFaissVectorStore:
         # Vérifier que l'index a été créé
         mock_index_class.assert_called_with(128)
 
-    def test_faiss_store_different_index_types(self, temp_dir):
-        """Test avec différents types d'index"""
-        for index_type in ["FlatL2"]:
-            index_path = temp_dir / f"{index_type}.index"
-            metadata_path = temp_dir / f"{index_type}.pkl"
-
-            store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path),
-                index_type=index_type,
-            )
-
-            assert store.index_type == index_type
-
     def test_faiss_store_invalid_dimension(self, temp_dir):
         """Test avec dimension invalide"""
         index_path = temp_dir / "invalid.index"

@@ -494,50 +494,6 @@ class TestNotificationEmail:
             mock_send.assert_called_once()
 
 
-class TestEmailValidation:
-    """Tests pour la validation des emails."""
-
-    @pytest.fixture
-    def email_service(self):
-        """Service email configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
-            mock_settings.smtp_host = "smtp.example.com"
-            mock_settings.smtp_port = 587
-            mock_settings.smtp_user = "user@example.com"
-            mock_settings.smtp_password = "password"
-            mock_settings.smtp_use_tls = True
-            mock_settings.escalation_email = "support@example.com"
-            return EmailService()
-
-    def test_validate_email_address_valid(self, email_service):
-        """Test de validation d'adresse email valide."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste la configuration
-        assert email_service._is_configured() is True
-
-    def test_validate_email_address_invalid(self, email_service):
-        """Test de validation d'adresse email invalide."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste la configuration
-        assert email_service._is_configured() is True
-
-    def test_sanitize_email_content(self, email_service):
-        """Test de nettoyage du contenu email."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste que le contenu
-        # est utilisé tel quel dans les templates
-        html = email_service._generate_escalation_html(
-            user_question="Test question", chat_history=[], user_info=None, context_sources=None
-        )
-        assert "Test question" in html
-
-    def test_sanitize_email_content_text(self, email_service):
-        """Test de nettoyage de contenu texte."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste que le contenu
-        # est utilisé tel quel dans les templates
-        text = email_service._generate_escalation_text(
-            user_question="Test question", chat_history=[], user_info=None, context_sources=None
-        )
-        assert "Test question" in text
-
-
 class TestIntegration:
     """Tests d'intégration."""
 
