@@ -23,7 +23,7 @@ class BaseRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def _handle_db_error(self, e: Exception, operation: str):
+    def _handle_db_error(self, e: Exception, operation: str) -> None:
         """Centralized database error handling"""
         logger.error(f"Database error during {operation}: {e}")
         self.session.rollback()
@@ -36,7 +36,7 @@ class DocumentRepository(BaseRepository):
     """
 
     def create(
-        self, filename: str, file_hash: str, path: str = None, preserve: bool = False
+        self, filename: str, file_hash: str, path: str | None = None, preserve: bool = False
     ) -> Document:
         """
         Create a new document
@@ -120,7 +120,7 @@ class DocumentRepository(BaseRepository):
 
     def get_all(
         self,
-        limit: int = None,
+        limit: int | None = None,
         offset: int = 0,
         order_by: str = "created_at",
         desc_order: bool = True,
@@ -157,7 +157,11 @@ class DocumentRepository(BaseRepository):
             raise
 
     def get_all_paginated(
-        self, offset: int = 0, limit: int = 50, filters: dict = None, search: str = None
+        self,
+        offset: int = 0,
+        limit: int = 50,
+        filters: dict[str, Any] | None = None,
+        search: str | None = None,
     ) -> tuple[list["Document"], int]:
         """
         Retrieve all documents with pagination and total count
@@ -201,8 +205,12 @@ class DocumentRepository(BaseRepository):
             raise
 
     def update_status(
-        self, doc_id: int, status: str, error_message: str = None, chunk_count: int = None
-    ):
+        self,
+        doc_id: int,
+        status: str,
+        error_message: str | None = None,
+        chunk_count: int | None = None,
+    ) -> None:
         """
         Update a document's status
 
@@ -306,7 +314,7 @@ class ConfigurationRepository(BaseRepository):
             self._handle_db_error(e, f"get configuration {key}")
             raise
 
-    def get_value(self, key: str, default: str = None) -> str | None:
+    def get_value(self, key: str, default: str | None = None) -> str | None:
         """Retrieve the value of a configuration"""
         config = self.get(key)
         return config.value if config else default
@@ -363,11 +371,11 @@ class AuditLogRepository(BaseRepository):
         self,
         user_type: str,
         action: str,
-        details: str = None,
-        ip_address: str = None,
-        user_agent: str = None,
+        details: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
         success: bool = True,
-        additional_data: dict = None,
+        additional_data: dict[str, Any] | None = None,
     ) -> AuditLog:
         """Create a new audit log"""
         try:
@@ -393,7 +401,11 @@ class AuditLogRepository(BaseRepository):
             raise
 
     def get_logs(
-        self, user_type: str = None, action: str = None, limit: int = 100, offset: int = 0
+        self,
+        user_type: str | None = None,
+        action: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[AuditLog]:
         """
         Retrieve audit logs with filters
@@ -425,7 +437,7 @@ class AuditLogRepository(BaseRepository):
             raise
 
     def get_logs_paginated(
-        self, offset: int = 0, limit: int = 100, filters: dict = None
+        self, offset: int = 0, limit: int = 100, filters: dict[str, Any] | None = None
     ) -> tuple[list[AuditLog], int]:
         """
         Retrieve audit logs with pagination and total count

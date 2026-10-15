@@ -344,7 +344,8 @@ except (ValueError, OSError) as config_error:
     if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
         # Under pytest, keep the historical behavior: test fixtures
         # override settings, so a load failure must not break collection.
-        settings = None
+        # The application never runs with None, hence the Settings type.
+        settings = None  # type: ignore[assignment]
     else:
         import logging
 

@@ -7,9 +7,15 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+)
 from contextlib import contextmanager, asynccontextmanager
 from collections.abc import Generator, AsyncGenerator
+from typing import cast
 import sqlite3
 import logging
 
@@ -52,11 +58,12 @@ class DatabaseManager:
     Supports both sync and async during migration
     """
 
-    _instance = None
-    _engine = None
-    _session_factory = None
-    _async_engine = None
-    _async_session_factory = None
+    _instance: "DatabaseManager | None" = None
+    # Set together by _initialize_database(), which raises on failure.
+    _engine: Engine | None = None
+    _session_factory: sessionmaker[Session] | None = None
+    _async_engine: AsyncEngine | None = None
+    _async_session_factory: async_sessionmaker[AsyncSession] | None = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -124,26 +131,26 @@ class DatabaseManager:
         """Return the synchronous database engine"""
         if self._engine is None:
             self._initialize_database()
-        return self._engine
+        return cast(Engine, self._engine)
 
     @property
-    def async_engine(self):
+    def async_engine(self) -> AsyncEngine:
         """Return the asynchronous database engine"""
         if self._async_engine is None:
             self._initialize_database()
-        return self._async_engine
+        return cast(AsyncEngine, self._async_engine)
 
     def get_session(self) -> Session:
         """Create a new synchronous database session"""
         if self._session_factory is None:
             self._initialize_database()
-        return self._session_factory()
+        return cast("sessionmaker[Session]", self._session_factory)()
 
     def get_async_session(self) -> AsyncSession:
         """Create a new asynchronous database session"""
         if self._async_session_factory is None:
             self._initialize_database()
-        return self._async_session_factory()
+        return cast("async_sessionmaker[AsyncSession]", self._async_session_factory)()
 
     @contextmanager
     def get_session_context(self) -> Generator[Session]:
