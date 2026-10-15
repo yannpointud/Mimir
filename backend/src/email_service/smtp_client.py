@@ -43,7 +43,7 @@ class EmailService:
         user_question: str,
         chat_history: list[dict[str, Any]],
         user_info: dict[str, str] | None = None,
-        context_sources: list[str] | None = None
+        context_sources: list[str] | None = None,
     ) -> bool:
         """
         Send escalation email to support team.
@@ -76,7 +76,7 @@ class EmailService:
                 to_emails=[self.escalation_email],
                 subject=subject,
                 html_content=html_content,
-                text_content=text_content
+                text_content=text_content,
             )
 
             if success:
@@ -91,11 +91,7 @@ class EmailService:
             return False
 
     async def send_notification_email(
-        self,
-        to_email: str,
-        subject: str,
-        message: str,
-        is_html: bool = False
+        self, to_email: str, subject: str, message: str, is_html: bool = False
     ) -> bool:
         """
         Send a general notification email.
@@ -121,9 +117,7 @@ class EmailService:
                 content_kwargs["text_content"] = message
 
             success = await self._send_email(
-                to_emails=[to_email],
-                subject=subject,
-                **content_kwargs
+                to_emails=[to_email], subject=subject, **content_kwargs
             )
 
             if success:
@@ -141,7 +135,7 @@ class EmailService:
         subject: str,
         text_content: str | None = None,
         html_content: str | None = None,
-        attachments: list[dict[str, Any]] | None = None
+        attachments: list[dict[str, Any]] | None = None,
     ) -> bool:
         """
         Internal method to send email via SMTP.
@@ -181,9 +175,7 @@ class EmailService:
 
             # Send email using aiosmtplib for async operation
             smtp_client = aiosmtplib.SMTP(
-                hostname=self.smtp_host,
-                port=self.smtp_port,
-                use_tls=self.smtp_use_tls
+                hostname=self.smtp_host, port=self.smtp_port, use_tls=self.smtp_use_tls
             )
 
             await smtp_client.connect()
@@ -209,12 +201,11 @@ class EmailService:
             attachment: Attachment info dict with 'filename', 'content', 'mime_type'
         """
         try:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment['content'])
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment["content"])
             encoders.encode_base64(part)
             part.add_header(
-                'Content-Disposition',
-                f'attachment; filename= {attachment["filename"]}'
+                "Content-Disposition", f"attachment; filename= {attachment['filename']}"
             )
             message.attach(part)
         except Exception as e:
@@ -225,7 +216,7 @@ class EmailService:
         user_question: str,
         chat_history: list[dict[str, Any]],
         user_info: dict[str, str] | None,
-        context_sources: list[str] | None
+        context_sources: list[str] | None,
     ) -> str:
         """Generate HTML content for escalation email."""
         template_str = """
@@ -324,7 +315,7 @@ class EmailService:
             user_question=user_question,
             chat_history=chat_history,
             context_sources=context_sources,
-            user_info=user_info
+            user_info=user_info,
         )
 
     def _generate_escalation_text(
@@ -332,7 +323,7 @@ class EmailService:
         user_question: str,
         chat_history: list[dict[str, Any]],
         user_info: dict[str, str] | None,
-        context_sources: list[str] | None
+        context_sources: list[str] | None,
     ) -> str:
         """Generate plain text content for escalation email."""
         content = []
@@ -351,7 +342,9 @@ class EmailService:
             content.append("RECENT CHAT HISTORY:")
             content.append("-" * 20)
             for message in chat_history[-5:]:
-                content.append(f"{message.get('type', 'unknown').upper()}: {message.get('content', '')[:200]}")
+                content.append(
+                    f"{message.get('type', 'unknown').upper()}: {message.get('content', '')[:200]}"
+                )
             content.append("")
 
         if context_sources:
@@ -382,11 +375,7 @@ class EmailService:
 
     def _is_configured(self) -> bool:
         """Check if email service is properly configured."""
-        return bool(
-            self.smtp_host and
-            self.smtp_user and
-            self.escalation_email
-        )
+        return bool(self.smtp_host and self.smtp_user and self.escalation_email)
 
     def get_configuration_status(self) -> dict[str, Any]:
         """
@@ -401,7 +390,7 @@ class EmailService:
             "smtp_user": bool(self.smtp_user),
             "escalation_email": bool(self.escalation_email),
             "smtp_port": self.smtp_port,
-            "smtp_use_tls": self.smtp_use_tls
+            "smtp_use_tls": self.smtp_use_tls,
         }
 
 

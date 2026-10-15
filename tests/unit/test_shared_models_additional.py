@@ -9,9 +9,18 @@ from pydantic import ValidationError
 from datetime import datetime
 
 from backend.src.shared.models import (
-    PaginationModel, BaseResponse, DocumentResponse, DocumentListResponse,
-    DocumentStatus, UserType, ErrorResponse, HealthCheckResponse,
-    DocumentBase, DocumentCreate, ConfigurationBase, FileUploadValidation
+    PaginationModel,
+    BaseResponse,
+    DocumentResponse,
+    DocumentListResponse,
+    DocumentStatus,
+    UserType,
+    ErrorResponse,
+    HealthCheckResponse,
+    DocumentBase,
+    DocumentCreate,
+    ConfigurationBase,
+    FileUploadValidation,
 )
 
 
@@ -30,12 +39,7 @@ class TestPaginationModel:
 
     def test_pagination_custom_values(self):
         """Test avec valeurs personnalisées."""
-        pagination = PaginationModel(
-            limit=25,
-            offset=10,
-            order_by="filename",
-            desc_order=False
-        )
+        pagination = PaginationModel(limit=25, offset=10, order_by="filename", desc_order=False)
 
         assert pagination.limit == 25
         assert pagination.offset == 10
@@ -85,10 +89,7 @@ class TestBaseResponse:
 
     def test_base_response_success(self):
         """Test de réponse de base avec succès."""
-        response = BaseResponse(
-            success=True,
-            message="Operation completed"
-        )
+        response = BaseResponse(success=True, message="Operation completed")
 
         assert response.success is True
         assert response.message == "Operation completed"
@@ -96,10 +97,7 @@ class TestBaseResponse:
 
     def test_base_response_error(self):
         """Test de réponse de base avec erreur."""
-        response = BaseResponse(
-            success=False,
-            message="Operation failed"
-        )
+        response = BaseResponse(success=False, message="Operation failed")
 
         assert response.success is False
         assert response.message == "Operation failed"
@@ -119,11 +117,7 @@ class TestDocumentModels:
 
     def test_document_base_creation(self):
         """Test de création DocumentBase - CORRIGÉ: DocumentBase n'a pas file_hash."""
-        doc = DocumentBase(
-            filename="test.pdf",
-            path="/uploads/test.pdf",
-            preserve=True
-        )
+        doc = DocumentBase(filename="test.pdf", path="/uploads/test.pdf", preserve=True)
 
         assert doc.filename == "test.pdf"
         assert doc.path == "/uploads/test.pdf"
@@ -133,7 +127,7 @@ class TestDocumentModels:
         """Test DocumentCreate avec champs requis - CORRIGÉ: file_hash requis."""
         doc = DocumentCreate(
             filename="test.pdf",
-            file_hash="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+            file_hash="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
         )
 
         assert doc.filename == "test.pdf"
@@ -145,7 +139,7 @@ class TestDocumentModels:
         with pytest.raises(ValueError, match="Hash must be hexadecimal"):
             DocumentCreate(
                 filename="test.pdf",
-                file_hash="ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ"
+                file_hash="ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
             )
 
     def test_validate_filename_valid(self):
@@ -199,7 +193,7 @@ class TestDocumentModels:
             status=DocumentStatus.INDEXED,
             chunk_count=5,
             preserve=False,
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
 
         assert response.id == 1
@@ -214,7 +208,7 @@ class TestDocumentModels:
             message="Documents retrieved",
             documents=[],
             total_count=2,
-            pagination={"page": 1, "size": 10}
+            pagination={"page": 1, "size": 10},
         )
 
         assert response.success is True
@@ -228,7 +222,7 @@ class TestDocumentModels:
             success=True,
             documents=[],
             total_count=150,
-            pagination={"page": 3, "size": 25, "total_pages": 6}
+            pagination={"page": 3, "size": 25, "total_pages": 6},
         )
 
         assert response.total_count == 150
@@ -243,9 +237,7 @@ class TestValidationModels:
     def test_file_upload_validation_success(self):
         """Test de validation d'upload réussie."""
         # FileUploadValidation peut ne pas avoir ces champs exacts
-        validation = FileUploadValidation(
-            allowed_extensions=[".pdf", ".docx", ".txt"]
-        )
+        validation = FileUploadValidation(allowed_extensions=[".pdf", ".docx", ".txt"])
 
         assert ".pdf" in validation.allowed_extensions
 
@@ -254,7 +246,7 @@ class TestValidationModels:
         error = ErrorResponse(
             error_code="VALIDATION_ERROR",
             error_message="Invalid input provided",
-            details={"field": "filename", "issue": "too_long"}
+            details={"field": "filename", "issue": "too_long"},
         )
 
         assert error.error_code == "VALIDATION_ERROR"
@@ -264,9 +256,7 @@ class TestValidationModels:
     def test_health_check_response(self):
         """Test du modèle HealthCheckResponse."""
         health = HealthCheckResponse(
-            success=True,
-            status="healthy",
-            checks={"database": {"healthy": True}}
+            success=True, status="healthy", checks={"database": {"healthy": True}}
         )
 
         assert health.success is True
@@ -279,10 +269,10 @@ class TestEnumModels:
 
     def test_document_status_enum(self):
         """Test de l'énumération DocumentStatus - CORRIGÉ: vraies valeurs."""
-        assert hasattr(DocumentStatus, 'PENDING')
-        assert hasattr(DocumentStatus, 'INDEXING')
-        assert hasattr(DocumentStatus, 'INDEXED')
-        assert hasattr(DocumentStatus, 'ERROR')
+        assert hasattr(DocumentStatus, "PENDING")
+        assert hasattr(DocumentStatus, "INDEXING")
+        assert hasattr(DocumentStatus, "INDEXED")
+        assert hasattr(DocumentStatus, "ERROR")
 
         # Test des valeurs
         assert DocumentStatus.PENDING == "pending"
@@ -292,9 +282,9 @@ class TestEnumModels:
 
     def test_user_type_enum(self):
         """Test de l'énumération UserType - CORRIGÉ: vraies valeurs."""
-        assert hasattr(UserType, 'ADMIN')
-        assert hasattr(UserType, 'USER')
-        assert hasattr(UserType, 'SYSTEM')
+        assert hasattr(UserType, "ADMIN")
+        assert hasattr(UserType, "USER")
+        assert hasattr(UserType, "SYSTEM")
 
         # Test des valeurs
         assert UserType.ADMIN == "admin"
@@ -320,19 +310,13 @@ class TestModelSerialization:
     def test_response_model_validation(self):
         """Test de validation des modèles de réponse."""
         # Données valides pour BaseResponse
-        response = BaseResponse(
-            success=True,
-            message="Success"
-        )
+        response = BaseResponse(success=True, message="Success")
         assert response.success is True
         assert response.message == "Success"
 
     def test_configuration_models(self):
         """Test des modèles de configuration."""
-        config_base = ConfigurationBase(
-            key="api_key",
-            value="secret_value"
-        )
+        config_base = ConfigurationBase(key="api_key", value="secret_value")
 
         assert config_base.key == "api_key"
         assert config_base.value == "secret_value"

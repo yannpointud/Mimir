@@ -14,45 +14,47 @@ from typing import Any
 # Import settings for dynamic log level configuration
 from src.config import settings
 
+
 class JSONFormatter(logging.Formatter):
     """Format logs as JSON for better parsing and analysis"""
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON"""
         log_obj = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'level': record.levelname,
-            'module': record.module,
-            'function': record.funcName,
-            'line': record.lineno,
-            'message': record.getMessage(),
-            'process_id': record.process,
-            'thread_id': record.thread,
-            'thread_name': record.threadName
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "message": record.getMessage(),
+            "process_id": record.process,
+            "thread_id": record.thread,
+            "thread_name": record.threadName,
         }
 
         # Add extra fields if present
-        if hasattr(record, 'extra_fields') and isinstance(record.extra_fields, dict):
+        if hasattr(record, "extra_fields") and isinstance(record.extra_fields, dict):
             log_obj.update(record.extra_fields)
 
         # Add exception info if present
         if record.exc_info:
-            log_obj['exception'] = self.formatException(record.exc_info)
+            log_obj["exception"] = self.formatException(record.exc_info)
 
         # Add stack trace for errors if available
         if record.levelno >= logging.ERROR and record.stack_info:
-            log_obj['stack_trace'] = self.formatStack(record.stack_info)
+            log_obj["stack_trace"] = self.formatStack(record.stack_info)
 
         return json.dumps(log_obj, ensure_ascii=False)
+
 
 class ConsoleFormatter(logging.Formatter):
     """Simple human-readable format for console output"""
 
     def __init__(self):
         super().__init__(
-            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
+
 
 def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
     """
@@ -89,7 +91,7 @@ def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
         when="midnight",
         interval=1,
         backupCount=30,  # Keep 30 days
-        encoding='utf-8'
+        encoding="utf-8",
     )
     app_handler.setLevel(getattr(logging, level.upper()))
     app_handler.setFormatter(json_formatter)
@@ -99,7 +101,7 @@ def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
         log_dir / "error.log",
         maxBytes=10_000_000,  # 10MB
         backupCount=5,
-        encoding='utf-8'
+        encoding="utf-8",
     )
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(json_formatter)
@@ -109,7 +111,7 @@ def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
         log_dir / "debug.log",
         maxBytes=50_000_000,  # 50MB
         backupCount=3,
-        encoding='utf-8'
+        encoding="utf-8",
     )
     debug_handler.setLevel(getattr(logging, level.upper()))
     debug_handler.setFormatter(json_formatter)
@@ -130,17 +132,19 @@ def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
 
     return logger
 
+
 # Global logger instance for main app - uses settings.log_level from config
 app_logger = setup_logger("mimir", level=settings.log_level.upper())
+
 
 def setup_frontend_logger(level: str = "DEBUG") -> logging.Logger:
     """
     Setup specialized logger for frontend logs
     Logs frontend events to dedicated frontend.log file
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        
+
     Returns:
         Configured frontend logger instance
     """
@@ -163,28 +167,32 @@ def setup_frontend_logger(level: str = "DEBUG") -> logging.Logger:
         log_dir / "frontend.log",
         maxBytes=20_000_000,  # 20MB
         backupCount=5,
-        encoding='utf-8'
+        encoding="utf-8",
     )
     frontend_handler.setLevel(getattr(logging, level.upper()))
     frontend_handler.setFormatter(json_formatter)
 
     # Add handler
     logger.addHandler(frontend_handler)
-    
+
     # Prevent propagation to root logger
     logger.propagate = False
 
     return logger
 
+
 # Global logger instances - uses settings.log_level from config
 frontend_logger = setup_frontend_logger(level=settings.log_level.upper())
 
-def log_api_request(endpoint: str,
-                   method: str,
-                   duration_ms: float | None = None,
-                   status_code: int | None = None,
-                   user_type: str | None = None,
-                   **kwargs):
+
+def log_api_request(
+    endpoint: str,
+    method: str,
+    duration_ms: float | None = None,
+    status_code: int | None = None,
+    user_type: str | None = None,
+    **kwargs,
+):
     """
     Helper to log API requests consistently
 
@@ -196,19 +204,14 @@ def log_api_request(endpoint: str,
         user_type: Type of user (admin, user, etc.)
         **kwargs: Additional fields
     """
-    extra_fields = {
-        'endpoint': endpoint,
-        'method': method,
-        'type': 'api_request',
-        **kwargs
-    }
+    extra_fields = {"endpoint": endpoint, "method": method, "type": "api_request", **kwargs}
 
     if duration_ms is not None:
-        extra_fields['duration_ms'] = duration_ms
+        extra_fields["duration_ms"] = duration_ms
     if status_code is not None:
-        extra_fields['status_code'] = status_code
+        extra_fields["status_code"] = status_code
     if user_type is not None:
-        extra_fields['user_type'] = user_type
+        extra_fields["user_type"] = user_type
 
     message = f"API {method} {endpoint}"
     if status_code:
@@ -220,14 +223,17 @@ def log_api_request(endpoint: str,
     if status_code and status_code >= 400:
         level = logging.WARNING if status_code < 500 else logging.ERROR
 
-    app_logger.log(level, message, extra={'extra_fields': extra_fields})
+    app_logger.log(level, message, extra={"extra_fields": extra_fields})
 
-def log_ingestion_event(document: str,
-                       status: str,
-                       duration_ms: float | None = None,
-                       chunk_count: int | None = None,
-                       file_size_mb: float | None = None,
-                       **kwargs):
+
+def log_ingestion_event(
+    document: str,
+    status: str,
+    duration_ms: float | None = None,
+    chunk_count: int | None = None,
+    file_size_mb: float | None = None,
+    **kwargs,
+):
     """
     Helper to log ingestion events
 
@@ -239,19 +245,14 @@ def log_ingestion_event(document: str,
         file_size_mb: File size in megabytes
         **kwargs: Additional fields
     """
-    extra_fields = {
-        'document': document,
-        'status': status,
-        'type': 'ingestion',
-        **kwargs
-    }
+    extra_fields = {"document": document, "status": status, "type": "ingestion", **kwargs}
 
     if duration_ms is not None:
-        extra_fields['duration_ms'] = duration_ms
+        extra_fields["duration_ms"] = duration_ms
     if chunk_count is not None:
-        extra_fields['chunk_count'] = chunk_count
+        extra_fields["chunk_count"] = chunk_count
     if file_size_mb is not None:
-        extra_fields['file_size_mb'] = file_size_mb
+        extra_fields["file_size_mb"] = file_size_mb
 
     message = f"Ingestion: {document} - {status}"
     if chunk_count:
@@ -259,14 +260,17 @@ def log_ingestion_event(document: str,
     if duration_ms:
         message += f" in {duration_ms:.1f}ms"
 
-    app_logger.info(message, extra={'extra_fields': extra_fields})
+    app_logger.info(message, extra={"extra_fields": extra_fields})
 
-def log_search_query(query: str,
-                    results_count: int,
-                    duration_ms: float,
-                    user_type: str | None = None,
-                    similarity_threshold: float | None = None,
-                    **kwargs):
+
+def log_search_query(
+    query: str,
+    results_count: int,
+    duration_ms: float,
+    user_type: str | None = None,
+    similarity_threshold: float | None = None,
+    **kwargs,
+):
     """
     Helper to log search queries
 
@@ -282,30 +286,33 @@ def log_search_query(query: str,
     query_truncated = query[:100] + "..." if len(query) > 100 else query
 
     extra_fields = {
-        'query_length': len(query),
-        'results_count': results_count,
-        'duration_ms': duration_ms,
-        'type': 'search',
-        **kwargs
+        "query_length": len(query),
+        "results_count": results_count,
+        "duration_ms": duration_ms,
+        "type": "search",
+        **kwargs,
     }
 
     if user_type is not None:
-        extra_fields['user_type'] = user_type
+        extra_fields["user_type"] = user_type
     if similarity_threshold is not None:
-        extra_fields['similarity_threshold'] = similarity_threshold
+        extra_fields["similarity_threshold"] = similarity_threshold
 
     app_logger.info(
         f"Search: '{query_truncated}' - {results_count} results in {duration_ms:.1f}ms",
-        extra={'extra_fields': extra_fields}
+        extra={"extra_fields": extra_fields},
     )
 
-def log_llm_request(model: str,
-                   operation: str,
-                   tokens: int,
-                   duration_ms: float,
-                   success: bool = True,
-                   error: str | None = None,
-                   **kwargs):
+
+def log_llm_request(
+    model: str,
+    operation: str,
+    tokens: int,
+    duration_ms: float,
+    success: bool = True,
+    error: str | None = None,
+    **kwargs,
+):
     """
     Helper to log LLM API requests
 
@@ -319,31 +326,34 @@ def log_llm_request(model: str,
         **kwargs: Additional fields
     """
     extra_fields = {
-        'model': model,
-        'operation': operation,
-        'tokens': tokens,
-        'duration_ms': duration_ms,
-        'success': success,
-        'type': 'llm_request',
-        **kwargs
+        "model": model,
+        "operation": operation,
+        "tokens": tokens,
+        "duration_ms": duration_ms,
+        "success": success,
+        "type": "llm_request",
+        **kwargs,
     }
 
     if error:
-        extra_fields['error'] = error
+        extra_fields["error"] = error
 
     message = f"LLM {operation}: {model} - {tokens} tokens in {duration_ms:.1f}ms"
     if not success and error:
         message += f" [ERROR: {error}]"
 
     level = logging.INFO if success else logging.ERROR
-    app_logger.log(level, message, extra={'extra_fields': extra_fields})
+    app_logger.log(level, message, extra={"extra_fields": extra_fields})
 
-def log_vector_operation(operation: str,
-                        vector_count: int,
-                        duration_ms: float,
-                        success: bool = True,
-                        error: str | None = None,
-                        **kwargs):
+
+def log_vector_operation(
+    operation: str,
+    vector_count: int,
+    duration_ms: float,
+    success: bool = True,
+    error: str | None = None,
+    **kwargs,
+):
     """
     Helper to log vector store operations
 
@@ -356,30 +366,33 @@ def log_vector_operation(operation: str,
         **kwargs: Additional fields
     """
     extra_fields = {
-        'operation': operation,
-        'vector_count': vector_count,
-        'duration_ms': duration_ms,
-        'success': success,
-        'type': 'vector_operation',
-        **kwargs
+        "operation": operation,
+        "vector_count": vector_count,
+        "duration_ms": duration_ms,
+        "success": success,
+        "type": "vector_operation",
+        **kwargs,
     }
 
     if error:
-        extra_fields['error'] = error
+        extra_fields["error"] = error
 
     message = f"Vector {operation}: {vector_count} vectors in {duration_ms:.1f}ms"
     if not success and error:
         message += f" [ERROR: {error}]"
 
     level = logging.INFO if success else logging.ERROR
-    app_logger.log(level, message, extra={'extra_fields': extra_fields})
+    app_logger.log(level, message, extra={"extra_fields": extra_fields})
 
-def log_auth_event(event: str,
-                  user_type: str | None = None,
-                  ip_address: str | None = None,
-                  success: bool = True,
-                  reason: str | None = None,
-                  **kwargs):
+
+def log_auth_event(
+    event: str,
+    user_type: str | None = None,
+    ip_address: str | None = None,
+    success: bool = True,
+    reason: str | None = None,
+    **kwargs,
+):
     """
     Helper to log authentication events
 
@@ -391,19 +404,14 @@ def log_auth_event(event: str,
         reason: Failure reason if applicable
         **kwargs: Additional fields
     """
-    extra_fields = {
-        'event': event,
-        'success': success,
-        'type': 'auth',
-        **kwargs
-    }
+    extra_fields = {"event": event, "success": success, "type": "auth", **kwargs}
 
     if user_type:
-        extra_fields['user_type'] = user_type
+        extra_fields["user_type"] = user_type
     if ip_address:
-        extra_fields['ip_address'] = ip_address
+        extra_fields["ip_address"] = ip_address
     if reason:
-        extra_fields['reason'] = reason
+        extra_fields["reason"] = reason
 
     message = f"Auth {event}"
     if user_type:
@@ -412,13 +420,16 @@ def log_auth_event(event: str,
         message += f" - FAILED: {reason}"
 
     level = logging.INFO if success else logging.WARNING
-    app_logger.log(level, message, extra={'extra_fields': extra_fields})
+    app_logger.log(level, message, extra={"extra_fields": extra_fields})
 
-def log_health_check(component: str,
-                    status: str,
-                    duration_ms: float | None = None,
-                    details: dict[str, Any] | None = None,
-                    **kwargs):
+
+def log_health_check(
+    component: str,
+    status: str,
+    duration_ms: float | None = None,
+    details: dict[str, Any] | None = None,
+    **kwargs,
+):
     """
     Helper to log health check events
 
@@ -429,29 +440,24 @@ def log_health_check(component: str,
         details: Additional health details
         **kwargs: Additional fields
     """
-    extra_fields = {
-        'component': component,
-        'status': status,
-        'type': 'health_check',
-        **kwargs
-    }
+    extra_fields = {"component": component, "status": status, "type": "health_check", **kwargs}
 
     if duration_ms is not None:
-        extra_fields['duration_ms'] = duration_ms
+        extra_fields["duration_ms"] = duration_ms
     if details:
-        extra_fields['details'] = details
+        extra_fields["details"] = details
 
     message = f"Health check: {component} - {status}"
     if duration_ms:
         message += f" ({duration_ms:.1f}ms)"
 
-    level = logging.INFO if status == 'healthy' else logging.WARNING
-    app_logger.log(level, message, extra={'extra_fields': extra_fields})
+    level = logging.INFO if status == "healthy" else logging.WARNING
+    app_logger.log(level, message, extra={"extra_fields": extra_fields})
 
-def log_system_event(event: str,
-                    severity: str = "info",
-                    details: dict[str, Any] | None = None,
-                    **kwargs):
+
+def log_system_event(
+    event: str, severity: str = "info", details: dict[str, Any] | None = None, **kwargs
+):
     """
     Helper to log system-level events
 
@@ -461,25 +467,21 @@ def log_system_event(event: str,
         details: Additional event details
         **kwargs: Additional fields
     """
-    extra_fields = {
-        'event': event,
-        'severity': severity,
-        'type': 'system',
-        **kwargs
-    }
+    extra_fields = {"event": event, "severity": severity, "type": "system", **kwargs}
 
     if details:
-        extra_fields['details'] = details
+        extra_fields["details"] = details
 
     level_mapping = {
-        'info': logging.INFO,
-        'warning': logging.WARNING,
-        'error': logging.ERROR,
-        'critical': logging.CRITICAL
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR,
+        "critical": logging.CRITICAL,
     }
 
     level = level_mapping.get(severity.lower(), logging.INFO)
-    app_logger.log(level, f"System: {event}", extra={'extra_fields': extra_fields})
+    app_logger.log(level, f"System: {event}", extra={"extra_fields": extra_fields})
+
 
 # Performance monitoring decorator
 def log_performance(operation: str):
@@ -502,13 +504,15 @@ def log_performance(operation: str):
 
                 app_logger.debug(
                     f"Performance: {operation} completed in {duration_ms:.1f}ms",
-                    extra={'extra_fields': {
-                        'operation': operation,
-                        'function': func.__name__,
-                        'duration_ms': duration_ms,
-                        'success': True,
-                        'type': 'performance'
-                    }}
+                    extra={
+                        "extra_fields": {
+                            "operation": operation,
+                            "function": func.__name__,
+                            "duration_ms": duration_ms,
+                            "success": True,
+                            "type": "performance",
+                        }
+                    },
                 )
 
                 return result
@@ -518,17 +522,20 @@ def log_performance(operation: str):
 
                 app_logger.error(
                     f"Performance: {operation} failed after {duration_ms:.1f}ms - {str(e)}",
-                    extra={'extra_fields': {
-                        'operation': operation,
-                        'function': func.__name__,
-                        'duration_ms': duration_ms,
-                        'success': False,
-                        'error': str(e),
-                        'type': 'performance'
-                    }}
+                    extra={
+                        "extra_fields": {
+                            "operation": operation,
+                            "function": func.__name__,
+                            "duration_ms": duration_ms,
+                            "success": False,
+                            "error": str(e),
+                            "type": "performance",
+                        }
+                    },
                 )
 
                 raise
 
         return wrapper
+
     return decorator

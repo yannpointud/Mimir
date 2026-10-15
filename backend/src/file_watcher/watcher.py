@@ -27,7 +27,7 @@ class DocumentFileHandler(FileSystemEventHandler):
         on_file_added: Callable[[str], None],
         on_file_modified: Callable[[str], None] | None = None,
         ignore_hidden: bool = True,
-        ignore_temp: bool = True
+        ignore_temp: bool = True,
     ):
         """
         Initialize file handler.
@@ -65,18 +65,21 @@ class DocumentFileHandler(FileSystemEventHandler):
         file_name = os.path.basename(file_path)
 
         # Ignore hidden files
-        if self.ignore_hidden and file_name.startswith('.'):
+        if self.ignore_hidden and file_name.startswith("."):
             return True
 
         # Ignore temporary files
         if self.ignore_temp:
             temp_patterns = [
-                '~$',  # Microsoft Office temp files
-                '.tmp', '.temp',
-                '.part',  # Partial downloads
-                '.crdownload',  # Chrome downloads
+                "~$",  # Microsoft Office temp files
+                ".tmp",
+                ".temp",
+                ".part",  # Partial downloads
+                ".crdownload",  # Chrome downloads
             ]
-            if any(file_name.endswith(pattern) or pattern in file_name for pattern in temp_patterns):
+            if any(
+                file_name.endswith(pattern) or pattern in file_name for pattern in temp_patterns
+            ):
                 return True
 
         # Check file extension
@@ -100,7 +103,8 @@ class DocumentFileHandler(FileSystemEventHandler):
 
             # Clean old entries (older than 5 seconds)
             to_remove = [
-                k for k, timestamp in self._recently_processed.items()
+                k
+                for k, timestamp in self._recently_processed.items()
                 if current_time - timestamp > 5
             ]
             for k in to_remove:
@@ -203,7 +207,7 @@ class FileWatcher:
         supported_extensions: set[str],
         on_file_added: Callable[[str], None],
         on_file_modified: Callable[[str], None] | None = None,
-        recursive: bool = True
+        recursive: bool = True,
     ):
         """
         Initialize file watcher.
@@ -225,7 +229,7 @@ class FileWatcher:
         self.handler = DocumentFileHandler(
             supported_extensions=supported_extensions,
             on_file_added=on_file_added,
-            on_file_modified=on_file_modified
+            on_file_modified=on_file_modified,
         )
 
         # Statistics
@@ -234,7 +238,7 @@ class FileWatcher:
             "files_added": 0,
             "files_modified": 0,
             "errors": 0,
-            "start_time": None
+            "start_time": None,
         }
 
         logger.info(f"FileWatcher initialized - directories: {self.watch_directories}")
@@ -266,11 +270,7 @@ class FileWatcher:
 
             # Set up watchers
             for directory in valid_directories:
-                self.observer.schedule(
-                    self.handler,
-                    str(directory),
-                    recursive=self.recursive
-                )
+                self.observer.schedule(self.handler, str(directory), recursive=self.recursive)
 
             # Start observer
             self.observer.start()
@@ -350,11 +350,7 @@ class FileWatcher:
 
             # Add to observer if running
             if self.is_running:
-                self.observer.schedule(
-                    self.handler,
-                    str(dir_path),
-                    recursive=self.recursive
-                )
+                self.observer.schedule(self.handler, str(dir_path), recursive=self.recursive)
 
             self.watch_directories.append(dir_path)
             logger.info(f"Added directory to watch list: {directory}")
@@ -412,7 +408,9 @@ class FileWatcher:
                 for ext in self.supported_extensions:
                     pattern = f"**/*{ext}" if self.recursive else f"*{ext}"
                     for file_path in directory.glob(pattern):
-                        if file_path.is_file() and not self.handler._should_ignore_file(str(file_path)):
+                        if file_path.is_file() and not self.handler._should_ignore_file(
+                            str(file_path)
+                        ):
                             existing_files.append(str(file_path))
 
             logger.info(f"Found {len(existing_files)} existing files")

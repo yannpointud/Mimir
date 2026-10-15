@@ -142,9 +142,7 @@ class Bm25LexicalStore:
                 if k <= 0:
                     return []
 
-                results, scores = self._retriever.retrieve(
-                    query_tokens, k=k, show_progress=False
-                )
+                results, scores = self._retriever.retrieve(query_tokens, k=k, show_progress=False)
                 # bm25s.retrieve returns integer corpus positions when no corpus
                 # is attached (fresh rebuild) but the corpus objects themselves
                 # when one was loaded (load_corpus=True). Resolve both shapes to
@@ -189,9 +187,7 @@ class Bm25LexicalStore:
                     str(self.index_path), load_corpus=True, allow_pickle=False
                 )
                 self._retriever = retriever
-                self._chunk_ids = [
-                    int(item["chunk_id"]) for item in (retriever.corpus or [])
-                ]
+                self._chunk_ids = [int(item["chunk_id"]) for item in (retriever.corpus or [])]
                 self._built = True
                 logger.info(
                     "BM25 lexical index loaded",
@@ -252,9 +248,7 @@ class Bm25LexicalStore:
         deserialization).
         """
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_dir = tempfile.mkdtemp(
-            dir=str(self.index_path.parent), suffix=".bm25.tmp"
-        )
+        tmp_dir = tempfile.mkdtemp(dir=str(self.index_path.parent), suffix=".bm25.tmp")
         try:
             corpus = [{"chunk_id": cid} for cid in self._chunk_ids]
             retriever.save(
@@ -271,9 +265,7 @@ class Bm25LexicalStore:
     def _persist_empty(self) -> None:
         """Persist an empty-corpus marker directory (no bm25s index)."""
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_dir = tempfile.mkdtemp(
-            dir=str(self.index_path.parent), suffix=".bm25.tmp"
-        )
+        tmp_dir = tempfile.mkdtemp(dir=str(self.index_path.parent), suffix=".bm25.tmp")
         try:
             (Path(tmp_dir) / "empty.marker").write_text("empty\n", encoding="utf-8")
             self._swap_dir_into_place(tmp_dir)

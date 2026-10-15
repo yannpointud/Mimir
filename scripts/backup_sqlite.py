@@ -12,6 +12,7 @@ Backup files are plaintext copies of ALL user data (chat history, document
 text). They are written with restrictive ``0o600`` permissions and rotated so
 only the newest ``settings.sqlite_backup_max_count`` files are kept.
 """
+
 import os
 import sqlite3
 import sys
@@ -47,9 +48,7 @@ def _assert_within_data_tree(path: Path) -> None:
     """
     parts = path.parts
     if "data" not in parts:
-        raise ValueError(
-            f"Refusing to operate on path outside a data/ tree: {path}"
-        )
+        raise ValueError(f"Refusing to operate on path outside a data/ tree: {path}")
 
 
 def backup(source_path=None, backup_dir=None, max_count=None) -> Path:
@@ -67,10 +66,12 @@ def backup(source_path=None, backup_dir=None, max_count=None) -> Path:
         Path to the newly written backup file.
     """
     source = _resolve_source_path(source_path)
-    dest_dir = Path(backup_dir).resolve() if backup_dir is not None \
+    dest_dir = (
+        Path(backup_dir).resolve()
+        if backup_dir is not None
         else Path(settings.sqlite_backup_dir).resolve()
-    keep = int(max_count) if max_count is not None \
-        else int(settings.sqlite_backup_max_count)
+    )
+    keep = int(max_count) if max_count is not None else int(settings.sqlite_backup_max_count)
 
     _assert_within_data_tree(source)
     _assert_within_data_tree(dest_dir)
@@ -105,7 +106,7 @@ def _rotate(backup_dir: Path, max_count: int) -> None:
     """
     backups = sorted(backup_dir.glob("mimir-*.db"))
     excess = len(backups) - max_count
-    for old in backups[:max(excess, 0)]:
+    for old in backups[: max(excess, 0)]:
         old.unlink()
 
 

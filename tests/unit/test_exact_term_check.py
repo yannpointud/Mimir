@@ -22,7 +22,7 @@ def test_no_regression_when_hybrid_matches_or_beats_dense():
 
     result = compare_exact_term_recall(dense_hits, hybrid_hits, expected_doc_ids)
 
-    assert result["dense_recall"] == pytest.approx(0.5)   # 1/2 queries hit
+    assert result["dense_recall"] == pytest.approx(0.5)  # 1/2 queries hit
     assert result["hybrid_recall"] == pytest.approx(1.0)  # 2/2 queries hit
     assert result["no_regression"] is True
     assert len(result["per_query"]) == 2

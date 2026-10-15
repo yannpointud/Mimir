@@ -16,6 +16,7 @@ teardown below) so the proof uses real db_manager.get_session() semantics
 without writing synthetic ledger rows into the developer's actual project
 database (data/sqlite/mimir.db).
 """
+
 import asyncio
 import shutil
 import tempfile
@@ -102,7 +103,7 @@ async def test_ten_parallel_reservations_cap_five_yields_exactly_five(isolated_d
     """10 concurrent reserve() calls against a cap affording 5 -> exactly 5
     True, 5 False; final spent_eur == 5 * ESTIMATE_EUR (no over-commit, no
     lost update)."""
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.utcnow().strftime("%Y-%m-%d")
 
     results = await asyncio.gather(
         *[asyncio.to_thread(_reserve_worker, today) for _ in range(N_WORKERS)]
@@ -125,7 +126,7 @@ async def test_ten_parallel_reservations_cap_five_yields_exactly_five(isolated_d
 async def test_release_frees_a_slot_for_a_subsequent_reservation(isolated_db_manager):
     """After 5 successful reserves exhaust the cap, a release() must free
     exactly one slot so a 6th reserve() then succeeds."""
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.utcnow().strftime("%Y-%m-%d")
 
     first_five = await asyncio.gather(
         *[asyncio.to_thread(_reserve_worker, today) for _ in range(5)]

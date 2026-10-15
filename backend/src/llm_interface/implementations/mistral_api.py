@@ -14,24 +14,27 @@ from ..interfaces import (
     EmbeddingResponse,
     LLMAPIError,
     LLMRateLimitError,
-    LLMInvalidRequestError
+    LLMInvalidRequestError,
 )
 from ...monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
+
 
 class MistralAPIService(AbstractLLMService):
     """
     Mistral AI API implementation with retry logic and error handling
     """
 
-    def __init__(self,
-                 api_key: str,
-                 model: str = "mistral-small-latest",
-                 embedding_model: str = "mistral-embed",
-                 base_url: str = "https://api.mistral.ai/v1",
-                 max_retries: int = 3,
-                 retry_delay: float = 1.0):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "mistral-small-latest",
+        embedding_model: str = "mistral-embed",
+        base_url: str = "https://api.mistral.ai/v1",
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ):
         """
         Initialize Mistral API service
 
@@ -62,15 +65,13 @@ class MistralAPIService(AbstractLLMService):
             self._session = aiohttp.ClientSession(
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
                 },
-                timeout=timeout
+                timeout=timeout,
             )
         return self._session
 
-    async def _make_request(self,
-                           endpoint: str,
-                           payload: dict[str, Any]) -> dict[str, Any]:
+    async def _make_request(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         """
         Make HTTP request with retry logic and comprehensive error handling
 
@@ -95,7 +96,9 @@ class MistralAPIService(AbstractLLMService):
 
                 logger.debug(f"Making request to {url}, attempt {attempt + 1}")
 
-                logger.debug(f"Sending request to Mistral API ({payload.get('model')}) at {time.time_ns()}")
+                logger.debug(
+                    f"Sending request to Mistral API ({payload.get('model')}) at {time.time_ns()}"
+                )
                 async with session.post(url, json=payload) as response:
                     response_text = await response.text()
 
@@ -107,7 +110,7 @@ class MistralAPIService(AbstractLLMService):
 
                     elif response.status == 429:
                         # Rate limiting
-                        retry_after = int(response.headers.get('Retry-After', 60))
+                        retry_after = int(response.headers.get("Retry-After", 60))
                         error_msg = f"Rate limit exceeded. Retry after {retry_after}s"
                         logger.warning(error_msg)
 
@@ -136,7 +139,7 @@ class MistralAPIService(AbstractLLMService):
                         last_exception = LLMAPIError(error_msg)
 
                         if attempt < self.max_retries:
-                            delay = self.retry_delay * (2 ** attempt)  # Exponential backoff
+                            delay = self.retry_delay * (2**attempt)  # Exponential backoff
                             logger.info(f"Retrying in {delay}s...")
                             await asyncio.sleep(delay)
                             continue
@@ -155,7 +158,7 @@ class MistralAPIService(AbstractLLMService):
                 last_exception = LLMAPIError(error_msg)
 
                 if attempt < self.max_retries:
-                    delay = self.retry_delay * (2 ** attempt)
+                    delay = self.retry_delay * (2**attempt)
                     logger.info(f"Retrying in {delay}s...")
                     await asyncio.sleep(delay)
                     continue
@@ -177,14 +180,16 @@ class MistralAPIService(AbstractLLMService):
         else:
             raise LLMAPIError("Request failed after all retry attempts")
 
-    async def generate(self,
-                      prompt: str,
-                      system_prompt: str | None = None,
-                      max_tokens: int | None = None,
-                      temperature: float = 0.1,
-                      session_id: str | None = None,
-                      rag_debug = None,
-                      **kwargs) -> GenerationResponse:
+    async def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.1,
+        session_id: str | None = None,
+        rag_debug=None,
+        **kwargs,
+    ) -> GenerationResponse:
         """
         Generate text using Mistral API
 
@@ -203,21 +208,15 @@ class MistralAPIService(AbstractLLMService):
         # Build messages array
         messages = []
         if system_prompt:
-            messages.append({
-                "role": "system",
-                "content": system_prompt
-            })
-        messages.append({
-            "role": "user",
-            "content": prompt
-        })
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
         # Build request payload
         payload = {
             "model": self._model,
             "messages": messages,
             "temperature": temperature,
-            **kwargs  # Allow additional parameters
+            **kwargs,  # Allow additional parameters
         }
 
         if max_tokens:
@@ -233,7 +232,7 @@ class MistralAPIService(AbstractLLMService):
                 model=self._model,
                 full_prompt=full_prompt,
                 user_question=prompt,
-                parameters={"temperature": temperature, "max_tokens": max_tokens, **kwargs}
+                parameters={"temperature": temperature, "max_tokens": max_tokens, **kwargs},
             )
 
         try:
@@ -255,13 +254,15 @@ class MistralAPIService(AbstractLLMService):
             logger.info(
                 f"Text generation successful: {usage_tokens} tokens, "
                 f"{duration_ms:.1f}ms, finish: {finish_reason}",
-                extra={'extra_fields': {
-                    'model': self._model,
-                    'tokens': usage_tokens,
-                    'duration_ms': duration_ms,
-                    'finish_reason': finish_reason,
-                    'type': 'text_generation'
-                }}
+                extra={
+                    "extra_fields": {
+                        "model": self._model,
+                        "tokens": usage_tokens,
+                        "duration_ms": duration_ms,
+                        "finish_reason": finish_reason,
+                        "type": "text_generation",
+                    }
+                },
             )
 
             # Log LLM response if RAG debug is enabled
@@ -271,7 +272,7 @@ class MistralAPIService(AbstractLLMService):
                     response=content,
                     tokens_used=usage_tokens,
                     duration_ms=duration_ms,
-                    finish_reason=finish_reason
+                    finish_reason=finish_reason,
                 )
 
             return GenerationResponse(
@@ -280,7 +281,7 @@ class MistralAPIService(AbstractLLMService):
                 usage_tokens=usage_tokens,
                 finish_reason=finish_reason,
                 prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens
+                completion_tokens=completion_tokens,
             )
 
         except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
@@ -291,15 +292,17 @@ class MistralAPIService(AbstractLLMService):
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
 
-    async def generate_stream(self,
-                             prompt: str,
-                             system_prompt: str | None = None,
-                             max_tokens: int | None = None,
-                             temperature: float = 0.1,
-                             session_id: str | None = None,
-                             rag_debug = None,
-                             usage_out: dict[str, Any] | None = None,
-                             **kwargs):
+    async def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.1,
+        session_id: str | None = None,
+        rag_debug=None,
+        usage_out: dict[str, Any] | None = None,
+        **kwargs,
+    ):
         """
         Generate text using Mistral API with streaming support.
         Yields chunks as they arrive from the API.
@@ -325,6 +328,7 @@ class MistralAPIService(AbstractLLMService):
             str: Text chunks as they are generated
         """
         import json
+
         start_time = time.time()
 
         # Build messages array
@@ -341,7 +345,7 @@ class MistralAPIService(AbstractLLMService):
             "stream": True,
             # Without this, Mistral never sends a usage object in the stream at all.
             "stream_options": {"include_usage": True},
-            **kwargs
+            **kwargs,
         }
 
         if max_tokens:
@@ -357,7 +361,12 @@ class MistralAPIService(AbstractLLMService):
                 model=self._model,
                 full_prompt=full_prompt,
                 user_question=prompt,
-                parameters={"temperature": temperature, "max_tokens": max_tokens, "stream": True, **kwargs}
+                parameters={
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": True,
+                    **kwargs,
+                },
             )
 
         url = f"{self.base_url}/chat/completions"
@@ -375,7 +384,7 @@ class MistralAPIService(AbstractLLMService):
 
                 # Read stream line by line
                 async for line in response.content:
-                    line = line.decode('utf-8').strip()
+                    line = line.decode("utf-8").strip()
 
                     if not line or line == "data: [DONE]":
                         continue
@@ -406,7 +415,9 @@ class MistralAPIService(AbstractLLMService):
                             usage_data = chunk_data.get("usage")
                             if usage_data is not None and usage_out is not None:
                                 usage_out["prompt_tokens"] = usage_data.get("prompt_tokens", 0)
-                                usage_out["completion_tokens"] = usage_data.get("completion_tokens", 0)
+                                usage_out["completion_tokens"] = usage_data.get(
+                                    "completion_tokens", 0
+                                )
                                 usage_out["total_tokens"] = usage_data.get("total_tokens", 0)
 
                         except json.JSONDecodeError:
@@ -427,7 +438,7 @@ class MistralAPIService(AbstractLLMService):
                     response=full_content,
                     tokens_used=total_tokens,
                     duration_ms=duration_ms,
-                    finish_reason=finish_reason
+                    finish_reason=finish_reason,
                 )
 
         except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
@@ -437,7 +448,9 @@ class MistralAPIService(AbstractLLMService):
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
 
-    async def embed(self, texts: list[str], session_id: str | None = None, rag_debug = None) -> EmbeddingResponse:
+    async def embed(
+        self, texts: list[str], session_id: str | None = None, rag_debug=None
+    ) -> EmbeddingResponse:
         """
         Generate embeddings using Mistral API with batching support
 
@@ -451,6 +464,7 @@ class MistralAPIService(AbstractLLMService):
             raise LLMInvalidRequestError("No texts provided for embedding")
 
         from ...config import settings
+
         batch_size = settings.embedding_batch_size
 
         start_time = time.time()
@@ -461,14 +475,18 @@ class MistralAPIService(AbstractLLMService):
         # If the number of texts is less than or equal to batch size, no batching needed
         if len(texts) <= batch_size:
             logger.info(f"Generating embeddings for {len(texts)} texts (single batch)")
-            return await self._embed_batch(texts, start_time, session_id=session_id, rag_debug=rag_debug)
+            return await self._embed_batch(
+                texts, start_time, session_id=session_id, rag_debug=rag_debug
+            )
 
         # Batch processing
         total_batches = (len(texts) + batch_size - 1) // batch_size
-        logger.info(f"Generating embeddings for {len(texts)} texts in {total_batches} batches (size: {batch_size})")
+        logger.info(
+            f"Generating embeddings for {len(texts)} texts in {total_batches} batches (size: {batch_size})"
+        )
 
         for i in range(0, len(texts), batch_size):
-            batch_texts = texts[i:i + batch_size]
+            batch_texts = texts[i : i + batch_size]
             batch_num = (i // batch_size) + 1
 
             # Rate limiting: Mistral embeddings have a 1 req/s limit
@@ -479,12 +497,16 @@ class MistralAPIService(AbstractLLMService):
             logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch_texts)} texts)")
 
             try:
-                batch_response = await self._embed_batch(batch_texts, session_id=session_id, rag_debug=rag_debug)
+                batch_response = await self._embed_batch(
+                    batch_texts, session_id=session_id, rag_debug=rag_debug
+                )
                 all_embeddings.extend(batch_response.embeddings)
                 total_usage_tokens += batch_response.usage_tokens
                 total_prompt_tokens += batch_response.prompt_tokens
 
-                logger.debug(f"Batch {batch_num} completed: {len(batch_response.embeddings)} embeddings, {batch_response.usage_tokens} tokens")
+                logger.debug(
+                    f"Batch {batch_num} completed: {len(batch_response.embeddings)} embeddings, {batch_response.usage_tokens} tokens"
+                )
 
             except Exception as e:
                 error_msg = f"Embedding batch {batch_num}/{total_batches} failed: {str(e)}"
@@ -496,14 +518,16 @@ class MistralAPIService(AbstractLLMService):
         logger.info(
             f"All batches completed: {len(all_embeddings)} embeddings, "
             f"{total_usage_tokens} tokens, {duration_ms:.1f}ms",
-            extra={'extra_fields': {
-                'model': self._embedding_model,
-                'embedding_count': len(all_embeddings),
-                'tokens': total_usage_tokens,
-                'duration_ms': duration_ms,
-                'batch_count': total_batches,
-                'type': 'embedding_generation_batched'
-            }}
+            extra={
+                "extra_fields": {
+                    "model": self._embedding_model,
+                    "embedding_count": len(all_embeddings),
+                    "tokens": total_usage_tokens,
+                    "duration_ms": duration_ms,
+                    "batch_count": total_batches,
+                    "type": "embedding_generation_batched",
+                }
+            },
         )
 
         return EmbeddingResponse(
@@ -511,10 +535,16 @@ class MistralAPIService(AbstractLLMService):
             model=self._embedding_model,
             usage_tokens=total_usage_tokens,
             prompt_tokens=total_prompt_tokens,
-            completion_tokens=0
+            completion_tokens=0,
         )
 
-    async def _embed_batch(self, texts: list[str], start_time: float = None, session_id: str | None = None, rag_debug = None) -> EmbeddingResponse:
+    async def _embed_batch(
+        self,
+        texts: list[str],
+        start_time: float = None,
+        session_id: str | None = None,
+        rag_debug=None,
+    ) -> EmbeddingResponse:
         """
         Generate embeddings for a single batch of texts
 
@@ -528,11 +558,7 @@ class MistralAPIService(AbstractLLMService):
         if start_time is None:
             start_time = time.time()
 
-        payload = {
-            "model": self._embedding_model,
-            "input": texts,
-            "encoding_format": "float"
-        }
+        payload = {"model": self._embedding_model, "input": texts, "encoding_format": "float"}
 
         try:
             response = await self._make_request("embeddings", payload)
@@ -553,13 +579,15 @@ class MistralAPIService(AbstractLLMService):
                 logger.info(
                     f"Embedding generation successful: {len(embeddings)} embeddings, "
                     f"{usage_tokens} tokens, {duration_ms:.1f}ms",
-                    extra={'extra_fields': {
-                        'model': self._embedding_model,
-                        'embedding_count': len(embeddings),
-                        'tokens': usage_tokens,
-                        'duration_ms': duration_ms,
-                        'type': 'embedding_generation'
-                    }}
+                    extra={
+                        "extra_fields": {
+                            "model": self._embedding_model,
+                            "embedding_count": len(embeddings),
+                            "tokens": usage_tokens,
+                            "duration_ms": duration_ms,
+                            "type": "embedding_generation",
+                        }
+                    },
                 )
 
             return EmbeddingResponse(
@@ -567,7 +595,7 @@ class MistralAPIService(AbstractLLMService):
                 model=self._embedding_model,
                 usage_tokens=usage_tokens,
                 prompt_tokens=prompt_tokens,
-                completion_tokens=0
+                completion_tokens=0,
             )
 
         except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
@@ -591,7 +619,7 @@ class MistralAPIService(AbstractLLMService):
                 "model": self._model,
                 "messages": [{"role": "user", "content": "test"}],
                 "max_tokens": 1,
-                "temperature": 0.0
+                "temperature": 0.0,
             }
 
             await self._make_request("chat/completions", test_payload)

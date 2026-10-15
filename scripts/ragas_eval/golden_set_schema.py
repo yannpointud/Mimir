@@ -87,9 +87,7 @@ def load_golden_set(path: str | Path) -> list[GoldenSetEntry]:
             try:
                 data = json.loads(stripped)
             except json.JSONDecodeError as exc:
-                raise ValueError(
-                    f"Invalid JSON on line {line_number} of {path}: {exc}"
-                ) from exc
+                raise ValueError(f"Invalid JSON on line {line_number} of {path}: {exc}") from exc
             try:
                 entries.append(GoldenSetEntry(**data))
             except (ValidationError, TypeError) as exc:
@@ -118,8 +116,7 @@ def validate_golden_set(entries: list[GoldenSetEntry]) -> list[GoldenSetEntry]:
     count = len(entries)
     if count < MIN_ENTRIES or count > MAX_ENTRIES:
         raise ValueError(
-            f"Golden set must contain between {MIN_ENTRIES} and {MAX_ENTRIES} "
-            f"entries, got {count}"
+            f"Golden set must contain between {MIN_ENTRIES} and {MAX_ENTRIES} entries, got {count}"
         )
     if not any(entry.is_adversarial for entry in entries):
         raise ValueError("Golden set must contain at least one adversarial entry")

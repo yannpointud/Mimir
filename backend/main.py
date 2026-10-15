@@ -32,7 +32,13 @@ from src.email_service.smtp_client import email_service
 from src.monitoring.logger import setup_logger
 from src.ingestion.processor import IngestionProcessor
 from src.ingestion.chunking import ChunkingConfig
-from src.api.dependencies import get_llm_service, get_vector_store, get_document_repository, set_ingestion_processor, get_bm25_store
+from src.api.dependencies import (
+    get_llm_service,
+    get_vector_store,
+    get_document_repository,
+    set_ingestion_processor,
+    get_bm25_store,
+)
 from pathlib import Path
 
 
@@ -52,7 +58,7 @@ class CustomJSONResponse(JSONResponse):
             allow_nan=False,
             indent=None,
             separators=(",", ":"),
-            default=self.json_encoder
+            default=self.json_encoder,
         ).encode("utf-8")
 
     def json_encoder(self, obj):
@@ -85,18 +91,23 @@ async def lifespan(app: FastAPI):
         # Cache services initialization
         cache_stats = cache_service.get_stats()
         chat_cache_stats = chat_cache_service.get_stats()
-        logger.info(f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries")
+        logger.info(
+            f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries"
+        )
 
         # Email service verification
         email_config = email_service.get_configuration_status()
         if email_config["configured"]:
             logger.info("Email service configured and ready")
         else:
-            logger.warning("Email service not fully configured - escalation features will be limited")
+            logger.warning(
+                "Email service not fully configured - escalation features will be limited"
+            )
 
         # Attach the fingerprinted SMTP error alerter to app_logger.
         # Idempotent and guarded internally; a failure here must not abort startup.
         from src.monitoring.alerting import setup_alerting
+
         setup_alerting()
 
         # Ingestion services initialization
@@ -109,11 +120,12 @@ async def lifespan(app: FastAPI):
             chunking_config = ChunkingConfig(
                 chunk_size=settings.max_chunk_size,
                 overlap=settings.chunk_overlap,
-                section_title_tracking=settings.structure_aware_chunking_enabled
+                section_title_tracking=settings.structure_aware_chunking_enabled,
             )
 
             # Get database session
             from src.database.connection import db_manager
+
             with db_manager.get_session_context() as session:
                 document_repo = get_document_repository(session)
 
@@ -125,7 +137,7 @@ async def lifespan(app: FastAPI):
                     chunking_config=chunking_config,
                     max_file_size_mb=settings.max_file_size_mb,
                     max_chunks_per_doc=settings.max_chunks_per_doc,
-                    bm25_store=get_bm25_store()
+                    bm25_store=get_bm25_store(),
                 )
 
                 # Start the processor
@@ -161,16 +173,18 @@ async def lifespan(app: FastAPI):
                 set_ingestion_processor(ingestion_processor)
 
                 # Process any pending documents
-                pending_documents = document_repo.get_by_status('pending')
+                pending_documents = document_repo.get_by_status("pending")
                 if pending_documents:
-                    logger.info(f"Found {len(pending_documents)} pending documents, queuing for processing")
+                    logger.info(
+                        f"Found {len(pending_documents)} pending documents, queuing for processing"
+                    )
                     for doc in pending_documents:
                         if Path(doc.path).exists():
                             ingestion_processor.queue_document(
                                 file_path=doc.path,
                                 document_id=str(doc.id),
                                 preserve=doc.preserve,
-                                metadata={}
+                                metadata={},
                             )
                         else:
                             logger.warning(f"Document file not found: {doc.path}")
@@ -210,6 +224,7 @@ async def lifespan(app: FastAPI):
         # Graceful LLM service shutdown to avoid "Event loop is closed"
         try:
             from src.api.dependencies import _llm_service
+
             if _llm_service is not None:
                 await _llm_service.close()
                 logger.info("LLM service closed gracefully")
@@ -229,7 +244,7 @@ app = FastAPI(
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
     openapi_url=f"/api/{settings.api_version}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
@@ -246,10 +261,7 @@ configure_rate_limiting(app)
 # default "*" preserves the permissive behaviour for local/dev deploys where the
 # hostname is not known ahead of time.
 _trusted_hosts = [h.strip() for h in settings.trusted_hosts.split(",") if h.strip()]
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=_trusted_hosts or ["*"]
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts or ["*"])
 
 
 # Custom middleware for request logging
@@ -259,9 +271,10 @@ async def request_logging_middleware(request: Request, call_next):
     start_time = time.time()
 
     # Client information extraction
-    client_ip = request.headers.get("X-Forwarded-For",
-                                   request.headers.get("X-Real-IP",
-                                                     request.client.host if request.client else "unknown"))
+    client_ip = request.headers.get(
+        "X-Forwarded-For",
+        request.headers.get("X-Real-IP", request.client.host if request.client else "unknown"),
+    )
 
     # Log incoming request (less verbose for health checks)
     if not request.url.path.startswith("/health"):
@@ -275,9 +288,13 @@ async def request_logging_middleware(request: Request, call_next):
 
     # Log response (with appropriate level based on status code)
     if response.status_code >= 400:
-        logger.warning(f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
+        logger.warning(
+            f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)"
+        )
     elif not request.url.path.startswith("/health"):
-        logger.debug(f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
+        logger.debug(
+            f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)"
+        )
 
     # Add monitoring headers
     response.headers["X-Process-Time"] = f"{process_time:.3f}"
@@ -295,8 +312,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content=ErrorResponse(
             error_code=f"HTTP_{exc.status_code}",
             error_message=exc.detail,
-            details={"path": str(request.url.path)}
-        ).model_dump()
+            details={"path": str(request.url.path)},
+        ).model_dump(),
     )
 
 
@@ -309,8 +326,8 @@ async def value_error_handler(request: Request, exc: ValueError):
         content=ErrorResponse(
             error_code="VALIDATION_ERROR",
             error_message=str(exc),
-            details={"path": str(request.url.path)}
-        ).model_dump()
+            details={"path": str(request.url.path)},
+        ).model_dump(),
     )
 
 
@@ -327,12 +344,13 @@ async def general_exception_handler(request: Request, exc: Exception):
         content=ErrorResponse(
             error_code="INTERNAL_ERROR",
             error_message=error_message,
-            details={"path": str(request.url.path)} if not settings.is_production else None
-        ).model_dump()
+            details={"path": str(request.url.path)} if not settings.is_production else None,
+        ).model_dump(),
     )
 
 
 # Base routes
+
 
 @app.get("/", response_model=dict)
 async def root():
@@ -342,7 +360,7 @@ async def root():
         "description": "Chatbot documentaire d'entreprise",
         "version": settings.api_version,
         "status": "running",
-        "docs_url": "/docs" if not settings.is_production else None
+        "docs_url": "/docs" if not settings.is_production else None,
     }
 
 
@@ -380,8 +398,8 @@ async def root_health_check(response: Response):
                 "success": False,
                 "status": "unhealthy",
                 "message": f"Health check failed: {e}",
-                "timestamp": time.time()
-            }
+                "timestamp": time.time(),
+            },
         )
 
 
@@ -390,23 +408,19 @@ def custom_openapi():
     """OpenAPI configuration with security information"""
     if app.openapi_schema:
         return app.openapi_schema
-    
+
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
         description=app.description,
         routes=app.routes,
     )
-    
+
     # Add security information for API endpoints
     openapi_schema["components"]["securitySchemes"] = {
-        "Bearer": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
+        "Bearer": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
     }
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
@@ -417,12 +431,12 @@ app.openapi = custom_openapi
 # Development entry point
 if __name__ == "__main__":
     logger.info(f"Starting Mimir in development mode on {settings.api_host}:{settings.api_port}")
-    
+
     uvicorn.run(
         "main:app",
         host=settings.api_host,
         port=settings.api_port,
         reload=True,  # Hot reload in development
         log_level=settings.log_level.lower(),
-        access_log=True
+        access_log=True,
     )

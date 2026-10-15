@@ -221,19 +221,27 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
-        "--retrieval-mode", choices=("dense", "hybrid"), default="dense",
+        "--retrieval-mode",
+        choices=("dense", "hybrid"),
+        default="dense",
         help="dense (défaut, baseline gelée) ou hybrid (met HYBRID_SEARCH_ENABLED avant l'import config).",
     )
     parser.add_argument(
-        "--golden-set", type=Path, default=_DEFAULT_GOLDEN,
+        "--golden-set",
+        type=Path,
+        default=_DEFAULT_GOLDEN,
         help="Chemin du golden set JSONL gelé (source).",
     )
     parser.add_argument(
-        "--out", type=Path, default=_DEFAULT_OUT,
+        "--out",
+        type=Path,
+        default=_DEFAULT_OUT,
         help="Chemin de sortie de eval_input.jsonl (frontière entre venvs).",
     )
     parser.add_argument(
-        "--limit", type=int, default=None,
+        "--limit",
+        type=int,
+        default=None,
         help="N'answer que les N premières questions (conservation de tokens / smoke-test).",
     )
     return parser
@@ -313,9 +321,7 @@ def main(argv: list[str] | None = None) -> int:
                     context_limit=settings.max_sources,
                 )
 
-            return await _collect_eval_rows(
-                entries, answer_fn, throttle_seconds=THROTTLE_SECONDS
-            )
+            return await _collect_eval_rows(entries, answer_fn, throttle_seconds=THROTTLE_SECONDS)
 
     rows = asyncio.run(_run())
     _write_eval_rows(rows, args.out)

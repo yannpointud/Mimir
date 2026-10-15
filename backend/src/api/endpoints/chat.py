@@ -21,12 +21,20 @@ from src.auth.middleware import get_optional_user
 from src.api.middleware.rate_limit import limiter, get_client_identifier
 from src.cache.lru_cache import ChatCacheService
 from src.email_service.smtp_client import EmailService
-from src.api.dependencies import get_chat_cache_service, get_email_service, get_document_repository, get_rag_debug_service, get_budget_guard, get_rag_service
+from src.api.dependencies import (
+    get_chat_cache_service,
+    get_email_service,
+    get_document_repository,
+    get_rag_debug_service,
+    get_budget_guard,
+    get_rag_service,
+)
 from src.database.repository import DocumentRepository
 from src.shared.models import BaseResponse
 from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.config import settings
+
 # RAG pipeline lives in src.services.rag_service: the stream route
 # delegates to RagService.answer_stream() via Depends(get_rag_service); the
 # route itself stays HTTP-pure (parse + budget gate + cache read + format).
@@ -43,12 +51,13 @@ router = APIRouter(
     responses={
         400: {"description": "Bad request"},
         500: {"description": "Internal server error"},
-    }
+    },
 )
 
 
 class ChatRequest(BaseModel):
     """Request model for chat questions."""
+
     question: str = Field(..., min_length=1, max_length=1000, description="User question")
     session_id: str | None = Field(None, description="Optional session ID for tracking")
     context_limit: int | None = Field(5, ge=1, le=10, description="Maximum context documents")
@@ -57,6 +66,7 @@ class ChatRequest(BaseModel):
 
 class SourceReference(BaseModel):
     """Model for document source references."""
+
     document_id: str
     filename: str
     chunk_text: str
@@ -67,6 +77,7 @@ class SourceReference(BaseModel):
 
 class ChatResponse(BaseModel):
     """Response model for chat answers."""
+
     answer: str
     sources: list[SourceReference] = []
     confidence_score: float = Field(ge=0.0, le=1.0)
@@ -78,6 +89,7 @@ class ChatResponse(BaseModel):
 
 class EscalationRequest(BaseModel):
     """Request model for escalating chat to human."""
+
     question: str
     session_id: str | None = None
     chat_history: list[dict[str, Any]] = []
@@ -87,6 +99,7 @@ class EscalationRequest(BaseModel):
 
 class EscalationResponse(BaseModel):
     """Response model for escalation requests."""
+
     success: bool
     message: str
     escalation_id: str | None = None
@@ -99,8 +112,9 @@ class EscalationResponse(BaseModel):
 # body, so a 429 is raised before any SSE byte is streamed; a stream under the
 # limit passes through untouched (StreamingResponse is a Response subclass,
 # no `response` param needed).
-@limiter.limit(lambda: f"{settings.rate_limit_chat_per_minute}/minute",
-               key_func=get_client_identifier)
+@limiter.limit(
+    lambda: f"{settings.rate_limit_chat_per_minute}/minute", key_func=get_client_identifier
+)
 async def chat_stream(
     request: Request,
     chat_request: ChatRequest,
@@ -109,7 +123,7 @@ async def chat_stream(
     document_repository: DocumentRepository = Depends(get_document_repository),
     rag_debug: RagDebugService = Depends(get_rag_debug_service),
     budget_guard: BudgetGuard = Depends(get_budget_guard),
-    rag_service: rag_service_module.RagService = Depends(get_rag_service)
+    rag_service: rag_service_module.RagService = Depends(get_rag_service),
 ):
     """
     Process user question with streaming response.
@@ -130,16 +144,14 @@ async def chat_stream(
     #
     # asyncio.to_thread: reserve() is a blocking SQLite write -- keep it off
     # the event loop.
-    reservation: BudgetReservation | None = await asyncio.to_thread(
-        budget_guard.reserve, "chat"
-    )
+    reservation: BudgetReservation | None = await asyncio.to_thread(budget_guard.reserve, "chat")
     if reservation is None:
         return JSONResponse(
             status_code=429,
             content={
                 "error_code": "budget_exceeded",
-                "error_message": "Plafond quotidien de dépense IA atteint."
-            }
+                "error_message": "Plafond quotidien de dépense IA atteint.",
+            },
         )
 
     # Idempotent settle guard shared between generate_sse() below and the
@@ -197,9 +209,9 @@ async def chat_stream(
                 user_context={
                     "client_ip": client_ip,
                     "user_type": current_user.get("user_type") if current_user else "anonymous",
-                    "streaming": True
+                    "streaming": True,
                 },
-                context_limit=chat_request.context_limit
+                context_limit=chat_request.context_limit,
             )
 
             # Snapshot the corpus version BEFORE consulting the cache: it is
@@ -210,9 +222,7 @@ async def chat_stream(
             corpus_version = rag_service.vector_store.get_corpus_version()
 
             # Check the corpus-aware SSE cache
-            cached_response = chat_cache.get_stream_response(
-                chat_request.question, corpus_version
-            )
+            cached_response = chat_cache.get_stream_response(chat_request.question, corpus_version)
 
             if cached_response:
                 # No LLM call happens on a cache hit: release the reservation
@@ -246,7 +256,7 @@ async def chat_stream(
                 session_id=session_id,
                 document_repository=document_repository,
                 reservation=reservation,
-                corpus_version=corpus_version
+                corpus_version=corpus_version,
             ):
                 # Convert all numpy types before serialization
                 event = convert_numpy_types(event)
@@ -286,9 +296,9 @@ async def chat_stream(
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
+            "Connection": "keep-alive",
         },
-        background=BackgroundTask(_release_if_unsettled)
+        background=BackgroundTask(_release_if_unsettled),
     )
 
 
@@ -297,7 +307,7 @@ async def escalate_to_human(
     request: Request,
     escalation_request: EscalationRequest,
     current_user: dict[str, Any] | None = Depends(get_optional_user),
-    email_service: EmailService = Depends(get_email_service)
+    email_service: EmailService = Depends(get_email_service),
 ) -> EscalationResponse:
     """
     Escalate conversation to human operator.
@@ -322,7 +332,7 @@ async def escalate_to_human(
             "user_email": escalation_request.user_email,
             "user_type": current_user.get("user_type") if current_user else "anonymous",
             "escalation_id": escalation_id,
-            "additional_context": escalation_request.additional_context
+            "additional_context": escalation_request.additional_context,
         }
 
         # Extract sources from chat history if available
@@ -333,7 +343,7 @@ async def escalate_to_human(
             user_question=escalation_request.question,
             chat_history=escalation_request.chat_history,
             user_info=user_info,
-            context_sources=context_sources
+            context_sources=context_sources,
         )
 
         if success:
@@ -341,14 +351,14 @@ async def escalate_to_human(
             return EscalationResponse(
                 success=True,
                 message="Votre demande a été transmise à notre équipe support. Vous recevrez une réponse dans les plus brefs délais.",
-                escalation_id=escalation_id
+                escalation_id=escalation_id,
             )
         else:
             logger.error(f"Escalation failed - ID: {escalation_id}")
             return EscalationResponse(
                 success=False,
                 message="Impossible d'envoyer votre demande pour le moment. Veuillez réessayer plus tard.",
-                escalation_id=None
+                escalation_id=None,
             )
 
     except Exception as e:
@@ -356,14 +366,13 @@ async def escalate_to_human(
         return EscalationResponse(
             success=False,
             message="Une erreur s'est produite lors de l'envoi de votre demande.",
-            escalation_id=None
+            escalation_id=None,
         )
 
 
 @router.get("/sessions/{session_id}/history")
 async def get_session_history(
-    session_id: str,
-    current_user: dict[str, Any] | None = Depends(get_optional_user)
+    session_id: str, current_user: dict[str, Any] | None = Depends(get_optional_user)
 ) -> dict[str, Any]:
     """
     Get chat history for a session.
@@ -375,17 +384,12 @@ async def get_session_history(
     Returns:
         dict: Session history
     """
-    return {
-        "session_id": session_id,
-        "messages": [],
-        "created_at": datetime.utcnow()
-    }
+    return {"session_id": session_id, "messages": [], "created_at": datetime.utcnow()}
 
 
 @router.delete("/sessions/{session_id}")
 async def clear_session_history(
-    session_id: str,
-    current_user: dict[str, Any] | None = Depends(get_optional_user)
+    session_id: str, current_user: dict[str, Any] | None = Depends(get_optional_user)
 ) -> BaseResponse:
     """
     Clear chat history for a session.
@@ -398,9 +402,7 @@ async def clear_session_history(
         BaseResponse: Operation result
     """
     return BaseResponse(
-        success=True,
-        message=f"Session {session_id} history cleared",
-        timestamp=datetime.utcnow()
+        success=True, message=f"Session {session_id} history cleared", timestamp=datetime.utcnow()
     )
 
 
@@ -449,5 +451,3 @@ def _extract_sources_from_history(chat_history: list[dict[str, Any]]) -> list[st
                     sources.add(source)
 
     return list(sources)
-
-

@@ -29,12 +29,14 @@ class TestMainApp:
         assert "version" in data
         assert data["status"] == "running"
 
-    @patch('src.api.endpoints.health._check_database_health')
-    @patch('src.api.endpoints.health._check_vector_store_health')
-    @patch('src.api.endpoints.health._check_llm_health')
-    @patch('src.api.endpoints.health._check_cache_health')
-    @patch('src.api.endpoints.health._check_email_health')
-    def test_health_check_success(self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client):
+    @patch("src.api.endpoints.health._check_database_health")
+    @patch("src.api.endpoints.health._check_vector_store_health")
+    @patch("src.api.endpoints.health._check_llm_health")
+    @patch("src.api.endpoints.health._check_cache_health")
+    @patch("src.api.endpoints.health._check_email_health")
+    def test_health_check_success(
+        self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
+    ):
         """Test du health check réussi"""
         # Simuler tous les checks comme sains
         mock_db.return_value = {"healthy": True, "connection": "ok"}
@@ -54,15 +56,21 @@ class TestMainApp:
         assert data["checks"]["database"]["healthy"] is True
         assert data["checks"]["vector_store"]["healthy"] is True
 
-    @patch('src.api.endpoints.health._check_database_health')
-    @patch('src.api.endpoints.health._check_vector_store_health')
-    @patch('src.api.endpoints.health._check_llm_health')
-    @patch('src.api.endpoints.health._check_cache_health')
-    @patch('src.api.endpoints.health._check_email_health')
-    def test_health_check_failure(self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client):
+    @patch("src.api.endpoints.health._check_database_health")
+    @patch("src.api.endpoints.health._check_vector_store_health")
+    @patch("src.api.endpoints.health._check_llm_health")
+    @patch("src.api.endpoints.health._check_cache_health")
+    @patch("src.api.endpoints.health._check_email_health")
+    def test_health_check_failure(
+        self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
+    ):
         """Test du health check en échec"""
         # Simuler une base de données défaillante
-        mock_db.return_value = {"healthy": False, "connection": "failed", "error": "Connection timeout"}
+        mock_db.return_value = {
+            "healthy": False,
+            "connection": "failed",
+            "error": "Connection timeout",
+        }
         mock_vector.return_value = {"healthy": True, "index_file": "exists"}
         mock_llm.return_value = {"healthy": True, "api_accessible": True}
         mock_cache.return_value = {"healthy": True, "cache_size": 100}
@@ -88,13 +96,15 @@ class TestMainApp:
 
     def test_cors_headers(self, client):
         """Test des headers CORS"""
-        response = client.options("/", headers={
-            "Origin": "http://localhost:3000",
-            "Access-Control-Request-Method": "GET"
-        })
+        response = client.options(
+            "/", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"}
+        )
 
         # Test de la présence des headers CORS
-        assert "access-control-allow-origin" in response.headers or response.status_code in [200, 404]
+        assert "access-control-allow-origin" in response.headers or response.status_code in [
+            200,
+            404,
+        ]
 
     def test_request_timing_header(self, client):
         """Test de l'ajout du header de timing"""
@@ -117,7 +127,7 @@ class TestMainApp:
 
     def test_production_mode_docs_disabled(self):
         """Test que les docs sont désactivées en mode production"""
-        with patch('src.config.settings') as mock_settings:
+        with patch("src.config.settings") as mock_settings:
             mock_settings.is_production = True
 
             # Créer un client avec les paramètres modifiés
@@ -146,7 +156,7 @@ class TestErrorHandling:
 
         assert "detail" in data or "error_message" in data
 
-    @patch('backend.main.logger')
+    @patch("backend.main.logger")
     def test_general_exception_handler(self, mock_logger, client):
         """Test du gestionnaire d'exceptions générales"""
         # Il est difficile de simuler une exception générale sans casser l'app

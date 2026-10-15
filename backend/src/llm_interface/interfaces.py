@@ -6,9 +6,11 @@ Provides base classes for implementing different LLM providers
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+
 @dataclass
 class GenerationResponse:
     """Response from LLM generation"""
+
     content: str
     model: str
     usage_tokens: int
@@ -19,9 +21,11 @@ class GenerationResponse:
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
+
 @dataclass
 class EmbeddingResponse:
     """Response from embedding generation"""
+
     embeddings: list[list[float]]
     model: str
     usage_tokens: int
@@ -30,21 +34,30 @@ class EmbeddingResponse:
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
+
 class LLMException(Exception):
     """Base exception for LLM operations"""
+
     pass
+
 
 class LLMAPIError(LLMException):
     """API-related errors (network, authentication, etc.)"""
+
     pass
+
 
 class LLMRateLimitError(LLMException):
     """Rate limiting errors"""
+
     pass
+
 
 class LLMInvalidRequestError(LLMException):
     """Invalid request errors (malformed prompt, etc.)"""
+
     pass
+
 
 class AbstractLLMService(ABC):
     """
@@ -53,12 +66,14 @@ class AbstractLLMService(ABC):
     """
 
     @abstractmethod
-    async def generate(self,
-                      prompt: str,
-                      system_prompt: str | None = None,
-                      max_tokens: int | None = None,
-                      temperature: float = 0.1,
-                      **kwargs) -> GenerationResponse:
+    async def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.1,
+        **kwargs,
+    ) -> GenerationResponse:
         """
         Generate text response from prompt
 

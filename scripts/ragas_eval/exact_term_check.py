@@ -101,7 +101,9 @@ def compare_exact_term_recall(
     dense_hit_count = 0
     hybrid_hit_count = 0
 
-    for dense_ids, hybrid_ids, expected in zip(dense_hits, hybrid_hits, expected_doc_ids, strict=False):
+    for dense_ids, hybrid_ids, expected in zip(
+        dense_hits, hybrid_hits, expected_doc_ids, strict=False
+    ):
         dense_ids_list = [int(x) for x in dense_ids]
         hybrid_ids_list = [int(x) for x in hybrid_ids]
         expected_id = int(expected)
@@ -111,13 +113,15 @@ def compare_exact_term_recall(
         dense_hit_count += int(dense_hit)
         hybrid_hit_count += int(hybrid_hit)
 
-        per_query.append({
-            "expected_doc_id": expected_id,
-            "dense_hit": dense_hit,
-            "hybrid_hit": hybrid_hit,
-            "dense_doc_ids": dense_ids_list,
-            "hybrid_doc_ids": hybrid_ids_list,
-        })
+        per_query.append(
+            {
+                "expected_doc_id": expected_id,
+                "dense_hit": dense_hit,
+                "hybrid_hit": hybrid_hit,
+                "dense_doc_ids": dense_ids_list,
+                "hybrid_doc_ids": hybrid_ids_list,
+            }
+        )
 
     total = len(expected_doc_ids)
     # Empty set: recall is 0.0 and no_regression is a vacuous True.
@@ -142,14 +146,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
-        "--queries", type=Path, default=_DEFAULT_QUERIES,
+        "--queries",
+        type=Path,
+        default=_DEFAULT_QUERIES,
         help=(
-            "Fichier JSON: liste d'objets {\"query\": str, \"expected_doc_id\": "
+            'Fichier JSON: liste d\'objets {"query": str, "expected_doc_id": '
             "int} de requêtes à terme exact (identifiants/sigles du corpus)."
         ),
     )
     parser.add_argument(
-        "--out", type=Path, default=_DEFAULT_OUT,
+        "--out",
+        type=Path,
+        default=_DEFAULT_OUT,
         help="Chemin de sortie du résultat JSON de la vérification.",
     )
     return parser
@@ -164,15 +172,11 @@ def _load_exact_term_queries(path: Path) -> list[dict[str, Any]]:
     """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, list) or not data:
-        raise ValueError(
-            f"Exact-term queries file {path} must be a non-empty JSON list"
-        )
+        raise ValueError(f"Exact-term queries file {path} must be a non-empty JSON list")
     queries: list[dict[str, Any]] = []
     for index, item in enumerate(data):
         if not isinstance(item, dict) or "query" not in item or "expected_doc_id" not in item:
-            raise ValueError(
-                f"Entry {index} of {path} must have 'query' and 'expected_doc_id'"
-            )
+            raise ValueError(f"Entry {index} of {path} must have 'query' and 'expected_doc_id'")
         query = str(item["query"]).strip()
         if not query:
             raise ValueError(f"Entry {index} of {path} has an empty 'query'")
@@ -275,8 +279,16 @@ def _hybrid_document_ids(question: str, embedding, vector_store, bm25_store, set
     return [int(r.document_id) for r in search_results]
 
 
-async def _run(queries: list[dict[str, Any]], *, llm_service, vector_store,
-               bm25_store, budget_guard, usage_tracker, settings) -> dict[str, Any] | None:
+async def _run(
+    queries: list[dict[str, Any]],
+    *,
+    llm_service,
+    vector_store,
+    bm25_store,
+    budget_guard,
+    usage_tracker,
+    settings,
+) -> dict[str, Any] | None:
     """Run the throttled dense+hybrid retrieval loop and compare recall.
 
     One embedding call per query (shared by both modes), throttled to
@@ -349,15 +361,17 @@ def main(argv: list[str] | None = None) -> int:
     vector_store.load()
     bm25_store = get_bm25_store()
 
-    result = asyncio.run(_run(
-        queries,
-        llm_service=get_llm_service(),
-        vector_store=vector_store,
-        bm25_store=bm25_store,
-        budget_guard=get_budget_guard(),
-        usage_tracker=get_usage_tracker(),
-        settings=settings,
-    ))
+    result = asyncio.run(
+        _run(
+            queries,
+            llm_service=get_llm_service(),
+            vector_store=vector_store,
+            bm25_store=bm25_store,
+            budget_guard=get_budget_guard(),
+            usage_tracker=get_usage_tracker(),
+            settings=settings,
+        )
+    )
 
     if result is None:
         print("Aucune requête traitée (corpus vide ou budget atteint).", file=sys.stderr)

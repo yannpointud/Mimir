@@ -31,13 +31,13 @@ def validate_password_strength(password: str) -> dict[str, any]:
     if len(password) > 128:
         errors.append("Password must be no more than 128 characters long")
 
-    if not re.search(r'[A-Z]', password):
+    if not re.search(r"[A-Z]", password):
         errors.append("Password must contain at least one uppercase letter")
 
-    if not re.search(r'[a-z]', password):
+    if not re.search(r"[a-z]", password):
         errors.append("Password must contain at least one lowercase letter")
 
-    if not re.search(r'\d', password):
+    if not re.search(r"\d", password):
         errors.append("Password must contain at least one digit")
 
     if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
@@ -45,8 +45,16 @@ def validate_password_strength(password: str) -> dict[str, any]:
 
     # Check for common weak passwords
     weak_passwords = [
-        "password", "123456", "123456789", "qwerty", "abc123",
-        "password123", "admin", "administrator", "root", "user"
+        "password",
+        "123456",
+        "123456789",
+        "qwerty",
+        "abc123",
+        "password123",
+        "admin",
+        "administrator",
+        "root",
+        "user",
     ]
     if password.lower() in weak_passwords:
         errors.append("Password is too common and easily guessable")
@@ -58,7 +66,7 @@ def validate_password_strength(password: str) -> dict[str, any]:
     return {
         "valid": len(errors) == 0,
         "errors": errors,
-        "strength": calculate_password_strength(password)
+        "strength": calculate_password_strength(password),
     }
 
 
@@ -77,14 +85,13 @@ def has_sequential_chars(password: str, min_length: int = 3) -> bool:
 
     # Check for sequential letters
     for i in range(len(password) - min_length + 1):
-        if all(ord(password[i + j + 1]) == ord(password[i + j]) + 1
-               for j in range(min_length - 1)):
+        if all(ord(password[i + j + 1]) == ord(password[i + j]) + 1 for j in range(min_length - 1)):
             return True
 
     # Check for sequential numbers
     for i in range(len(password) - min_length + 1):
-        if password[i:i + min_length].isdigit():
-            numbers = [int(c) for c in password[i:i + min_length]]
+        if password[i : i + min_length].isdigit():
+            numbers = [int(c) for c in password[i : i + min_length]]
             if all(numbers[j + 1] == numbers[j] + 1 for j in range(min_length - 1)):
                 return True
 
@@ -112,11 +119,11 @@ def calculate_password_strength(password: str) -> str:
         score += 1
 
     # Character variety scoring
-    if re.search(r'[a-z]', password):
+    if re.search(r"[a-z]", password):
         score += 1
-    if re.search(r'[A-Z]', password):
+    if re.search(r"[A-Z]", password):
         score += 1
-    if re.search(r'\d', password):
+    if re.search(r"\d", password):
         score += 1
     if re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         score += 1
@@ -157,7 +164,7 @@ def generate_secure_password(length: int = 16) -> str:
     lowercase = string.ascii_lowercase
     uppercase = string.ascii_uppercase
     digits = string.digits
-    special = "!@#$%^&*(),.?\":{}|<>"
+    special = '!@#$%^&*(),.?":{}|<>'
     all_chars = lowercase + uppercase + digits + special
 
     # Regenerate until the candidate also passes validate_password_strength. By
@@ -174,7 +181,7 @@ def generate_secure_password(length: int = 16) -> str:
             secrets.choice(lowercase),
             secrets.choice(uppercase),
             secrets.choice(digits),
-            secrets.choice(special)
+            secrets.choice(special),
         ]
         for _ in range(length - 4):
             password_chars.append(secrets.choice(all_chars))
@@ -184,7 +191,7 @@ def generate_secure_password(length: int = 16) -> str:
             j = secrets.randbelow(len(password_chars))
             password_chars[i], password_chars[j] = password_chars[j], password_chars[i]
 
-        password = ''.join(password_chars)
+        password = "".join(password_chars)
         if not has_sequential_chars(password):
             return password
 
@@ -206,10 +213,25 @@ def is_password_compromised(password: str) -> bool:
     """
     # For now, just check against a small list of very common passwords
     very_common_passwords = {
-        "password", "123456", "123456789", "qwerty", "abc123",
-        "password123", "admin", "administrator", "letmein",
-        "welcome", "monkey", "dragon", "master", "jesus",
-        "ninja", "mustang", "soccer", "batman", "hello"
+        "password",
+        "123456",
+        "123456789",
+        "qwerty",
+        "abc123",
+        "password123",
+        "admin",
+        "administrator",
+        "letmein",
+        "welcome",
+        "monkey",
+        "dragon",
+        "master",
+        "jesus",
+        "ninja",
+        "mustang",
+        "soccer",
+        "batman",
+        "hello",
     }
 
     return password.lower() in very_common_passwords

@@ -35,9 +35,7 @@ class JWTHandler:
             raise ValueError("JWT secret key must be at least 32 characters long")
 
     def create_access_token(
-        self,
-        data: dict[str, Any],
-        expires_delta: timedelta | None = None
+        self, data: dict[str, Any], expires_delta: timedelta | None = None
     ) -> str:
         """
         Create a JWT access token.
@@ -57,11 +55,7 @@ class JWTHandler:
         else:
             expire = datetime.utcnow() + timedelta(hours=self.expiration_hours)
 
-        to_encode.update({
-            "exp": expire,
-            "iat": datetime.utcnow(),
-            "type": "access"
-        })
+        to_encode.update({"exp": expire, "iat": datetime.utcnow(), "type": "access"})
 
         try:
             encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
@@ -91,7 +85,7 @@ class JWTHandler:
                 # behavior and avoid rejecting legitimate tokens under clock skew
                 # between servers -- exp is still enforced, so this is not a security
                 # regression (python-jose -> PyJWT migration).
-                options={"verify_iat": False}
+                options={"verify_iat": False},
             )
 
             # Validate token type

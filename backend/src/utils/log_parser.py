@@ -28,7 +28,7 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
     """Parse ISO timestamp from logs."""
     try:
         # Format: 2025-09-20T17:21:25.224541Z
-        return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
     except Exception as e:
         logger.warning(f"Failed to parse timestamp {timestamp_str}: {e}")
         return datetime.utcnow()
@@ -39,6 +39,7 @@ def _is_within_last_hour(timestamp: datetime) -> bool:
     now = datetime.utcnow().replace(tzinfo=timestamp.tzinfo)
     one_hour_ago = now - timedelta(hours=1)
     return one_hour_ago <= timestamp <= now
+
 
 def _is_within_period(timestamp: datetime, period: timedelta) -> bool:
     """Check if timestamp is within the specified period."""
@@ -60,17 +61,18 @@ def get_chat_requests_last_hour() -> int:
             return 0
 
         chat_requests = 0
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
 
                     # Look for text generation logs (chat indicator)
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if _is_within_last_hour(timestamp):
                             chat_requests += 1
 
@@ -100,19 +102,20 @@ def get_average_response_time() -> float:
             return 0.0
 
         response_times = []
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
 
                     # Look for text generation logs with response time
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if _is_within_last_hour(timestamp):
-                            duration_ms = log_entry.get('duration_ms', 0)
+                            duration_ms = log_entry.get("duration_ms", 0)
                             if duration_ms > 0:
                                 response_times.append(duration_ms)
 
@@ -153,9 +156,9 @@ def get_average_tokens_per_request() -> int:
         # Retrieve chat requests to estimate input tokens
         chat_requests = []
         if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, encoding='utf-8') as f:
+            with open(UVICORN_LOG, encoding="utf-8") as f:
                 for line in f:
-                    if 'POST /api/v1/chat/' in line and ' 200 OK' in line:
+                    if "POST /api/v1/chat/" in line and " 200 OK" in line:
                         chat_requests.append(line)
 
         # Estimated average characters per question (based on observation)
@@ -163,19 +166,20 @@ def get_average_tokens_per_request() -> int:
         avg_input_chars = 150  # Conservative estimate
         avg_input_tokens = avg_input_chars // 4  # 1 token ~ 4 characters
 
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
 
                     # Look for text generation logs with output tokens
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if _is_within_last_hour(timestamp):
-                            output_tokens = log_entry.get('tokens', 0)
+                            output_tokens = log_entry.get("tokens", 0)
                             if output_tokens > 0:
                                 # Total = output tokens + estimated input tokens
                                 total_tokens_for_request = output_tokens + avg_input_tokens
@@ -212,19 +216,19 @@ def get_success_rate() -> float:
         successful_requests = 0
         one_hour_ago = datetime.utcnow() - timedelta(hours=1)
 
-        with open(UVICORN_LOG, encoding='utf-8') as f:
+        with open(UVICORN_LOG, encoding="utf-8") as f:
             for line in f:
                 # Look for POST chat requests
-                if 'POST /api/v1/chat/' in line:
+                if "POST /api/v1/chat/" in line:
                     # Extract timestamp from uvicorn log (format: YYYY-MM-DD HH:MM:SS)
-                    timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                    timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
                     if timestamp_match:
                         try:
                             timestamp_str = timestamp_match.group(1)
-                            log_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                            log_time = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
                             if log_time >= one_hour_ago:
                                 total_requests += 1
-                                if ' 200 OK' in line:
+                                if " 200 OK" in line:
                                     successful_requests += 1
                         except ValueError:
                             continue
@@ -251,15 +255,15 @@ def get_errors_last_hour() -> int:
 
         # Count HTTP errors in uvicorn.log (with time filter)
         if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, encoding='utf-8') as f:
+            with open(UVICORN_LOG, encoding="utf-8") as f:
                 for line in f:
-                    if 'POST /api/v1/chat/' in line and (' 4' in line or ' 5' in line):
+                    if "POST /api/v1/chat/" in line and (" 4" in line or " 5" in line):
                         # Extract timestamp from uvicorn log (format: YYYY-MM-DD HH:MM:SS)
-                        timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                        timestamp_match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
                         if timestamp_match:
                             try:
                                 timestamp_str = timestamp_match.group(1)
-                                log_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                                log_time = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
                                 if log_time >= one_hour_ago:
                                     error_count += 1
                             except ValueError:
@@ -268,13 +272,13 @@ def get_errors_last_hour() -> int:
         # Count errors in error.log (with time filter)
         if ERROR_LOG.exists():
             try:
-                with open(ERROR_LOG, encoding='utf-8') as f:
+                with open(ERROR_LOG, encoding="utf-8") as f:
                     for line in f:
                         try:
                             if line.strip():
                                 log_entry = json.loads(line.strip())
-                                if 'timestamp' in log_entry:
-                                    timestamp = _parse_timestamp(log_entry['timestamp'])
+                                if "timestamp" in log_entry:
+                                    timestamp = _parse_timestamp(log_entry["timestamp"])
                                     if _is_within_last_hour(timestamp):
                                         error_count += 1
                         except json.JSONDecodeError:
@@ -306,17 +310,17 @@ def get_performance_status(avg_response_time: float, success_rate: float, errors
     try:
         # Performance criteria
         if errors_count > 10:
-            return 'poor'
+            return "poor"
         elif avg_response_time > 3000 or success_rate < 90:  # > 3 seconds
-            return 'degraded'
+            return "degraded"
         elif avg_response_time > 1500 or success_rate < 95:  # > 1.5 seconds
-            return 'good'
+            return "good"
         else:
-            return 'excellent'
+            return "excellent"
 
     except Exception as e:
         logger.error(f"Error determining performance status: {e}")
-        return 'unknown'
+        return "unknown"
 
 
 def get_active_sessions_estimate() -> int:
@@ -335,11 +339,11 @@ def get_active_sessions_estimate() -> int:
 
         # Analyze uvicorn.log for unique IPs from recent chat requests
         if UVICORN_LOG.exists():
-            with open(UVICORN_LOG, encoding='utf-8') as f:
+            with open(UVICORN_LOG, encoding="utf-8") as f:
                 for line in f:
-                    if 'POST /api/v1/chat/' in line:
+                    if "POST /api/v1/chat/" in line:
                         # Extract the IP
-                        match = re.search(r'(\d+\.\d+\.\d+\.\d+)', line)
+                        match = re.search(r"(\d+\.\d+\.\d+\.\d+)", line)
                         if match:
                             unique_ips.add(match.group(1))
 
@@ -372,7 +376,7 @@ def get_chat_metrics() -> dict:
             "success_rate": round(success_rate, 1),
             "errors_last_hour": errors_last_hour,
             "avg_tokens_per_request": avg_tokens,
-            "active_sessions": active_sessions
+            "active_sessions": active_sessions,
         }
 
     except Exception as e:
@@ -383,7 +387,7 @@ def get_chat_metrics() -> dict:
             "success_rate": 100.0,
             "errors_last_hour": 0,
             "avg_tokens_per_request": 0,
-            "active_sessions": 0
+            "active_sessions": 0,
         }
 
 
@@ -402,7 +406,7 @@ def get_usage_analytics() -> dict:
             "last_hour": timedelta(hours=1),
             "last_24h": timedelta(hours=24),
             "last_7d": timedelta(days=7),
-            "last_30d": timedelta(days=30)
+            "last_30d": timedelta(days=30),
         }
 
         analytics = {
@@ -410,33 +414,37 @@ def get_usage_analytics() -> dict:
                 "total_requests_24h": _count_requests_in_period(periods["last_24h"]),
                 "total_requests_7d": _count_requests_in_period(periods["last_7d"]),
                 "total_requests_30d": _count_requests_in_period(periods["last_30d"]),
-                "avg_daily_requests": _get_avg_daily_requests(periods["last_7d"])
+                "avg_daily_requests": _get_avg_daily_requests(periods["last_7d"]),
             },
             "trends": {
-                "requests_growth_24h": _calculate_growth_rate(periods["last_24h"], periods["last_24h"]),
-                "requests_growth_7d": _calculate_growth_rate(periods["last_7d"], periods["last_7d"]),
+                "requests_growth_24h": _calculate_growth_rate(
+                    periods["last_24h"], periods["last_24h"]
+                ),
+                "requests_growth_7d": _calculate_growth_rate(
+                    periods["last_7d"], periods["last_7d"]
+                ),
                 "hourly_distribution": _get_hourly_distribution(),
-                "daily_distribution": _get_daily_distribution()
+                "daily_distribution": _get_daily_distribution(),
             },
             "performance": {
                 "avg_response_time_24h": _get_avg_response_time_period(periods["last_24h"]),
                 "avg_response_time_7d": _get_avg_response_time_period(periods["last_7d"]),
                 "success_rate_24h": _get_success_rate_period(periods["last_24h"]),
                 "success_rate_7d": _get_success_rate_period(periods["last_7d"]),
-                "peak_usage_time": _get_peak_usage_time()
+                "peak_usage_time": _get_peak_usage_time(),
             },
             "resources": {
                 "total_tokens_24h": _get_total_tokens_period(periods["last_24h"]),
                 "total_tokens_7d": _get_total_tokens_period(periods["last_7d"]),
                 "avg_tokens_per_day": _get_avg_tokens_per_day(periods["last_7d"]),
-                "estimated_monthly_tokens": _estimate_monthly_tokens()
+                "estimated_monthly_tokens": _estimate_monthly_tokens(),
             },
             "system": {
                 "log_file_sizes": _get_log_file_sizes(),
                 "uptime_estimate": _estimate_system_uptime(),
                 "error_rate_24h": _get_error_rate_period(periods["last_24h"]),
-                "health_score": _calculate_health_score()
-            }
+                "health_score": _calculate_health_score(),
+            },
         }
 
         return analytics
@@ -444,11 +452,37 @@ def get_usage_analytics() -> dict:
     except Exception as e:
         logger.error(f"Error getting usage analytics: {e}")
         return {
-            "overview": {"total_requests_24h": 0, "total_requests_7d": 0, "total_requests_30d": 0, "avg_daily_requests": 0},
-            "trends": {"requests_growth_24h": 0, "requests_growth_7d": 0, "hourly_distribution": {}, "daily_distribution": {}},
-            "performance": {"avg_response_time_24h": 0, "avg_response_time_7d": 0, "success_rate_24h": 100, "success_rate_7d": 100, "peak_usage_time": "N/A"},
-            "resources": {"total_tokens_24h": 0, "total_tokens_7d": 0, "avg_tokens_per_day": 0, "estimated_monthly_tokens": 0},
-            "system": {"log_file_sizes": {}, "uptime_estimate": "N/A", "error_rate_24h": 0, "health_score": 85}
+            "overview": {
+                "total_requests_24h": 0,
+                "total_requests_7d": 0,
+                "total_requests_30d": 0,
+                "avg_daily_requests": 0,
+            },
+            "trends": {
+                "requests_growth_24h": 0,
+                "requests_growth_7d": 0,
+                "hourly_distribution": {},
+                "daily_distribution": {},
+            },
+            "performance": {
+                "avg_response_time_24h": 0,
+                "avg_response_time_7d": 0,
+                "success_rate_24h": 100,
+                "success_rate_7d": 100,
+                "peak_usage_time": "N/A",
+            },
+            "resources": {
+                "total_tokens_24h": 0,
+                "total_tokens_7d": 0,
+                "avg_tokens_per_day": 0,
+                "estimated_monthly_tokens": 0,
+            },
+            "system": {
+                "log_file_sizes": {},
+                "uptime_estimate": "N/A",
+                "error_rate_24h": 0,
+                "health_score": 85,
+            },
         }
 
 
@@ -462,15 +496,16 @@ def _count_requests_in_period(period: timedelta) -> int:
         # Initialize cutoff_time, will be set to match log timezone
         cutoff_time = None
 
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         # Set cutoff_time with correct timezone on first valid timestamp
                         if cutoff_time is None:
                             now = datetime.utcnow().replace(tzinfo=timestamp.tzinfo)
@@ -493,15 +528,16 @@ def _count_requests_in_timeframe(start_time: datetime, end_time: datetime) -> in
             return 0
 
         count = 0
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         # Adjust timezones for comparison
                         start_tz = start_time.replace(tzinfo=timestamp.tzinfo)
                         end_tz = end_time.replace(tzinfo=timestamp.tzinfo)
@@ -537,6 +573,7 @@ def _calculate_growth_rate(current_period: timedelta, previous_period: timedelta
         # Calculate requests for the previous period (same duration, shifted)
         # E.g.: if current_period = 24h, previous_period = previous 24h
         from datetime import datetime
+
         now = datetime.utcnow()
 
         # Previous period: same duration but shifted
@@ -568,17 +605,19 @@ def _get_hourly_distribution() -> dict[str, int]:
 
         # Analyze logs from the last 7 days to have enough data
         from datetime import datetime, timedelta
+
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if timestamp >= seven_days_ago.replace(tzinfo=timestamp.tzinfo):
                             hour_key = f"{timestamp.hour:02d}:00"
                             distribution[hour_key] += 1
@@ -603,17 +642,19 @@ def _get_daily_distribution() -> dict[str, int]:
 
         # Analyze logs from the last 30 days to have enough data
         from datetime import datetime, timedelta
+
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
 
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if timestamp >= thirty_days_ago.replace(tzinfo=timestamp.tzinfo):
                             # weekday() returns 0=Monday, 1=Tuesday, etc.
                             day_index = timestamp.weekday()
@@ -635,17 +676,18 @@ def _get_avg_response_time_period(period: timedelta) -> float:
             return 0.0
 
         response_times = []
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if _is_within_period(timestamp, period):
-                            duration_ms = log_entry.get('duration_ms', 0)
+                            duration_ms = log_entry.get("duration_ms", 0)
                             if duration_ms > 0:
                                 response_times.append(duration_ms)
                 except (json.JSONDecodeError, KeyError, ValueError, TypeError):
@@ -685,17 +727,18 @@ def _get_total_tokens_period(period: timedelta) -> int:
             return 0
 
         total_tokens = 0
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in f:
                 try:
                     log_entry = json.loads(line.strip())
-                    if (log_entry.get('module') == 'mistral_api' and
-                        'Text generation successful' in log_entry.get('message', '') and
-                        log_entry.get('type') == 'text_generation'):
-
-                        timestamp = _parse_timestamp(log_entry['timestamp'])
+                    if (
+                        log_entry.get("module") == "mistral_api"
+                        and "Text generation successful" in log_entry.get("message", "")
+                        and log_entry.get("type") == "text_generation"
+                    ):
+                        timestamp = _parse_timestamp(log_entry["timestamp"])
                         if _is_within_period(timestamp, period):
-                            output_tokens = log_entry.get('tokens', 0)
+                            output_tokens = log_entry.get("tokens", 0)
                             if output_tokens > 0:
                                 # Total = output tokens + estimated input tokens (37)
                                 total_tokens += output_tokens + 37
@@ -733,11 +776,7 @@ def _get_log_file_sizes() -> dict[str, str]:
     """Get log file sizes."""
     try:
         sizes = {}
-        log_files = [
-            ("uvicorn.log", UVICORN_LOG),
-            ("app.log", APP_LOG),
-            ("error.log", ERROR_LOG)
-        ]
+        log_files = [("uvicorn.log", UVICORN_LOG), ("app.log", APP_LOG), ("error.log", ERROR_LOG)]
 
         for name, path in log_files:
             try:
@@ -767,13 +806,15 @@ def _estimate_system_uptime() -> str:
             return "N/A"
 
         # Find the last startup in the logs
-        with open(APP_LOG, encoding='utf-8') as f:
+        with open(APP_LOG, encoding="utf-8") as f:
             for line in reversed(list(f)):
                 try:
                     log_entry = json.loads(line.strip())
-                    if "Application startup completed successfully" in log_entry.get('message', ''):
-                        startup_time = _parse_timestamp(log_entry['timestamp'])
-                        uptime = datetime.utcnow().replace(tzinfo=startup_time.tzinfo) - startup_time
+                    if "Application startup completed successfully" in log_entry.get("message", ""):
+                        startup_time = _parse_timestamp(log_entry["timestamp"])
+                        uptime = (
+                            datetime.utcnow().replace(tzinfo=startup_time.tzinfo) - startup_time
+                        )
 
                         hours = int(uptime.total_seconds() // 3600)
                         minutes = int((uptime.total_seconds() % 3600) // 60)

@@ -72,16 +72,18 @@ def _clean_filename(filename: str) -> str:
     filename = os.path.splitext(filename)[0]
 
     # Remove the hash (64 hex characters at the beginning)
-    if '_' in filename and len(filename.split('_')[0]) == 64:
-        filename = '_'.join(filename.split('_')[1:])
+    if "_" in filename and len(filename.split("_")[0]) == 64:
+        filename = "_".join(filename.split("_")[1:])
 
     # Replace underscores with spaces
-    filename = filename.replace('_', ' ')
+    filename = filename.replace("_", " ")
 
     return filename.strip()
 
 
-def _find_documents_by_fuzzy_match(question: str, document_repository, threshold: int = 70) -> list[tuple]:
+def _find_documents_by_fuzzy_match(
+    question: str, document_repository, threshold: int = 70
+) -> list[tuple]:
     """
     Find documents whose filename matches the question via fuzzy matching.
 
@@ -105,7 +107,9 @@ def _find_documents_by_fuzzy_match(question: str, document_repository, threshold
 
         if fuzzy_score >= threshold:
             matches.append((doc.id, doc.filename, fuzzy_score))
-            logger.info(f"Fuzzy match found: '{clean_name}' (score: {fuzzy_score}) for question: '{question}'")
+            logger.info(
+                f"Fuzzy match found: '{clean_name}' (score: {fuzzy_score}) for question: '{question}'"
+            )
 
     # Sort by descending score
     matches.sort(key=lambda x: x[2], reverse=True)
@@ -119,7 +123,7 @@ async def _pre_include_document_chunks(
     vector_store,
     document_repository,
     boost_factor: float,
-    filename_similarities: dict[int, float]
+    filename_similarities: dict[int, float],
 ) -> list[Any]:
     """
     Retrieve all chunks from specified documents and apply the boost.
@@ -167,9 +171,11 @@ async def _pre_include_document_chunks(
             # Report the true pre-boost score: chunk.similarity_score has already
             # been reassigned to the (possibly clamped) boosted value, so it can
             # no longer be reversed by subtracting boost_amount.
-            logger.debug(f"Pre-included chunk: doc_id={doc_id}, chunk_index={chunk.chunk_index}, "
-                        f"score_original={original_score:.3f}, "
-                        f"boost={boost_amount:.3f}, score_final={boosted_score:.3f}")
+            logger.debug(
+                f"Pre-included chunk: doc_id={doc_id}, chunk_index={chunk.chunk_index}, "
+                f"score_original={original_score:.3f}, "
+                f"boost={boost_amount:.3f}, score_final={boosted_score:.3f}"
+            )
 
     return pre_included_chunks
 
@@ -237,12 +243,12 @@ def _merge_and_attach_rrf_scores(
     by_id: dict[int, Any] = {}
     for r in dense_pool:
         by_id.setdefault(r.chunk_id, r)
-    for r in (extra_results or []):
+    for r in extra_results or []:
         by_id.setdefault(r.chunk_id, r)
 
     # chunk_id -> metadata dict, restricted to non-deleted FAISS entries.
     meta_by_id: dict[int, dict[str, Any]] = {}
-    for meta in (getattr(vector_store, "metadata", None) or []):
+    for meta in getattr(vector_store, "metadata", None) or []:
         if isinstance(meta, dict) and not meta.get("deleted", False):
             meta_by_id[meta["chunk_id"]] = meta
 
@@ -258,16 +264,18 @@ def _merge_and_attach_rrf_scores(
             # chunk_id known to BM25 but absent from FAISS metadata (index
             # drift) -- cannot reconstruct a source, skip it.
             continue
-        merged.append(SearchResult(
-            chunk_id=meta["chunk_id"],
-            document_id=meta["document_id"],
-            text=meta["text"],
-            source=meta["source"],
-            similarity_score=rrf_score,
-            chunk_index=meta["chunk_index"],
-            total_chunks=meta["total_chunks"],
-            metadata=meta.get("metadata", {}),
-        ))
+        merged.append(
+            SearchResult(
+                chunk_id=meta["chunk_id"],
+                document_id=meta["document_id"],
+                text=meta["text"],
+                source=meta["source"],
+                similarity_score=rrf_score,
+                chunk_index=meta["chunk_index"],
+                total_chunks=meta["total_chunks"],
+                metadata=meta.get("metadata", {}),
+            )
+        )
 
     merged.sort(key=lambda x: x.similarity_score, reverse=True)
     return merged
@@ -319,10 +327,9 @@ def _calculate_weighted_confidence(
         # 1. Position-weighted score (first results count more)
         weights = [1.0, 0.8, 0.6, 0.4, 0.2]  # Degressive weighting
         weighted_sum = sum(
-            score * weights[min(i, len(weights)-1)]
-            for i, score in enumerate(scores)
+            score * weights[min(i, len(weights) - 1)] for i, score in enumerate(scores)
         )
-        weight_total = sum(weights[:min(len(scores), len(weights))])
+        weight_total = sum(weights[: min(len(scores), len(weights))])
         base_score = weighted_sum / weight_total
 
         # 2. Coherence factor (penalizes highly dispersed scores)
@@ -343,12 +350,13 @@ def _calculate_weighted_confidence(
             quality_bonus = 1.1
 
         # 4. Combined final score
-        confidence = min(0.95,
-                        base_score * 0.7 +           # 70% weighted score
-                        coherence_factor * 0.2 +     # 20% coherence
-                        (best_score * 0.1) *         # 10% best result quality
-                        quality_bonus
-                        )
+        confidence = min(
+            0.95,
+            base_score * 0.7  # 70% weighted score
+            + coherence_factor * 0.2  # 20% coherence
+            + (best_score * 0.1)  # 10% best result quality
+            * quality_bonus,
+        )
 
         logger.debug(
             f"Confidence computed: base={base_score:.3f}, coherence={coherence_factor:.3f}, "
@@ -363,8 +371,9 @@ def _calculate_weighted_confidence(
         return _calculate_weighted_confidence(search_results, "simple")
 
 
-def _filter_dynamic_sources(search_results: list[Any], config: Any, question: str = "",
-                            mode: str = "dense") -> list[Any]:
+def _filter_dynamic_sources(
+    search_results: list[Any], config: Any, question: str = "", mode: str = "dense"
+) -> list[Any]:
     """
     Dynamically filter sources based on relevance with gap detection.
 
@@ -401,17 +410,19 @@ def _filter_dynamic_sources(search_results: list[Any], config: Any, question: st
         method = f"dynamic@{final_threshold:.3f}"
     filtered_results = [r for r in search_results if r.similarity_score >= final_threshold]
 
-    logger.debug(f"Dynamic filtering: best={best_score:.3f}, gap={config.dynamic_filter_percentage:.2f}, "
-                f"threshold={final_threshold:.3f}, {len(search_results)} → {len(filtered_results)} chunks")
+    logger.debug(
+        f"Dynamic filtering: best={best_score:.3f}, gap={config.dynamic_filter_percentage:.2f}, "
+        f"threshold={final_threshold:.3f}, {len(search_results)} → {len(filtered_results)} chunks"
+    )
 
     # 4. Enforce min/max constraints
     original_count = len(filtered_results)
 
     if len(filtered_results) < config.min_sources:
-        filtered_results = search_results[:config.min_sources]
+        filtered_results = search_results[: config.min_sources]
         method += f"→min({config.min_sources})"
     elif len(filtered_results) > config.max_sources:
-        filtered_results = filtered_results[:config.max_sources]
+        filtered_results = filtered_results[: config.max_sources]
         method += f"→max({config.max_sources})"
 
     # 5. Detailed filtering log
@@ -466,9 +477,7 @@ async def _hybrid_retrieve(
     # bm25_store.query() would raise. In that case fall back to dense-only for
     # this query rather than let the exception break an otherwise-working engine.
     try:
-        lexical_pool = await asyncio.to_thread(
-            bm25_store.query, question, _HYBRID_POOL_SIZE
-        )
+        lexical_pool = await asyncio.to_thread(bm25_store.query, question, _HYBRID_POOL_SIZE)
     except Exception as e:  # noqa: BLE001 -- any lexical-store failure degrades to dense-only
         logger.warning(
             f"BM25 lexical retrieval unavailable ({e}); degrading to dense-only for this query"
@@ -517,7 +526,7 @@ async def _process_question_with_rag_stream(
     reservation: Optional["BudgetReservation"] = None,
     chat_cache: Any | None = None,
     corpus_version: str | None = None,
-    bm25_store: Any | None = None
+    bm25_store: Any | None = None,
 ):
     """
     Process question using RAG pipeline with streaming.
@@ -536,7 +545,9 @@ async def _process_question_with_rag_stream(
     try:
         # Step 1: Generate embeddings
         logger.info("Generating embeddings for streaming question")
-        embedding_response = await llm_service.embed([question], session_id=session_id, rag_debug=rag_debug)
+        embedding_response = await llm_service.embed(
+            [question], session_id=session_id, rag_debug=rag_debug
+        )
         question_embedding = np.array(embedding_response.embeddings[0], dtype=np.float32)
 
         llm_call_made = True
@@ -549,16 +560,14 @@ async def _process_question_with_rag_stream(
                 embedding_response.prompt_tokens,
                 embedding_response.completion_tokens,
                 estimated=False,
-                session_id=session_id
+                session_id=session_id,
             )
 
         # Step 1.5: Filename pre-inclusion
         pre_included_chunks = []
         if settings.filename_pre_inclusion:
             matched_docs = _find_documents_by_fuzzy_match(
-                question,
-                document_repository,
-                threshold=settings.filename_fuzzy_threshold
+                question, document_repository, threshold=settings.filename_fuzzy_threshold
             )
 
             if matched_docs:
@@ -571,7 +580,7 @@ async def _process_question_with_rag_stream(
                     vector_store=vector_store,
                     document_repository=document_repository,
                     boost_factor=settings.filename_boost,
-                    filename_similarities=filename_similarities
+                    filename_similarities=filename_similarities,
                 )
 
         # Step 2: Vector search
@@ -591,10 +600,8 @@ async def _process_question_with_rag_stream(
         else:
             start_search = datetime.utcnow()
             dense_top_k = settings.max_sources * 2
-            search_results = await asyncio.to_thread(vector_store.query,
-                vector=question_embedding,
-                top_k=dense_top_k,
-                filter_dict=None
+            search_results = await asyncio.to_thread(
+                vector_store.query, vector=question_embedding, top_k=dense_top_k, filter_dict=None
             )
             search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
 
@@ -602,19 +609,23 @@ async def _process_question_with_rag_stream(
                 session_id=session_id,
                 search_results=search_results,
                 embedding_tokens=embedding_response.usage_tokens,
-                search_time_ms=search_time
+                search_time_ms=search_time,
             )
 
             # Step 2.1: Merge pre-included chunks
             if pre_included_chunks:
                 pre_included_ids = {chunk.chunk_id for chunk in pre_included_chunks}
-                unique_vector_results = [r for r in search_results if r.chunk_id not in pre_included_ids]
+                unique_vector_results = [
+                    r for r in search_results if r.chunk_id not in pre_included_ids
+                ]
                 search_results = pre_included_chunks + unique_vector_results
                 search_results.sort(key=lambda x: x.similarity_score, reverse=True)
 
         # Step 2.5: Apply filtering.
         if search_results:
-            search_results = _filter_dynamic_sources(search_results, settings, question, mode=retrieval_mode)
+            search_results = _filter_dynamic_sources(
+                search_results, settings, question, mode=retrieval_mode
+            )
 
         # Step 3: Build context
         context_parts = []
@@ -645,14 +656,16 @@ async def _process_question_with_rag_stream(
                     document = documents_by_id.get(int(result.document_id))
                     filename = document.filename if document else str(result.source)
 
-                    sources.append({
-                        "document_id": int(result.document_id),
-                        "filename": filename,
-                        "chunk_text": result.text,
-                        "similarity_score": float(round(result.similarity_score, 3)),
-                        "chunk_index": int(result.chunk_index),
-                        "total_chunks": int(result.total_chunks)
-                    })
+                    sources.append(
+                        {
+                            "document_id": int(result.document_id),
+                            "filename": filename,
+                            "chunk_text": result.text,
+                            "similarity_score": float(round(result.similarity_score, 3)),
+                            "chunk_index": int(result.chunk_index),
+                            "total_chunks": int(result.total_chunks),
+                        }
+                    )
 
         # Derive the [N] -> source citation map from the SAME numbering used above,
         # emitted as its own SSE event before `done`.
@@ -675,7 +688,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
             system_prompt=system_prompt,
             context_text=context_text,
             context_chunks=len(context_parts),
-            filtered_sources=sources
+            filtered_sources=sources,
         )
 
         # Step 5: Stream LLM generation
@@ -692,7 +705,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                 temperature=0.1,
                 session_id=session_id,
                 rag_debug=rag_debug,
-                usage_out=usage_out
+                usage_out=usage_out,
             ):
                 full_answer += chunk
                 yield {"type": "chunk", "content": chunk}
@@ -707,7 +720,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                     usage_out.get("prompt_tokens", 0),
                     usage_out.get("completion_tokens", 0),
                     estimated=False,
-                    session_id=session_id
+                    session_id=session_id,
                 )
                 chat_usage_recorded = True
         finally:
@@ -734,14 +747,13 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                     estimated_prompt_tokens,
                     estimated_completion_tokens,
                     estimated=True,
-                    session_id=session_id
+                    session_id=session_id,
                 )
                 chat_usage_recorded = True
 
         # Calculate confidence
         confidence_score = _calculate_weighted_confidence(
-            search_results, settings.confidence_algorithm,
-            mode=retrieval_mode, rrf_k=settings.rrf_k
+            search_results, settings.confidence_algorithm, mode=retrieval_mode, rrf_k=settings.rrf_k
         )
 
         # Emit the [N] -> source citation map as its own SSE event immediately
@@ -755,7 +767,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
             "type": "done",
             "sources": sources,
             "confidence_score": float(round(confidence_score, 2)),
-            "cached": False
+            "cached": False,
         }
 
         logger.info(f"Streaming RAG completed - confidence: {confidence_score:.2f}")
@@ -777,7 +789,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
                     "sources": sources,
                     "citations": citations,
                     "confidence_score": float(round(confidence_score, 2)),
-                }
+                },
             )
 
     except Exception as e:
@@ -786,7 +798,7 @@ L'utilisateur vous pose une question mais aucun contexte pertinent n'a été tro
             session_id=session_id,
             error_type=type(e).__name__,
             error_message=str(e),
-            stage="streaming_rag_pipeline"
+            stage="streaming_rag_pipeline",
         )
         # Generic client-facing message; details stay in logs/rag_debug only
         yield {"type": "error", "message": "Une erreur interne est survenue."}

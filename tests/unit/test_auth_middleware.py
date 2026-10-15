@@ -16,7 +16,7 @@ from backend.src.auth.middleware import (
     require_admin,
     get_optional_user,
     security,
-    optional_security
+    optional_security,
 )
 
 
@@ -39,14 +39,13 @@ class TestJWTBearer:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="valid_token"
+                scheme="Bearer", credentials="valid_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_payload = {"user_type": "admin", "exp": 1234567890}
                 mock_jwt_handler.verify_token.return_value = mock_payload
 
@@ -62,10 +61,9 @@ class TestJWTBearer:
         """Test avec un schéma d'authentification invalide."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Basic",
-                credentials="some_token"
+                scheme="Basic", credentials="some_token"
             )
             mock_parent_call.return_value = mock_credentials
 
@@ -82,14 +80,13 @@ class TestJWTBearer:
         """Test avec un token invalide."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="invalid_token"
+                scheme="Bearer", credentials="invalid_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_jwt_handler.verify_token.return_value = None
 
                 bearer = JWTBearer()
@@ -105,7 +102,7 @@ class TestJWTBearer:
         """Test sans credentials."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_parent_call.return_value = None
 
             bearer = JWTBearer()
@@ -118,14 +115,13 @@ class TestJWTBearer:
         """Test avec un token expiré."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="expired_token"
+                scheme="Bearer", credentials="expired_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_jwt_handler.verify_token.return_value = None
 
                 bearer = JWTBearer()
@@ -141,14 +137,13 @@ class TestJWTBearer:
         """Test avec exception du JWT handler."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="some_token"
+                scheme="Bearer", credentials="some_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_jwt_handler.verify_token.side_effect = Exception("JWT processing error")
 
                 bearer = JWTBearer()
@@ -172,24 +167,16 @@ class TestGetCurrentUser:
             "user_type": "admin",
             "exp": 1234567890,
             "sub": "admin123",
-            "iat": 1234567800
+            "iat": 1234567800,
         }
         mock_request.state.jwt_payload = payload
 
-        mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="valid_token"
-        )
+        mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
 
         result = await get_current_user(mock_request, mock_credentials)
 
         # get_current_user retourne seulement certains champs du payload
-        expected = {
-            "user_type": "admin",
-            "sub": "admin123",
-            "exp": 1234567890,
-            "iat": 1234567800
-        }
+        expected = {"user_type": "admin", "sub": "admin123", "exp": 1234567890, "iat": 1234567800}
         assert result == expected
 
     @pytest.mark.asyncio
@@ -200,8 +187,7 @@ class TestGetCurrentUser:
         mock_request.state.jwt_payload = None
 
         mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="invalid_token"
+            scheme="Bearer", credentials="invalid_token"
         )
 
         with pytest.raises(HTTPException) as exc_info:
@@ -218,8 +204,7 @@ class TestGetCurrentUser:
         mock_request.state.jwt_payload = None  # payload absent car token expiré
 
         mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="expired_token"
+            scheme="Bearer", credentials="expired_token"
         )
 
         with pytest.raises(HTTPException) as exc_info:
@@ -235,10 +220,7 @@ class TestGetCurrentUser:
         mock_request.state = Mock()
         mock_request.state.jwt_payload = None  # pas de payload à cause de l'exception
 
-        mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="some_token"
-        )
+        mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="some_token")
 
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(mock_request, mock_credentials)
@@ -257,7 +239,7 @@ class TestRequireAdmin:
             "user_type": "admin",
             "sub": "admin123",
             "exp": 1234567890,
-            "iat": 1234567800
+            "iat": 1234567800,
         }
 
         result = await require_admin(current_user)
@@ -266,12 +248,7 @@ class TestRequireAdmin:
     @pytest.mark.asyncio
     async def test_require_admin_non_admin(self):
         """Test avec un utilisateur non admin."""
-        current_user = {
-            "user_type": "user",
-            "sub": "user123",
-            "exp": 1234567890,
-            "iat": 1234567800
-        }
+        current_user = {"user_type": "user", "sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin(current_user)
@@ -282,11 +259,7 @@ class TestRequireAdmin:
     @pytest.mark.asyncio
     async def test_require_admin_missing_user_type(self):
         """Test avec user_type manquant."""
-        current_user = {
-            "sub": "user123",
-            "exp": 1234567890,
-            "iat": 1234567800
-        }
+        current_user = {"sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin(current_user)
@@ -297,12 +270,7 @@ class TestRequireAdmin:
     @pytest.mark.asyncio
     async def test_require_admin_none_user_type(self):
         """Test avec user_type None."""
-        current_user = {
-            "user_type": None,
-            "sub": "user123",
-            "exp": 1234567890,
-            "iat": 1234567800
-        }
+        current_user = {"user_type": None, "sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin(current_user)
@@ -313,12 +281,7 @@ class TestRequireAdmin:
     @pytest.mark.asyncio
     async def test_require_admin_empty_user_type(self):
         """Test avec user_type vide."""
-        current_user = {
-            "user_type": "",
-            "sub": "user123",
-            "exp": 1234567890,
-            "iat": 1234567800
-        }
+        current_user = {"user_type": "", "sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
             await require_admin(current_user)
@@ -333,7 +296,7 @@ class TestRequireAdmin:
             "user_type": "Admin",  # Casse différente
             "sub": "user123",
             "exp": 1234567890,
-            "iat": 1234567800
+            "iat": 1234567800,
         }
 
         with pytest.raises(HTTPException) as exc_info:
@@ -363,19 +326,18 @@ class TestMiddlewareIntegration:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="valid_admin_token"
+                scheme="Bearer", credentials="valid_admin_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_payload = {
                     "user_type": "admin",
                     "sub": "admin123",
                     "exp": 1234567890,
-                    "iat": 1234567800
+                    "iat": 1234567800,
                 }
                 mock_jwt_handler.verify_token.return_value = mock_payload
 
@@ -391,7 +353,7 @@ class TestMiddlewareIntegration:
                     "user_type": "admin",
                     "sub": "admin123",
                     "exp": 1234567890,
-                    "iat": 1234567800
+                    "iat": 1234567800,
                 }
                 assert user == expected_user
 
@@ -405,19 +367,18 @@ class TestMiddlewareIntegration:
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="valid_user_token"
+                scheme="Bearer", credentials="valid_user_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_payload = {
                     "user_type": "user",
                     "sub": "user123",
                     "exp": 1234567890,
-                    "iat": 1234567800
+                    "iat": 1234567800,
                 }
                 mock_jwt_handler.verify_token.return_value = mock_payload
 
@@ -432,7 +393,7 @@ class TestMiddlewareIntegration:
                     "user_type": "user",
                     "sub": "user123",
                     "exp": 1234567890,
-                    "iat": 1234567800
+                    "iat": 1234567800,
                 }
                 assert user == expected_user
 
@@ -448,14 +409,13 @@ class TestMiddlewareIntegration:
         """Test de la chaîne d'authentification avec token invalide."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="invalid_token"
+                scheme="Bearer", credentials="invalid_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_jwt_handler.verify_token.return_value = None
 
                 bearer = JWTBearer()
@@ -471,19 +431,20 @@ class TestMiddlewareIntegration:
         """Test de propagation d'erreurs."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer",
-                credentials="some_token"
+                scheme="Bearer", credentials="some_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.jwt_handler') as mock_jwt_handler:
+            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
                 # jwt_handler.verify_token lance une ValueError qui est propagée sans être catchée
                 mock_jwt_handler.verify_token.side_effect = ValueError("Invalid token format")
 
                 bearer = JWTBearer()
-                with pytest.raises(ValueError) as exc_info:  # ValueError propagée, pas HTTPException
+                with pytest.raises(
+                    ValueError
+                ) as exc_info:  # ValueError propagée, pas HTTPException
                     await bearer(mock_request)
 
                 assert str(exc_info.value) == "Invalid token format"
@@ -493,7 +454,7 @@ class TestMiddlewareIntegration:
         """Test JWTBearer avec auto_error=False."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_parent_call.return_value = None
 
             bearer = JWTBearer(auto_error=False)
@@ -507,7 +468,7 @@ class TestMiddlewareIntegration:
             JWTBearer,
             get_current_user,
             require_admin,
-            get_optional_user
+            get_optional_user,
         )
 
         assert JWTBearer is not None
@@ -522,14 +483,13 @@ class TestMiddlewareIntegration:
         """Test du comportement de logging."""
         mock_request = Mock(spec=Request)
 
-        with patch('fastapi.security.HTTPBearer.__call__') as mock_parent_call:
+        with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
             mock_credentials = HTTPAuthorizationCredentials(
-                scheme="Basic",
-                credentials="some_token"
+                scheme="Basic", credentials="some_token"
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch('backend.src.auth.middleware.logger') as mock_logger:
+            with patch("backend.src.auth.middleware.logger") as mock_logger:
                 bearer = JWTBearer()
 
                 with pytest.raises(HTTPException):
@@ -556,12 +516,9 @@ class TestGetOptionalUser:
     async def test_get_optional_user_no_payload(self):
         """Test avec payload absent - doit retourner None."""
         mock_request = Mock(spec=Request)
-        mock_request.state = type('State', (), {})()  # Créer un objet sans attribut jwt_payload
+        mock_request.state = type("State", (), {})()  # Créer un objet sans attribut jwt_payload
 
-        mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="some_token"
-        )
+        mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="some_token")
 
         result = await get_optional_user(mock_request, mock_credentials)
 
@@ -577,21 +534,13 @@ class TestGetOptionalUser:
             "user_type": "user",
             "exp": 1234567890,
             "sub": "user123",
-            "iat": 1234567800
+            "iat": 1234567800,
         }
         mock_request.state.jwt_payload = payload
 
-        mock_credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer",
-            credentials="valid_token"
-        )
+        mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid_token")
 
         result = await get_optional_user(mock_request, mock_credentials)
 
-        expected = {
-            "user_type": "user",
-            "sub": "user123",
-            "exp": 1234567890,
-            "iat": 1234567800
-        }
+        expected = {"user_type": "user", "sub": "user123", "exp": 1234567890, "iat": 1234567800}
         assert result == expected

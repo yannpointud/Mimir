@@ -12,8 +12,8 @@ def test_rrf_k60_consensus_top_doc_wins():
     # Doc 2 is ranked 1st by BOTH retrievers, so its summed RRF score beats
     # docs 1 and 3 (each ranked highly by a single list only). This is the
     # canonical "consensus wins" behavior of RRF (Elasticsearch/Azure AI Search).
-    dense = [2, 1, 3]     # doc 2 = rank 1 dense
-    lexical = [2, 3, 1]   # doc 2 = rank 1 lexical too -> wins over 1 and 3
+    dense = [2, 1, 3]  # doc 2 = rank 1 dense
+    lexical = [2, 3, 1]  # doc 2 = rank 1 lexical too -> wins over 1 and 3
     fused = reciprocal_rank_fusion([dense, lexical], k=60)
     assert max(fused, key=fused.get) == 2
 

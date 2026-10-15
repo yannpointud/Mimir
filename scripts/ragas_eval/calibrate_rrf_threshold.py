@@ -100,8 +100,16 @@ def summarize_rrf_scores(scores: Sequence[float]) -> dict[str, Any]:
     count = len(scores)
     if count == 0:
         return {
-            "count": 0, "min": 0.0, "max": 0.0, "mean": 0.0, "median": 0.0,
-            "p10": 0.0, "p25": 0.0, "p50": 0.0, "p75": 0.0, "p90": 0.0,
+            "count": 0,
+            "min": 0.0,
+            "max": 0.0,
+            "mean": 0.0,
+            "median": 0.0,
+            "p10": 0.0,
+            "p25": 0.0,
+            "p50": 0.0,
+            "p75": 0.0,
+            "p90": 0.0,
         }
     ordered = sorted(float(s) for s in scores)
     return {
@@ -200,18 +208,18 @@ def build_distribution_report(
     """
     report = summarize_rrf_scores(all_scores)
     recommended = recommend_rrf_threshold(per_query_top_scores)
-    coherent, assessment = assess_starting_value(
-        starting_value, per_query_top_scores, all_scores
+    coherent, assessment = assess_starting_value(starting_value, per_query_top_scores, all_scores)
+    report.update(
+        {
+            "num_queries": num_queries,
+            "rrf_k": rrf_k,
+            "per_query_top_scores": [float(s) for s in per_query_top_scores],
+            "recommended_rrf_score_threshold": recommended,
+            "starting_value": starting_value,
+            "starting_value_coherent": coherent,
+            "starting_value_assessment": assessment,
+        }
     )
-    report.update({
-        "num_queries": num_queries,
-        "rrf_k": rrf_k,
-        "per_query_top_scores": [float(s) for s in per_query_top_scores],
-        "recommended_rrf_score_threshold": recommended,
-        "starting_value": starting_value,
-        "starting_value_coherent": coherent,
-        "starting_value_assessment": assessment,
-    })
     return report
 
 
@@ -225,15 +233,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
-        "--golden-set", type=Path, default=_DEFAULT_GOLDEN_SET,
+        "--golden-set",
+        type=Path,
+        default=_DEFAULT_GOLDEN_SET,
         help="Chemin du golden set JSONL gelé (source des questions).",
     )
     parser.add_argument(
-        "--out", type=Path, default=_DEFAULT_OUT,
+        "--out",
+        type=Path,
+        default=_DEFAULT_OUT,
         help="Chemin de sortie de la distribution des scores RRF.",
     )
     parser.add_argument(
-        "--top-k", type=int, default=None,
+        "--top-k",
+        type=int,
+        default=None,
         help="Taille du pool candidat par retriever (défaut: _HYBRID_POOL_SIZE).",
     )
     return parser
@@ -281,8 +295,9 @@ async def _embed_question(
     return np.array(response.embeddings[0], dtype=np.float32)
 
 
-def _fused_scores_for_query(question: str, embedding, vector_store, bm25_store,
-                            *, top_k: int, rrf_k: int) -> list[float]:
+def _fused_scores_for_query(
+    question: str, embedding, vector_store, bm25_store, *, top_k: int, rrf_k: int
+) -> list[float]:
     """Compute the RRF fused scores for one query WITHOUT the threshold filter.
 
     Mirrors ``_hybrid_retrieve`` (raw dense pool at similarity_floor=0.0 + BM25
@@ -307,8 +322,17 @@ def _fused_scores_for_query(question: str, embedding, vector_store, bm25_store,
     return list(fused_scores.values())
 
 
-async def _run(entries: list[str], *, llm_service, vector_store, bm25_store,
-               budget_guard, usage_tracker, top_k: int, rrf_k: int) -> dict[str, Any]:
+async def _run(
+    entries: list[str],
+    *,
+    llm_service,
+    vector_store,
+    bm25_store,
+    budget_guard,
+    usage_tracker,
+    top_k: int,
+    rrf_k: int,
+) -> dict[str, Any]:
     """Run the throttled fusion loop and assemble the distribution report.
 
     One embedding call per question, throttled to <= 1 call/sec.
@@ -388,16 +412,18 @@ def main(argv: list[str] | None = None) -> int:
     vector_store.load()
     bm25_store = get_bm25_store()
 
-    report = asyncio.run(_run(
-        questions,
-        llm_service=get_llm_service(),
-        vector_store=vector_store,
-        bm25_store=bm25_store,
-        budget_guard=get_budget_guard(),
-        usage_tracker=get_usage_tracker(),
-        top_k=top_k,
-        rrf_k=settings.rrf_k,
-    ))
+    report = asyncio.run(
+        _run(
+            questions,
+            llm_service=get_llm_service(),
+            vector_store=vector_store,
+            bm25_store=bm25_store,
+            budget_guard=get_budget_guard(),
+            usage_tracker=get_usage_tracker(),
+            top_k=top_k,
+            rrf_k=settings.rrf_k,
+        )
+    )
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -408,10 +434,7 @@ def main(argv: list[str] | None = None) -> int:
         f"(count={report['count']}, median={report['median']:.5f}, "
         f"p10={report['p10']:.5f})"
     )
-    print(
-        f"Seuil recommandé (data-driven): "
-        f"{report['recommended_rrf_score_threshold']:.5f}"
-    )
+    print(f"Seuil recommandé (data-driven): {report['recommended_rrf_score_threshold']:.5f}")
     print(f"Valeur de départ 0.015 -> {report['starting_value_assessment']}")
     if not report["starting_value_coherent"]:
         print(

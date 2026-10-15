@@ -306,7 +306,7 @@ class TestCacheServiceIntegration:
             "How does neural network work?",
             "What is deep learning?",
             "Explain reinforcement learning",
-            "What is machine learning?"  # Répétée
+            "What is machine learning?",  # Répétée
         ]
 
         # Première passe - cache misses
@@ -367,7 +367,7 @@ class TestCacheServiceIntegration:
             ("list_key", [1, 2, 3]),
             ("dict_key", {"nested": "value"}),
             ("bool_key", True),
-            ("none_key", None)
+            ("none_key", None),
         ]
 
         for key, value in test_data:

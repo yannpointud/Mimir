@@ -7,8 +7,13 @@ from unittest.mock import Mock, patch, AsyncMock
 import aiohttp
 
 from src.llm_interface.interfaces import (
-    AbstractLLMService, GenerationResponse, EmbeddingResponse,
-    LLMException, LLMAPIError, LLMRateLimitError, LLMInvalidRequestError
+    AbstractLLMService,
+    GenerationResponse,
+    EmbeddingResponse,
+    LLMException,
+    LLMAPIError,
+    LLMRateLimitError,
+    LLMInvalidRequestError,
 )
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 
@@ -31,7 +36,7 @@ class TestGenerationResponse:
             content="Hello world",
             model="mistral-small-latest",
             usage_tokens=10,
-            finish_reason="stop"
+            finish_reason="stop",
         )
 
         assert response.content == "Hello world"
@@ -46,11 +51,7 @@ class TestEmbeddingResponse:
     def test_embedding_response_creation(self):
         """Test de création d'une réponse d'embedding"""
         embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
-        response = EmbeddingResponse(
-            embeddings=embeddings,
-            model="mistral-embed",
-            usage_tokens=20
-        )
+        response = EmbeddingResponse(embeddings=embeddings, model="mistral-embed", usage_tokens=20)
 
         assert response.embeddings == embeddings
         assert response.model == "mistral-embed"
@@ -82,9 +83,7 @@ class TestMistralAPIService:
     def mistral_service(self):
         """Instance MistralAPIService pour les tests"""
         return MistralAPIService(
-            api_key="test_api_key",
-            model="mistral-small-latest",
-            embedding_model="mistral-embed"
+            api_key="test_api_key", model="mistral-small-latest", embedding_model="mistral-embed"
         )
 
     def test_mistral_api_initialization(self):
@@ -102,7 +101,7 @@ class TestMistralAPIService:
             model="custom-model",
             embedding_model="custom-embed",
             max_retries=5,
-            retry_delay=2.0
+            retry_delay=2.0,
         )
 
         assert service._model == "custom-model"
@@ -114,19 +113,14 @@ class TestMistralAPIService:
     async def test_generate_success(self, mistral_service):
         """Test de génération réussie"""
         mock_response_data = {
-            "choices": [{
-                "message": {
-                    "content": "Hello, how can I help you?"
-                },
-                "finish_reason": "stop"
-            }],
+            "choices": [
+                {"message": {"content": "Hello, how can I help you?"}, "finish_reason": "stop"}
+            ],
             "model": "mistral-small-latest",
-            "usage": {
-                "total_tokens": 15
-            }
+            "usage": {"total_tokens": 15},
         }
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=mock_response_data)
@@ -145,15 +139,12 @@ class TestMistralAPIService:
     async def test_embed_success(self, mistral_service):
         """Test d'embedding réussi"""
         mock_response_data = {
-            "data": [
-                {"embedding": [0.1, 0.2, 0.3]},
-                {"embedding": [0.4, 0.5, 0.6]}
-            ],
+            "data": [{"embedding": [0.1, 0.2, 0.3]}, {"embedding": [0.4, 0.5, 0.6]}],
             "model": "mistral-embed",
-            "usage": {"total_tokens": 20}
+            "usage": {"total_tokens": 20},
         }
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=mock_response_data)
@@ -171,11 +162,11 @@ class TestMistralAPIService:
     @pytest.mark.asyncio
     async def test_health_check_success(self, mistral_service):
         """Test de health check réussi"""
-        with patch.object(mistral_service, '_make_request') as mock_request:
+        with patch.object(mistral_service, "_make_request") as mock_request:
             mock_request.return_value = {
                 "choices": [{"message": {"content": "test"}}],
                 "model": "mistral-small-latest",
-                "usage": {"total_tokens": 5}
+                "usage": {"total_tokens": 5},
             }
 
             is_healthy = await mistral_service.health_check()
@@ -186,7 +177,7 @@ class TestMistralAPIService:
     @pytest.mark.asyncio
     async def test_health_check_failure(self, mistral_service):
         """Test de health check en échec"""
-        with patch.object(mistral_service, '_make_request') as mock_request:
+        with patch.object(mistral_service, "_make_request") as mock_request:
             mock_request.side_effect = LLMAPIError("Connection failed")
 
             is_healthy = await mistral_service.health_check()
@@ -196,13 +187,13 @@ class TestMistralAPIService:
     @pytest.mark.asyncio
     async def test_api_error_handling(self, mistral_service):
         """Test de gestion d'erreurs API"""
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 401
             mock_response.json = AsyncMock(return_value={"error": {"message": "Invalid API key"}})
-            mock_response.raise_for_status = Mock(side_effect=aiohttp.ClientResponseError(
-                request_info=Mock(), history=(), status=401
-            ))
+            mock_response.raise_for_status = Mock(
+                side_effect=aiohttp.ClientResponseError(request_info=Mock(), history=(), status=401)
+            )
             mock_post.return_value.__aenter__.return_value = mock_response
 
             with pytest.raises(LLMAPIError) as exc_info:
@@ -214,17 +205,22 @@ class TestMistralAPIService:
     async def test_rate_limit_error(self, mistral_service):
         """Test d'erreur de limite de taux"""
         # Patch asyncio.sleep pour éviter d'attendre réellement
-        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep, \
-             patch('aiohttp.ClientSession.post') as mock_post:
-
+        with (
+            patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("aiohttp.ClientSession.post") as mock_post,
+        ):
             mock_response = AsyncMock()
             mock_response.status = 429
-            mock_response.headers = {'Retry-After': '1'}  # Court délai
-            mock_response.text = AsyncMock(return_value='{"error": {"message": "Rate limit exceeded"}}')
-            mock_response.json = AsyncMock(return_value={"error": {"message": "Rate limit exceeded"}})
-            mock_response.raise_for_status = Mock(side_effect=aiohttp.ClientResponseError(
-                request_info=Mock(), history=(), status=429
-            ))
+            mock_response.headers = {"Retry-After": "1"}  # Court délai
+            mock_response.text = AsyncMock(
+                return_value='{"error": {"message": "Rate limit exceeded"}}'
+            )
+            mock_response.json = AsyncMock(
+                return_value={"error": {"message": "Rate limit exceeded"}}
+            )
+            mock_response.raise_for_status = Mock(
+                side_effect=aiohttp.ClientResponseError(request_info=Mock(), history=(), status=429)
+            )
             mock_post.return_value.__aenter__.return_value = mock_response
 
             with pytest.raises(LLMRateLimitError) as exc_info:
@@ -237,13 +233,13 @@ class TestMistralAPIService:
     @pytest.mark.asyncio
     async def test_invalid_request_error(self, mistral_service):
         """Test d'erreur de requête invalide"""
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 400
             mock_response.json = AsyncMock(return_value={"error": {"message": "Invalid request"}})
-            mock_response.raise_for_status = Mock(side_effect=aiohttp.ClientResponseError(
-                request_info=Mock(), history=(), status=400
-            ))
+            mock_response.raise_for_status = Mock(
+                side_effect=aiohttp.ClientResponseError(request_info=Mock(), history=(), status=400)
+            )
             mock_post.return_value.__aenter__.return_value = mock_response
 
             with pytest.raises(LLMInvalidRequestError) as exc_info:
@@ -254,7 +250,7 @@ class TestMistralAPIService:
     @pytest.mark.asyncio
     async def test_connection_error(self, mistral_service):
         """Test d'erreur de connexion"""
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_post.side_effect = aiohttp.ClientConnectionError("Connection failed")
 
             with pytest.raises(LLMAPIError) as exc_info:
@@ -279,19 +275,23 @@ class TestMistralAPIService:
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.text = AsyncMock(return_value='{"success": true}')
-                mock_response.json = AsyncMock(return_value={
-                    "choices": [{"message": {"content": "Success"}, "finish_reason": "stop"}],
-                    "model": "mistral-small-latest",
-                    "usage": {"total_tokens": 10}
-                })
+                mock_response.json = AsyncMock(
+                    return_value={
+                        "choices": [{"message": {"content": "Success"}, "finish_reason": "stop"}],
+                        "model": "mistral-small-latest",
+                        "usage": {"total_tokens": 10},
+                    }
+                )
                 mock_response.raise_for_status = Mock()
                 mock_response.__aenter__ = AsyncMock(return_value=mock_response)
                 mock_response.__aexit__ = AsyncMock(return_value=None)
                 return mock_response
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_post.side_effect = side_effect
-            with patch('asyncio.sleep', new_callable=AsyncMock):  # Mock sleep pour accélérer les tests
+            with patch(
+                "asyncio.sleep", new_callable=AsyncMock
+            ):  # Mock sleep pour accélérer les tests
                 response = await mistral_service.generate("test")
 
                 assert response.content == "Success"
@@ -314,10 +314,10 @@ class TestMistralAPIService:
         mock_response_data = {
             "choices": [{"message": {"content": "System response"}, "finish_reason": "stop"}],
             "model": "mistral-small-latest",
-            "usage": {"total_tokens": 15}
+            "usage": {"total_tokens": 15},
         }
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=mock_response_data)
@@ -328,19 +328,19 @@ class TestMistralAPIService:
                 prompt="User prompt",
                 system_prompt="You are a helpful assistant",
                 max_tokens=100,
-                temperature=0.7
+                temperature=0.7,
             )
 
             # Vérifier que les paramètres ont été envoyés
             call_args = mock_post.call_args
-            json_data = call_args[1]['json']
+            json_data = call_args[1]["json"]
 
             # Vérifier la structure des messages avec système
-            assert len(json_data['messages']) == 2
-            assert json_data['messages'][0]['role'] == 'system'
-            assert json_data['messages'][1]['role'] == 'user'
-            assert json_data['max_tokens'] == 100
-            assert json_data['temperature'] == 0.7
+            assert len(json_data["messages"]) == 2
+            assert json_data["messages"][0]["role"] == "system"
+            assert json_data["messages"][1]["role"] == "user"
+            assert json_data["max_tokens"] == 100
+            assert json_data["temperature"] == 0.7
 
     @pytest.mark.asyncio
     async def test_empty_texts_validation(self, mistral_service):

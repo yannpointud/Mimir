@@ -23,14 +23,13 @@ router = APIRouter(
     tags=["health"],
     responses={
         503: {"description": "Service unavailable - one or more components unhealthy"},
-    }
+    },
 )
 
 
 @router.get("/", response_model=HealthCheckResponse)
 async def health_check(
-    response: Response,
-    db: Session = Depends(get_db_session)
+    response: Response, db: Session = Depends(get_db_session)
 ) -> HealthCheckResponse:
     """
     Comprehensive health check of all system components.
@@ -44,7 +43,7 @@ async def health_check(
             "timestamp": datetime.utcnow(),
             "version": settings.api_version,
             "environment": "production" if settings.is_production else "development",
-            "checks": {}
+            "checks": {},
         }
 
         # Database health check
@@ -69,7 +68,8 @@ async def health_check(
 
         # Determine overall health
         unhealthy_checks = [
-            name for name, check in health_status["checks"].items()
+            name
+            for name, check in health_status["checks"].items()
             if not check.get("healthy", False)
         ]
 
@@ -95,14 +95,12 @@ async def health_check(
         logger.error(f"Health check error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Health check failed due to internal error"
+            detail="Health check failed due to internal error",
         ) from e
 
 
 @router.get("/database", response_model=dict[str, Any])
-async def database_health(
-    db: Session = Depends(get_db_session)
-) -> dict[str, Any]:
+async def database_health(db: Session = Depends(get_db_session)) -> dict[str, Any]:
     """
     Database-specific health check.
 
@@ -138,7 +136,7 @@ async def disk_usage() -> dict[str, Any]:
         data_dirs = {
             "data_dir": settings.data_dir,
             "upload_dir": settings.upload_dir,
-            "faiss_index_dir": os.path.dirname(settings.faiss_index_path)
+            "faiss_index_dir": os.path.dirname(settings.faiss_index_path),
         }
 
         usage_info = {}
@@ -152,32 +150,18 @@ async def disk_usage() -> dict[str, Any]:
                         "total_gb": round(total / (1024**3), 2),
                         "used_gb": round(used / (1024**3), 2),
                         "free_gb": round(free / (1024**3), 2),
-                        "usage_percent": round((used / total) * 100, 1)
+                        "usage_percent": round((used / total) * 100, 1),
                     }
                 else:
-                    usage_info[name] = {
-                        "path": path,
-                        "error": "Directory does not exist"
-                    }
+                    usage_info[name] = {"path": path, "error": "Directory does not exist"}
             except Exception as e:
-                usage_info[name] = {
-                    "path": path,
-                    "error": str(e)
-                }
+                usage_info[name] = {"path": path, "error": str(e)}
 
-        return {
-            "healthy": True,
-            "disk_usage": usage_info,
-            "timestamp": datetime.utcnow()
-        }
+        return {"healthy": True, "disk_usage": usage_info, "timestamp": datetime.utcnow()}
 
     except Exception as e:
         logger.error(f"Disk usage check error: {e}")
-        return {
-            "healthy": False,
-            "error": str(e),
-            "timestamp": datetime.utcnow()
-        }
+        return {"healthy": False, "error": str(e), "timestamp": datetime.utcnow()}
 
 
 async def _check_database_health(db: Session) -> dict[str, Any]:
@@ -192,22 +176,19 @@ async def _check_database_health(db: Session) -> dict[str, Any]:
 
         # Test document table access
         from src.database.models import Document
+
         doc_count = db.query(Document).count()
 
         return {
             "healthy": True,
             "connection": "ok",
             "document_count": doc_count,
-            "response_time_ms": 0  # Could measure actual response time
+            "response_time_ms": 0,  # Could measure actual response time
         }
 
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
-        return {
-            "healthy": False,
-            "connection": "failed",
-            "error": str(e)
-        }
+        return {"healthy": False, "connection": "failed", "error": str(e)}
 
 
 async def _check_vector_store_health() -> dict[str, Any]:
@@ -225,40 +206,32 @@ async def _check_vector_store_health() -> dict[str, Any]:
         # avoid a false "inconsistent" report right after an index exists
         # but metadata.json has not been written yet (see faiss_store.py
         # legacy_metadata_path, pickle -> JSON metadata migration).
-        legacy_metadata_path = os.path.splitext(settings.faiss_metadata_path)[0] + '.pkl'
-        metadata_exists = (
-            os.path.exists(settings.faiss_metadata_path)
-            or os.path.exists(legacy_metadata_path)
+        legacy_metadata_path = os.path.splitext(settings.faiss_metadata_path)[0] + ".pkl"
+        metadata_exists = os.path.exists(settings.faiss_metadata_path) or os.path.exists(
+            legacy_metadata_path
         )
 
         if index_exists and metadata_exists:
-            return {
-                "healthy": True,
-                "index_file": "exists",
-                "metadata_file": "exists"
-            }
+            return {"healthy": True, "index_file": "exists", "metadata_file": "exists"}
         elif not index_exists and not metadata_exists:
             # New installation - no index yet is OK
             return {
                 "healthy": True,
                 "index_file": "not_initialized",
                 "metadata_file": "not_initialized",
-                "note": "Vector store not initialized yet - normal for new installation"
+                "note": "Vector store not initialized yet - normal for new installation",
             }
         else:
             return {
                 "healthy": False,
                 "index_file": "exists" if index_exists else "missing",
                 "metadata_file": "exists" if metadata_exists else "missing",
-                "error": "Inconsistent vector store state"
+                "error": "Inconsistent vector store state",
             }
 
     except Exception as e:
         logger.error(f"Vector store health check failed: {e}")
-        return {
-            "healthy": False,
-            "error": str(e)
-        }
+        return {"healthy": False, "error": str(e)}
 
 
 async def _check_llm_health() -> dict[str, Any]:
@@ -273,15 +246,12 @@ async def _check_llm_health() -> dict[str, Any]:
             "api_configured": llm_configured,
             "provider": settings.llm_provider,
             "model": settings.mistral_model if llm_configured else None,
-            "note": "API key configured" if llm_configured else "API key not configured"
+            "note": "API key configured" if llm_configured else "API key not configured",
         }
 
     except Exception as e:
         logger.error(f"LLM health check failed: {e}")
-        return {
-            "healthy": False,
-            "error": str(e)
-        }
+        return {"healthy": False, "error": str(e)}
 
 
 async def _check_cache_health() -> dict[str, Any]:
@@ -310,15 +280,12 @@ async def _check_cache_health() -> dict[str, Any]:
             "healthy": True,
             "test": "passed",
             "main_cache": cache_stats,
-            "chat_cache": chat_cache_stats
+            "chat_cache": chat_cache_stats,
         }
 
     except Exception as e:
         logger.error(f"Cache health check failed: {e}")
-        return {
-            "healthy": False,
-            "error": str(e)
-        }
+        return {"healthy": False, "error": str(e)}
 
 
 async def _check_email_health() -> dict[str, Any]:
@@ -331,15 +298,14 @@ async def _check_email_health() -> dict[str, Any]:
         return {
             "healthy": config_status["configured"],
             "configuration": config_status,
-            "note": "Email service configured" if config_status["configured"] else "Email service not configured"
+            "note": "Email service configured"
+            if config_status["configured"]
+            else "Email service not configured",
         }
 
     except Exception as e:
         logger.error(f"Email health check failed: {e}")
-        return {
-            "healthy": False,
-            "error": str(e)
-        }
+        return {"healthy": False, "error": str(e)}
 
 
 @router.get("/live")
@@ -359,10 +325,7 @@ async def liveness() -> dict[str, str]:
 
 
 @router.get("/ready")
-async def readiness(
-    response: Response,
-    db: Session = Depends(get_db_session)
-) -> dict[str, Any]:
+async def readiness(response: Response, db: Session = Depends(get_db_session)) -> dict[str, Any]:
     """
     Readiness probe.
 

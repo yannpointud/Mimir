@@ -44,9 +44,7 @@ class FingerprintAlertHandler(logging.Handler):
     def _fingerprint(self, record: logging.LogRecord) -> str:
         """Hash the call site + exception type into a short stable fingerprint."""
         exc_type = (
-            record.exc_info[0].__name__
-            if record.exc_info and record.exc_info[0]
-            else "Error"
+            record.exc_info[0].__name__ if record.exc_info and record.exc_info[0] else "Error"
         )
         raw = f"{exc_type}:{record.module}:{record.funcName}:{record.lineno}"
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
@@ -94,9 +92,7 @@ class FingerprintAlertHandler(logging.Handler):
         except RuntimeError:
             # No running event loop (e.g. sync worker thread) -- log and skip;
             # never risk blocking the caller on smtplib I/O.
-            logger.warning(
-                "FingerprintAlertHandler: no event loop, dropped alert for %s", fp
-            )
+            logger.warning("FingerprintAlertHandler: no event loop, dropped alert for %s", fp)
 
     async def _send_alert(
         self, fingerprint: str, record: logging.LogRecord, occurrences: int
@@ -106,8 +102,7 @@ class FingerprintAlertHandler(logging.Handler):
         from src.email_service.smtp_client import email_service
 
         subject = (
-            f"Mimir error alert [{fingerprint}] "
-            f"{record.module}.{record.funcName}:{record.lineno}"
+            f"Mimir error alert [{fingerprint}] {record.module}.{record.funcName}:{record.lineno}"
         )
         # Body limited to message + location + fingerprint + occurrence count.
         # No traceback, no request payload, no settings/secret interpolation

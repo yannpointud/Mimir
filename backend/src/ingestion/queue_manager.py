@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+
 @dataclass
 class IngestionTask:
     """Task for document ingestion processing"""
+
     file_path: str
     document_id: str
     retry_count: int = 0
@@ -24,4 +26,3 @@ class IngestionTask:
     def increment_retry(self):
         """Increment retry count"""
         self.retry_count += 1
-

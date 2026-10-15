@@ -15,20 +15,21 @@ logger = setup_logger(__name__)
 # MarkdownExtractor(convert_to_html=True) BEFORE chunking sees it. Non-greedy
 # `(.*?)` without DOTALL keeps the scan bounded per line, mitigating
 # catastrophic backtracking on pathological markup.
-_HTML_HEADING_RE = re.compile(r'<h[1-6][^>]*>(.*?)</h[1-6]>', re.IGNORECASE)
+_HTML_HEADING_RE = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.IGNORECASE)
 # DEFENSIVE: raw Markdown-style headings for inputs that reach chunking as plain
 # text (e.g. a .txt carrying `#`-style headers). Anchored, line-bounded.
-_MD_HEADING_RE = re.compile(r'^#{1,6}\s+(.*)$', re.MULTILINE)
+_MD_HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$", re.MULTILINE)
 # Strip any residual inline tags out of a captured HTML heading so the stored
 # section_title is plain-text DATA, never rendered markup.
-_INNER_TAG_RE = re.compile(r'<[^>]+>')
+_INNER_TAG_RE = re.compile(r"<[^>]+>")
 
 
 @dataclass
 class ChunkingConfig:
     """Configuration for chunking strategy"""
+
     chunk_size: int = 1000  # Target chunk size in characters
-    overlap: int = 120      # Overlap between chunks in characters (optimized: 12%)
+    overlap: int = 120  # Overlap between chunks in characters (optimized: 12%)
     min_chunk_size: int = 100  # Minimum viable chunk size
     max_chunk_size: int = 3000  # Maximum chunk size before force split (increased for resumes)
     preserve_sentences: bool = True  # Try to keep sentences intact
@@ -37,6 +38,7 @@ class ChunkingConfig:
     # gains a 'section_title' key derived from the nearest preceding heading.
     # Default False keeps chunking output byte-identical to the current splitter.
     section_title_tracking: bool = False
+
 
 class ChunkingStrategy:
     """Smart text chunking with sentence and paragraph boundaries"""
@@ -71,15 +73,17 @@ class ChunkingStrategy:
 
         if len(cleaned_text) <= self.config.chunk_size:
             # Text is small enough to be one chunk
-            single_chunk = [{
-                'text': cleaned_text,
-                'chunk_index': 0,
-                'total_chunks': 1,
-                'start_char': 0,
-                'end_char': len(cleaned_text),
-                'word_count': len(cleaned_text.split()),
-                'char_count': len(cleaned_text)
-            }]
+            single_chunk = [
+                {
+                    "text": cleaned_text,
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": len(cleaned_text),
+                    "word_count": len(cleaned_text.split()),
+                    "char_count": len(cleaned_text),
+                }
+            ]
             if self.config.section_title_tracking:
                 headings = self._detect_headings(cleaned_text)
                 self._assign_section_titles(single_chunk, headings)
@@ -96,12 +100,14 @@ class ChunkingStrategy:
 
         # Add metadata to chunks
         for i, chunk_data in enumerate(chunks):
-            chunk_data.update({
-                'chunk_index': i,
-                'total_chunks': len(chunks),
-                'word_count': len(chunk_data['text'].split()),
-                'char_count': len(chunk_data['text'])
-            })
+            chunk_data.update(
+                {
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "word_count": len(chunk_data["text"].split()),
+                    "char_count": len(chunk_data["text"]),
+                }
+            )
 
         # Structure-aware pass (flag-gated): tag each chunk with its section
         # title. Runs AFTER boundaries are fixed, so it never alters chunk text
@@ -112,13 +118,15 @@ class ChunkingStrategy:
 
         logger.info(
             f"Chunked text into {len(chunks)} chunks (avg: {sum(len(c['text']) for c in chunks) // len(chunks)} chars)",
-            extra={'extra_fields': {
-                'source': source,
-                'original_chars': len(cleaned_text),
-                'chunk_count': len(chunks),
-                'avg_chunk_size': sum(len(c['text']) for c in chunks) // len(chunks),
-                'type': 'text_chunking'
-            }}
+            extra={
+                "extra_fields": {
+                    "source": source,
+                    "original_chars": len(cleaned_text),
+                    "chunk_count": len(chunks),
+                    "avg_chunk_size": sum(len(c["text"]) for c in chunks) // len(chunks),
+                    "type": "text_chunking",
+                }
+            },
         )
 
         return chunks
@@ -134,19 +142,19 @@ class ChunkingStrategy:
             Cleaned text
         """
         # Remove excessive whitespace but preserve paragraph breaks
-        lines = text.split('\n')
+        lines = text.split("\n")
         cleaned_lines = []
 
         for line in lines:
             # Remove excessive spaces within lines
-            cleaned_line = re.sub(r'\s+', ' ', line.strip())
+            cleaned_line = re.sub(r"\s+", " ", line.strip())
             cleaned_lines.append(cleaned_line)
 
         # Join lines and normalize paragraph breaks
-        result = '\n'.join(cleaned_lines)
+        result = "\n".join(cleaned_lines)
 
         # Remove excessive newlines (more than 2 consecutive)
-        result = re.sub(r'\n{3,}', '\n\n', result)
+        result = re.sub(r"\n{3,}", "\n\n", result)
 
         # Remove leading/trailing whitespace
         result = result.strip()
@@ -178,23 +186,21 @@ class ChunkingStrategy:
 
         for match in _HTML_HEADING_RE.finditer(text):
             # Strip any inner tags so the stored title is plain data.
-            title = _INNER_TAG_RE.sub('', match.group(1)).strip()
+            title = _INNER_TAG_RE.sub("", match.group(1)).strip()
             if title:
-                signature = re.compile(r'<h[1-6][^>]*>\s*' + re.escape(title))
+                signature = re.compile(r"<h[1-6][^>]*>\s*" + re.escape(title))
                 found.append((match.start(), signature, title))
 
         for match in _MD_HEADING_RE.finditer(text):
             title = match.group(1).strip()
             if title:
-                signature = re.compile(r'#{1,6}\s+' + re.escape(title))
+                signature = re.compile(r"#{1,6}\s+" + re.escape(title))
                 found.append((match.start(), signature, title))
 
         found.sort(key=lambda item: item[0])
         return [(signature, title) for _, signature, title in found]
 
-    def _assign_section_titles(
-        self, chunks: list[dict[str, Any]], headings: list[tuple]
-    ) -> None:
+    def _assign_section_titles(self, chunks: list[dict[str, Any]], headings: list[tuple]) -> None:
         """
         Tag each chunk with its section title by consuming headings in order.
 
@@ -213,7 +219,7 @@ class ChunkingStrategy:
         current_section: str | None = None
         index = 0
         for chunk in chunks:
-            text = chunk['text']
+            text = chunk["text"]
             while index < len(headings):
                 signature, title = headings[index]
                 if signature.search(text):
@@ -221,7 +227,7 @@ class ChunkingStrategy:
                     index += 1
                 else:
                     break
-            chunk['section_title'] = current_section
+            chunk["section_title"] = current_section
 
     def _chunk_by_paragraphs(self, text: str) -> list[dict[str, Any]]:
         """
@@ -233,7 +239,7 @@ class ChunkingStrategy:
         Returns:
             List of chunk data dictionaries
         """
-        paragraphs = re.split(r'\n\s*\n', text)
+        paragraphs = re.split(r"\n\s*\n", text)
         chunks = []
         current_chunk = ""
         current_start = 0
@@ -247,16 +253,20 @@ class ChunkingStrategy:
             if current_chunk and len(current_chunk) + len(paragraph) + 2 > self.config.chunk_size:
                 # Finalize current chunk
                 if current_chunk:
-                    chunks.append({
-                        'text': current_chunk.strip(),
-                        'start_char': current_start,
-                        'end_char': current_start + len(current_chunk)
-                    })
+                    chunks.append(
+                        {
+                            "text": current_chunk.strip(),
+                            "start_char": current_start,
+                            "end_char": current_start + len(current_chunk),
+                        }
+                    )
 
                 # Start new chunk with overlap
                 overlap_text = self._get_overlap_text(current_chunk, self.config.overlap)
                 current_chunk = overlap_text + paragraph
-                current_start = current_start + len(current_chunk) - len(overlap_text) - len(paragraph)
+                current_start = (
+                    current_start + len(current_chunk) - len(overlap_text) - len(paragraph)
+                )
             else:
                 # Add paragraph to current chunk
                 if current_chunk:
@@ -266,18 +276,22 @@ class ChunkingStrategy:
 
         # Add final chunk
         if current_chunk:
-            chunks.append({
-                'text': current_chunk.strip(),
-                'start_char': current_start,
-                'end_char': current_start + len(current_chunk)
-            })
+            chunks.append(
+                {
+                    "text": current_chunk.strip(),
+                    "start_char": current_start,
+                    "end_char": current_start + len(current_chunk),
+                }
+            )
 
         # Handle oversized paragraphs
         final_chunks = []
         for chunk_data in chunks:
-            if len(chunk_data['text']) > self.config.max_chunk_size:
+            if len(chunk_data["text"]) > self.config.max_chunk_size:
                 # Split oversized chunk by sentences
-                sentence_chunks = self._chunk_by_sentences(chunk_data['text'], chunk_data['start_char'])
+                sentence_chunks = self._chunk_by_sentences(
+                    chunk_data["text"], chunk_data["start_char"]
+                )
                 final_chunks.extend(sentence_chunks)
             else:
                 final_chunks.append(chunk_data)
@@ -313,16 +327,20 @@ class ChunkingStrategy:
             if current_chunk and len(current_chunk) + len(sentence) + 1 > self.config.chunk_size:
                 # Finalize current chunk if it's substantial enough
                 if len(current_chunk) >= self.config.min_chunk_size:
-                    chunks.append({
-                        'text': current_chunk.strip(),
-                        'start_char': current_start,
-                        'end_char': current_start + len(current_chunk)
-                    })
+                    chunks.append(
+                        {
+                            "text": current_chunk.strip(),
+                            "start_char": current_start,
+                            "end_char": current_start + len(current_chunk),
+                        }
+                    )
 
                     # Start new chunk with overlap
                     overlap_text = self._get_overlap_text(current_chunk, self.config.overlap)
                     current_chunk = overlap_text + sentence
-                    current_start = current_start + len(current_chunk) - len(overlap_text) - len(sentence)
+                    current_start = (
+                        current_start + len(current_chunk) - len(overlap_text) - len(sentence)
+                    )
                 else:
                     # Current chunk is too small, just add the sentence
                     current_chunk += " " + sentence if current_chunk else sentence
@@ -334,20 +352,24 @@ class ChunkingStrategy:
 
         # Add final chunk
         if current_chunk and len(current_chunk) >= self.config.min_chunk_size:
-            chunks.append({
-                'text': current_chunk.strip(),
-                'start_char': current_start,
-                'end_char': current_start + len(current_chunk)
-            })
+            chunks.append(
+                {
+                    "text": current_chunk.strip(),
+                    "start_char": current_start,
+                    "end_char": current_start + len(current_chunk),
+                }
+            )
 
         # Handle edge case: if no substantial chunks were created
         if not chunks and text.strip():
             # Force create one chunk even if it's small
-            chunks.append({
-                'text': text.strip(),
-                'start_char': start_offset,
-                'end_char': start_offset + len(text)
-            })
+            chunks.append(
+                {
+                    "text": text.strip(),
+                    "start_char": start_offset,
+                    "end_char": start_offset + len(text),
+                }
+            )
 
         return chunks
 
@@ -363,7 +385,7 @@ class ChunkingStrategy:
         """
         # Advanced sentence splitting pattern
         # Handles common abbreviations and edge cases
-        sentence_pattern = r'''
+        sentence_pattern = r"""
         (?<![A-Z][a-z]\.)    # Not after abbreviations like "Mr."
         (?<![A-Z]\.)         # Not after single letter abbreviations
         (?<!Dr\.)            # Not after "Dr."
@@ -377,7 +399,7 @@ class ChunkingStrategy:
         [.!?]+               # One or more sentence terminators
         \s+                  # Followed by whitespace
         (?=[A-Z]|["\'„«])    # Followed by capital letter or quote
-        '''
+        """
 
         sentences = re.split(sentence_pattern, text, flags=re.VERBOSE)
 
@@ -391,7 +413,7 @@ class ChunkingStrategy:
         # Fallback: if regex splitting failed, split by simple patterns
         if len(cleaned_sentences) <= 1 and len(text) > self.config.chunk_size:
             # Simple fallback splitting
-            sentences = re.split(r'[.!?]+\s+', text)
+            sentences = re.split(r"[.!?]+\s+", text)
             cleaned_sentences = [s.strip() for s in sentences if s.strip()]
 
         return cleaned_sentences
@@ -418,7 +440,7 @@ class ChunkingStrategy:
 
             # Find last sentence boundary in overlap region
             sentence_endings = []
-            for match in re.finditer(r'[.!?]+\s+', overlap_region):
+            for match in re.finditer(r"[.!?]+\s+", overlap_region):
                 sentence_endings.append(match.end())
 
             if sentence_endings:
@@ -446,24 +468,24 @@ class ChunkingStrategy:
         """
         if not chunks:
             return {
-                'total_chunks': 0,
-                'total_characters': 0,
-                'total_words': 0,
-                'avg_chunk_size': 0,
-                'min_chunk_size': 0,
-                'max_chunk_size': 0
+                "total_chunks": 0,
+                "total_characters": 0,
+                "total_words": 0,
+                "avg_chunk_size": 0,
+                "min_chunk_size": 0,
+                "max_chunk_size": 0,
             }
 
-        chunk_sizes = [len(chunk['text']) for chunk in chunks]
-        word_counts = [chunk.get('word_count', len(chunk['text'].split())) for chunk in chunks]
+        chunk_sizes = [len(chunk["text"]) for chunk in chunks]
+        word_counts = [chunk.get("word_count", len(chunk["text"].split())) for chunk in chunks]
 
         return {
-            'total_chunks': len(chunks),
-            'total_characters': sum(chunk_sizes),
-            'total_words': sum(word_counts),
-            'avg_chunk_size': sum(chunk_sizes) / len(chunk_sizes),
-            'min_chunk_size': min(chunk_sizes),
-            'max_chunk_size': max(chunk_sizes),
-            'avg_words_per_chunk': sum(word_counts) / len(word_counts),
-            'config': self.config.__dict__
+            "total_chunks": len(chunks),
+            "total_characters": sum(chunk_sizes),
+            "total_words": sum(word_counts),
+            "avg_chunk_size": sum(chunk_sizes) / len(chunk_sizes),
+            "min_chunk_size": min(chunk_sizes),
+            "max_chunk_size": max(chunk_sizes),
+            "avg_words_per_chunk": sum(word_counts) / len(word_counts),
+            "config": self.config.__dict__,
         }

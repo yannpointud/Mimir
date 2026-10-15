@@ -112,9 +112,7 @@ class TestValidateProductionSecrets:
         assert "JWT_SECRET_KEY" in message
         assert "ADMIN_PASSWORD_HASH" in message
 
-    def test_production_custom_secrets_pass_silently(
-        self, make_settings, validation_caplog
-    ):
+    def test_production_custom_secrets_pass_silently(self, make_settings, validation_caplog):
         """Test 4: production + custom secrets -> no raise, no warning."""
         custom_admin_hash = jwt_handler.hash_password("AnotherPassword42")
         settings = make_settings(
@@ -128,14 +126,11 @@ class TestValidateProductionSecrets:
         warning_records = [
             record
             for record in validation_caplog.records
-            if record.name == VALIDATION_LOGGER_NAME
-            and record.levelno >= logging.WARNING
+            if record.name == VALIDATION_LOGGER_NAME and record.levelno >= logging.WARNING
         ]
         assert warning_records == []
 
-    def test_development_defaults_warn_and_continue(
-        self, make_settings, validation_caplog
-    ):
+    def test_development_defaults_warn_and_continue(self, make_settings, validation_caplog):
         """Test 5: development + defaults -> no raise, warning names variables."""
         settings = make_settings(
             environment="development",
@@ -148,16 +143,13 @@ class TestValidateProductionSecrets:
         warning_records = [
             record
             for record in validation_caplog.records
-            if record.name == VALIDATION_LOGGER_NAME
-            and record.levelno == logging.WARNING
+            if record.name == VALIDATION_LOGGER_NAME and record.levelno == logging.WARNING
         ]
         assert len(warning_records) == 1
         assert "JWT_SECRET_KEY" in validation_caplog.text
         assert "ADMIN_PASSWORD_HASH" in validation_caplog.text
 
-    def test_no_secret_values_leaked_in_message_or_logs(
-        self, make_settings, validation_caplog
-    ):
+    def test_no_secret_values_leaked_in_message_or_logs(self, make_settings, validation_caplog):
         """Test 6: neither the JWT secret value nor the hash ever appear anywhere."""
         # Production path: exception message must not leak values
         prod_settings = make_settings(
@@ -196,9 +188,7 @@ class TestStartupFailFast:
         # Production environment with default secrets (jwt pinned explicitly
         # so the test stays deterministic regardless of any local .env)
         monkeypatch.setattr(config_module.settings, "environment", "production")
-        monkeypatch.setattr(
-            config_module.settings, "jwt_secret_key", DEFAULT_JWT_SECRET
-        )
+        monkeypatch.setattr(config_module.settings, "jwt_secret_key", DEFAULT_JWT_SECRET)
 
         # Track init_database calls: the refusal must precede DB initialization
         init_db_mock = Mock()

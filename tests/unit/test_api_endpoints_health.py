@@ -14,7 +14,9 @@ from backend.src.api.endpoints.health import health_check, database_health, cach
 class TestHealthModels:
     """Tests pour les modèles de santé."""
 
-    @pytest.mark.skip(reason="No-op placeholder: response structure is enforced by the Pydantic models themselves")
+    @pytest.mark.skip(
+        reason="No-op placeholder: response structure is enforced by the Pydantic models themselves"
+    )
     def test_health_check_response_structure(self):
         """Test de la structure de réponse de health check."""
         # Structure guaranteed by the Pydantic response models in shared.models;
@@ -30,15 +32,14 @@ class TestHealthCheckEndpoint:
         """Mock session de base de données."""
         return Mock(spec=Session)
 
-    @patch('backend.src.api.endpoints.health._check_database_health')
-    @patch('backend.src.api.endpoints.health._check_vector_store_health')
-    @patch('backend.src.api.endpoints.health._check_llm_health')
-    @patch('backend.src.api.endpoints.health._check_cache_health')
-    @patch('backend.src.api.endpoints.health._check_email_health')
-    @patch('backend.src.api.endpoints.health.settings')
+    @patch("backend.src.api.endpoints.health._check_database_health")
+    @patch("backend.src.api.endpoints.health._check_vector_store_health")
+    @patch("backend.src.api.endpoints.health._check_llm_health")
+    @patch("backend.src.api.endpoints.health._check_cache_health")
+    @patch("backend.src.api.endpoints.health._check_email_health")
+    @patch("backend.src.api.endpoints.health.settings")
     def test_health_check_all_healthy(
-        self, mock_settings, mock_email, mock_cache, mock_llm,
-        mock_vector, mock_db, mock_db_session
+        self, mock_settings, mock_email, mock_cache, mock_llm, mock_vector, mock_db, mock_db_session
     ):
         """Test health check avec tous les composants sains."""
 
@@ -67,15 +68,14 @@ class TestHealthCheckEndpoint:
         assert "cache" in result.checks
         assert "email_service" in result.checks
 
-    @patch('backend.src.api.endpoints.health._check_database_health')
-    @patch('backend.src.api.endpoints.health._check_vector_store_health')
-    @patch('backend.src.api.endpoints.health._check_llm_health')
-    @patch('backend.src.api.endpoints.health._check_cache_health')
-    @patch('backend.src.api.endpoints.health._check_email_health')
-    @patch('backend.src.api.endpoints.health.settings')
+    @patch("backend.src.api.endpoints.health._check_database_health")
+    @patch("backend.src.api.endpoints.health._check_vector_store_health")
+    @patch("backend.src.api.endpoints.health._check_llm_health")
+    @patch("backend.src.api.endpoints.health._check_cache_health")
+    @patch("backend.src.api.endpoints.health._check_email_health")
+    @patch("backend.src.api.endpoints.health.settings")
     def test_health_check_some_unhealthy(
-        self, mock_settings, mock_email, mock_cache, mock_llm,
-        mock_vector, mock_db, mock_db_session
+        self, mock_settings, mock_email, mock_cache, mock_llm, mock_vector, mock_db, mock_db_session
     ):
         """Test health check avec certains composants défaillants."""
 
@@ -83,7 +83,11 @@ class TestHealthCheckEndpoint:
         mock_settings.api_version = "1.0.0"
         mock_settings.is_production = True
 
-        mock_db.return_value = {"healthy": False, "connection": "failed", "error": "Connection timeout"}
+        mock_db.return_value = {
+            "healthy": False,
+            "connection": "failed",
+            "error": "Connection timeout",
+        }
         mock_vector.return_value = {"healthy": True, "index_file": "exists"}
         mock_llm.return_value = {"healthy": False, "api_configured": False}
         mock_cache.return_value = {"healthy": True, "test": "passed"}
@@ -104,7 +108,7 @@ class TestHealthCheckEndpoint:
         assert "vector_store" in result.checks
         assert result.checks["vector_store"]["healthy"] is True
 
-    @patch('backend.src.api.endpoints.health._check_database_health')
+    @patch("backend.src.api.endpoints.health._check_database_health")
     def test_health_check_exception_handling(self, mock_db, mock_db_session):
         """Test de gestion d'exception dans health check."""
 
@@ -126,7 +130,7 @@ class TestDatabaseHealthEndpoint:
         """Mock session de base de données."""
         return Mock(spec=Session)
 
-    @patch('backend.src.api.endpoints.health._check_database_health')
+    @patch("backend.src.api.endpoints.health._check_database_health")
     def test_database_health_success(self, mock_check, mock_db_session):
         """Test de santé base de données réussie."""
 
@@ -135,7 +139,7 @@ class TestDatabaseHealthEndpoint:
             "healthy": True,
             "connection": "ok",
             "document_count": 5,
-            "response_time_ms": 10
+            "response_time_ms": 10,
         }
         mock_check.return_value = expected_result
 
@@ -147,16 +151,12 @@ class TestDatabaseHealthEndpoint:
         assert result["healthy"] is True
         assert result["document_count"] == 5
 
-    @patch('backend.src.api.endpoints.health._check_database_health')
+    @patch("backend.src.api.endpoints.health._check_database_health")
     def test_database_health_failure(self, mock_check, mock_db_session):
         """Test de santé base de données en échec."""
 
         # Configuration du mock
-        expected_result = {
-            "healthy": False,
-            "connection": "failed",
-            "error": "Connection timeout"
-        }
+        expected_result = {"healthy": False, "connection": "failed", "error": "Connection timeout"}
         mock_check.return_value = expected_result
 
         # Appel de la fonction
@@ -171,7 +171,7 @@ class TestDatabaseHealthEndpoint:
 class TestCacheHealthEndpoint:
     """Tests pour l'endpoint de santé cache."""
 
-    @patch('backend.src.api.endpoints.health._check_cache_health')
+    @patch("backend.src.api.endpoints.health._check_cache_health")
     def test_cache_health_success(self, mock_check):
         """Test de santé cache réussie."""
 
@@ -180,7 +180,7 @@ class TestCacheHealthEndpoint:
             "healthy": True,
             "test": "passed",
             "main_cache": {"size": 100, "hits": 80, "misses": 20},
-            "chat_cache": {"size": 50, "hits": 40, "misses": 10}
+            "chat_cache": {"size": 50, "hits": 40, "misses": 10},
         }
         mock_check.return_value = expected_result
 
@@ -192,15 +192,12 @@ class TestCacheHealthEndpoint:
         assert result["healthy"] is True
         assert result["test"] == "passed"
 
-    @patch('backend.src.api.endpoints.health._check_cache_health')
+    @patch("backend.src.api.endpoints.health._check_cache_health")
     def test_cache_health_failure(self, mock_check):
         """Test de santé cache en échec."""
 
         # Configuration du mock
-        expected_result = {
-            "healthy": False,
-            "error": "Cache service unavailable"
-        }
+        expected_result = {"healthy": False, "error": "Cache service unavailable"}
         mock_check.return_value = expected_result
 
         # Appel de la fonction
@@ -214,9 +211,9 @@ class TestCacheHealthEndpoint:
 class TestDiskUsageEndpoint:
     """Tests pour l'endpoint d'usage disque."""
 
-    @patch('backend.src.api.endpoints.health.settings')
-    @patch('shutil.disk_usage')
-    @patch('os.path.exists')
+    @patch("backend.src.api.endpoints.health.settings")
+    @patch("shutil.disk_usage")
+    @patch("os.path.exists")
     def test_disk_usage_success(self, mock_exists, mock_disk_usage, mock_settings):
         """Test d'usage disque réussi."""
 
@@ -226,7 +223,11 @@ class TestDiskUsageEndpoint:
         mock_settings.faiss_index_path = "/indexes/faiss.index"
 
         mock_exists.return_value = True
-        mock_disk_usage.return_value = (1000000000000, 500000000000, 500000000000)  # 1TB total, 500GB used
+        mock_disk_usage.return_value = (
+            1000000000000,
+            500000000000,
+            500000000000,
+        )  # 1TB total, 500GB used
 
         # Appel de la fonction
         result = asyncio.run(disk_usage())
@@ -238,8 +239,8 @@ class TestDiskUsageEndpoint:
         assert result["disk_usage"]["data_dir"]["total_gb"] == 931.32  # 1TB en GB
         assert result["disk_usage"]["data_dir"]["usage_percent"] == 50.0
 
-    @patch('backend.src.api.endpoints.health.settings')
-    @patch('os.path.exists')
+    @patch("backend.src.api.endpoints.health.settings")
+    @patch("os.path.exists")
     def test_disk_usage_directory_not_exists(self, mock_exists, mock_settings):
         """Test d'usage disque avec répertoire inexistant."""
 
@@ -259,11 +260,13 @@ class TestDiskUsageEndpoint:
         assert "error" in result["disk_usage"]["data_dir"]
         assert result["disk_usage"]["data_dir"]["error"] == "Directory does not exist"
 
-    @patch('os.path.dirname')
-    @patch('backend.src.api.endpoints.health.settings')
-    @patch('shutil.disk_usage')
-    @patch('os.path.exists')
-    def test_disk_usage_exception_handling(self, mock_exists, mock_disk_usage, mock_settings, mock_dirname):
+    @patch("os.path.dirname")
+    @patch("backend.src.api.endpoints.health.settings")
+    @patch("shutil.disk_usage")
+    @patch("os.path.exists")
+    def test_disk_usage_exception_handling(
+        self, mock_exists, mock_disk_usage, mock_settings, mock_dirname
+    ):
         """Test de gestion d'exception pour usage disque."""
 
         # Configuration des mocks
@@ -290,7 +293,7 @@ class TestHealthHelperFunctions:
         """Mock session de base de données."""
         return Mock(spec=Session)
 
-    @patch('backend.src.api.endpoints.health.text')
+    @patch("backend.src.api.endpoints.health.text")
     def test_check_database_health_success(self, mock_text, mock_db_session):
         """Test de vérification santé base de données réussie."""
         from backend.src.api.endpoints.health import _check_database_health
@@ -309,7 +312,7 @@ class TestHealthHelperFunctions:
         assert result["connection"] == "ok"
         assert result["document_count"] == 10
 
-    @patch('backend.src.api.endpoints.health.text')
+    @patch("backend.src.api.endpoints.health.text")
     def test_check_database_health_query_failure(self, mock_text, mock_db_session):
         """Test de vérification santé base de données avec échec de requête."""
         from backend.src.api.endpoints.health import _check_database_health
@@ -325,8 +328,8 @@ class TestHealthHelperFunctions:
         assert result["connection"] == "failed"
         assert "error" in result
 
-    @patch('backend.src.api.endpoints.health.settings')
-    @patch('os.path.exists')
+    @patch("backend.src.api.endpoints.health.settings")
+    @patch("os.path.exists")
     def test_check_vector_store_health_initialized(self, mock_exists, mock_settings):
         """Test de vérification santé vector store initialisé."""
         from backend.src.api.endpoints.health import _check_vector_store_health
@@ -344,8 +347,8 @@ class TestHealthHelperFunctions:
         assert result["index_file"] == "exists"
         assert result["metadata_file"] == "exists"
 
-    @patch('backend.src.api.endpoints.health.settings')
-    @patch('os.path.exists')
+    @patch("backend.src.api.endpoints.health.settings")
+    @patch("os.path.exists")
     def test_check_vector_store_health_not_initialized(self, mock_exists, mock_settings):
         """Test de vérification santé vector store non initialisé."""
         from backend.src.api.endpoints.health import _check_vector_store_health
@@ -363,7 +366,7 @@ class TestHealthHelperFunctions:
         assert result["index_file"] == "not_initialized"
         assert "normal for new installation" in result["note"]
 
-    @patch('backend.src.api.endpoints.health.settings')
+    @patch("backend.src.api.endpoints.health.settings")
     def test_check_llm_health_configured(self, mock_settings):
         """Test de vérification santé LLM avec API configurée."""
         from backend.src.api.endpoints.health import _check_llm_health
@@ -382,7 +385,7 @@ class TestHealthHelperFunctions:
         assert result["provider"] == "mistral"
         assert result["model"] == "mistral-small-latest"
 
-    @patch('backend.src.api.endpoints.health.settings')
+    @patch("backend.src.api.endpoints.health.settings")
     def test_check_llm_health_not_configured(self, mock_settings):
         """Test de vérification santé LLM sans API configurée."""
         from backend.src.api.endpoints.health import _check_llm_health
@@ -399,8 +402,8 @@ class TestHealthHelperFunctions:
         assert result["api_configured"] is False
         assert "API key not configured" in result["note"]
 
-    @patch('backend.src.cache.lru_cache.cache_service')
-    @patch('backend.src.cache.lru_cache.chat_cache_service')
+    @patch("backend.src.cache.lru_cache.cache_service")
+    @patch("backend.src.cache.lru_cache.chat_cache_service")
     def test_check_cache_health_success(self, mock_chat_cache, mock_cache):
         """Test de vérification santé cache réussie."""
         from backend.src.api.endpoints.health import _check_cache_health
@@ -419,8 +422,8 @@ class TestHealthHelperFunctions:
         assert "main_cache" in result
         assert "chat_cache" in result
 
-    @patch('src.cache.lru_cache.chat_cache_service')
-    @patch('src.cache.lru_cache.cache_service')
+    @patch("src.cache.lru_cache.chat_cache_service")
+    @patch("src.cache.lru_cache.cache_service")
     def test_check_cache_health_failure(self, mock_cache, mock_chat_cache):
         """Test de vérification santé cache en échec."""
         from backend.src.api.endpoints.health import _check_cache_health
@@ -435,7 +438,7 @@ class TestHealthHelperFunctions:
         assert result["healthy"] is False
         assert "error" in result
 
-    @patch('src.email_service.smtp_client.email_service')
+    @patch("src.email_service.smtp_client.email_service")
     def test_check_email_health_configured(self, mock_email_service):
         """Test de vérification santé email configuré."""
         from backend.src.api.endpoints.health import _check_email_health
@@ -444,7 +447,7 @@ class TestHealthHelperFunctions:
         mock_email_service.get_configuration_status.return_value = {
             "configured": True,
             "smtp_host": "smtp.example.com",
-            "smtp_port": 587
+            "smtp_port": 587,
         }
 
         # Appel de la fonction
@@ -455,7 +458,7 @@ class TestHealthHelperFunctions:
         assert result["configuration"]["configured"] is True
         assert "Email service configured" in result["note"]
 
-    @patch('src.email_service.smtp_client.email_service')
+    @patch("src.email_service.smtp_client.email_service")
     def test_check_email_health_not_configured(self, mock_email_service):
         """Test de vérification santé email non configuré."""
         from backend.src.api.endpoints.health import _check_email_health
@@ -475,15 +478,14 @@ class TestHealthHelperFunctions:
 class TestHealthIntegration:
     """Tests d'intégration pour les endpoints de santé."""
 
-    @patch('backend.src.api.endpoints.health._check_database_health')
-    @patch('backend.src.api.endpoints.health._check_vector_store_health')
-    @patch('backend.src.api.endpoints.health._check_llm_health')
-    @patch('backend.src.api.endpoints.health._check_cache_health')
-    @patch('backend.src.api.endpoints.health._check_email_health')
-    @patch('backend.src.api.endpoints.health.settings')
+    @patch("backend.src.api.endpoints.health._check_database_health")
+    @patch("backend.src.api.endpoints.health._check_vector_store_health")
+    @patch("backend.src.api.endpoints.health._check_llm_health")
+    @patch("backend.src.api.endpoints.health._check_cache_health")
+    @patch("backend.src.api.endpoints.health._check_email_health")
+    @patch("backend.src.api.endpoints.health.settings")
     def test_health_check_comprehensive_scenario(
-        self, mock_settings, mock_email, mock_cache, mock_llm,
-        mock_vector, mock_db
+        self, mock_settings, mock_email, mock_cache, mock_llm, mock_vector, mock_db
     ):
         """Test de scénario complet de health check."""
 
@@ -496,14 +498,14 @@ class TestHealthIntegration:
             "healthy": True,
             "connection": "ok",
             "document_count": 25,
-            "response_time_ms": 15
+            "response_time_ms": 15,
         }
 
         # Vector store initialisé
         mock_vector.return_value = {
             "healthy": True,
             "index_file": "exists",
-            "metadata_file": "exists"
+            "metadata_file": "exists",
         }
 
         # LLM configuré
@@ -511,7 +513,7 @@ class TestHealthIntegration:
             "healthy": True,
             "api_configured": True,
             "provider": "mistral",
-            "model": "mistral-small-latest"
+            "model": "mistral-small-latest",
         }
 
         # Cache fonctionnel
@@ -519,14 +521,11 @@ class TestHealthIntegration:
             "healthy": True,
             "test": "passed",
             "main_cache": {"hits": 150, "misses": 30},
-            "chat_cache": {"hits": 80, "misses": 15}
+            "chat_cache": {"hits": 80, "misses": 15},
         }
 
         # Email configuré
-        mock_email.return_value = {
-            "healthy": True,
-            "configuration": {"configured": True}
-        }
+        mock_email.return_value = {"healthy": True, "configuration": {"configured": True}}
 
         mock_db_session = Mock()
 
@@ -537,4 +536,4 @@ class TestHealthIntegration:
         assert result.status == "healthy"
         assert len(result.checks) == 5
         assert all(check["healthy"] for check in result.checks.values())
-        assert not hasattr(result, 'unhealthy_components')
+        assert not hasattr(result, "unhealthy_components")

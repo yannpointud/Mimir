@@ -12,19 +12,18 @@ from typing import Any
 from pathlib import Path
 
 
-
 def _make_json_serializable(obj):
     """Recursively convert all objects to JSON-serializable types."""
     if isinstance(obj, datetime):
         # Convert datetime to ISO 8601 with UTC timezone
-        return obj.isoformat() + 'Z'
+        return obj.isoformat() + "Z"
     elif isinstance(obj, dict):
         return {k: _make_json_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return [_make_json_serializable(item) for item in obj]
     elif isinstance(obj, Path):
         return str(obj)
-    elif hasattr(obj, 'item') and callable(obj.item):  # numpy scalars
+    elif hasattr(obj, "item") and callable(obj.item):  # numpy scalars
         return obj.item()
     elif isinstance(obj, (int, float, str, bool, type(None))):
         return obj
@@ -60,21 +59,23 @@ class RagDebugService:
         log_dir.mkdir(exist_ok=True)
 
         # File handler for RAG debug logs
-        handler = logging.FileHandler(
-            log_dir / "rag_debug.log",
-            encoding='utf-8'
-        )
+        handler = logging.FileHandler(log_dir / "rag_debug.log", encoding="utf-8")
         handler.setLevel(logging.DEBUG)
 
         # JSON formatter for structured logs
-        formatter = logging.Formatter('%(message)s')
+        formatter = logging.Formatter("%(message)s")
         handler.setFormatter(formatter)
 
         logger.addHandler(handler)
         return logger
 
-    def configure(self, enabled: bool, log_prompts: bool = True,
-                  log_context: bool = True, log_responses: bool = True):
+    def configure(
+        self,
+        enabled: bool,
+        log_prompts: bool = True,
+        log_context: bool = True,
+        log_responses: bool = True,
+    ):
         """Configure debug service from settings."""
         self.enabled = enabled
         self.log_prompts = log_prompts
@@ -82,15 +83,19 @@ class RagDebugService:
         self.log_responses = log_responses
 
         if self.enabled:
-            self.logger.info(self._format_log({
-                "event_type": "debug_service_enabled",
-                "timestamp": datetime.utcnow().isoformat() + 'Z',
-                "config": {
-                    "log_prompts": self.log_prompts,
-                    "log_context": self.log_context,
-                    "log_responses": self.log_responses
-                }
-            }))
+            self.logger.info(
+                self._format_log(
+                    {
+                        "event_type": "debug_service_enabled",
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "config": {
+                            "log_prompts": self.log_prompts,
+                            "log_context": self.log_context,
+                            "log_responses": self.log_responses,
+                        },
+                    }
+                )
+            )
 
     def _format_log(self, data: dict[str, Any]) -> str:
         """Format log data as JSON with proper serialization."""
@@ -98,27 +103,36 @@ class RagDebugService:
         clean_data = _make_json_serializable(data)
         return json.dumps(clean_data, ensure_ascii=False, indent=None)
 
-    def log_user_request(self, session_id: str, question: str,
-                        user_context: dict[str, Any] | None = None,
-                        context_limit: int | None = None):
+    def log_user_request(
+        self,
+        session_id: str,
+        question: str,
+        user_context: dict[str, Any] | None = None,
+        context_limit: int | None = None,
+    ):
         """Log incoming user request."""
         if not self.enabled:
             return
 
         log_data = {
             "event_type": "user_request",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "question": question,
             "question_length": len(question),
             "context_limit": context_limit,
-            "user_context": user_context or {}
+            "user_context": user_context or {},
         }
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_vector_search(self, session_id: str, search_results: list[Any],
-                         embedding_tokens: int, search_time_ms: float):
+    def log_vector_search(
+        self,
+        session_id: str,
+        search_results: list[Any],
+        embedding_tokens: int,
+        search_time_ms: float,
+    ):
         """Log vector search results with details."""
         if not self.enabled:
             return
@@ -126,44 +140,53 @@ class RagDebugService:
         # Format search results for logging
         formatted_results = []
         for result in search_results:
-            formatted_results.append({
-                "document_id": str(result.document_id),
-                "filename": getattr(result, 'source', 'unknown'),
-                "chunk_index": getattr(result, 'chunk_index', 0),
-                "total_chunks": getattr(result, 'total_chunks', 1),
-                "similarity_score": round(result.similarity_score, 4),
-                "chunk_text": result.text[:200] + "..." if len(result.text) > 200 else result.text,
-                "chunk_length": len(result.text)
-            })
+            formatted_results.append(
+                {
+                    "document_id": str(result.document_id),
+                    "filename": getattr(result, "source", "unknown"),
+                    "chunk_index": getattr(result, "chunk_index", 0),
+                    "total_chunks": getattr(result, "total_chunks", 1),
+                    "similarity_score": round(result.similarity_score, 4),
+                    "chunk_text": result.text[:200] + "..."
+                    if len(result.text) > 200
+                    else result.text,
+                    "chunk_length": len(result.text),
+                }
+            )
 
         log_data = {
             "event_type": "vector_search",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "embedding_tokens": embedding_tokens,
             "search_results": formatted_results,
             "total_found": len(search_results),
             "processing_time_ms": round(search_time_ms, 2),
             "best_score": round(search_results[0].similarity_score, 4) if search_results else 0.0,
-            "worst_score": round(search_results[-1].similarity_score, 4) if search_results else 0.0
+            "worst_score": round(search_results[-1].similarity_score, 4) if search_results else 0.0,
         }
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_context_building(self, session_id: str, system_prompt: str,
-                           context_text: str, context_chunks: int,
-                           filtered_sources: list[dict[str, Any]]):
+    def log_context_building(
+        self,
+        session_id: str,
+        system_prompt: str,
+        context_text: str,
+        context_chunks: int,
+        filtered_sources: list[dict[str, Any]],
+    ):
         """Log context building with prompt and sources."""
         if not self.enabled:
             return
 
         log_data = {
             "event_type": "context_building",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "context_chunks": context_chunks,
             "context_length": len(context_text),
-            "filtered_sources": filtered_sources
+            "filtered_sources": filtered_sources,
         }
 
         # Log full prompts and context only if enabled
@@ -179,20 +202,26 @@ class RagDebugService:
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_llm_request(self, session_id: str, model: str, full_prompt: str,
-                       user_question: str, parameters: dict[str, Any]):
+    def log_llm_request(
+        self,
+        session_id: str,
+        model: str,
+        full_prompt: str,
+        user_question: str,
+        parameters: dict[str, Any],
+    ):
         """Log LLM request with full prompt."""
         if not self.enabled:
             return
 
         log_data = {
             "event_type": "llm_request",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "model": model,
             "user_question": user_question,
             "prompt_length": len(full_prompt),
-            "parameters": parameters
+            "parameters": parameters,
         }
 
         # Log full prompt only if enabled
@@ -203,20 +232,26 @@ class RagDebugService:
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_llm_response(self, session_id: str, response: str, tokens_used: int,
-                        duration_ms: float, finish_reason: str):
+    def log_llm_response(
+        self,
+        session_id: str,
+        response: str,
+        tokens_used: int,
+        duration_ms: float,
+        finish_reason: str,
+    ):
         """Log LLM response with metrics."""
         if not self.enabled:
             return
 
         log_data = {
             "event_type": "llm_response",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "tokens_used": tokens_used,
             "duration_ms": round(duration_ms, 2),
             "finish_reason": finish_reason,
-            "response_length": len(response)
+            "response_length": len(response),
         }
 
         # Log full response only if enabled
@@ -227,39 +262,51 @@ class RagDebugService:
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_final_response(self, session_id: str, confidence_score: float,
-                          sources_count: int, final_sources: list[dict[str, Any]],
-                          total_processing_time_ms: float, cached: bool = False):
+    def log_final_response(
+        self,
+        session_id: str,
+        confidence_score: float,
+        sources_count: int,
+        final_sources: list[dict[str, Any]],
+        total_processing_time_ms: float,
+        cached: bool = False,
+    ):
         """Log final response with confidence and sources."""
         if not self.enabled:
             return
 
         log_data = {
             "event_type": "final_response",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "confidence_score": round(confidence_score, 3),
             "sources_count": sources_count,
             "final_sources": final_sources,
             "total_processing_time_ms": round(total_processing_time_ms, 2),
-            "cached": cached
+            "cached": cached,
         }
 
         self.logger.debug(self._format_log(log_data))
 
-    def log_error(self, session_id: str, error_type: str, error_message: str,
-                  stage: str, traceback_info: str | None = None):
+    def log_error(
+        self,
+        session_id: str,
+        error_type: str,
+        error_message: str,
+        stage: str,
+        traceback_info: str | None = None,
+    ):
         """Log errors in RAG pipeline."""
         if not self.enabled:
             return
 
         log_data = {
             "event_type": "error",
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": session_id,
             "error_type": error_type,
             "error_message": error_message,
-            "stage": stage
+            "stage": stage,
         }
 
         if traceback_info:

@@ -6,7 +6,6 @@ it is a pure function of (model, tokens, price grid) -> cost in euros.
 """
 
 
-
 def compute_cost_eur(
     model: str,
     prompt_tokens: int,
@@ -38,7 +37,6 @@ def compute_cost_eur(
     if prices is None:
         raise ValueError(f"No price configured for model '{model}'")
 
-    return (
-        (prompt_tokens / 1_000_000) * prices["input"]
-        + (completion_tokens / 1_000_000) * prices["output"]
-    )
+    return (prompt_tokens / 1_000_000) * prices["input"] + (completion_tokens / 1_000_000) * prices[
+        "output"
+    ]

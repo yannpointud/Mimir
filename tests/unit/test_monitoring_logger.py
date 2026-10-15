@@ -10,10 +10,18 @@ from unittest.mock import Mock, patch
 from datetime import datetime
 
 from src.monitoring.logger import (
-    JSONFormatter, ConsoleFormatter, setup_logger,
-    log_api_request, log_ingestion_event, log_search_query,
-    log_llm_request, log_vector_operation, log_auth_event,
-    log_health_check, log_system_event, log_performance
+    JSONFormatter,
+    ConsoleFormatter,
+    setup_logger,
+    log_api_request,
+    log_ingestion_event,
+    log_search_query,
+    log_llm_request,
+    log_vector_operation,
+    log_auth_event,
+    log_health_check,
+    log_system_event,
+    log_performance,
 )
 
 
@@ -24,8 +32,13 @@ class TestJSONFormatter:
         """Test de formatage de base"""
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=10,
-            msg="Test message", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None,
         )
         record.module = "test_module"
         record.funcName = "test_function"
@@ -36,34 +49,39 @@ class TestJSONFormatter:
         formatted = formatter.format(record)
         log_data = json.loads(formatted)
 
-        assert log_data['level'] == 'INFO'
-        assert log_data['module'] == 'test_module'
-        assert log_data['function'] == 'test_function'
-        assert log_data['line'] == 10
-        assert log_data['message'] == 'Test message'
-        assert log_data['process_id'] == 1234
-        assert log_data['thread_id'] == 5678
-        assert 'timestamp' in log_data
+        assert log_data["level"] == "INFO"
+        assert log_data["module"] == "test_module"
+        assert log_data["function"] == "test_function"
+        assert log_data["line"] == 10
+        assert log_data["message"] == "Test message"
+        assert log_data["process_id"] == 1234
+        assert log_data["thread_id"] == 5678
+        assert "timestamp" in log_data
 
     def test_json_formatter_with_extra_fields(self):
         """Test de formatage avec champs supplémentaires"""
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=10,
-            msg="Test message", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None,
         )
         record.module = "test_module"
         record.funcName = "test_function"
         record.process = 1234
         record.thread = 5678
         record.threadName = "MainThread"
-        record.extra_fields = {'user_id': '123', 'action': 'login'}
+        record.extra_fields = {"user_id": "123", "action": "login"}
 
         formatted = formatter.format(record)
         log_data = json.loads(formatted)
 
-        assert log_data['user_id'] == '123'
-        assert log_data['action'] == 'login'
+        assert log_data["user_id"] == "123"
+        assert log_data["action"] == "login"
 
     def test_json_formatter_with_exception(self):
         """Test de formatage avec exception"""
@@ -73,9 +91,15 @@ class TestJSONFormatter:
             raise ValueError("Test error")
         except ValueError:
             import sys
+
             record = logging.LogRecord(
-                name="test", level=logging.ERROR, pathname="test.py", lineno=10,
-                msg="Error occurred", args=(), exc_info=sys.exc_info()
+                name="test",
+                level=logging.ERROR,
+                pathname="test.py",
+                lineno=10,
+                msg="Error occurred",
+                args=(),
+                exc_info=sys.exc_info(),
             )
             record.module = "test_module"
             record.funcName = "test_function"
@@ -86,9 +110,9 @@ class TestJSONFormatter:
             formatted = formatter.format(record)
             log_data = json.loads(formatted)
 
-            assert log_data['level'] == 'ERROR'
-            assert 'exception' in log_data
-            assert 'ValueError: Test error' in log_data['exception']
+            assert log_data["level"] == "ERROR"
+            assert "exception" in log_data
+            assert "ValueError: Test error" in log_data["exception"]
 
 
 class TestConsoleFormatter:
@@ -98,16 +122,21 @@ class TestConsoleFormatter:
         """Test de formatage console de base"""
         formatter = ConsoleFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=10,
-            msg="Test message", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None,
         )
         record.created = datetime.now().timestamp()
 
         formatted = formatter.format(record)
 
-        assert 'test' in formatted
-        assert 'INFO' in formatted
-        assert 'Test message' in formatted
+        assert "test" in formatted
+        assert "INFO" in formatted
+        assert "Test message" in formatted
 
 
 class TestSetupLogger:
@@ -140,7 +169,7 @@ class TestSetupLogger:
         logger = setup_logger("file_logger")
 
         # Vérifier qu'un handler de fichier existe (créé automatiquement)
-        file_handlers = [h for h in logger.handlers if hasattr(h, 'baseFilename')]
+        file_handlers = [h for h in logger.handlers if hasattr(h, "baseFilename")]
         assert len(file_handlers) > 0
 
 
@@ -154,12 +183,8 @@ class TestLoggingHelpers:
 
     def test_log_api_request(self, mock_logger):
         """Test de log des requêtes API"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_api_request(
-                method="POST",
-                endpoint="/api/test",
-                status_code=200
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_api_request(method="POST", endpoint="/api/test", status_code=200)
 
             mock_logger.log.assert_called_once()
             call_args = mock_logger.log.call_args
@@ -167,12 +192,8 @@ class TestLoggingHelpers:
 
     def test_log_search_query(self, mock_logger):
         """Test de log des requêtes de recherche"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_search_query(
-                query="test search",
-                results_count=5,
-                duration_ms=200
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_search_query(query="test search", results_count=5, duration_ms=200)
 
             mock_logger.info.assert_called_once()
             call_args = mock_logger.info.call_args
@@ -180,11 +201,8 @@ class TestLoggingHelpers:
 
     def test_log_ingestion_event(self, mock_logger):
         """Test de log des événements d'ingestion"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_ingestion_event(
-                document="doc.pdf",
-                status="processed"
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_ingestion_event(document="doc.pdf", status="processed")
 
             mock_logger.info.assert_called_once()
             call_args = mock_logger.info.call_args
@@ -192,21 +210,16 @@ class TestLoggingHelpers:
 
     def test_log_ingestion_event_with_error(self, mock_logger):
         """Test de log des événements d'ingestion avec erreur"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
+        with patch("src.monitoring.logger.app_logger", mock_logger):
             # Les fonctions de log n'ont pas de paramètre success, elles logguent toujours en info
-            log_ingestion_event(
-                document="doc.pdf",
-                status="failed"
-            )
+            log_ingestion_event(document="doc.pdf", status="failed")
 
             mock_logger.info.assert_called_once()
 
     def test_log_auth_event(self, mock_logger):
         """Test de log des événements d'authentification"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_auth_event(
-                event="login_success"
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_auth_event(event="login_success")
 
             mock_logger.log.assert_called_once()
             call_args = mock_logger.log.call_args
@@ -215,7 +228,8 @@ class TestLoggingHelpers:
     def test_log_performance(self, mock_logger):
         """Test de log des métriques de performance"""
         # log_performance est un décorateur, pas un gestionnaire de contexte
-        with patch('src.monitoring.logger.app_logger', mock_logger):
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+
             @log_performance("search_operation")
             def test_function():
                 return "result"
@@ -228,12 +242,9 @@ class TestLoggingHelpers:
 
     def test_log_llm_request(self, mock_logger):
         """Test de log des requêtes LLM"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
+        with patch("src.monitoring.logger.app_logger", mock_logger):
             log_llm_request(
-                model="mistral-small",
-                operation="generate",
-                tokens=10,
-                duration_ms=1500
+                model="mistral-small", operation="generate", tokens=10, duration_ms=1500
             )
 
             mock_logger.log.assert_called_once()
@@ -251,12 +262,8 @@ class TestAdditionalLoggerFunctions:
 
     def test_log_vector_operation(self, mock_logger):
         """Test de log des opérations vectorielles"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_vector_operation(
-                operation="similarity_search",
-                vector_count=1000,
-                duration_ms=300
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_vector_operation(operation="similarity_search", vector_count=1000, duration_ms=300)
 
             mock_logger.log.assert_called_once()
             call_args = mock_logger.log.call_args
@@ -264,11 +271,8 @@ class TestAdditionalLoggerFunctions:
 
     def test_log_health_check(self, mock_logger):
         """Test de log des health checks"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_health_check(
-                component="database",
-                status="healthy"
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_health_check(component="database", status="healthy")
 
             mock_logger.log.assert_called_once()
             call_args = mock_logger.log.call_args
@@ -276,10 +280,8 @@ class TestAdditionalLoggerFunctions:
 
     def test_log_system_event(self, mock_logger):
         """Test de log des événements système"""
-        with patch('src.monitoring.logger.app_logger', mock_logger):
-            log_system_event(
-                event="service_startup"
-            )
+        with patch("src.monitoring.logger.app_logger", mock_logger):
+            log_system_event(event="service_startup")
 
             mock_logger.log.assert_called_once()
             call_args = mock_logger.log.call_args
@@ -324,11 +326,10 @@ class TestLoggerIntegration:
 
         # Simuler un log avec champs extra
         record = logger.makeRecord(
-            logger.name, logging.INFO, __file__, 1,
-            "Test with extra fields", (), None
+            logger.name, logging.INFO, __file__, 1, "Test with extra fields", (), None
         )
         record.extra_fields = {"request_id": "req_123", "user_id": "user_456"}
 
         # Vérifier que le record contient les champs extra
-        assert hasattr(record, 'extra_fields')
+        assert hasattr(record, "extra_fields")
         assert record.extra_fields["request_id"] == "req_123"

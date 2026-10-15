@@ -26,21 +26,21 @@ def configure_sqlite_performance(dbapi_connection, connection_record):
     """
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
-        
+
         # WAL mode to improve concurrency (spec requirement)
         if config.settings and config.settings.sqlite_wal_mode:
             cursor.execute("PRAGMA journal_mode=WAL")
             logger.info("SQLite WAL mode activated")
-        
+
         # Performance optimizations
         cursor.execute("PRAGMA synchronous=NORMAL")  # Balance perf/safety
-        cursor.execute("PRAGMA cache_size=10000")    # Larger cache
-        cursor.execute("PRAGMA temp_store=MEMORY")   # Temp tables in memory
-        cursor.execute("PRAGMA mmap_size=268435456") # Memory mapping 256MB
+        cursor.execute("PRAGMA cache_size=10000")  # Larger cache
+        cursor.execute("PRAGMA temp_store=MEMORY")  # Temp tables in memory
+        cursor.execute("PRAGMA mmap_size=268435456")  # Memory mapping 256MB
 
         # Concurrency configuration
         cursor.execute("PRAGMA busy_timeout=30000")  # 30s timeout on locks
-        
+
         cursor.close()
 
 
@@ -56,16 +56,16 @@ class DatabaseManager:
     _session_factory = None
     _async_engine = None
     _async_session_factory = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         if self._engine is None:
             self._initialize_database()
-    
+
     def _initialize_database(self):
         """Initialize the database engine and session factory"""
         try:
@@ -74,11 +74,11 @@ class DatabaseManager:
                 config.settings.database_url_sync if config.settings else "sqlite:///:memory:",
                 echo=False,  # No SQL logs in prod
                 pool_pre_ping=True,  # Connection verification
-                pool_recycle=3600,   # Recycle connections every hour
+                pool_recycle=3600,  # Recycle connections every hour
                 connect_args={
                     "check_same_thread": False,  # Allow multi-thread usage
-                    "timeout": 20  # Connection timeout
-                }
+                    "timeout": 20,  # Connection timeout
+                },
             )
 
             # Enable SQLite optimizations on each connection
@@ -86,19 +86,17 @@ class DatabaseManager:
 
             # Factory for SYNC sessions
             self._session_factory = sessionmaker(
-                bind=self._engine,
-                autocommit=False,
-                autoflush=False,
-                expire_on_commit=False
+                bind=self._engine, autocommit=False, autoflush=False, expire_on_commit=False
             )
 
             # Create ASYNC engine with SQLite optimizations
-            async_database_url = config.settings.database_url_sync.replace("sqlite:///", "sqlite+aiosqlite:///") if config.settings else "sqlite+aiosqlite:///:memory:"
+            async_database_url = (
+                config.settings.database_url_sync.replace("sqlite:///", "sqlite+aiosqlite:///")
+                if config.settings
+                else "sqlite+aiosqlite:///:memory:"
+            )
             self._async_engine = create_async_engine(
-                async_database_url,
-                echo=False,
-                pool_pre_ping=True,
-                pool_recycle=3600
+                async_database_url, echo=False, pool_pre_ping=True, pool_recycle=3600
             )
 
             # Factory for ASYNC sessions
@@ -107,16 +105,18 @@ class DatabaseManager:
                 class_=AsyncSession,
                 autocommit=False,
                 autoflush=False,
-                expire_on_commit=False
+                expire_on_commit=False,
             )
 
-            logger.info(f"Database initialized: {config.settings.database_url_sync if config.settings else 'memory'}")
+            logger.info(
+                f"Database initialized: {config.settings.database_url_sync if config.settings else 'memory'}"
+            )
             logger.info(f"Async database initialized: {async_database_url}")
 
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
-    
+
     @property
     def engine(self) -> Engine:
         """Return the synchronous database engine"""
@@ -130,7 +130,7 @@ class DatabaseManager:
         if self._async_engine is None:
             self._initialize_database()
         return self._async_engine
-    
+
     def get_session(self) -> Session:
         """Create a new synchronous database session"""
         if self._session_factory is None:
@@ -142,7 +142,7 @@ class DatabaseManager:
         if self._async_session_factory is None:
             self._initialize_database()
         return self._async_session_factory()
-    
+
     @contextmanager
     def get_session_context(self) -> Generator[Session]:
         """
@@ -176,7 +176,7 @@ class DatabaseManager:
             raise
         finally:
             await session.close()
-    
+
     def create_tables(self):
         """Create all tables if they do not exist (synchronous version)"""
         try:
@@ -195,7 +195,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to create async tables: {e}")
             raise
-    
+
     def drop_tables(self):
         """Drop all tables (for tests only)"""
         try:
@@ -204,7 +204,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to drop tables: {e}")
             raise
-    
+
     def health_check(self) -> bool:
         """
         Check the database connection health
@@ -224,6 +224,7 @@ db_manager = DatabaseManager()
 
 
 # Utility functions for FastAPI dependency injection
+
 
 def get_db_session() -> Generator[Session]:
     """
@@ -267,27 +268,28 @@ def get_db_manager() -> DatabaseManager:
 
 # Initialization functions
 
+
 def init_database():
     """
     Initialize the database at application startup
     Creates tables and verifies connectivity
     """
     logger.info("Initializing database...")
-    
+
     try:
         # Ensure directories exist
         if config.settings:
             config.settings._ensure_directories()
-        
+
         # Initialize the manager and create tables
         db_manager.create_tables()
-        
+
         # Connectivity test
         if not db_manager.health_check():
             raise RuntimeError("Database health check failed after initialization")
-        
+
         logger.info("Database initialization completed successfully")
-        
+
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
@@ -300,7 +302,7 @@ def reset_database():
     """
     if config.settings and config.settings.is_production:
         raise RuntimeError("Database reset not allowed in production")
-    
+
     logger.warning("Resetting database - all data will be lost!")
     db_manager.drop_tables()
     db_manager.create_tables()

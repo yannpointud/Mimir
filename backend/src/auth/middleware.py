@@ -27,10 +27,7 @@ class JWTBearer(HTTPBearer):
         403 this API has always returned: the frontend treats any 401 as an
         expired session and redirects to the login page.
         """
-        return HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authenticated"
-        )
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
 
     async def __call__(self, request: Request) -> HTTPAuthorizationCredentials | None:
         """
@@ -52,7 +49,7 @@ class JWTBearer(HTTPBearer):
                 logger.warning(f"Invalid authentication scheme: {credentials.scheme}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid authentication scheme. Expected 'Bearer'"
+                    detail="Invalid authentication scheme. Expected 'Bearer'",
                 )
 
             # Validate the token
@@ -60,8 +57,7 @@ class JWTBearer(HTTPBearer):
             if not payload:
                 logger.warning("Invalid JWT token received")
                 raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token"
+                    status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
                 )
 
             # Store payload in request state for access in endpoints
@@ -78,8 +74,7 @@ security = JWTBearer()
 
 
 async def get_current_user(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
     """
     Dependency to get the current authenticated user from JWT payload.
@@ -94,19 +89,18 @@ async def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    payload = getattr(request.state, 'jwt_payload', None)
+    payload = getattr(request.state, "jwt_payload", None)
     if not payload:
         logger.error("JWT payload not found in request state")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
         )
 
     return {
         "user_type": payload.get("user_type", "user"),
         "sub": payload.get("sub"),
         "exp": payload.get("exp"),
-        "iat": payload.get("iat")
+        "iat": payload.get("iat"),
     }
 
 
@@ -126,8 +120,7 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     if current_user.get("user_type") != "admin":
         logger.warning(f"Access denied - user type: {current_user.get('user_type')}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required"
         )
 
     return current_user
@@ -138,8 +131,7 @@ optional_security = JWTBearer(auto_error=False)
 
 
 async def get_optional_user(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
+    request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(optional_security)
 ) -> dict | None:
     """
     Optional dependency to get user info if authenticated.
@@ -154,7 +146,7 @@ async def get_optional_user(
     if not credentials:
         return None
 
-    payload = getattr(request.state, 'jwt_payload', None)
+    payload = getattr(request.state, "jwt_payload", None)
     if not payload:
         return None
 
@@ -162,5 +154,5 @@ async def get_optional_user(
         "user_type": payload.get("user_type", "user"),
         "sub": payload.get("sub"),
         "exp": payload.get("exp"),
-        "iat": payload.get("iat")
+        "iat": payload.get("iat"),
     }

@@ -12,10 +12,7 @@ class TestIngestionTask:
 
     def test_task_creation(self):
         """Test de création d'une tâche"""
-        task = IngestionTask(
-            file_path="/test/file.txt",
-            document_id="doc123"
-        )
+        task = IngestionTask(file_path="/test/file.txt", document_id="doc123")
 
         assert task.file_path == "/test/file.txt"
         assert task.document_id == "doc123"
@@ -27,21 +24,13 @@ class TestIngestionTask:
     def test_task_with_metadata(self):
         """Test avec métadonnées"""
         metadata = {"user": "admin", "batch": "morning"}
-        task = IngestionTask(
-            file_path="/test/file.txt",
-            document_id="doc123",
-            metadata=metadata
-        )
+        task = IngestionTask(file_path="/test/file.txt", document_id="doc123", metadata=metadata)
 
         assert task.metadata == metadata
 
     def test_can_retry(self):
         """Test de vérification de possibilité de retry"""
-        task = IngestionTask(
-            file_path="/test.txt",
-            document_id="doc",
-            max_retries=2
-        )
+        task = IngestionTask(file_path="/test.txt", document_id="doc", max_retries=2)
 
         assert task.can_retry() is True
 
@@ -53,10 +42,7 @@ class TestIngestionTask:
 
     def test_increment_retry(self):
         """Test d'incrémentation des retries"""
-        task = IngestionTask(
-            file_path="/test.txt",
-            document_id="doc"
-        )
+        task = IngestionTask(file_path="/test.txt", document_id="doc")
 
         task.increment_retry()
 

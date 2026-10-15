@@ -29,8 +29,8 @@ def configure_cors_middleware(app):
         ]
 
         # Add custom allowed origins from settings if available
-        if hasattr(settings, 'allowed_origins') and settings.allowed_origins:
-            allowed_origins.extend(settings.allowed_origins.split(','))
+        if hasattr(settings, "allowed_origins") and settings.allowed_origins:
+            allowed_origins.extend(settings.allowed_origins.split(","))
 
         logger.info(f"CORS configured for production - allowed origins: {allowed_origins}")
     else:

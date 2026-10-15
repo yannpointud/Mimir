@@ -27,13 +27,18 @@ from ..monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+
 class ExtractionError(Exception):
     """Base exception for text extraction errors"""
+
     pass
+
 
 class UnsupportedFormatError(ExtractionError):
     """Raised when file format is not supported"""
+
     pass
+
 
 class TextExtractor(ABC):
     """Abstract base class for text extractors"""
@@ -81,22 +86,25 @@ class TextExtractor(ABC):
         stat = file_path_obj.stat()
 
         return {
-            'file_size': stat.st_size,
-            'modified_time': stat.st_mtime,
-            'file_extension': file_path_obj.suffix.lower(),
-            'file_name': file_path_obj.name
+            "file_size": stat.st_size,
+            "modified_time": stat.st_mtime,
+            "file_extension": file_path_obj.suffix.lower(),
+            "file_name": file_path_obj.name,
         }
+
 
 class PDFExtractor(TextExtractor):
     """Extract text from PDF files using pypdf"""
 
     def __init__(self):
         if pypdf is None:
-            raise ImportError("pypdf is required for PDF extraction. Install with: pip install pypdf")
+            raise ImportError(
+                "pypdf is required for PDF extraction. Install with: pip install pypdf"
+            )
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is PDF"""
-        return Path(file_path).suffix.lower() == '.pdf'
+        return Path(file_path).suffix.lower() == ".pdf"
 
     def extract(self, file_path: str) -> str:
         """Extract text from PDF file"""
@@ -106,14 +114,14 @@ class PDFExtractor(TextExtractor):
         try:
             text_parts = []
 
-            with open(file_path, 'rb') as file:
+            with open(file_path, "rb") as file:
                 reader = pypdf.PdfReader(file)
 
                 # Check if PDF is encrypted
                 if reader.is_encrypted:
                     logger.warning(f"PDF is encrypted, attempting to decrypt: {file_path}")
                     try:
-                        reader.decrypt('')  # Try empty password
+                        reader.decrypt("")  # Try empty password
                     except Exception as exc:
                         raise ExtractionError(f"Cannot decrypt encrypted PDF: {file_path}") from exc
 
@@ -124,7 +132,9 @@ class PDFExtractor(TextExtractor):
                         if page_text.strip():  # Only add non-empty pages
                             text_parts.append(page_text)
                     except Exception as e:
-                        logger.warning(f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}")
+                        logger.warning(
+                            f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}"
+                        )
                         continue
 
                 # Capture the page count while the handle is still open: pypdf
@@ -136,16 +146,18 @@ class PDFExtractor(TextExtractor):
                 logger.warning(f"No text extracted from PDF: {file_path}")
                 return ""
 
-            extracted_text = '\n\n'.join(text_parts)
+            extracted_text = "\n\n".join(text_parts)
 
             logger.info(
                 f"Extracted {len(extracted_text)} characters from PDF: {Path(file_path).name}",
-                extra={'extra_fields': {
-                    'file_path': file_path,
-                    'pages': page_count,
-                    'characters': len(extracted_text),
-                    'type': 'pdf_extraction'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": file_path,
+                        "pages": page_count,
+                        "characters": len(extracted_text),
+                        "type": "pdf_extraction",
+                    }
+                },
             )
 
             return extracted_text
@@ -155,16 +167,19 @@ class PDFExtractor(TextExtractor):
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
 
+
 class DOCXExtractor(TextExtractor):
     """Extract text from DOCX files using python-docx"""
 
     def __init__(self):
         if DocxDocument is None:
-            raise ImportError("python-docx is required for DOCX extraction. Install with: pip install python-docx")
+            raise ImportError(
+                "python-docx is required for DOCX extraction. Install with: pip install python-docx"
+            )
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is DOCX"""
-        return Path(file_path).suffix.lower() == '.docx'
+        return Path(file_path).suffix.lower() == ".docx"
 
     def extract(self, file_path: str) -> str:
         """Extract text from DOCX file"""
@@ -188,23 +203,25 @@ class DOCXExtractor(TextExtractor):
                         if cell.text.strip():
                             row_text.append(cell.text.strip())
                     if row_text:
-                        text_parts.append(' | '.join(row_text))
+                        text_parts.append(" | ".join(row_text))
 
             if not text_parts:
                 logger.warning(f"No text extracted from DOCX: {file_path}")
                 return ""
 
-            extracted_text = '\n\n'.join(text_parts)
+            extracted_text = "\n\n".join(text_parts)
 
             logger.info(
                 f"Extracted {len(extracted_text)} characters from DOCX: {Path(file_path).name}",
-                extra={'extra_fields': {
-                    'file_path': file_path,
-                    'paragraphs': len(doc.paragraphs),
-                    'tables': len(doc.tables),
-                    'characters': len(extracted_text),
-                    'type': 'docx_extraction'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": file_path,
+                        "paragraphs": len(doc.paragraphs),
+                        "tables": len(doc.tables),
+                        "characters": len(extracted_text),
+                        "type": "docx_extraction",
+                    }
+                },
             )
 
             return extracted_text
@@ -214,15 +231,16 @@ class DOCXExtractor(TextExtractor):
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
 
+
 class TXTExtractor(TextExtractor):
     """Extract text from plain text files"""
 
-    SUPPORTED_ENCODINGS = ['utf-8', 'utf-16', 'latin-1', 'cp1252']
+    SUPPORTED_ENCODINGS = ["utf-8", "utf-16", "latin-1", "cp1252"]
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is text file"""
         ext = Path(file_path).suffix.lower()
-        return ext in ['.txt', '.text', '.log', '.csv', '.json', '.xml']
+        return ext in [".txt", ".text", ".log", ".csv", ".json", ".xml"]
 
     def extract(self, file_path: str) -> str:
         """Extract text from text file with encoding detection"""
@@ -237,12 +255,14 @@ class TXTExtractor(TextExtractor):
 
                 logger.info(
                     f"Extracted {len(content)} characters from TXT: {Path(file_path).name}",
-                    extra={'extra_fields': {
-                        'file_path': file_path,
-                        'encoding': encoding,
-                        'characters': len(content),
-                        'type': 'txt_extraction'
-                    }}
+                    extra={
+                        "extra_fields": {
+                            "file_path": file_path,
+                            "encoding": encoding,
+                            "characters": len(content),
+                            "type": "txt_extraction",
+                        }
+                    },
                 )
 
                 return content
@@ -250,14 +270,19 @@ class TXTExtractor(TextExtractor):
             except UnicodeDecodeError:
                 continue
             except Exception as e:
-                error_msg = f"Failed to read text file {file_path} with encoding {encoding}: {str(e)}"
+                error_msg = (
+                    f"Failed to read text file {file_path} with encoding {encoding}: {str(e)}"
+                )
                 logger.warning(error_msg)
                 continue
 
         # If all encodings failed
-        error_msg = f"Failed to extract text from {file_path}: Unable to decode with any supported encoding"
+        error_msg = (
+            f"Failed to extract text from {file_path}: Unable to decode with any supported encoding"
+        )
         logger.error(error_msg)
         raise ExtractionError(error_msg)
+
 
 class MarkdownExtractor(TextExtractor):
     """Extract text from Markdown files"""
@@ -271,12 +296,14 @@ class MarkdownExtractor(TextExtractor):
         """
         self.convert_to_html = convert_to_html
         if convert_to_html and markdown is None:
-            raise ImportError("markdown is required for HTML conversion. Install with: pip install markdown")
+            raise ImportError(
+                "markdown is required for HTML conversion. Install with: pip install markdown"
+            )
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is Markdown"""
         ext = Path(file_path).suffix.lower()
-        return ext in ['.md', '.markdown', '.mdown', '.mkd']
+        return ext in [".md", ".markdown", ".mdown", ".mkd"]
 
     def extract(self, file_path: str) -> str:
         """Extract text from Markdown file"""
@@ -285,7 +312,7 @@ class MarkdownExtractor(TextExtractor):
 
         try:
             # First, read the raw markdown
-            with open(file_path, encoding='utf-8') as file:
+            with open(file_path, encoding="utf-8") as file:
                 content = file.read()
 
             if self.convert_to_html and markdown is not None:
@@ -294,12 +321,14 @@ class MarkdownExtractor(TextExtractor):
 
             logger.info(
                 f"Extracted {len(content)} characters from Markdown: {Path(file_path).name}",
-                extra={'extra_fields': {
-                    'file_path': file_path,
-                    'characters': len(content),
-                    'converted_to_html': self.convert_to_html,
-                    'type': 'markdown_extraction'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": file_path,
+                        "characters": len(content),
+                        "converted_to_html": self.convert_to_html,
+                        "type": "markdown_extraction",
+                    }
+                },
             )
 
             return content
@@ -308,6 +337,7 @@ class MarkdownExtractor(TextExtractor):
             error_msg = f"Failed to extract text from Markdown {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
+
 
 class ExtractorFactory:
     """Factory for creating appropriate text extractors"""
@@ -390,7 +420,17 @@ class ExtractorFactory:
         extensions = set()
 
         # Test each extractor with common extensions
-        test_extensions = ['.pdf', '.docx', '.txt', '.md', '.markdown', '.log', '.csv', '.json', '.xml']
+        test_extensions = [
+            ".pdf",
+            ".docx",
+            ".txt",
+            ".md",
+            ".markdown",
+            ".log",
+            ".csv",
+            ".json",
+            ".xml",
+        ]
 
         for ext in test_extensions:
             test_file = f"test{ext}"

@@ -15,6 +15,7 @@ This test is also the base reused by the milestone validation script
 (scripts/validate_milestone.sh), so its structure (shared singleton, write contention during
 reads, fresh-reload proof) should remain stable for future extension.
 """
+
 import asyncio
 import shutil
 import tempfile
@@ -78,10 +79,7 @@ async def test_concurrent_queries_during_ingestion(temp_dir):
         whole test duration, to guarantee real write contention against the
         concurrent readers below (a read-only test would prove nothing)."""
         for batch in range(INGESTION_BATCHES):
-            chunks = [
-                _random_chunk(f"batch{batch}_doc{i}")
-                for i in range(CHUNKS_PER_BATCH)
-            ]
+            chunks = [_random_chunk(f"batch{batch}_doc{i}") for i in range(CHUNKS_PER_BATCH)]
             await asyncio.to_thread(store.upsert, chunks)
             await asyncio.to_thread(store.persist)
 

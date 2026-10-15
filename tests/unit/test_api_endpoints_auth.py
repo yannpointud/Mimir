@@ -22,11 +22,7 @@ class TestAuthModels:
 
     def test_login_response_model(self):
         """Test login response model."""
-        response = LoginResponse(
-            access_token="test_token",
-            expires_in=3600,
-            user_type="admin"
-        )
+        response = LoginResponse(access_token="test_token", expires_in=3600, user_type="admin")
         assert response.access_token == "test_token"
         assert response.token_type == "bearer"
         assert response.expires_in == 3600
@@ -34,10 +30,7 @@ class TestAuthModels:
 
     def test_token_refresh_response_model(self):
         """Test token refresh response model."""
-        response = TokenRefreshResponse(
-            access_token="new_token",
-            expires_in=3600
-        )
+        response = TokenRefreshResponse(access_token="new_token", expires_in=3600)
         assert response.access_token == "new_token"
         assert response.token_type == "bearer"
         assert response.expires_in == 3600
@@ -51,9 +44,9 @@ class TestAuthEndpoints:
         """Mock audit repository."""
         return AsyncMock()
 
-    @patch('backend.src.api.endpoints.auth._authenticate_admin')
-    @patch('backend.src.api.endpoints.auth.jwt_handler')
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth._authenticate_admin")
+    @patch("backend.src.api.endpoints.auth.jwt_handler")
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_login_success(self, mock_log_event, mock_jwt, mock_auth):
         """Test successful login."""
         from backend.src.api.endpoints.auth import login
@@ -70,12 +63,14 @@ class TestAuthEndpoints:
         mock_audit_repo = AsyncMock()
 
         # Call the function
-        result = asyncio.run(login(
-            request=mock_request,
-            response=Mock(),  # required by slowapi header injection
-            login_data=login_data,
-            audit_repo=mock_audit_repo
-        ))
+        result = asyncio.run(
+            login(
+                request=mock_request,
+                response=Mock(),  # required by slowapi header injection
+                login_data=login_data,
+                audit_repo=mock_audit_repo,
+            )
+        )
 
         # Assertions
         assert result.access_token == "test_token"
@@ -83,8 +78,8 @@ class TestAuthEndpoints:
         assert result.user_type == "admin"
         mock_auth.assert_called_once_with("admin", "test123")
 
-    @patch('backend.src.api.endpoints.auth._authenticate_admin')
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth._authenticate_admin")
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_login_failure_invalid_credentials(self, mock_log_event, mock_auth):
         """Test login with invalid credentials."""
         from backend.src.api.endpoints.auth import login
@@ -101,12 +96,14 @@ class TestAuthEndpoints:
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(login(
-                request=mock_request,
-                response=Mock(),  # required by slowapi header injection
-                login_data=login_data,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                login(
+                    request=mock_request,
+                    response=Mock(),  # required by slowapi header injection
+                    login_data=login_data,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -127,8 +124,8 @@ class TestAuthEndpoints:
         with pytest.raises(ValidationError):
             LoginRequest()  # No fields provided
 
-    @patch('backend.src.api.endpoints.auth._authenticate_admin')
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth._authenticate_admin")
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_login_exception_handling(self, mock_log_event, mock_auth):
         """Test exception handling during login."""
         from backend.src.api.endpoints.auth import login
@@ -145,12 +142,14 @@ class TestAuthEndpoints:
 
         # Test that exception is handled
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(login(
-                request=mock_request,
-                response=Mock(),  # required by slowapi header injection
-                login_data=login_data,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                login(
+                    request=mock_request,
+                    response=Mock(),  # required by slowapi header injection
+                    login_data=login_data,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -158,8 +157,8 @@ class TestAuthEndpoints:
 class TestAuthHelperFunctions:
     """Tests for authentication utility functions."""
 
-    @patch('backend.src.api.endpoints.auth.settings')
-    @patch('backend.src.api.endpoints.auth.jwt_handler.verify_password')
+    @patch("backend.src.api.endpoints.auth.settings")
+    @patch("backend.src.api.endpoints.auth.jwt_handler.verify_password")
     def test_authenticate_admin_success(self, mock_verify_password, mock_settings):
         """Test successful admin authentication."""
         from backend.src.api.endpoints.auth import _authenticate_admin
@@ -170,7 +169,7 @@ class TestAuthHelperFunctions:
         result = _authenticate_admin("admin", "test123")
         assert result is True
 
-    @patch('backend.src.api.endpoints.auth.settings')
+    @patch("backend.src.api.endpoints.auth.settings")
     def test_authenticate_admin_wrong_username(self, mock_settings):
         """Test authentication with wrong username."""
         from backend.src.api.endpoints.auth import _authenticate_admin
@@ -180,8 +179,8 @@ class TestAuthHelperFunctions:
         result = _authenticate_admin("wrong_user", "test123")
         assert result is False
 
-    @patch('backend.src.api.endpoints.auth.settings')
-    @patch('backend.src.api.endpoints.auth.jwt_handler.verify_password')
+    @patch("backend.src.api.endpoints.auth.settings")
+    @patch("backend.src.api.endpoints.auth.jwt_handler.verify_password")
     def test_authenticate_admin_wrong_password(self, mock_verify_password, mock_settings):
         """Test authentication with wrong password."""
         from backend.src.api.endpoints.auth import _authenticate_admin
@@ -247,14 +246,16 @@ class TestAuthHelperFunctions:
         mock_audit_repo = Mock()
 
         # Call the function
-        asyncio.run(_log_auth_event(
-            audit_repo=mock_audit_repo,
-            action="login_success",
-            username="admin",
-            ip_address="127.0.0.1",
-            success=True,
-            details="Login successful"
-        ))
+        asyncio.run(
+            _log_auth_event(
+                audit_repo=mock_audit_repo,
+                action="login_success",
+                username="admin",
+                ip_address="127.0.0.1",
+                success=True,
+                details="Login successful",
+            )
+        )
 
         # Verify the repository was called
         mock_audit_repo.create_log.assert_called_once()
@@ -268,14 +269,16 @@ class TestAuthHelperFunctions:
 
         # Test that exception is handled silently
         try:
-            asyncio.run(_log_auth_event(
-                audit_repo=mock_audit_repo,
-                action="login_failed",
-                username="admin",
-                ip_address="127.0.0.1",
-                success=False,
-                details="Login failed"
-            ))
+            asyncio.run(
+                _log_auth_event(
+                    audit_repo=mock_audit_repo,
+                    action="login_failed",
+                    username="admin",
+                    ip_address="127.0.0.1",
+                    success=False,
+                    details="Login failed",
+                )
+            )
         except Exception:
             pytest.fail("Exception should be handled silently")
 
@@ -283,9 +286,9 @@ class TestAuthHelperFunctions:
 class TestTokenRefresh:
     """Tests for token refresh."""
 
-    @patch('backend.src.api.endpoints.auth.jwt_handler')
-    @patch('backend.src.api.endpoints.auth.settings')
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth.jwt_handler")
+    @patch("backend.src.api.endpoints.auth.settings")
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_refresh_token_success(self, mock_log_event, mock_settings, mock_jwt):
         """Test successful token refresh."""
         from backend.src.api.endpoints.auth import refresh_token
@@ -302,11 +305,9 @@ class TestTokenRefresh:
         mock_audit_repo = AsyncMock()
 
         # Call the function
-        result = asyncio.run(refresh_token(
-            request=mock_request,
-            current_user=mock_user,
-            audit_repo=mock_audit_repo
-        ))
+        result = asyncio.run(
+            refresh_token(request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo)
+        )
 
         # Assertions
         assert result.access_token == "new_token"
@@ -319,9 +320,9 @@ class TestTokenRefresh:
         # so this branch is not reachable at the unit level.
         pass
 
-    @patch('backend.src.api.endpoints.auth.jwt_handler')
-    @patch('backend.src.api.endpoints.auth.settings')
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth.jwt_handler")
+    @patch("backend.src.api.endpoints.auth.settings")
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_refresh_token_invalid_token(self, mock_log_event, mock_settings, mock_jwt):
         """Test refresh with invalid token."""
         from backend.src.api.endpoints.auth import refresh_token
@@ -340,11 +341,11 @@ class TestTokenRefresh:
 
         # Test that exception is handled
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(refresh_token(
-                request=mock_request,
-                current_user=mock_user,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                refresh_token(
+                    request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -352,7 +353,7 @@ class TestTokenRefresh:
 class TestLogout:
     """Tests for logout."""
 
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_logout_success(self, mock_log_event):
         """Test successful logout."""
         from backend.src.api.endpoints.auth import logout
@@ -367,11 +368,9 @@ class TestLogout:
         mock_audit_repo = AsyncMock()
 
         # Call the function
-        result = asyncio.run(logout(
-            request=mock_request,
-            current_user=mock_user,
-            audit_repo=mock_audit_repo
-        ))
+        result = asyncio.run(
+            logout(request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo)
+        )
 
         # Assertions
         assert result["message"] == "Successfully logged out"
@@ -387,10 +386,10 @@ class TestLogout:
 class TestAuthIntegration:
     """Integration tests for authentication."""
 
-    @patch('backend.src.api.endpoints.auth._authenticate_admin')
-    @patch('backend.src.api.endpoints.auth.jwt_handler')
-    @patch('backend.src.api.endpoints.auth.settings')
-    @patch('backend.src.api.endpoints.auth._log_auth_event')
+    @patch("backend.src.api.endpoints.auth._authenticate_admin")
+    @patch("backend.src.api.endpoints.auth.jwt_handler")
+    @patch("backend.src.api.endpoints.auth.settings")
+    @patch("backend.src.api.endpoints.auth._log_auth_event")
     def test_full_auth_workflow(self, mock_log_event, mock_settings, mock_jwt, mock_auth):
         """Test full authentication workflow."""
         from backend.src.api.endpoints.auth import login, refresh_token, logout
@@ -410,29 +409,27 @@ class TestAuthIntegration:
         login_data = LoginRequest(username="admin", password="test123")
 
         # Test login
-        login_result = asyncio.run(login(
-            request=mock_request,
-            response=Mock(),  # required by slowapi header injection
-            login_data=login_data,
-            audit_repo=mock_audit_repo
-        ))
+        login_result = asyncio.run(
+            login(
+                request=mock_request,
+                response=Mock(),  # required by slowapi header injection
+                login_data=login_data,
+                audit_repo=mock_audit_repo,
+            )
+        )
 
         assert login_result.access_token == "test_token"
 
         # Test refresh
-        refresh_result = asyncio.run(refresh_token(
-            request=mock_request,
-            current_user=mock_user,
-            audit_repo=mock_audit_repo
-        ))
+        refresh_result = asyncio.run(
+            refresh_token(request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo)
+        )
         assert refresh_result.access_token == "test_token"
 
         # Test logout
-        logout_result = asyncio.run(logout(
-            request=mock_request,
-            current_user=mock_user,
-            audit_repo=mock_audit_repo
-        ))
+        logout_result = asyncio.run(
+            logout(request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo)
+        )
 
         assert logout_result["message"] == "Successfully logged out"
 

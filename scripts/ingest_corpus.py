@@ -13,6 +13,7 @@ Requires MISTRAL_API_KEY in backend/.env (loaded here, never printed). Embedding
 are batched by MistralAPIService; the free-tier 1 call/sec limit is respected by
 the SDK's 429/Retry-After handling.
 """
+
 import asyncio
 import hashlib
 import os
@@ -53,8 +54,7 @@ async def main() -> int:
         return 1
 
     files = sorted(
-        p for p in SOURCE_DIR.iterdir()
-        if p.suffix.lower() in {".pdf", ".docx", ".txt", ".md"}
+        p for p in SOURCE_DIR.iterdir() if p.suffix.lower() in {".pdf", ".docx", ".txt", ".md"}
     )
     if not files:
         print(f"ERROR: no ingestable documents found in {SOURCE_DIR}")

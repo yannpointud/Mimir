@@ -16,7 +16,7 @@ class TestConfigureCorsMiddleware:
         """Test de configuration CORS en production."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = None  # Pas d'origines personnalisées
 
@@ -28,33 +28,34 @@ class TestConfigureCorsMiddleware:
 
             # Vérifier les arguments
             from fastapi.middleware.cors import CORSMiddleware
+
             assert args[0] == CORSMiddleware
 
             # Vérifier les origines autorisées en production
-            allowed_origins = kwargs['allow_origins']
+            allowed_origins = kwargs["allow_origins"]
             assert "https://localhost" in allowed_origins
             assert "https://127.0.0.1" in allowed_origins
             assert "https://localhost:3000" in allowed_origins
 
             # Vérifier d'autres paramètres
-            assert kwargs['allow_credentials'] is True
-            assert "GET" in kwargs['allow_methods']
-            assert "POST" in kwargs['allow_methods']
-            assert "Authorization" in kwargs['allow_headers']
-            assert kwargs['max_age'] == 600
+            assert kwargs["allow_credentials"] is True
+            assert "GET" in kwargs["allow_methods"]
+            assert "POST" in kwargs["allow_methods"]
+            assert "Authorization" in kwargs["allow_headers"]
+            assert kwargs["max_age"] == 600
 
     def test_configure_cors_production_with_custom_origins(self):
         """Test de configuration CORS en production avec origines personnalisées."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = "https://example.com,https://app.example.com"
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_origins = kwargs['allow_origins']
+            allowed_origins = kwargs["allow_origins"]
 
             # Vérifier que les origines personnalisées sont ajoutées
             assert "https://example.com" in allowed_origins
@@ -66,14 +67,14 @@ class TestConfigureCorsMiddleware:
         """Test en production sans attribut allowed_origins."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             # Pas d'attribut allowed_origins
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_origins = kwargs['allow_origins']
+            allowed_origins = kwargs["allow_origins"]
 
             # Seules les origines par défaut doivent être présentes
             assert "https://localhost" in allowed_origins
@@ -83,13 +84,13 @@ class TestConfigureCorsMiddleware:
         """Test de configuration CORS en développement."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_origins = kwargs['allow_origins']
+            allowed_origins = kwargs["allow_origins"]
 
             # Vérifier les origines de développement
             assert "http://localhost:3000" in allowed_origins
@@ -107,13 +108,13 @@ class TestConfigureCorsMiddleware:
         """Test des méthodes HTTP autorisées."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_methods = kwargs['allow_methods']
+            allowed_methods = kwargs["allow_methods"]
 
             expected_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
             for method in expected_methods:
@@ -123,13 +124,13 @@ class TestConfigureCorsMiddleware:
         """Test des headers autorisés."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_headers = kwargs['allow_headers']
+            allowed_headers = kwargs["allow_headers"]
 
             expected_headers = [
                 "Accept",
@@ -138,7 +139,7 @@ class TestConfigureCorsMiddleware:
                 "Content-Type",
                 "Authorization",
                 "X-Requested-With",
-                "X-Request-ID"
+                "X-Request-ID",
             ]
 
             for header in expected_headers:
@@ -148,13 +149,13 @@ class TestConfigureCorsMiddleware:
         """Test des headers exposés."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            expose_headers = kwargs['expose_headers']
+            expose_headers = kwargs["expose_headers"]
 
             assert "X-Request-ID" in expose_headers
             assert "X-Response-Time" in expose_headers
@@ -163,35 +164,35 @@ class TestConfigureCorsMiddleware:
         """Test de la configuration allow_credentials."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
 
-            assert kwargs['allow_credentials'] is True
+            assert kwargs["allow_credentials"] is True
 
     def test_configure_cors_max_age(self):
         """Test de la configuration max_age."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
 
-            assert kwargs['max_age'] == 600  # 10 minutes
+            assert kwargs["max_age"] == 600  # 10 minutes
 
     def test_configure_cors_logging_production(self):
         """Test du logging en mode production."""
         mock_app = Mock()
 
         with (
-            patch('backend.src.api.middleware.cors.settings') as mock_settings,
-            patch('backend.src.api.middleware.cors.logger') as mock_logger,
+            patch("backend.src.api.middleware.cors.settings") as mock_settings,
+            patch("backend.src.api.middleware.cors.logger") as mock_logger,
         ):
             mock_settings.is_production = True
             mock_settings.allowed_origins = None
@@ -209,8 +210,8 @@ class TestConfigureCorsMiddleware:
         mock_app = Mock()
 
         with (
-            patch('backend.src.api.middleware.cors.settings') as mock_settings,
-            patch('backend.src.api.middleware.cors.logger') as mock_logger,
+            patch("backend.src.api.middleware.cors.settings") as mock_settings,
+            patch("backend.src.api.middleware.cors.logger") as mock_logger,
         ):
             mock_settings.is_production = False
 
@@ -226,15 +227,17 @@ class TestConfigureCorsMiddleware:
         """Test du parsing des origines personnalisées."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             # Test avec espaces et virgules
-            mock_settings.allowed_origins = "https://site1.com, https://site2.com ,https://site3.com"
+            mock_settings.allowed_origins = (
+                "https://site1.com, https://site2.com ,https://site3.com"
+            )
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_origins = kwargs['allow_origins']
+            allowed_origins = kwargs["allow_origins"]
 
             # Les origines doivent être parsées correctement
             assert "https://site1.com" in allowed_origins
@@ -245,14 +248,14 @@ class TestConfigureCorsMiddleware:
         """Test avec origines personnalisées vides."""
         mock_app = Mock()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = ""  # Chaîne vide
 
             configure_cors_middleware(mock_app)
 
             args, kwargs = mock_app.add_middleware.call_args
-            allowed_origins = kwargs['allow_origins']
+            allowed_origins = kwargs["allow_origins"]
 
             # Seules les origines par défaut doivent être présentes
             assert len(allowed_origins) == 3  # 3 origines par défaut
@@ -267,7 +270,7 @@ class TestCorsIntegration:
 
         app = FastAPI()
 
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             # La configuration ne devrait pas lever d'erreur
@@ -282,14 +285,14 @@ class TestCorsIntegration:
         mock_app_dev = Mock()
 
         # Configuration production
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = None
 
             configure_cors_middleware(mock_app_prod)
 
         # Configuration développement
-        with patch('backend.src.api.middleware.cors.settings') as mock_settings:
+        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app_dev)
@@ -298,8 +301,8 @@ class TestCorsIntegration:
         prod_kwargs = mock_app_prod.add_middleware.call_args[1]
         dev_kwargs = mock_app_dev.add_middleware.call_args[1]
 
-        prod_origins = prod_kwargs['allow_origins']
-        dev_origins = dev_kwargs['allow_origins']
+        prod_origins = prod_kwargs["allow_origins"]
+        dev_origins = dev_kwargs["allow_origins"]
 
         # Vérifier les différences
         assert any(origin.startswith("https://") for origin in prod_origins)
@@ -312,7 +315,7 @@ class TestCorsIntegration:
         original_settings = Mock()
         original_settings.is_production = False
 
-        with patch('backend.src.api.middleware.cors.settings', original_settings):
+        with patch("backend.src.api.middleware.cors.settings", original_settings):
             configure_cors_middleware(mock_app)
 
             # Les settings ne doivent pas être modifiés

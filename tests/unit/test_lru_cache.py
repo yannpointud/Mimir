@@ -14,6 +14,7 @@ non-stream methods:
 The existing md5 non-stream methods (get_chat_response/set_chat_response) are
 left untouched and are not re-tested here.
 """
+
 import pytest
 
 from backend.src.cache.lru_cache import ChatCacheService
@@ -98,7 +99,8 @@ class TestStreamCacheGetSet:
         """The SHA-256 stream methods and the md5 non-stream methods do not
         collide: a stream set is not visible to the non-stream getter."""
         chat_cache.set_stream_response(
-            "shared question", "v1",
+            "shared question",
+            "v1",
             {"answer": "stream", "sources": [], "confidence_score": 0.5},
         )
 

@@ -50,11 +50,25 @@ class TestSimilarityFloorRawPool:
         )
         chunks = [
             # cosine 1.0 with the query -> always kept
-            Chunk(text="exact match", embedding=_unit(1.0), document_id="doc_hi",
-                  chunk_index=0, total_chunks=1, source="hi.txt", metadata={}),
+            Chunk(
+                text="exact match",
+                embedding=_unit(1.0),
+                document_id="doc_hi",
+                chunk_index=0,
+                total_chunks=1,
+                source="hi.txt",
+                metadata={},
+            ),
             # cosine 0.3 with the query -> below the 0.5 cosine threshold
-            Chunk(text="weak dense but exact term", embedding=_unit(0.3), document_id="doc_lo",
-                  chunk_index=0, total_chunks=1, source="lo.txt", metadata={}),
+            Chunk(
+                text="weak dense but exact term",
+                embedding=_unit(0.3),
+                document_id="doc_lo",
+                chunk_index=0,
+                total_chunks=1,
+                source="lo.txt",
+                metadata={},
+            ),
         ]
         assert store.upsert(chunks) is True
         return store
@@ -113,13 +127,20 @@ class TestGetBm25StoreSingleton:
 
 def _sr(chunk_id, document_id, text, source, score):
     return SearchResult(
-        chunk_id=chunk_id, document_id=document_id, text=text, source=source,
-        similarity_score=score, chunk_index=0, total_chunks=1, metadata={},
+        chunk_id=chunk_id,
+        document_id=document_id,
+        text=text,
+        source=source,
+        similarity_score=score,
+        chunk_index=0,
+        total_chunks=1,
+        metadata={},
     )
 
 
 def _fake_generate_stream(*chunks):
     """Return an async-generator function standing in for llm.generate_stream."""
+
     async def _gen(*args, **kwargs):
         for c in chunks:
             yield c
@@ -142,11 +163,16 @@ def _base_mocks():
     # No fuzzy filename pre-inclusion matches (keeps the pipeline on the pure
     # dense/hybrid retrieval path).
     mock_document_repository.get_all.return_value = []
-    mock_document_repository.get_by_ids.side_effect = lambda ids: {i: Mock(filename="doc.pdf") for i in ids}
+    mock_document_repository.get_by_ids.side_effect = lambda ids: {
+        i: Mock(filename="doc.pdf") for i in ids
+    }
 
     mock_llm_service.embed.return_value = AsyncMock(
-        embeddings=[[0.1] * 1024], usage_tokens=10,
-        model="mistral-embed", prompt_tokens=10, completion_tokens=0,
+        embeddings=[[0.1] * 1024],
+        usage_tokens=10,
+        model="mistral-embed",
+        prompt_tokens=10,
+        completion_tokens=0,
     )
     mock_llm_service.generate_stream = _fake_generate_stream("Réponse ", "synthétique.")
     return mock_llm_service, mock_vector_store, mock_document_repository, mock_rag_debug
@@ -166,8 +192,7 @@ async def _drain_result(**kwargs):
         elif etype == "done":
             sources = event.get("sources", [])
             confidence = event.get("confidence_score", 0.0)
-    return {"answer": "".join(answer_parts), "sources": sources,
-            "confidence_score": confidence}
+    return {"answer": "".join(answer_parts), "sources": sources, "confidence_score": confidence}
 
 
 class TestHybridBranch:
@@ -187,12 +212,33 @@ class TestHybridBranch:
         vs.query.return_value = dense_pool
         # chunk_id 3 is lexical-only: reconstructed from the FAISS metadata.
         vs.metadata = [
-            {"chunk_id": 1, "document_id": "10", "text": "dense and lexical hit",
-             "source": "a.txt", "chunk_index": 0, "total_chunks": 1, "metadata": {}},
-            {"chunk_id": 2, "document_id": "11", "text": "dense only hit",
-             "source": "b.txt", "chunk_index": 0, "total_chunks": 1, "metadata": {}},
-            {"chunk_id": 3, "document_id": "12", "text": "lexical only exact term",
-             "source": "c.txt", "chunk_index": 0, "total_chunks": 1, "metadata": {}},
+            {
+                "chunk_id": 1,
+                "document_id": "10",
+                "text": "dense and lexical hit",
+                "source": "a.txt",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "metadata": {},
+            },
+            {
+                "chunk_id": 2,
+                "document_id": "11",
+                "text": "dense only hit",
+                "source": "b.txt",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "metadata": {},
+            },
+            {
+                "chunk_id": 3,
+                "document_id": "12",
+                "text": "lexical only exact term",
+                "source": "c.txt",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "metadata": {},
+            },
         ]
 
         mock_bm25 = Mock()
@@ -210,17 +256,19 @@ class TestHybridBranch:
             mock_settings.confidence_algorithm = "weighted"
             mock_settings.filename_pre_inclusion = False
 
-            result = asyncio.run(_drain_result(
-                question="terme exact JIRA-4521",
-                context_limit=5,
-                include_sources=True,
-                session_id="hybrid_1",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-                bm25_store=mock_bm25,
-            ))
+            result = asyncio.run(
+                _drain_result(
+                    question="terme exact JIRA-4521",
+                    context_limit=5,
+                    include_sources=True,
+                    session_id="hybrid_1",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                    bm25_store=mock_bm25,
+                )
+            )
 
         # BM25 was actually consulted, and sources are non-empty (never zero by
         # threshold artifact).
@@ -251,17 +299,19 @@ class TestHybridBranch:
             mock_settings.confidence_algorithm = "weighted"
             mock_settings.filename_pre_inclusion = False
 
-            result = asyncio.run(_drain_result(
-                question="question dense",
-                context_limit=5,
-                include_sources=True,
-                session_id="dense_1",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-                bm25_store=mock_bm25,
-            ))
+            result = asyncio.run(
+                _drain_result(
+                    question="question dense",
+                    context_limit=5,
+                    include_sources=True,
+                    session_id="dense_1",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                    bm25_store=mock_bm25,
+                )
+            )
 
         mock_bm25.query.assert_not_called()
         assert isinstance(result, dict)
@@ -275,6 +325,7 @@ class TestHybridBranch:
         built, bm25_store.query() raises; the engine MUST degrade to dense-only and
         still answer, never surface the exception as a broken (confidence 0) reply."""
         from backend.src.rag_core.interfaces import VectorStoreOperationError
+
         llm, vs, docs, dbg = _base_mocks()
 
         dense_pool = [
@@ -283,10 +334,24 @@ class TestHybridBranch:
         ]
         vs.query.return_value = dense_pool
         vs.metadata = [
-            {"chunk_id": 1, "document_id": "10", "text": "dense hit one",
-             "source": "a.txt", "chunk_index": 0, "total_chunks": 1, "metadata": {}},
-            {"chunk_id": 2, "document_id": "11", "text": "dense hit two",
-             "source": "b.txt", "chunk_index": 0, "total_chunks": 1, "metadata": {}},
+            {
+                "chunk_id": 1,
+                "document_id": "10",
+                "text": "dense hit one",
+                "source": "a.txt",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "metadata": {},
+            },
+            {
+                "chunk_id": 2,
+                "document_id": "11",
+                "text": "dense hit two",
+                "source": "b.txt",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "metadata": {},
+            },
         ]
 
         mock_bm25 = Mock()
@@ -303,17 +368,19 @@ class TestHybridBranch:
             mock_settings.confidence_algorithm = "weighted"
             mock_settings.filename_pre_inclusion = False
 
-            result = asyncio.run(_drain_result(
-                question="question hybride sans index bm25",
-                context_limit=5,
-                include_sources=True,
-                session_id="degrade_1",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-                bm25_store=mock_bm25,
-            ))
+            result = asyncio.run(
+                _drain_result(
+                    question="question hybride sans index bm25",
+                    context_limit=5,
+                    include_sources=True,
+                    session_id="degrade_1",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                    bm25_store=mock_bm25,
+                )
+            )
 
         # BM25 was attempted and failed, but the engine still answered from the
         # dense pool (graceful degradation) with real sources + confidence.

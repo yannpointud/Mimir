@@ -9,7 +9,12 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from src.database.connection import get_db_session
-from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository, UsageRepository
+from src.database.repository import (
+    DocumentRepository,
+    ConfigurationRepository,
+    AuditLogRepository,
+    UsageRepository,
+)
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
 from src.auth.jwt_handler import jwt_handler
@@ -91,7 +96,7 @@ def get_llm_service() -> MistralAPIService:
             model=settings.mistral_model,
             embedding_model=settings.mistral_embedding_model,
             max_retries=3,
-            retry_delay=1.0
+            retry_delay=1.0,
         )
     return _llm_service
 
@@ -105,7 +110,7 @@ def get_vector_store() -> FaissVectorStore:
             index_path=settings.faiss_index_path,
             metadata_path=settings.faiss_metadata_path,
             similarity_threshold=settings.similarity_threshold,
-            index_type="FlatL2"
+            index_type="FlatL2",
         )
     return _vector_store
 
@@ -136,7 +141,9 @@ def get_ingestion_processor():
     """Get ingestion processor instance (singleton)."""
     global _ingestion_processor
     if _ingestion_processor is None:
-        raise RuntimeError("Ingestion processor not initialized. Application startup may have failed.")
+        raise RuntimeError(
+            "Ingestion processor not initialized. Application startup may have failed."
+        )
     return _ingestion_processor
 
 
@@ -153,7 +160,7 @@ def get_rag_debug_service():
         enabled=settings.rag_debug_enabled,
         log_prompts=settings.rag_debug_log_prompts,
         log_context=settings.rag_debug_log_context,
-        log_responses=settings.rag_debug_log_responses
+        log_responses=settings.rag_debug_log_responses,
     )
     return rag_debug_service
 

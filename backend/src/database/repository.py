@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 class BaseRepository:
     """Base repository with common operations"""
-    
+
     def __init__(self, session: Session):
         self.session = session
-    
+
     def _handle_db_error(self, e: Exception, operation: str):
         """Centralized database error handling"""
         logger.error(f"Database error during {operation}: {e}")
@@ -34,9 +34,10 @@ class DocumentRepository(BaseRepository):
     Repository for documents
     Handles document CRUD with integrated business logic
     """
-    
-    def create(self, filename: str, file_hash: str, path: str = None, 
-               preserve: bool = False) -> Document:
+
+    def create(
+        self, filename: str, file_hash: str, path: str = None, preserve: bool = False
+    ) -> Document:
         """
         Create a new document
 
@@ -58,23 +59,23 @@ class DocumentRepository(BaseRepository):
                 file_hash=file_hash,
                 path=path,
                 preserve=preserve,
-                status='pending'
+                status="pending",
             )
-            
+
             self.session.add(document)
             self.session.commit()
             self.session.refresh(document)
-            
+
             logger.info(f"Document created: {filename} (id={document.id})")
             return document
-            
+
         except IntegrityError as e:
             self._handle_db_error(e, f"create document {filename}")
             raise ValueError(f"Document with hash {file_hash} already exists") from e
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"create document {filename}")
             raise
-    
+
     def get_by_id(self, doc_id: int) -> Document | None:
         """Retrieve a document by its ID"""
         try:
@@ -82,7 +83,7 @@ class DocumentRepository(BaseRepository):
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"get document by id {doc_id}")
             raise
-    
+
     def get_by_ids(self, doc_ids: list[int]) -> dict[int, Document]:
         """Retrieve multiple documents by ID in a single query.
 
@@ -108,7 +109,7 @@ class DocumentRepository(BaseRepository):
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"get document by hash {file_hash}")
             raise
-    
+
     def get_by_status(self, status: str) -> list[Document]:
         """Retrieve all documents with a given status"""
         try:
@@ -116,9 +117,14 @@ class DocumentRepository(BaseRepository):
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"get documents by status {status}")
             raise
-    
-    def get_all(self, limit: int = None, offset: int = 0, 
-                order_by: str = 'created_at', desc_order: bool = True) -> list[Document]:
+
+    def get_all(
+        self,
+        limit: int = None,
+        offset: int = 0,
+        order_by: str = "created_at",
+        desc_order: bool = True,
+    ) -> list[Document]:
         """
         Retrieve all documents with pagination and sorting
 
@@ -130,14 +136,14 @@ class DocumentRepository(BaseRepository):
         """
         try:
             query = self.session.query(Document)
-            
+
             # Sorting
             order_field = getattr(Document, order_by, Document.created_at)
             if desc_order:
                 query = query.order_by(desc(order_field))
             else:
                 query = query.order_by(asc(order_field))
-            
+
             # Pagination
             if offset > 0:
                 query = query.offset(offset)
@@ -150,8 +156,9 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, "get all documents")
             raise
 
-    def get_all_paginated(self, offset: int = 0, limit: int = 50,
-                         filters: dict = None, search: str = None) -> tuple[list['Document'], int]:
+    def get_all_paginated(
+        self, offset: int = 0, limit: int = 50, filters: dict = None, search: str = None
+    ) -> tuple[list["Document"], int]:
         """
         Retrieve all documents with pagination and total count
 
@@ -193,8 +200,9 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, "get all documents paginated")
             raise
 
-    def update_status(self, doc_id: int, status: str,
-                     error_message: str = None, chunk_count: int = None):
+    def update_status(
+        self, doc_id: int, status: str, error_message: str = None, chunk_count: int = None
+    ):
         """
         Update a document's status
 
@@ -208,25 +216,25 @@ class DocumentRepository(BaseRepository):
             document = self.get_by_id(doc_id)
             if not document:
                 raise ValueError(f"Document {doc_id} not found")
-            
+
             old_status = document.status
             document.status = status
             document.error_message = error_message
-            
+
             if chunk_count is not None:
                 document.chunk_count = chunk_count
-            
-            if status == 'indexed':
+
+            if status == "indexed":
                 document.indexed_at = datetime.utcnow()
-            
+
             self.session.commit()
-            
+
             logger.info(f"Document {doc_id} status updated: {old_status} -> {status}")
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"update document {doc_id} status")
             raise
-    
+
     def delete(self, doc_id: int, force: bool = False) -> bool:
         """
         Delete a document
@@ -242,46 +250,46 @@ class DocumentRepository(BaseRepository):
             document = self.get_by_id(doc_id)
             if not document:
                 return False
-            
+
             if document.preserve and not force:
                 raise ValueError(f"Document {doc_id} is protected from deletion")
-            
+
             self.session.delete(document)
             self.session.commit()
-            
+
             logger.info(f"Document deleted: {document.filename} (id={doc_id})")
             return True
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"delete document {doc_id}")
             raise
-    
+
     def get_statistics(self) -> dict[str, Any]:
         """Return statistics about documents"""
         try:
             stats = {}
-            
+
             # Counts by status
-            for status in ['pending', 'indexing', 'indexed', 'error']:
+            for status in ["pending", "indexing", "indexed", "error"]:
                 count = self.session.query(Document).filter_by(status=status).count()
-                stats[f'count_{status}'] = count
-            
+                stats[f"count_{status}"] = count
+
             # Total count
-            stats['total_documents'] = self.session.query(Document).count()
-            
+            stats["total_documents"] = self.session.query(Document).count()
+
             # Total chunks
-            total_chunks = self.session.query(Document.chunk_count).filter(
-                Document.status == 'indexed'
-            ).all()
-            stats['total_chunks'] = sum(count[0] for count in total_chunks if count[0])
-            
+            total_chunks = (
+                self.session.query(Document.chunk_count).filter(Document.status == "indexed").all()
+            )
+            stats["total_chunks"] = sum(count[0] for count in total_chunks if count[0])
+
             # Protected documents
-            stats['protected_documents'] = self.session.query(Document).filter_by(
-                preserve=True
-            ).count()
-            
+            stats["protected_documents"] = (
+                self.session.query(Document).filter_by(preserve=True).count()
+            )
+
             return stats
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, "get document statistics")
             raise
@@ -289,7 +297,7 @@ class DocumentRepository(BaseRepository):
 
 class ConfigurationRepository(BaseRepository):
     """Repository for system configuration"""
-    
+
     def get(self, key: str) -> Configuration | None:
         """Retrieve a configuration by key"""
         try:
@@ -297,12 +305,12 @@ class ConfigurationRepository(BaseRepository):
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"get configuration {key}")
             raise
-    
+
     def get_value(self, key: str, default: str = None) -> str | None:
         """Retrieve the value of a configuration"""
         config = self.get(key)
         return config.value if config else default
-    
+
     def set(self, key: str, value: str) -> Configuration:
         """Set or update a configuration"""
         try:
@@ -313,17 +321,17 @@ class ConfigurationRepository(BaseRepository):
             else:
                 config = Configuration(key=key, value=value)
                 self.session.add(config)
-            
+
             self.session.commit()
             self.session.refresh(config)
-            
+
             logger.info(f"Configuration updated: {key}")
             return config
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"set configuration {key}")
             raise
-    
+
     def delete(self, key: str) -> bool:
         """Delete a configuration"""
         try:
@@ -334,11 +342,11 @@ class ConfigurationRepository(BaseRepository):
                 logger.info(f"Configuration deleted: {key}")
                 return True
             return False
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"delete configuration {key}")
             raise
-    
+
     def get_all(self) -> list[Configuration]:
         """Retrieve all configurations"""
         try:
@@ -350,10 +358,17 @@ class ConfigurationRepository(BaseRepository):
 
 class AuditLogRepository(BaseRepository):
     """Repository for audit logs"""
-    
-    def create_log(self, user_type: str, action: str, details: str = None,
-                   ip_address: str = None, user_agent: str = None,
-                   success: bool = True, additional_data: dict = None) -> AuditLog:
+
+    def create_log(
+        self,
+        user_type: str,
+        action: str,
+        details: str = None,
+        ip_address: str = None,
+        user_agent: str = None,
+        success: bool = True,
+        additional_data: dict = None,
+    ) -> AuditLog:
         """Create a new audit log"""
         try:
             # Note: additional_data is accepted for compatibility but not persisted
@@ -364,21 +379,22 @@ class AuditLogRepository(BaseRepository):
                 details=details,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                success=success
+                success=success,
             )
-            
+
             self.session.add(log_entry)
             self.session.commit()
             self.session.refresh(log_entry)
-            
+
             return log_entry
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"create audit log {action}")
             raise
-    
-    def get_logs(self, user_type: str = None, action: str = None,
-                 limit: int = 100, offset: int = 0) -> list[AuditLog]:
+
+    def get_logs(
+        self, user_type: str = None, action: str = None, limit: int = 100, offset: int = 0
+    ) -> list[AuditLog]:
         """
         Retrieve audit logs with filters
 
@@ -390,26 +406,27 @@ class AuditLogRepository(BaseRepository):
         """
         try:
             query = self.session.query(AuditLog)
-            
+
             if user_type:
                 query = query.filter_by(user_type=user_type)
-            
+
             if action:
                 query = query.filter(AuditLog.action.like(f"%{action}%"))
-            
+
             query = query.order_by(desc(AuditLog.created_at))
-            
+
             if offset > 0:
                 query = query.offset(offset)
-            
+
             return query.limit(limit).all()
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, "get audit logs")
             raise
-    
-    def get_logs_paginated(self, offset: int = 0, limit: int = 100,
-                           filters: dict = None) -> tuple[list[AuditLog], int]:
+
+    def get_logs_paginated(
+        self, offset: int = 0, limit: int = 100, filters: dict = None
+    ) -> tuple[list[AuditLog], int]:
         """
         Retrieve audit logs with pagination and total count
 
@@ -466,18 +483,18 @@ class AuditLogRepository(BaseRepository):
         """
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
-            
-            deleted_count = self.session.query(AuditLog).filter(
-                AuditLog.created_at < cutoff_date
-            ).delete()
-            
+
+            deleted_count = (
+                self.session.query(AuditLog).filter(AuditLog.created_at < cutoff_date).delete()
+            )
+
             self.session.commit()
-            
+
             if deleted_count > 0:
                 logger.info(f"Cleaned up {deleted_count} old audit logs")
-            
+
             return deleted_count
-            
+
         except SQLAlchemyError as e:
             self._handle_db_error(e, "cleanup audit logs")
             raise
@@ -494,9 +511,17 @@ class UsageRepository(BaseRepository):
         release), which make the daily cap race-free (anti-TOCTOU)
     """
 
-    def create_usage_entry(self, call_type: str, model: str, prompt_tokens: int,
-                            completion_tokens: int, total_tokens: int, cost_eur: float,
-                            estimated: bool = False, session_id: str | None = None) -> LlmUsage:
+    def create_usage_entry(
+        self,
+        call_type: str,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
+        cost_eur: float,
+        estimated: bool = False,
+        session_id: str | None = None,
+    ) -> LlmUsage:
         """
         Create a new per-call usage log entry.
 
@@ -522,7 +547,7 @@ class UsageRepository(BaseRepository):
                 total_tokens=total_tokens,
                 cost_eur=cost_eur,
                 estimated=estimated,
-                session_id=session_id
+                session_id=session_id,
             )
 
             self.session.add(usage_entry)
@@ -543,16 +568,16 @@ class UsageRepository(BaseRepository):
             List of {model, calls, prompt_tokens, completion_tokens, total_tokens, cost_eur}
         """
         try:
-            today = datetime.utcnow().strftime('%Y-%m-%d')
+            today = datetime.utcnow().strftime("%Y-%m-%d")
 
             rows = (
                 self.session.query(
                     LlmUsage.model,
-                    func.count(LlmUsage.id).label('calls'),
-                    func.sum(LlmUsage.prompt_tokens).label('prompt_tokens'),
-                    func.sum(LlmUsage.completion_tokens).label('completion_tokens'),
-                    func.sum(LlmUsage.total_tokens).label('total_tokens'),
-                    func.sum(LlmUsage.cost_eur).label('cost_eur'),
+                    func.count(LlmUsage.id).label("calls"),
+                    func.sum(LlmUsage.prompt_tokens).label("prompt_tokens"),
+                    func.sum(LlmUsage.completion_tokens).label("completion_tokens"),
+                    func.sum(LlmUsage.total_tokens).label("total_tokens"),
+                    func.sum(LlmUsage.cost_eur).label("cost_eur"),
                 )
                 .filter(func.date(LlmUsage.created_at) == today)
                 .group_by(LlmUsage.model)
@@ -561,12 +586,12 @@ class UsageRepository(BaseRepository):
 
             return [
                 {
-                    'model': row.model,
-                    'calls': row.calls,
-                    'prompt_tokens': row.prompt_tokens or 0,
-                    'completion_tokens': row.completion_tokens or 0,
-                    'total_tokens': row.total_tokens or 0,
-                    'cost_eur': row.cost_eur or 0.0,
+                    "model": row.model,
+                    "calls": row.calls,
+                    "prompt_tokens": row.prompt_tokens or 0,
+                    "completion_tokens": row.completion_tokens or 0,
+                    "total_tokens": row.total_tokens or 0,
+                    "cost_eur": row.cost_eur or 0.0,
                 }
                 for row in rows
             ]
@@ -592,11 +617,11 @@ class UsageRepository(BaseRepository):
 
             rows = (
                 self.session.query(
-                    date_col.label('date'),
+                    date_col.label("date"),
                     LlmUsage.model,
-                    func.count(LlmUsage.id).label('calls'),
-                    func.sum(LlmUsage.total_tokens).label('tokens'),
-                    func.sum(LlmUsage.cost_eur).label('cost_eur'),
+                    func.count(LlmUsage.id).label("calls"),
+                    func.sum(LlmUsage.total_tokens).label("tokens"),
+                    func.sum(LlmUsage.cost_eur).label("cost_eur"),
                 )
                 .filter(LlmUsage.created_at >= cutoff_date)
                 .group_by(date_col, LlmUsage.model)
@@ -606,11 +631,11 @@ class UsageRepository(BaseRepository):
 
             return [
                 {
-                    'date': row.date,
-                    'model': row.model,
-                    'calls': row.calls,
-                    'tokens': row.tokens or 0,
-                    'cost_eur': row.cost_eur or 0.0,
+                    "date": row.date,
+                    "model": row.model,
+                    "calls": row.calls,
+                    "tokens": row.tokens or 0,
+                    "cost_eur": row.cost_eur or 0.0,
                 }
                 for row in rows
             ]
@@ -622,7 +647,7 @@ class UsageRepository(BaseRepository):
     def get_today_ledger(self) -> LlmBudgetLedger | None:
         """Retrieve today's budget ledger row, or None if it does not exist yet."""
         try:
-            today = datetime.utcnow().strftime('%Y-%m-%d')
+            today = datetime.utcnow().strftime("%Y-%m-%d")
             return self.session.query(LlmBudgetLedger).filter_by(date=today).first()
         except SQLAlchemyError as e:
             self._handle_db_error(e, "get today budget ledger")
@@ -642,9 +667,9 @@ class UsageRepository(BaseRepository):
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
 
-            deleted_count = self.session.query(LlmUsage).filter(
-                LlmUsage.created_at < cutoff_date
-            ).delete()
+            deleted_count = (
+                self.session.query(LlmUsage).filter(LlmUsage.created_at < cutoff_date).delete()
+            )
 
             self.session.commit()
 
@@ -747,6 +772,7 @@ class UsageRepository(BaseRepository):
 
 # Factory function to create repositories with a session
 
+
 def create_repositories(session: Session) -> dict[str, Any]:
     """
     Factory to create all repositories with a given session
@@ -755,8 +781,8 @@ def create_repositories(session: Session) -> dict[str, Any]:
         Dictionary containing all repositories
     """
     return {
-        'document': DocumentRepository(session),
-        'config': ConfigurationRepository(session),
-        'audit': AuditLogRepository(session),
-        'usage': UsageRepository(session)
+        "document": DocumentRepository(session),
+        "config": ConfigurationRepository(session),
+        "audit": AuditLogRepository(session),
+        "usage": UsageRepository(session),
     }

@@ -8,9 +8,11 @@ from typing import Any
 from dataclasses import dataclass
 import numpy as np
 
+
 @dataclass
 class Chunk:
     """Represents a text chunk with embedding"""
+
     text: str
     embedding: np.ndarray
     document_id: str
@@ -20,9 +22,11 @@ class Chunk:
     metadata: dict[str, Any]
     preserve: bool = False
 
+
 @dataclass
 class SearchResult:
     """Result from vector similarity search"""
+
     chunk_id: int
     document_id: str
     text: str
@@ -32,17 +36,24 @@ class SearchResult:
     total_chunks: int
     metadata: dict[str, Any]
 
+
 class VectorStoreException(Exception):
     """Base exception for vector store operations"""
+
     pass
+
 
 class VectorStoreConnectionError(VectorStoreException):
     """Vector store connection/persistence errors"""
+
     pass
+
 
 class VectorStoreOperationError(VectorStoreException):
     """Vector store operation errors"""
+
     pass
+
 
 class AbstractVectorStore(ABC):
     """
@@ -67,10 +78,9 @@ class AbstractVectorStore(ABC):
         pass
 
     @abstractmethod
-    def query(self,
-              vector: np.ndarray,
-              top_k: int = 5,
-              filter_dict: dict[str, Any] | None = None) -> list[SearchResult]:
+    def query(
+        self, vector: np.ndarray, top_k: int = 5, filter_dict: dict[str, Any] | None = None
+    ) -> list[SearchResult]:
         """
         Search for similar vectors
 

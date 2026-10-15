@@ -36,9 +36,9 @@ def get_client_identifier(request: Request) -> str:
         str: Client identifier
     """
     # Check if user is authenticated
-    if hasattr(request.state, 'jwt_payload') and request.state.jwt_payload:
-        user_id = request.state.jwt_payload.get('sub')
-        user_type = request.state.jwt_payload.get('user_type')
+    if hasattr(request.state, "jwt_payload") and request.state.jwt_payload:
+        user_id = request.state.jwt_payload.get("sub")
+        user_type = request.state.jwt_payload.get("user_type")
         if user_id:
             return f"user:{user_type}:{user_id}"
 
@@ -92,8 +92,6 @@ def configure_rate_limiting(app):
         )
         # Inject Retry-After and X-RateLimit-* headers from the window state
         # recorded by the limit check (request.state.view_rate_limit)
-        return request.app.state.limiter._inject_headers(
-            response, request.state.view_rate_limit
-        )
+        return request.app.state.limiter._inject_headers(response, request.state.view_rate_limit)
 
     logger.info("Rate limiting configured successfully")

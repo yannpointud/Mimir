@@ -86,9 +86,7 @@ def _resolve_metrics(names: list[str]):
     resolved = []
     for name in names:
         if name not in registry:
-            raise ValueError(
-                f"Unknown metric '{name}'. Choose from: {', '.join(registry)}"
-            )
+            raise ValueError(f"Unknown metric '{name}'. Choose from: {', '.join(registry)}")
         resolved.append(registry[name])
     return resolved
 
@@ -109,9 +107,7 @@ def _nan_rate(values: list[float]) -> float:
     return nan_count / len(values)
 
 
-def _summarize(
-    df, metric_names: list[str], is_adversarial: list[bool]
-) -> dict[str, Any]:
+def _summarize(df, metric_names: list[str], is_adversarial: list[bool]) -> dict[str, Any]:
     """Compute per-metric mean + NaN rate (overall / corpus / adversarial).
 
     Splitting the NaN rate on adversarial vs corpus questions is what lets a
@@ -154,18 +150,40 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "métrique. MISTRAL_API_KEY via environnement, jamais loggée."
         )
     )
-    parser.add_argument("--in", dest="in_path", type=Path, default=_DEFAULT_IN,
-                        help="Chemin de eval_input.jsonl (entrée).")
-    parser.add_argument("--out", type=Path, default=None,
-                        help="Chemin du JSON de résultats (défaut: results/baseline_run_{N}.json).")
-    parser.add_argument("--run", type=int, default=1,
-                        help="Numéro de run (utilisé pour le nom de fichier par défaut).")
-    parser.add_argument("--metrics", type=str, default=",".join(_ALL_METRICS),
-                        help="Liste de métriques séparées par des virgules.")
-    parser.add_argument("--model", type=str, default="mistral-small-latest",
-                        help="Modèle juge Mistral (chat).")
-    parser.add_argument("--embedding-model", type=str, default="mistral-embed",
-                        help="Modèle d'embeddings Mistral pour answer_relevancy.")
+    parser.add_argument(
+        "--in",
+        dest="in_path",
+        type=Path,
+        default=_DEFAULT_IN,
+        help="Chemin de eval_input.jsonl (entrée).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Chemin du JSON de résultats (défaut: results/baseline_run_{N}.json).",
+    )
+    parser.add_argument(
+        "--run",
+        type=int,
+        default=1,
+        help="Numéro de run (utilisé pour le nom de fichier par défaut).",
+    )
+    parser.add_argument(
+        "--metrics",
+        type=str,
+        default=",".join(_ALL_METRICS),
+        help="Liste de métriques séparées par des virgules.",
+    )
+    parser.add_argument(
+        "--model", type=str, default="mistral-small-latest", help="Modèle juge Mistral (chat)."
+    )
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default="mistral-embed",
+        help="Modèle d'embeddings Mistral pour answer_relevancy.",
+    )
     return parser
 
 
@@ -181,6 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     # is down here). Default behavior is unchanged when the flag is unset.
     if os.environ.get("RAGAS_FORCE_IPV4") == "1":
         import socket as _socket
+
         _orig_getaddrinfo = _socket.getaddrinfo
 
         def _getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
@@ -195,14 +214,17 @@ def main(argv: list[str] | None = None) -> int:
     if not os.environ.get("MISTRAL_API_KEY"):
         try:
             from dotenv import load_dotenv
+
             load_dotenv(Path(__file__).resolve().parents[2] / "backend" / ".env")
         except ImportError:
             pass
 
     if not os.environ.get("MISTRAL_API_KEY"):
         # Fail fast with an actionable message; never echo the key itself.
-        print("MISTRAL_API_KEY absente de l'environnement -- exportez-la avant de scorer.",
-              file=sys.stderr)
+        print(
+            "MISTRAL_API_KEY absente de l'environnement -- exportez-la avant de scorer.",
+            file=sys.stderr,
+        )
         return 2
 
     metric_names = [m.strip() for m in args.metrics.split(",") if m.strip()]
@@ -269,8 +291,10 @@ def main(argv: list[str] | None = None) -> int:
     for name, stats in per_metric.items():
         mean = stats["mean"]
         mean_str = f"{mean:.3f}" if mean is not None else "NaN"
-        print(f"  {name}: mean={mean_str} nan_rate={stats['nan_rate']:.1%} "
-              f"(corpus={stats['nan_rate_corpus']:.1%}, adv={stats['nan_rate_adversarial']:.1%})")
+        print(
+            f"  {name}: mean={mean_str} nan_rate={stats['nan_rate']:.1%} "
+            f"(corpus={stats['nan_rate_corpus']:.1%}, adv={stats['nan_rate_adversarial']:.1%})"
+        )
     return 0
 
 

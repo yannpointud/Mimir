@@ -31,18 +31,20 @@ router = APIRouter(
     responses={
         401: {"description": "Authentication failed"},
         403: {"description": "Access forbidden"},
-    }
+    },
 )
 
 
 class LoginRequest(BaseModel):
     """Request model for login."""
+
     username: str
     password: str
 
 
 class LoginResponse(BaseModel):
     """Response model for successful login."""
+
     access_token: str
     token_type: str = "bearer"
     expires_in: int
@@ -51,12 +53,14 @@ class LoginResponse(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     """Request model for password change."""
+
     current_password: str
     new_password: str
 
 
 class TokenRefreshResponse(BaseModel):
     """Response model for token refresh."""
+
     access_token: str
     token_type: str = "bearer"
     expires_in: int
@@ -66,13 +70,14 @@ class TokenRefreshResponse(BaseModel):
 # Rate limit per IP: login is anonymous, IP is the only identity.
 # Callable limit is re-evaluated on every request (configurable via .env,
 # patchable in tests without module reload).
-@limiter.limit(lambda: f"{settings.rate_limit_login_per_minute}/minute",
-               key_func=get_remote_address)
+@limiter.limit(
+    lambda: f"{settings.rate_limit_login_per_minute}/minute", key_func=get_remote_address
+)
 async def login(
     request: Request,
     response: Response,
     login_data: LoginRequest,
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
+    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> LoginResponse:
     """
     Authenticate admin user and return access token.
@@ -99,26 +104,20 @@ async def login(
                 username=login_data.username,
                 ip_address=client_ip,
                 success=False,
-                details="Invalid credentials"
+                details="Invalid credentials",
             )
 
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Bearer"}
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
         # Create access token
-        token_data = {
-            "sub": login_data.username,
-            "user_type": "admin"
-        }
+        token_data = {"sub": login_data.username, "user_type": "admin"}
 
         expires_delta = timedelta(hours=settings.jwt_expiration_hours)
-        access_token = jwt_handler.create_access_token(
-            data=token_data,
-            expires_delta=expires_delta
-        )
+        access_token = jwt_handler.create_access_token(data=token_data, expires_delta=expires_delta)
 
         # Log successful login
         await _log_auth_event(
@@ -127,7 +126,7 @@ async def login(
             username=login_data.username,
             ip_address=client_ip,
             success=True,
-            details="Admin login successful"
+            details="Admin login successful",
         )
 
         logger.info(f"Admin login successful - user: {login_data.username}, IP: {client_ip}")
@@ -136,7 +135,7 @@ async def login(
             access_token=access_token,
             token_type="bearer",
             expires_in=settings.jwt_expiration_hours * 3600,  # Convert to seconds
-            user_type="admin"
+            user_type="admin",
         )
 
     except HTTPException:
@@ -151,12 +150,11 @@ async def login(
             username=login_data.username,
             ip_address=client_ip,
             success=False,
-            details=f"System error: {str(e)}"
+            details=f"System error: {str(e)}",
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication system error"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authentication system error"
         ) from e
 
 
@@ -164,7 +162,7 @@ async def login(
 async def logout(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
+    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> dict[str, str]:
     """
     Logout current user (invalidate session).
@@ -190,7 +188,7 @@ async def logout(
             username=current_user.get("sub", "unknown"),
             ip_address=client_ip,
             success=True,
-            details="User logout"
+            details="User logout",
         )
 
         logger.info(f"User logout - user: {current_user.get('sub')}, IP: {client_ip}")
@@ -206,7 +204,7 @@ async def logout(
 async def refresh_token(
     request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
+    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> TokenRefreshResponse:
     """
     Refresh access token for authenticated user.
@@ -223,15 +221,11 @@ async def refresh_token(
 
     try:
         # Create new token with same claims
-        token_data = {
-            "sub": current_user["sub"],
-            "user_type": current_user["user_type"]
-        }
+        token_data = {"sub": current_user["sub"], "user_type": current_user["user_type"]}
 
         expires_delta = timedelta(hours=settings.jwt_expiration_hours)
         new_access_token = jwt_handler.create_access_token(
-            data=token_data,
-            expires_delta=expires_delta
+            data=token_data, expires_delta=expires_delta
         )
 
         # Log token refresh
@@ -241,7 +235,7 @@ async def refresh_token(
             username=current_user["sub"],
             ip_address=client_ip,
             success=True,
-            details="Token refreshed successfully"
+            details="Token refreshed successfully",
         )
 
         logger.debug(f"Token refreshed for user: {current_user['sub']}")
@@ -249,7 +243,7 @@ async def refresh_token(
         return TokenRefreshResponse(
             access_token=new_access_token,
             token_type="bearer",
-            expires_in=settings.jwt_expiration_hours * 3600
+            expires_in=settings.jwt_expiration_hours * 3600,
         )
 
     except Exception as e:
@@ -261,18 +255,17 @@ async def refresh_token(
             username=current_user.get("sub", "unknown"),
             ip_address=client_ip,
             success=False,
-            details=f"Token refresh failed: {str(e)}"
+            details=f"Token refresh failed: {str(e)}",
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Token refresh failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed"
         ) from e
 
 
 @router.get("/me")
 async def get_current_user_info(
-    current_user: dict[str, Any] = Depends(get_current_user)
+    current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     """
     Get current authenticated user information.
@@ -287,13 +280,13 @@ async def get_current_user_info(
         "username": current_user["sub"],
         "user_type": current_user["user_type"],
         "token_issued_at": current_user.get("iat"),
-        "token_expires_at": current_user.get("exp")
+        "token_expires_at": current_user.get("exp"),
     }
 
 
 @router.post("/verify-admin")
 async def verify_admin_access(
-    admin_user: dict[str, Any] = Depends(require_admin)
+    admin_user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, str]:
     """
     Verify admin access (protected endpoint for testing admin auth).
@@ -304,10 +297,7 @@ async def verify_admin_access(
     Returns:
         dict: Confirmation message
     """
-    return {
-        "message": "Admin access confirmed",
-        "user": admin_user["sub"]
-    }
+    return {"message": "Admin access confirmed", "user": admin_user["sub"]}
 
 
 @router.post("/change-password")
@@ -315,7 +305,7 @@ async def change_password(
     request: Request,
     data: ChangePasswordRequest,
     admin_user: dict[str, Any] = Depends(require_admin),
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository)
+    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> dict[str, str]:
     """
     Change admin password.
@@ -340,21 +330,17 @@ async def change_password(
             username=username,
             ip_address=client_ip,
             success=False,
-            details="Invalid current password"
+            details="Invalid current password",
         )
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Mot de passe actuel incorrect"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Mot de passe actuel incorrect"
         )
 
     # Validate new password strength
     validation = validate_password_strength(data.new_password)
     if not validation["valid"]:
         errors_text = ". ".join(validation["errors"])
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=errors_text
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=errors_text)
 
     # Hash new password and persist
     new_hash = jwt_handler.hash_password(data.new_password)
@@ -365,7 +351,7 @@ async def change_password(
         logger.error(f"Failed to update .env file: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de la mise à jour du fichier de configuration"
+            detail="Erreur lors de la mise à jour du fichier de configuration",
         ) from e
 
     await _log_auth_event(
@@ -374,7 +360,7 @@ async def change_password(
         username=username,
         ip_address=client_ip,
         success=True,
-        details="Admin password changed successfully"
+        details="Admin password changed successfully",
     )
 
     logger.info(f"Admin password changed by user: {username}, IP: {client_ip}")
@@ -472,7 +458,7 @@ async def _log_auth_event(
     username: str,
     ip_address: str,
     success: bool,
-    details: str = None
+    details: str = None,
 ):
     """
     Log authentication event to audit log.
@@ -492,10 +478,7 @@ async def _log_auth_event(
             details=details,
             ip_address=ip_address,
             success=success,
-            additional_data={
-                "username": username,
-                "timestamp": "auto"
-            }
+            additional_data={"username": username, "timestamp": "auto"},
         )
     except Exception as e:
         logger.error(f"Failed to log auth event: {e}")

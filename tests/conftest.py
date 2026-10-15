@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 import sys
 
 # Add backend to PATH
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../backend"))
 
 from src.config import Settings
 from src.database.models import Base
@@ -24,7 +24,7 @@ def test_settings():
     """Test configuration with temporary database"""
     with tempfile.TemporaryDirectory() as temp_dir:
         test_db_path = Path(temp_dir) / "test.db"
-        
+
         # Test configuration
         test_config = {
             "database_url": f"sqlite:///{test_db_path}",
@@ -36,9 +36,9 @@ def test_settings():
             "upload_dir": str(Path(temp_dir) / "uploads"),
             "watch_folder": str(Path(temp_dir) / "watch"),
             "cache_enabled": False,  # Disabled for tests
-            "log_level": "DEBUG"
+            "log_level": "DEBUG",
         }
-        
+
         yield Settings(**test_config)
 
 
@@ -46,16 +46,14 @@ def test_settings():
 def test_engine(test_settings):
     """Test database engine"""
     engine = create_engine(
-        test_settings.database_url_sync,
-        echo=False,
-        connect_args={"check_same_thread": False}
+        test_settings.database_url_sync, echo=False, connect_args={"check_same_thread": False}
     )
-    
+
     # Create tables
     Base.metadata.create_all(bind=engine)
-    
+
     yield engine
-    
+
     # Cleanup
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
@@ -66,11 +64,11 @@ def test_session(test_engine):
     """Test session with automatic rollback"""
     connection = test_engine.connect()
     transaction = connection.begin()
-    
+
     session = sessionmaker(bind=connection)()
-    
+
     yield session
-    
+
     session.close()
     transaction.rollback()
     connection.close()
@@ -89,17 +87,14 @@ def sample_document_data():
         "filename": "test_document.pdf",
         "file_hash": "a1b2c3d4e5f6789012345678901234567890123456789012345678901234567890",
         "path": "/test/path/test_document.pdf",
-        "preserve": False
+        "preserve": False,
     }
 
 
 @pytest.fixture
 def sample_config_data():
     """Test data for configuration"""
-    return {
-        "key": "test_setting",
-        "value": "test_value"
-    }
+    return {"key": "test_setting", "value": "test_value"}
 
 
 @pytest.fixture
@@ -110,7 +105,7 @@ def sample_audit_data():
         "action": "test_action",
         "details": "Test action details",
         "ip_address": "127.0.0.1",
-        "success": True
+        "success": True,
     }
 
 
@@ -145,29 +140,27 @@ def disable_rate_limiter():
 def test_app():
     """Test FastAPI application"""
     from src.config import settings
-    
+
     # Override settings for tests
     original_values = {}
-    test_values = {
-        'cache_enabled': False,
-        'log_level': 'DEBUG'
-    }
-    
+    test_values = {"cache_enabled": False, "log_level": "DEBUG"}
+
     # Save and override
     for key, value in test_values.items():
         original_values[key] = getattr(settings, key)
         setattr(settings, key, value)
-    
+
     from main import app
-    
+
     yield app
-    
+
     # Restore
     for key, value in original_values.items():
         setattr(settings, key, value)
 
 
 # Test utilities
+
 
 def create_test_file(directory: Path, filename: str, content: str = "test content") -> Path:
     """Create a test file"""
@@ -181,4 +174,6 @@ def assert_model_dict_subset(model_dict: dict, expected_subset: dict):
     """Verify that a model dictionary contains the expected key/value pairs"""
     for key, expected_value in expected_subset.items():
         assert key in model_dict, f"Key '{key}' not found in model dict"
-        assert model_dict[key] == expected_value, f"Expected {key}={expected_value}, got {model_dict[key]}"
+        assert model_dict[key] == expected_value, (
+            f"Expected {key}={expected_value}, got {model_dict[key]}"
+        )

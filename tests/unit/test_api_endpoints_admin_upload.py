@@ -33,23 +33,23 @@ def temp_upload_dir():
 
 def _run_admin_upload(mock_file, ingestion_processor=None):
     """Call the endpoint function directly (same pattern as documents tests)."""
-    return asyncio.run(admin_upload_document(
-        request=Mock(),  # required by slowapi decorator
-        response=Mock(),  # required by slowapi header injection
-        file=mock_file,
-        preserve=False,
-        current_user={"username": "admin", "user_type": "admin"},
-        ingestion_processor=ingestion_processor or Mock()
-    ))
+    return asyncio.run(
+        admin_upload_document(
+            request=Mock(),  # required by slowapi decorator
+            response=Mock(),  # required by slowapi header injection
+            file=mock_file,
+            preserve=False,
+            current_user={"username": "admin", "user_type": "admin"},
+            ingestion_processor=ingestion_processor or Mock(),
+        )
+    )
 
 
 class TestAdminUploadInputValidation:
     """Size and empty-file guards, parity with /documents/upload."""
 
-    @patch('backend.src.api.endpoints.admin.settings')
-    def test_admin_upload_file_too_large_returns_413(
-        self, mock_settings, mock_upload_file
-    ):
+    @patch("backend.src.api.endpoints.admin.settings")
+    def test_admin_upload_file_too_large_returns_413(self, mock_settings, mock_upload_file):
         """A file above max_file_size_mb is rejected with 413 before read()."""
         mock_settings.max_file_size_mb = 5
         mock_upload_file.size = 10 * 1024 * 1024  # 10MB > 5MB limit
@@ -63,12 +63,11 @@ class TestAdminUploadInputValidation:
         assert exc_info.value.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
         assert "File too large" in str(exc_info.value.detail)
 
-    @patch('src.database.repository.DocumentRepository')
-    @patch('src.database.connection.get_db_session')
-    @patch('backend.src.api.endpoints.admin.settings')
+    @patch("src.database.repository.DocumentRepository")
+    @patch("src.database.connection.get_db_session")
+    @patch("backend.src.api.endpoints.admin.settings")
     def test_admin_upload_empty_file_returns_400(
-        self, mock_settings, mock_get_db_session, mock_repo_cls,
-        mock_upload_file, temp_upload_dir
+        self, mock_settings, mock_get_db_session, mock_repo_cls, mock_upload_file, temp_upload_dir
     ):
         """An empty file is rejected with 400 and never persisted."""
         mock_settings.max_file_size_mb = 10
@@ -92,12 +91,11 @@ class TestAdminUploadQueueFullCleanup:
     file must be rolled back, otherwise any retry of the same file hits 409
     (get_by_hash matches the orphaned pending record) and is never ingested."""
 
-    @patch('src.database.repository.DocumentRepository')
-    @patch('src.database.connection.get_db_session')
-    @patch('backend.src.api.endpoints.admin.settings')
+    @patch("src.database.repository.DocumentRepository")
+    @patch("src.database.connection.get_db_session")
+    @patch("backend.src.api.endpoints.admin.settings")
     def test_admin_upload_queue_full_deletes_record_and_file(
-        self, mock_settings, mock_get_db_session, mock_repo_cls,
-        mock_upload_file, temp_upload_dir
+        self, mock_settings, mock_get_db_session, mock_repo_cls, mock_upload_file, temp_upload_dir
     ):
         """queue_document() == False -> 503 + record deleted + file removed."""
         import hashlib
@@ -126,5 +124,4 @@ class TestAdminUploadQueueFullCleanup:
 
         assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         mock_repo.delete.assert_called_once_with(3, force=True)
-        assert not expected_path.exists(), \
-            "stored file must be removed on queue-full rejection"
+        assert not expected_path.exists(), "stored file must be removed on queue-full rejection"

@@ -8,9 +8,7 @@ import logging
 import tempfile
 from pathlib import Path
 
-from src.monitoring.logger import (
-    JSONFormatter, ConsoleFormatter, setup_logger
-)
+from src.monitoring.logger import JSONFormatter, ConsoleFormatter, setup_logger
 
 
 class TestJSONFormatterSimple:
@@ -20,8 +18,13 @@ class TestJSONFormatterSimple:
         """Test basic JSON formatting."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=10,
-            msg="Test message", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test message",
+            args=(),
+            exc_info=None,
         )
         # Add required attributes
         record.module = "test_module"
@@ -35,28 +38,33 @@ class TestJSONFormatterSimple:
         assert isinstance(result, str)
         # Verify it is valid JSON
         data = json.loads(result)
-        assert data['level'] == 'INFO'
-        assert data['message'] == 'Test message'
+        assert data["level"] == "INFO"
+        assert data["message"] == "Test message"
 
     def test_json_formatter_with_extra(self):
         """Test with extra fields."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.ERROR, pathname="test.py", lineno=10,
-            msg="Error", args=(), exc_info=None
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=10,
+            msg="Error",
+            args=(),
+            exc_info=None,
         )
         record.module = "test"
         record.funcName = "test"
         record.process = 1234
         record.thread = 5678
         record.threadName = "MainThread"
-        record.extra_fields = {'key': 'value'}
+        record.extra_fields = {"key": "value"}
 
         result = formatter.format(record)
         data = json.loads(result)
 
-        assert data['key'] == 'value'
-        assert data['level'] == 'ERROR'
+        assert data["key"] == "value"
+        assert data["level"] == "ERROR"
 
 
 class TestConsoleFormatterSimple:
@@ -71,8 +79,13 @@ class TestConsoleFormatterSimple:
         """Test console formatting."""
         formatter = ConsoleFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=10,
-            msg="Test", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=10,
+            msg="Test",
+            args=(),
+            exc_info=None,
         )
 
         result = formatter.format(record)
@@ -166,8 +179,13 @@ class TestLoggerFunctionalitySimple:
         """Test formatter without exception info."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=1,
-            msg="No exception", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="No exception",
+            args=(),
+            exc_info=None,
         )
         record.module = "test"
         record.funcName = "test"
@@ -178,15 +196,20 @@ class TestLoggerFunctionalitySimple:
         result = formatter.format(record)
         data = json.loads(result)
 
-        assert 'exception' not in data
-        assert data['message'] == 'No exception'
+        assert "exception" not in data
+        assert data["message"] == "No exception"
 
     def test_json_formatter_ensure_ascii_false(self):
         """Test that ensure_ascii=False works."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="test.py", lineno=1,
-            msg="Message avec accents: café", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="Message avec accents: café",
+            args=(),
+            exc_info=None,
         )
         record.module = "test"
         record.funcName = "test"
@@ -200,4 +223,4 @@ class TestLoggerFunctionalitySimple:
         assert "café" in result
         # And be valid JSON
         data = json.loads(result)
-        assert data['message'] == "Message avec accents: café"
+        assert data["message"] == "Message avec accents: café"

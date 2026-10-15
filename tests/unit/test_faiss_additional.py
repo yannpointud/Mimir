@@ -25,9 +25,7 @@ class TestFaissVectorStoreAdditional:
             index_path = Path(temp_dir) / "test.index"
             metadata_path = Path(temp_dir) / "test.metadata"
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
             yield store
 
@@ -38,9 +36,7 @@ class TestFaissVectorStoreAdditional:
             metadata_path = Path(temp_dir) / "test.metadata"
 
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
             assert store.dimension == 128
@@ -53,14 +49,12 @@ class TestFaissVectorStoreAdditional:
             metadata_path = Path(temp_dir) / "test.metadata"
 
             store = FaissVectorStore(
-                dimension=64,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=64, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
             # Test des propriétés
-            assert hasattr(store, 'dimension')
-            assert hasattr(store, 'index')
+            assert hasattr(store, "dimension")
+            assert hasattr(store, "index")
             assert store.dimension == 64
 
     def test_faiss_store_add_chunks_basic(self, temp_store):
@@ -74,7 +68,7 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=0,
                 total_chunks=2,
                 source="test_source",
-                metadata={"id": "1"}
+                metadata={"id": "1"},
             ),
             Chunk(
                 text="Test chunk 2",
@@ -83,8 +77,8 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=1,
                 total_chunks=2,
                 source="test_source",
-                metadata={"id": "2"}
-            )
+                metadata={"id": "2"},
+            ),
         ]
 
         # Ajouter les chunks - ne doit pas lever d'exception
@@ -108,7 +102,7 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"id": str(i)}
+                metadata={"id": str(i)},
             )
             for i in range(5)
         ]
@@ -126,7 +120,7 @@ class TestFaissVectorStoreAdditional:
         """Test des statistiques du store"""
         # Au début, doit être 0
         stats = temp_store.get_stats()
-        assert stats['total_vectors'] == 0
+        assert stats["total_vectors"] == 0
 
         # Ajouter des chunks
         chunks = [
@@ -137,14 +131,14 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"id": "1"}
+                metadata={"id": "1"},
             )
         ]
         temp_store.upsert(chunks)
 
         # Maintenant doit être 1
         stats = temp_store.get_stats()
-        assert stats['total_vectors'] == 1
+        assert stats["total_vectors"] == 1
 
     def test_faiss_store_delete_documents(self, temp_store):
         """Test de suppression de documents"""
@@ -157,13 +151,13 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"id": str(i)}
+                metadata={"id": str(i)},
             )
             for i in range(5)  # 5 chunks, supprimer 1 = 20% < 25%
         ]
         temp_store.upsert(chunks)
         stats = temp_store.get_stats()
-        initial_total = stats['total_vectors']
+        initial_total = stats["total_vectors"]
         assert initial_total == 5
 
         # Supprimer un document (ne déclenche pas l'optimisation car <25%)
@@ -172,9 +166,9 @@ class TestFaissVectorStoreAdditional:
 
         # Vérifier que le document a été marqué comme supprimé
         # L'optimisation ne se déclenche pas car 1/5 = 20% < 25%
-        assert stats_after['deleted_vectors'] == 1
-        assert stats_after['active_vectors'] == 4
-        assert stats_after['total_vectors'] == initial_total  # Index pas reconstruit
+        assert stats_after["deleted_vectors"] == 1
+        assert stats_after["active_vectors"] == 4
+        assert stats_after["total_vectors"] == initial_total  # Index pas reconstruit
 
     def test_faiss_store_different_dimensions(self):
         """Test avec différentes dimensions"""
@@ -184,9 +178,7 @@ class TestFaissVectorStoreAdditional:
                 metadata_path = Path(temp_dir) / f"test_{dim}.metadata"
 
                 store = FaissVectorStore(
-                    dimension=dim,
-                    index_path=str(index_path),
-                    metadata_path=str(metadata_path)
+                    dimension=dim, index_path=str(index_path), metadata_path=str(metadata_path)
                 )
                 assert store.dimension == dim
 
@@ -208,7 +200,7 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"document_id": "doc_1", "type": "test", "score": 0.9}
+                metadata={"document_id": "doc_1", "type": "test", "score": 0.9},
             )
         ]
 
@@ -225,7 +217,7 @@ class TestFaissVectorStoreAdditional:
 
         assert len(results) >= 0  # Au moins 0 résultats (peut être vide si seuil trop haut)
         if len(results) > 0:
-            assert hasattr(results[0], 'metadata')
+            assert hasattr(results[0], "metadata")
 
     def test_faiss_store_large_batch(self, temp_store):
         """Test avec un lot important de données"""
@@ -238,14 +230,14 @@ class TestFaissVectorStoreAdditional:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"id": str(i), "batch": "large"}
+                metadata={"id": str(i), "batch": "large"},
             )
             for i in range(100)
         ]
 
         temp_store.upsert(chunks)
         stats = temp_store.get_stats()
-        assert stats['total_vectors'] == 100
+        assert stats["total_vectors"] == 100
 
         # Recherche
         # Utiliser un des vecteurs ajoutés comme query pour garantir des résultats
@@ -265,9 +257,7 @@ class TestFaissStoreFunctionality:
             metadata_path = Path(temp_dir) / "populated.metadata"
 
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
             # Ajouter des données de test
@@ -279,7 +269,7 @@ class TestFaissStoreFunctionality:
                     chunk_index=0,
                     total_chunks=1,
                     source="test_source",
-                    metadata={"id": str(i)}
+                    metadata={"id": str(i)},
                 )
                 for i in range(10)
             ]
@@ -310,7 +300,7 @@ class TestFaissStoreFunctionality:
                 index_path=str(index_path),
                 metadata_path=str(metadata_path),
                 similarity_threshold=0.8,
-                index_type="FlatL2"
+                index_type="FlatL2",
             )
 
             assert store.dimension == 256
@@ -323,9 +313,7 @@ class TestFaissStoreFunctionality:
             metadata_path = Path(temp_dir) / "validation.metadata"
 
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
             # Test avec dimension incorrecte
@@ -336,7 +324,7 @@ class TestFaissStoreFunctionality:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"id": "invalid"}
+                metadata={"id": "invalid"},
             )
 
             # Devrait lever une exception ou échouer gracieusement
@@ -362,7 +350,7 @@ class TestFaissStoreFunctionality:
                 chunk_index=0,
                 total_chunks=1,
                 source="test_source",
-                metadata={"id": "test_query"}
+                metadata={"id": "test_query"},
             )
         ]
         populated_store.upsert(test_chunks)
@@ -371,7 +359,7 @@ class TestFaissStoreFunctionality:
         for k in [1, 3, 5, 10, 15]:
             results = populated_store.query(query_vector, top_k=k)
             stats = populated_store.get_stats()
-            min(k, stats['total_vectors'])
+            min(k, stats["total_vectors"])
             # Avec un vecteur identique, on devrait avoir au moins 1 résultat
             assert len(results) >= 1
 
@@ -386,9 +374,7 @@ class TestBackupRotation:
             index_path = Path(temp_dir) / "index.bin"
             metadata_path = Path(temp_dir) / "metadata.pkl"
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
             # Add a chunk so save creates real files
             chunk = Chunk(
@@ -398,7 +384,7 @@ class TestBackupRotation:
                 chunk_index=0,
                 total_chunks=1,
                 source="test",
-                metadata={"id": "1"}
+                metadata={"id": "1"},
             )
             store.upsert([chunk])
             store.persist()
@@ -420,7 +406,8 @@ class TestBackupRotation:
 
         # Create 6 backups manually (disable rotation during creation)
         import time as _time
-        with patch.object(store, '_rotate_backups'):
+
+        with patch.object(store, "_rotate_backups"):
             for i in range(6):
                 ts = f"20260101_12000{i}"
                 store._create_backup(ts)
@@ -447,8 +434,9 @@ class TestBackupRotation:
         store, temp_dir = store_with_data
 
         import time as _time
+
         timestamps = []
-        with patch.object(store, '_rotate_backups'):
+        with patch.object(store, "_rotate_backups"):
             for i in range(4):
                 ts = f"2026010{i}_120000"
                 timestamps.append(ts)
@@ -472,7 +460,7 @@ class TestBackupRotation:
         """Rotation should not remove anything if under the limit"""
         store, temp_dir = store_with_data
 
-        with patch.object(store, '_rotate_backups'):
+        with patch.object(store, "_rotate_backups"):
             store._create_backup("20260101_120000")
             store._create_backup("20260102_120000")
 
@@ -512,41 +500,41 @@ class TestMetadataMigration:
             # Hand-write a legacy pickle metadata file, matching the old
             # persist() format (metadata/document_to_chunks/stats/version/saved_at)
             legacy_payload = {
-                'metadata': [{
-                    'document_id': 'doc_legacy',
-                    'text': 'Legacy chunk text',
-                    'source': 'legacy.txt',
-                    'chunk_index': 0,
-                    'total_chunks': 1,
-                    'preserve': False,
-                    'indexed_at': '2026-07-01T00:00:00',
-                    'metadata': {},
-                    'chunk_id': 0
-                }],
-                'document_to_chunks': {'doc_legacy': [0]},
-                'stats': {
-                    'total_vectors': 1,
-                    'total_documents': 1,
-                    'last_updated': '2026-07-01T00:00:00'
+                "metadata": [
+                    {
+                        "document_id": "doc_legacy",
+                        "text": "Legacy chunk text",
+                        "source": "legacy.txt",
+                        "chunk_index": 0,
+                        "total_chunks": 1,
+                        "preserve": False,
+                        "indexed_at": "2026-07-01T00:00:00",
+                        "metadata": {},
+                        "chunk_id": 0,
+                    }
+                ],
+                "document_to_chunks": {"doc_legacy": [0]},
+                "stats": {
+                    "total_vectors": 1,
+                    "total_documents": 1,
+                    "last_updated": "2026-07-01T00:00:00",
                 },
-                'version': '1.0',
-                'saved_at': '2026-07-01T00:00:00'
+                "version": "1.0",
+                "saved_at": "2026-07-01T00:00:00",
             }
-            with open(legacy_pkl_path, 'wb') as f:
+            with open(legacy_pkl_path, "wb") as f:
                 pickle.dump(legacy_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
 
             # Instantiate the store pointing at these legacy files (passing
             # the .pkl path as metadata_path, as an old config.json would)
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(legacy_pkl_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(legacy_pkl_path)
             )
 
             # Data loaded without loss from the legacy pickle
             assert len(store.metadata) == 1
-            assert store.metadata[0]['document_id'] == 'doc_legacy'
-            assert store.document_to_chunks == {'doc_legacy': [0]}
+            assert store.metadata[0]["document_id"] == "doc_legacy"
+            assert store.document_to_chunks == {"doc_legacy": [0]}
 
             # The .pkl file was NOT deleted/rewritten by the migration
             assert legacy_pkl_path.exists()
@@ -568,33 +556,33 @@ class TestMetadataMigration:
             faiss.write_index(index, str(index_path))
 
             legacy_payload = {
-                'metadata': [{
-                    'document_id': 'doc_legacy',
-                    'text': 'Legacy chunk text',
-                    'source': 'legacy.txt',
-                    'chunk_index': 0,
-                    'total_chunks': 1,
-                    'preserve': False,
-                    'indexed_at': '2026-07-01T00:00:00',
-                    'metadata': {},
-                    'chunk_id': 0
-                }],
-                'document_to_chunks': {'doc_legacy': [0]},
-                'stats': {
-                    'total_vectors': 1,
-                    'total_documents': 1,
-                    'last_updated': '2026-07-01T00:00:00'
+                "metadata": [
+                    {
+                        "document_id": "doc_legacy",
+                        "text": "Legacy chunk text",
+                        "source": "legacy.txt",
+                        "chunk_index": 0,
+                        "total_chunks": 1,
+                        "preserve": False,
+                        "indexed_at": "2026-07-01T00:00:00",
+                        "metadata": {},
+                        "chunk_id": 0,
+                    }
+                ],
+                "document_to_chunks": {"doc_legacy": [0]},
+                "stats": {
+                    "total_vectors": 1,
+                    "total_documents": 1,
+                    "last_updated": "2026-07-01T00:00:00",
                 },
-                'version': '1.0',
-                'saved_at': '2026-07-01T00:00:00'
+                "version": "1.0",
+                "saved_at": "2026-07-01T00:00:00",
             }
-            with open(legacy_pkl_path, 'wb') as f:
+            with open(legacy_pkl_path, "wb") as f:
                 pickle.dump(legacy_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
 
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(legacy_pkl_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(legacy_pkl_path)
             )
 
             # Migration happened, pickle still in place before persist()
@@ -605,16 +593,14 @@ class TestMetadataMigration:
             # JSON metadata written; legacy pickle retired (renamed)
             assert store.metadata_path.exists()
             assert not legacy_pkl_path.exists()
-            assert Path(str(legacy_pkl_path) + '.migrated').exists()
+            assert Path(str(legacy_pkl_path) + ".migrated").exists()
 
             # A new store on the same paths loads from JSON without the
             # pickle fallback ever being reachable again
             new_store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(legacy_pkl_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(legacy_pkl_path)
             )
-            assert new_store.document_to_chunks == {'doc_legacy': [0]}
+            assert new_store.document_to_chunks == {"doc_legacy": [0]}
 
     def test_round_trip_json(self):
         """A fresh store persists to JSON; a new instance on the same paths
@@ -624,9 +610,7 @@ class TestMetadataMigration:
             metadata_path = Path(temp_dir) / "metadata.json"
 
             store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
             chunk = Chunk(
@@ -636,7 +620,7 @@ class TestMetadataMigration:
                 chunk_index=0,
                 total_chunks=1,
                 source="roundtrip.txt",
-                metadata={"k": "v"}
+                metadata={"k": "v"},
             )
             store.upsert([chunk])
             assert store.persist() is True
@@ -646,11 +630,9 @@ class TestMetadataMigration:
             assert store.metadata_path.exists()
 
             new_store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path)
+                dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
             assert new_store.document_to_chunks == store.document_to_chunks
             assert len(new_store.metadata) == len(store.metadata)
-            assert new_store.metadata[0]['document_id'] == 'doc_roundtrip'
+            assert new_store.metadata[0]["document_id"] == "doc_roundtrip"

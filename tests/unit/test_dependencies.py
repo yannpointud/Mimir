@@ -17,14 +17,14 @@ from src.api.dependencies import (
     get_llm_service,
     get_vector_store,
     get_ingestion_processor,
-    set_ingestion_processor
+    set_ingestion_processor,
 )
 
 
 class TestRepositoryDependencies:
     """Tests pour les dépendances de repository."""
 
-    @patch('src.api.dependencies.DocumentRepository')
+    @patch("src.api.dependencies.DocumentRepository")
     def test_get_document_repository(self, mock_repo_class):
         """Test obtention du repository de documents."""
         mock_db = Mock(spec=Session)
@@ -36,7 +36,7 @@ class TestRepositoryDependencies:
         assert result == mock_repo_instance
         mock_repo_class.assert_called_once_with(mock_db)
 
-    @patch('src.api.dependencies.ConfigurationRepository')
+    @patch("src.api.dependencies.ConfigurationRepository")
     def test_get_configuration_repository(self, mock_repo_class):
         """Test obtention du repository de configuration."""
         mock_db = Mock(spec=Session)
@@ -48,7 +48,7 @@ class TestRepositoryDependencies:
         assert result == mock_repo_instance
         mock_repo_class.assert_called_once_with(mock_db)
 
-    @patch('src.api.dependencies.AuditLogRepository')
+    @patch("src.api.dependencies.AuditLogRepository")
     def test_get_audit_log_repository(self, mock_repo_class):
         """Test obtention du repository d'audit log."""
         mock_db = Mock(spec=Session)
@@ -64,28 +64,28 @@ class TestRepositoryDependencies:
 class TestServiceDependencies:
     """Tests pour les dépendances de services."""
 
-    @patch('src.api.dependencies.cache_service')
+    @patch("src.api.dependencies.cache_service")
     def test_get_cache_service(self, mock_cache_service):
         """Test obtention du service de cache."""
         result = get_cache_service()
 
         assert result == mock_cache_service
 
-    @patch('src.api.dependencies.chat_cache_service')
+    @patch("src.api.dependencies.chat_cache_service")
     def test_get_chat_cache_service(self, mock_chat_cache_service):
         """Test obtention du service de cache chat."""
         result = get_chat_cache_service()
 
         assert result == mock_chat_cache_service
 
-    @patch('src.api.dependencies.email_service')
+    @patch("src.api.dependencies.email_service")
     def test_get_email_service(self, mock_email_service):
         """Test obtention du service email."""
         result = get_email_service()
 
         assert result == mock_email_service
 
-    @patch('src.api.dependencies.jwt_handler')
+    @patch("src.api.dependencies.jwt_handler")
     def test_get_jwt_handler(self, mock_jwt_handler):
         """Test obtention du handler JWT."""
         result = get_jwt_handler()
@@ -99,10 +99,11 @@ class TestLLMServiceSingleton:
     def setup_method(self):
         """Reset du singleton avant chaque test."""
         import src.api.dependencies
+
         src.api.dependencies._llm_service = None
 
-    @patch('src.api.dependencies.settings')
-    @patch('src.api.dependencies.MistralAPIService')
+    @patch("src.api.dependencies.settings")
+    @patch("src.api.dependencies.MistralAPIService")
     def test_get_llm_service_first_call(self, mock_mistral_class, mock_settings):
         """Test première création du service LLM."""
         mock_settings.mistral_api_key = "test_key"
@@ -120,11 +121,11 @@ class TestLLMServiceSingleton:
             model="test_model",
             embedding_model="test_embedding",
             max_retries=3,
-            retry_delay=1.0
+            retry_delay=1.0,
         )
 
-    @patch('src.api.dependencies.settings')
-    @patch('src.api.dependencies.MistralAPIService')
+    @patch("src.api.dependencies.settings")
+    @patch("src.api.dependencies.MistralAPIService")
     def test_get_llm_service_singleton_behavior(self, mock_mistral_class, mock_settings):
         """Test comportement singleton - même instance retournée."""
         mock_service_instance = Mock()
@@ -147,10 +148,11 @@ class TestVectorStoreSingleton:
     def setup_method(self):
         """Reset du singleton avant chaque test."""
         import src.api.dependencies
+
         src.api.dependencies._vector_store = None
 
-    @patch('src.api.dependencies.settings')
-    @patch('src.api.dependencies.FaissVectorStore')
+    @patch("src.api.dependencies.settings")
+    @patch("src.api.dependencies.FaissVectorStore")
     def test_get_vector_store_first_call(self, mock_faiss_class, mock_settings):
         """Test première création du vector store."""
         mock_settings.embedding_dimension = 768
@@ -169,11 +171,11 @@ class TestVectorStoreSingleton:
             index_path="/path/to/index",
             metadata_path="/path/to/metadata",
             similarity_threshold=0.7,
-            index_type="FlatL2"
+            index_type="FlatL2",
         )
 
-    @patch('src.api.dependencies.settings')
-    @patch('src.api.dependencies.FaissVectorStore')
+    @patch("src.api.dependencies.settings")
+    @patch("src.api.dependencies.FaissVectorStore")
     def test_get_vector_store_singleton_behavior(self, mock_faiss_class, mock_settings):
         """Test comportement singleton du vector store."""
         mock_store_instance = Mock()
@@ -196,6 +198,7 @@ class TestIngestionProcessorManagement:
     def setup_method(self):
         """Reset du processeur avant chaque test."""
         import src.api.dependencies
+
         src.api.dependencies._ingestion_processor = None
 
     def test_get_ingestion_processor_not_initialized(self):
@@ -251,14 +254,17 @@ class TestGlobalStateConsistency:
     def setup_method(self):
         """Reset de tous les singletons."""
         import src.api.dependencies
+
         src.api.dependencies._llm_service = None
         src.api.dependencies._vector_store = None
         src.api.dependencies._ingestion_processor = None
 
-    @patch('src.api.dependencies.settings')
-    @patch('src.api.dependencies.MistralAPIService')
-    @patch('src.api.dependencies.FaissVectorStore')
-    def test_multiple_services_independent(self, mock_faiss_class, mock_mistral_class, mock_settings):
+    @patch("src.api.dependencies.settings")
+    @patch("src.api.dependencies.MistralAPIService")
+    @patch("src.api.dependencies.FaissVectorStore")
+    def test_multiple_services_independent(
+        self, mock_faiss_class, mock_mistral_class, mock_settings
+    ):
         """Test indépendance des différents singletons."""
         # Mock des settings
         mock_settings.mistral_api_key = "test_key"

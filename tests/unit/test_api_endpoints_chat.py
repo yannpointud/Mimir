@@ -8,8 +8,14 @@ from unittest.mock import Mock, patch, AsyncMock
 from pydantic import ValidationError
 
 from backend.src.api.endpoints.chat import (
-    escalate_to_human, get_session_history, clear_session_history,
-    ChatRequest, ChatResponse, SourceReference, EscalationRequest, EscalationResponse
+    escalate_to_human,
+    get_session_history,
+    clear_session_history,
+    ChatRequest,
+    ChatResponse,
+    SourceReference,
+    EscalationRequest,
+    EscalationResponse,
 )
 
 
@@ -22,7 +28,7 @@ class TestChatModels:
             question="Qu'est-ce que l'intelligence artificielle ?",
             session_id="test_session_123",
             context_limit=5,
-            include_sources=True
+            include_sources=True,
         )
 
         assert request.question == "Qu'est-ce que l'intelligence artificielle ?"
@@ -67,7 +73,7 @@ class TestChatModels:
             chunk_text="Contenu du chunk",
             similarity_score=0.85,
             chunk_index=2,
-            total_chunks=10
+            total_chunks=10,
         )
 
         assert source.document_id == "doc_001"
@@ -83,7 +89,7 @@ class TestChatModels:
             confidence_score=0.8,
             session_id="session_123",
             response_time_ms=150,
-            cached=False
+            cached=False,
         )
 
         assert response.answer == "Voici la réponse"
@@ -99,7 +105,7 @@ class TestChatModels:
             session_id="session_123",
             chat_history=[{"role": "user", "message": "Hello"}],
             user_email="user@example.com",
-            additional_context="Contexte supplémentaire"
+            additional_context="Contexte supplémentaire",
         )
 
         assert request.question == "Question complexe"
@@ -110,9 +116,7 @@ class TestChatModels:
     def test_escalation_response_model(self):
         """Test escalation response model."""
         response = EscalationResponse(
-            success=True,
-            message="Escalade réussie",
-            escalation_id="ESC-20231201-ABC123"
+            success=True, message="Escalade réussie", escalation_id="ESC-20231201-ABC123"
         )
 
         assert response.success is True
@@ -136,11 +140,10 @@ class TestEscalationEndpoint:
         """Mock email service."""
         return AsyncMock()
 
-    @patch('backend.src.api.endpoints.chat._generate_escalation_id')
-    @patch('backend.src.api.endpoints.chat._extract_sources_from_history')
+    @patch("backend.src.api.endpoints.chat._generate_escalation_id")
+    @patch("backend.src.api.endpoints.chat._extract_sources_from_history")
     def test_escalate_to_human_success(
-        self, mock_extract_sources, mock_escalation_id,
-        mock_request, mock_email_service
+        self, mock_extract_sources, mock_escalation_id, mock_request, mock_email_service
     ):
         """Test successful escalation."""
 
@@ -153,16 +156,18 @@ class TestEscalationEndpoint:
             question="Question complexe nécessitant aide humaine",
             session_id="session_123",
             chat_history=[{"role": "user", "message": "Hello"}],
-            user_email="user@example.com"
+            user_email="user@example.com",
         )
 
         # Call the function
-        result = asyncio.run(escalate_to_human(
-            request=mock_request,
-            escalation_request=escalation_request,
-            current_user=None,
-            email_service=mock_email_service
-        ))
+        result = asyncio.run(
+            escalate_to_human(
+                request=mock_request,
+                escalation_request=escalation_request,
+                current_user=None,
+                email_service=mock_email_service,
+            )
+        )
 
         # Assertions
         assert result.success is True
@@ -170,7 +175,7 @@ class TestEscalationEndpoint:
         assert "transmise à notre équipe" in result.message
         mock_email_service.send_escalation_email.assert_called_once()
 
-    @patch('backend.src.api.endpoints.chat._generate_escalation_id')
+    @patch("backend.src.api.endpoints.chat._generate_escalation_id")
     def test_escalate_to_human_email_failure(
         self, mock_escalation_id, mock_request, mock_email_service
     ):
@@ -181,17 +186,18 @@ class TestEscalationEndpoint:
         mock_email_service.send_escalation_email.return_value = False
 
         escalation_request = EscalationRequest(
-            question="Question complexe",
-            session_id="session_123"
+            question="Question complexe", session_id="session_123"
         )
 
         # Call the function
-        result = asyncio.run(escalate_to_human(
-            request=mock_request,
-            escalation_request=escalation_request,
-            current_user=None,
-            email_service=mock_email_service
-        ))
+        result = asyncio.run(
+            escalate_to_human(
+                request=mock_request,
+                escalation_request=escalation_request,
+                current_user=None,
+                email_service=mock_email_service,
+            )
+        )
 
         # Assertions
         assert result.success is False
@@ -207,16 +213,18 @@ class TestEscalationEndpoint:
         escalation_request = EscalationRequest(question="Question complexe")
         current_user = {"sub": "admin", "user_type": "admin"}
 
-        with patch('backend.src.api.endpoints.chat._generate_escalation_id') as mock_id:
+        with patch("backend.src.api.endpoints.chat._generate_escalation_id") as mock_id:
             mock_id.return_value = "ESC-20231201-ABC123"
 
             # Call the function
-            result = asyncio.run(escalate_to_human(
-                request=mock_request,
-                escalation_request=escalation_request,
-                current_user=current_user,
-                email_service=mock_email_service
-            ))
+            result = asyncio.run(
+                escalate_to_human(
+                    request=mock_request,
+                    escalation_request=escalation_request,
+                    current_user=current_user,
+                    email_service=mock_email_service,
+                )
+            )
 
             # Assertions
             assert result.success is True
@@ -230,12 +238,14 @@ class TestEscalationEndpoint:
         escalation_request = EscalationRequest(question="Question complexe")
 
         # Call the function
-        result = asyncio.run(escalate_to_human(
-            request=mock_request,
-            escalation_request=escalation_request,
-            current_user=None,
-            email_service=mock_email_service
-        ))
+        result = asyncio.run(
+            escalate_to_human(
+                request=mock_request,
+                escalation_request=escalation_request,
+                current_user=None,
+                email_service=mock_email_service,
+            )
+        )
 
         # Assertions
         assert result.success is False
@@ -253,10 +263,7 @@ class TestSessionHistoryEndpoints:
         current_user = None
 
         # Call the function
-        result = asyncio.run(get_session_history(
-            session_id=session_id,
-            current_user=current_user
-        ))
+        result = asyncio.run(get_session_history(session_id=session_id, current_user=current_user))
 
         # Assertions
         assert result["session_id"] == session_id
@@ -270,10 +277,7 @@ class TestSessionHistoryEndpoints:
         current_user = {"sub": "admin", "user_type": "admin"}
 
         # Call the function
-        result = asyncio.run(get_session_history(
-            session_id=session_id,
-            current_user=current_user
-        ))
+        result = asyncio.run(get_session_history(session_id=session_id, current_user=current_user))
 
         # Assertions
         assert result["session_id"] == session_id
@@ -285,10 +289,9 @@ class TestSessionHistoryEndpoints:
         current_user = None
 
         # Call the function
-        result = asyncio.run(clear_session_history(
-            session_id=session_id,
-            current_user=current_user
-        ))
+        result = asyncio.run(
+            clear_session_history(session_id=session_id, current_user=current_user)
+        )
 
         # Assertions
         assert result.success is True
@@ -302,10 +305,9 @@ class TestSessionHistoryEndpoints:
         current_user = {"sub": "admin", "user_type": "admin"}
 
         # Call the function
-        result = asyncio.run(clear_session_history(
-            session_id=session_id,
-            current_user=current_user
-        ))
+        result = asyncio.run(
+            clear_session_history(session_id=session_id, current_user=current_user)
+        )
 
         # Assertions
         assert result.success is True
@@ -409,14 +411,10 @@ class TestChatHelperFunctions:
                 "message": "Réponse",
                 "sources": [
                     {"filename": "doc1.pdf", "chunk_text": "Contenu 1"},
-                    {"filename": "doc2.txt", "chunk_text": "Contenu 2"}
-                ]
+                    {"filename": "doc2.txt", "chunk_text": "Contenu 2"},
+                ],
             },
-            {
-                "type": "assistant",
-                "message": "Autre réponse",
-                "sources": ["doc3.md"]
-            }
+            {"type": "assistant", "message": "Autre réponse", "sources": ["doc3.md"]},
         ]
 
         sources = _extract_sources_from_history(chat_history)
@@ -432,7 +430,7 @@ class TestChatHelperFunctions:
 
         chat_history = [
             {"type": "user", "message": "Question"},
-            {"type": "assistant", "message": "Réponse sans sources"}
+            {"type": "assistant", "message": "Réponse sans sources"},
         ]
 
         sources = _extract_sources_from_history(chat_history)
@@ -449,7 +447,7 @@ class TestChatHelperFunctions:
 class TestChatIntegration:
     """Integration tests for chat endpoints."""
 
-    @patch('backend.src.api.endpoints.chat._generate_escalation_id')
+    @patch("backend.src.api.endpoints.chat._generate_escalation_id")
     def test_full_escalation_workflow(self, mock_escalation_id):
         """Test full escalation workflow."""
 
@@ -468,21 +466,23 @@ class TestChatIntegration:
             session_id="session_123",
             chat_history=[
                 {"type": "user", "message": "Question initiale"},
-                {"type": "assistant", "message": "Réponse partielle", "sources": ["doc1.pdf"]}
+                {"type": "assistant", "message": "Réponse partielle", "sources": ["doc1.pdf"]},
             ],
             user_email="user@company.com",
-            additional_context="Contexte métier spécifique"
+            additional_context="Contexte métier spécifique",
         )
 
         current_user = {"sub": "john.doe", "user_type": "user"}
 
         # Call the function
-        result = asyncio.run(escalate_to_human(
-            request=mock_request,
-            escalation_request=escalation_request,
-            current_user=current_user,
-            email_service=mock_email_service
-        ))
+        result = asyncio.run(
+            escalate_to_human(
+                request=mock_request,
+                escalation_request=escalation_request,
+                current_user=current_user,
+                email_service=mock_email_service,
+            )
+        )
 
         # Full assertions
         assert result.success is True

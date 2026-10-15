@@ -30,6 +30,7 @@ class BudgetExceededError(Exception):
     turn that into a 429 response; only non-HTTP call sites (ingestion)
     raise this exception to short-circuit their own retry logic.
     """
+
     pass
 
 
@@ -40,6 +41,7 @@ class BudgetReservation:
     a later finalize()/release() call knows which ledger row and how much
     to adjust.
     """
+
     today: str
     estimate_eur: float
 

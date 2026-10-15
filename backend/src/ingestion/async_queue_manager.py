@@ -17,18 +17,21 @@ from ..monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+
 class AsyncQueueManager:
     """
     Async queue manager for document ingestion processing
     Implements single-worker pattern using asyncio for sequential processing
     """
 
-    def __init__(self,
-                 max_size: int = 1000,
-                 worker_timeout: float = 60.0,
-                 stats_interval: float = 300.0,  # 5 minutes
-                 retry_base_delay: float = 2.0,
-                 retry_max_delay: float = 60.0):
+    def __init__(
+        self,
+        max_size: int = 1000,
+        worker_timeout: float = 60.0,
+        stats_interval: float = 300.0,  # 5 minutes
+        retry_base_delay: float = 2.0,
+        retry_max_delay: float = 60.0,
+    ):
         """
         Initialize async queue manager
 
@@ -55,15 +58,15 @@ class AsyncQueueManager:
 
         # Statistics and monitoring
         self.stats = {
-            'tasks_processed': 0,
-            'tasks_failed': 0,
-            'tasks_retried': 0,
-            'total_processing_time': 0.0,
-            'avg_processing_time': 0.0,
-            'queue_size': 0,
-            'worker_active': False,
-            'last_task_at': None,
-            'started_at': None
+            "tasks_processed": 0,
+            "tasks_failed": 0,
+            "tasks_retried": 0,
+            "total_processing_time": 0.0,
+            "avg_processing_time": 0.0,
+            "queue_size": 0,
+            "worker_active": False,
+            "last_task_at": None,
+            "started_at": None,
         }
 
         self._last_stats_log = time.time()
@@ -85,13 +88,10 @@ class AsyncQueueManager:
         self.stop_event.clear()
 
         # Create and start worker task
-        self.worker_task = asyncio.create_task(
-            self._worker_loop(),
-            name="IngestionWorker"
-        )
+        self.worker_task = asyncio.create_task(self._worker_loop(), name="IngestionWorker")
 
-        self.stats['started_at'] = datetime.utcnow()
-        self.stats['worker_active'] = True
+        self.stats["started_at"] = datetime.utcnow()
+        self.stats["worker_active"] = True
 
         logger.info("Async queue manager started with worker task")
 
@@ -123,7 +123,7 @@ class AsyncQueueManager:
             with contextlib.suppress(asyncio.CancelledError):
                 await self.worker_task
 
-        self.stats['worker_active'] = False
+        self.stats["worker_active"] = False
         logger.info("Async queue manager stopped successfully")
         return True
 
@@ -141,16 +141,18 @@ class AsyncQueueManager:
             # Use put_nowait for non-blocking add
             self.queue.put_nowait(task)
 
-            self.stats['queue_size'] = self.queue.qsize()
+            self.stats["queue_size"] = self.queue.qsize()
 
             logger.debug(
                 f"Added task to queue: {task.file_path}",
-                extra={'extra_fields': {
-                    'file_path': task.file_path,
-                    'document_id': task.document_id,
-                    'queue_size': self.queue.qsize(),
-                    'type': 'task_queued'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": task.file_path,
+                        "document_id": task.document_id,
+                        "queue_size": self.queue.qsize(),
+                        "type": "task_queued",
+                    }
+                },
             )
 
             return True
@@ -158,12 +160,14 @@ class AsyncQueueManager:
         except asyncio.QueueFull:
             logger.error(
                 f"Queue is full ({self.max_size}), cannot add task: {task.file_path}",
-                extra={'extra_fields': {
-                    'file_path': task.file_path,
-                    'queue_size': self.queue.qsize(),
-                    'max_size': self.max_size,
-                    'type': 'queue_full'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": task.file_path,
+                        "queue_size": self.queue.qsize(),
+                        "max_size": self.max_size,
+                        "type": "queue_full",
+                    }
+                },
             )
             return False
 
@@ -177,7 +181,7 @@ class AsyncQueueManager:
                 task = await asyncio.wait_for(self.queue.get(), timeout=1.0)
 
                 # Update queue size
-                self.stats['queue_size'] = self.queue.qsize()
+                self.stats["queue_size"] = self.queue.qsize()
 
                 # Process the task
                 success = await self._process_task(task)
@@ -205,14 +209,18 @@ class AsyncQueueManager:
                         # Re-queue for retry
                         try:
                             self.queue.put_nowait(task)
-                            self.stats['tasks_retried'] += 1
-                            self.stats['queue_size'] = self.queue.qsize()
+                            self.stats["tasks_retried"] += 1
+                            self.stats["queue_size"] = self.queue.qsize()
                         except asyncio.QueueFull:
-                            logger.error(f"Cannot re-queue failed task (queue full): {task.file_path}")
-                            self.stats['tasks_failed'] += 1
+                            logger.error(
+                                f"Cannot re-queue failed task (queue full): {task.file_path}"
+                            )
+                            self.stats["tasks_failed"] += 1
                     else:
-                        logger.error(f"Task failed after {task.max_retries} retries: {task.file_path}")
-                        self.stats['tasks_failed'] += 1
+                        logger.error(
+                            f"Task failed after {task.max_retries} retries: {task.file_path}"
+                        )
+                        self.stats["tasks_failed"] += 1
 
                 # Mark task as done
                 self.queue.task_done()
@@ -263,12 +271,14 @@ class AsyncQueueManager:
         try:
             logger.info(
                 f"Processing task: {task.file_path} (attempt {task.retry_count + 1})",
-                extra={'extra_fields': {
-                    'file_path': task.file_path,
-                    'document_id': task.document_id,
-                    'retry_count': task.retry_count,
-                    'type': 'task_processing'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": task.file_path,
+                        "document_id": task.document_id,
+                        "retry_count": task.retry_count,
+                        "type": "task_processing",
+                    }
+                },
             )
 
             # Process with async callback
@@ -276,21 +286,23 @@ class AsyncQueueManager:
 
             processing_time = time.time() - start_time
 
-            self.stats['tasks_processed'] += 1
-            self.stats['total_processing_time'] += processing_time
-            self.stats['avg_processing_time'] = (
-                self.stats['total_processing_time'] / self.stats['tasks_processed']
+            self.stats["tasks_processed"] += 1
+            self.stats["total_processing_time"] += processing_time
+            self.stats["avg_processing_time"] = (
+                self.stats["total_processing_time"] / self.stats["tasks_processed"]
             )
-            self.stats['last_task_at'] = datetime.utcnow()
+            self.stats["last_task_at"] = datetime.utcnow()
 
             if success:
                 logger.info(
                     f"Task processed successfully in {processing_time:.2f}s: {task.file_path}",
-                    extra={'extra_fields': {
-                        'file_path': task.file_path,
-                        'processing_time': processing_time,
-                        'type': 'task_completed'
-                    }}
+                    extra={
+                        "extra_fields": {
+                            "file_path": task.file_path,
+                            "processing_time": processing_time,
+                            "type": "task_completed",
+                        }
+                    },
                 )
             else:
                 logger.warning(f"Task processing returned False: {task.file_path}")
@@ -301,12 +313,14 @@ class AsyncQueueManager:
             processing_time = time.time() - start_time
             logger.error(
                 f"Task processing failed after {processing_time:.2f}s: {task.file_path} - {str(e)}",
-                extra={'extra_fields': {
-                    'file_path': task.file_path,
-                    'processing_time': processing_time,
-                    'error': str(e),
-                    'type': 'task_error'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": task.file_path,
+                        "processing_time": processing_time,
+                        "error": str(e),
+                        "type": "task_error",
+                    }
+                },
             )
             return False
 
@@ -323,19 +337,18 @@ class AsyncQueueManager:
 
         # Convert datetime objects to ISO strings for JSON serialization
         stats_serializable = stats.copy()
-        if stats_serializable.get('started_at'):
-            stats_serializable['started_at'] = stats_serializable['started_at'].isoformat() + 'Z'
-        if stats_serializable.get('last_task_at'):
-            stats_serializable['last_task_at'] = stats_serializable['last_task_at'].isoformat() + 'Z'
+        if stats_serializable.get("started_at"):
+            stats_serializable["started_at"] = stats_serializable["started_at"].isoformat() + "Z"
+        if stats_serializable.get("last_task_at"):
+            stats_serializable["last_task_at"] = (
+                stats_serializable["last_task_at"].isoformat() + "Z"
+            )
 
         logger.info(
             f"Queue stats: processed={stats['tasks_processed']}, "
             f"failed={stats['tasks_failed']}, queue_size={stats['queue_size']}, "
             f"avg_time={stats['avg_processing_time']:.2f}s",
-            extra={'extra_fields': {
-                **stats_serializable,
-                'type': 'queue_stats'
-            }}
+            extra={"extra_fields": {**stats_serializable, "type": "queue_stats"}},
         )
 
     def get_stats(self) -> dict[str, Any]:
@@ -346,7 +359,7 @@ class AsyncQueueManager:
             Statistics dictionary
         """
         stats_copy = self.stats.copy()
-        stats_copy['queue_size'] = self.queue.qsize()
+        stats_copy["queue_size"] = self.queue.qsize()
         return stats_copy
 
     def get_queue_size(self) -> int:
@@ -359,9 +372,11 @@ class AsyncQueueManager:
 
     def is_running(self) -> bool:
         """Check if worker task is running"""
-        return (self.worker_task is not None and
-                not self.worker_task.done() and
-                not self.stop_event.is_set())
+        return (
+            self.worker_task is not None
+            and not self.worker_task.done()
+            and not self.stop_event.is_set()
+        )
 
     async def clear_queue(self) -> int:
         """
@@ -378,7 +393,7 @@ class AsyncQueueManager:
         except asyncio.QueueEmpty:
             pass
 
-        self.stats['queue_size'] = 0
+        self.stats["queue_size"] = 0
 
         logger.warning(f"Cleared {count} pending tasks from queue")
         return count

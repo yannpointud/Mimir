@@ -33,15 +33,9 @@ class TestMakeJsonSerializable:
 
     def test_nested_serialization(self):
         """Test de sérialisation d'objets imbriqués"""
-        data = {
-            "list": [1, 2, Path("/test")],
-            "nested": {"key": "value"}
-        }
+        data = {"list": [1, 2, Path("/test")], "nested": {"key": "value"}}
         result = _make_json_serializable(data)
-        assert result == {
-            "list": [1, 2, "/test"],
-            "nested": {"key": "value"}
-        }
+        assert result == {"list": [1, 2, "/test"], "nested": {"key": "value"}}
 
     def test_primitive_types(self):
         """Test de sérialisation des types primitifs"""
@@ -58,7 +52,7 @@ class TestRagDebugService:
     @pytest.fixture
     def debug_service(self):
         """Fixture pour créer un service de debug"""
-        with patch('src.monitoring.rag_debug_logger.Path.mkdir'):
+        with patch("src.monitoring.rag_debug_logger.Path.mkdir"):
             service = RagDebugService()
             return service
 
@@ -71,10 +65,7 @@ class TestRagDebugService:
     def test_configure_enabled(self, debug_service):
         """Test de configuration du service"""
         debug_service.configure(
-            enabled=True,
-            log_prompts=True,
-            log_context=True,
-            log_responses=True
+            enabled=True, log_prompts=True, log_context=True, log_responses=True
         )
 
         assert debug_service.enabled is True
@@ -91,11 +82,9 @@ class TestRagDebugService:
         """Test que les logs ne sont pas créés quand le service est désactivé"""
         debug_service.enabled = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_user_request(
-                session_id="test_session",
-                question="Test question?",
-                context_limit=3
+                session_id="test_session", question="Test question?", context_limit=3
             )
             mock_debug.assert_not_called()
 
@@ -103,12 +92,12 @@ class TestRagDebugService:
         """Test de logging d'une requête utilisateur"""
         debug_service.enabled = True
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_user_request(
                 session_id="test_session",
                 question="Test question?",
                 user_context={"user_id": "123"},
-                context_limit=3
+                context_limit=3,
             )
 
             mock_debug.assert_called_once()
@@ -124,12 +113,12 @@ class TestRagDebugService:
         """Test que les logs de recherche ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_vector_search(
                 session_id="test_session",
                 search_results=[],
                 embedding_tokens=50,
-                search_time_ms=100.0
+                search_time_ms=100.0,
             )
             mock_debug.assert_not_called()
 
@@ -146,12 +135,12 @@ class TestRagDebugService:
         mock_result.similarity_score = 0.9234
         mock_result.text = "Test chunk content" * 20  # Long text
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_vector_search(
                 session_id="test_session",
                 search_results=[mock_result],
                 embedding_tokens=50,
-                search_time_ms=123.456
+                search_time_ms=123.456,
             )
 
             mock_debug.assert_called_once()
@@ -170,13 +159,13 @@ class TestRagDebugService:
         debug_service.log_prompts = False
         debug_service.log_context = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_context_building(
                 session_id="test_session",
                 system_prompt="You are a helpful assistant",
                 context_text="Context information here",
                 context_chunks=3,
-                filtered_sources=[{"doc": "test.pdf"}]
+                filtered_sources=[{"doc": "test.pdf"}],
             )
 
             mock_debug.assert_called_once()
@@ -192,13 +181,13 @@ class TestRagDebugService:
         debug_service.log_prompts = True
         debug_service.log_context = True
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_context_building(
                 session_id="test_session",
                 system_prompt="You are a helpful assistant",
                 context_text="Context information here",
                 context_chunks=3,
-                filtered_sources=[]
+                filtered_sources=[],
             )
 
             mock_debug.assert_called_once()
@@ -211,13 +200,13 @@ class TestRagDebugService:
         """Test que les logs LLM ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_llm_request(
                 session_id="test_session",
                 model="mistral-small",
                 full_prompt="Full prompt text",
                 user_question="Question?",
-                parameters={"temperature": 0.7}
+                parameters={"temperature": 0.7},
             )
             mock_debug.assert_not_called()
 
@@ -226,13 +215,13 @@ class TestRagDebugService:
         debug_service.enabled = True
         debug_service.log_prompts = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_llm_request(
                 session_id="test_session",
                 model="mistral-small",
                 full_prompt="Full prompt text",
                 user_question="Question?",
-                parameters={"temperature": 0.7}
+                parameters={"temperature": 0.7},
             )
 
             mock_debug.assert_called_once()
@@ -245,13 +234,13 @@ class TestRagDebugService:
         """Test que les logs de réponse LLM ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_llm_response(
                 session_id="test_session",
                 response="Response text",
                 tokens_used=150,
                 duration_ms=500.0,
-                finish_reason="stop"
+                finish_reason="stop",
             )
             mock_debug.assert_not_called()
 
@@ -260,13 +249,13 @@ class TestRagDebugService:
         debug_service.enabled = True
         debug_service.log_responses = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_llm_response(
                 session_id="test_session",
                 response="Response text",
                 tokens_used=150,
                 duration_ms=500.123,
-                finish_reason="stop"
+                finish_reason="stop",
             )
 
             mock_debug.assert_called_once()
@@ -282,13 +271,13 @@ class TestRagDebugService:
         """Test que les logs finaux ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_final_response(
                 session_id="test_session",
                 confidence_score=0.85,
                 sources_count=3,
                 final_sources=[],
-                total_processing_time_ms=1000.0
+                total_processing_time_ms=1000.0,
             )
             mock_debug.assert_not_called()
 
@@ -296,14 +285,14 @@ class TestRagDebugService:
         """Test de logging de la réponse finale avec cache"""
         debug_service.enabled = True
 
-        with patch.object(debug_service.logger, 'debug') as mock_debug:
+        with patch.object(debug_service.logger, "debug") as mock_debug:
             debug_service.log_final_response(
                 session_id="test_session",
                 confidence_score=0.8567,
                 sources_count=3,
                 final_sources=[{"doc": "test.pdf"}],
                 total_processing_time_ms=1234.567,
-                cached=True
+                cached=True,
             )
 
             mock_debug.assert_called_once()
@@ -319,12 +308,12 @@ class TestRagDebugService:
         """Test que les logs d'erreur ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
-        with patch.object(debug_service.logger, 'error') as mock_error:
+        with patch.object(debug_service.logger, "error") as mock_error:
             debug_service.log_error(
                 session_id="test_session",
                 error_type="ValueError",
                 error_message="Test error",
-                stage="vector_search"
+                stage="vector_search",
             )
             mock_error.assert_not_called()
 
@@ -332,13 +321,13 @@ class TestRagDebugService:
         """Test de logging d'erreur avec traceback"""
         debug_service.enabled = True
 
-        with patch.object(debug_service.logger, 'error') as mock_error:
+        with patch.object(debug_service.logger, "error") as mock_error:
             debug_service.log_error(
                 session_id="test_session",
                 error_type="ValueError",
                 error_message="Test error",
                 stage="vector_search",
-                traceback_info="Traceback line 1\nTraceback line 2"
+                traceback_info="Traceback line 1\nTraceback line 2",
             )
 
             mock_error.assert_called_once()

@@ -37,12 +37,7 @@ class CacheService:
         self._lock = threading.RLock()  # Reentrant lock for thread safety
         self._ttl_seconds = ttl_seconds
         self._expiry_times = {}
-        self._stats = {
-            "hits": 0,
-            "misses": 0,
-            "evictions": 0,
-            "total_requests": 0
-        }
+        self._stats = {"hits": 0, "misses": 0, "evictions": 0, "total_requests": 0}
         logger.info(f"CacheService initialized - max_size: {max_size}, ttl: {ttl_seconds}s")
 
     def _generate_key(self, question: str, context: str = "") -> str:
@@ -57,7 +52,7 @@ class CacheService:
             str: The generated cache key
         """
         key_data = f"{question}|{context}"
-        return hashlib.md5(key_data.encode('utf-8')).hexdigest()
+        return hashlib.md5(key_data.encode("utf-8")).hexdigest()
 
     def _is_expired(self, key: str) -> bool:
         """
@@ -128,12 +123,7 @@ class CacheService:
 
             logger.debug(f"Cache set: {key}, TTL: {ttl_to_use}s")
 
-    def get_or_set(
-        self,
-        key: str,
-        factory: Callable[[], Any],
-        ttl: int | None = None
-    ) -> Any:
+    def get_or_set(self, key: str, factory: Callable[[], Any], ttl: int | None = None) -> Any:
         """
         Get value from cache or compute and set it.
 
@@ -208,10 +198,7 @@ class CacheService:
             int: Number of entries removed
         """
         with self._lock:
-            expired_keys = [
-                key for key in self._cache
-                if self._is_expired(key)
-            ]
+            expired_keys = [key for key in self._cache if self._is_expired(key)]
 
             for key in expired_keys:
                 del self._cache[key]
@@ -244,18 +231,13 @@ class CacheService:
                 "hits": self._stats["hits"],
                 "misses": self._stats["misses"],
                 "evictions": self._stats["evictions"],
-                "expired_entries": len([k for k in self._expiry_times if self._is_expired(k)])
+                "expired_entries": len([k for k in self._expiry_times if self._is_expired(k)]),
             }
 
     def reset_stats(self):
         """Reset cache statistics."""
         with self._lock:
-            self._stats = {
-                "hits": 0,
-                "misses": 0,
-                "evictions": 0,
-                "total_requests": 0
-            }
+            self._stats = {"hits": 0, "misses": 0, "evictions": 0, "total_requests": 0}
             logger.debug("Cache statistics reset")
 
 
@@ -296,7 +278,7 @@ class ChatCacheService(CacheService):
         question: str,
         response: dict[str, Any],
         context_hash: str = "",
-        ttl: int | None = None
+        ttl: int | None = None,
     ):
         """
         Cache a chat response.
@@ -329,11 +311,9 @@ class ChatCacheService(CacheService):
             str: 64-char hex SHA-256 cache key
         """
         key_data = f"{question.strip().lower()}|{corpus_version}"
-        return hashlib.sha256(key_data.encode('utf-8')).hexdigest()
+        return hashlib.sha256(key_data.encode("utf-8")).hexdigest()
 
-    def get_stream_response(
-        self, question: str, corpus_version: str
-    ) -> dict[str, Any] | None:
+    def get_stream_response(self, question: str, corpus_version: str) -> dict[str, Any] | None:
         """
         Get a cached streamed chat response for the current corpus version.
 
@@ -348,11 +328,7 @@ class ChatCacheService(CacheService):
         return self.get(cache_key)
 
     def set_stream_response(
-        self,
-        question: str,
-        corpus_version: str,
-        payload: dict[str, Any],
-        ttl: int | None = None
+        self, question: str, corpus_version: str, payload: dict[str, Any], ttl: int | None = None
     ):
         """
         Cache a streamed chat response scoped to the current corpus version.

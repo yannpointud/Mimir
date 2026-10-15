@@ -9,10 +9,11 @@ import sys
 import logging
 
 # Ajouter le backend au path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from src.config import settings
 from src.monitoring.logger import app_logger, frontend_logger
+
 
 def test_current_implementation():
     """Test de l'implémentation actuelle - PROUVE LE BUG"""
@@ -57,18 +58,19 @@ def test_current_implementation():
         print("✅ OK: app_logger respecte LOG_LEVEL=" + settings.log_level)
         return True
 
+
 def show_file_sizes():
     """Affiche la taille des fichiers de logs"""
     print("\n" + "=" * 80)
     print("TAILLE DES FICHIERS DE LOGS ACTUELS:")
     print("=" * 80)
 
-    log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+    log_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
     if not os.path.exists(log_dir):
         print("Dossier logs/ n'existe pas encore")
         return
 
-    for log_file in ['app.log', 'error.log', 'debug.log', 'frontend.log', 'rag_debug.log']:
+    for log_file in ["app.log", "error.log", "debug.log", "frontend.log", "rag_debug.log"]:
         log_path = os.path.join(log_dir, log_file)
         if os.path.exists(log_path):
             size_bytes = os.path.getsize(log_path)
@@ -76,6 +78,7 @@ def show_file_sizes():
             print(f"   - {log_file}: {size_mb:.2f} MB ({size_bytes:,} bytes)")
         else:
             print(f"   - {log_file}: n'existe pas")
+
 
 if __name__ == "__main__":
     test_current_implementation()
