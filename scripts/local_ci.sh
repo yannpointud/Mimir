@@ -2,7 +2,8 @@
 # scripts/local_ci.sh -- Mimir local CI runner.
 #
 # Single entrypoint chaining three quality gates, aborting on the first failure:
-#   1. ruff       -- static lint (config in pyproject.toml [tool.ruff])
+#   1. ruff       -- static lint and formatting check (config in
+#                    pyproject.toml [tool.ruff])
 #   2. pytest     -- the full test suite (testpaths=tests in pytest.ini:
 #                    unit + integration + performance, incl. the
 #                    health/alerting/backup tests and the reused
@@ -10,14 +11,15 @@
 #   3. pip-audit  -- runtime dependency vulnerability scan against the PyPA
 #                    advisory database
 #
-# The GitHub Actions workflow (.github/workflows/ci.yml) runs the pytest and
-# pip-audit steps on every pull request; this script also runs ruff locally.
+# The GitHub Actions workflow (.github/workflows/ci.yml) runs the same steps
+# on every pull request.
 #
 # Usage: bash scripts/local_ci.sh
 set -euo pipefail
 
 echo "== ruff =="
 ruff check .
+ruff format --check .
 
 echo "== pytest (full suite) =="
 pytest
