@@ -4,7 +4,6 @@ Configuration optimized for performance and concurrency
 """
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import (
@@ -118,8 +117,7 @@ class DatabaseManager:
             )
             logger.info(f"Async database initialized: {async_database_url}")
 
-        except (SQLAlchemyError, ImportError) as e:
-            # ImportError: the async engine needs the aiosqlite driver
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             logger.error(f"Failed to initialize database: {e}")
             raise
 
@@ -188,7 +186,7 @@ class DatabaseManager:
         try:
             Base.metadata.create_all(bind=self.engine)
             logger.info("Database tables created successfully")
-        except SQLAlchemyError as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             logger.error(f"Failed to create tables: {e}")
             raise
 
@@ -198,7 +196,7 @@ class DatabaseManager:
             async with self.async_engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("Async database tables created successfully")
-        except SQLAlchemyError as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             logger.error(f"Failed to create async tables: {e}")
             raise
 
@@ -207,7 +205,7 @@ class DatabaseManager:
         try:
             Base.metadata.drop_all(bind=self.engine)
             logger.warning("All database tables dropped")
-        except SQLAlchemyError as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             logger.error(f"Failed to drop tables: {e}")
             raise
 
@@ -220,7 +218,7 @@ class DatabaseManager:
             with self.get_session_context() as session:
                 session.execute(text("SELECT 1"))
                 return True
-        except SQLAlchemyError as e:
+        except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
             logger.error(f"Database health check failed: {e}")
             return False
 
@@ -296,7 +294,7 @@ def init_database():
 
         logger.info("Database initialization completed successfully")
 
-    except (OSError, SQLAlchemyError, RuntimeError, ImportError) as e:
+    except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
         logger.error(f"Database initialization failed: {e}")
         raise
 

@@ -69,5 +69,5 @@ def _remove_stored_file(file_path: str | None) -> None:
         try:
             os.remove(file_path)
             logger.debug(f"Deleted file: {file_path}")
-        except OSError as e:
+        except Exception as e:  # noqa: BLE001 - best effort: the database deletion already succeeded
             logger.warning(f"Failed to delete file {file_path}: {e}")

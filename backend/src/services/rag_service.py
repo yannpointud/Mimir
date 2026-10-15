@@ -21,7 +21,6 @@ import logging
 
 import numpy as np
 from rapidfuzz import fuzz
-from sqlalchemy.exc import SQLAlchemyError
 
 from src.cache.lru_cache import ChatCacheService
 from src.database.repository import DocumentRepository
@@ -32,7 +31,6 @@ from src.monitoring.rag_debug_logger import RagDebugService
 from src.cost.budget_guard import BudgetGuard, BudgetReservation
 from src.cost.usage_tracker import UsageTracker
 from src.config import settings
-from src.shared.errors import RetrievalError
 
 logger = logging.getLogger(__name__)
 
@@ -480,7 +478,7 @@ async def _hybrid_retrieve(
     # the exception break an otherwise-working engine.
     try:
         lexical_pool = await asyncio.to_thread(bm25_store.query, question, _HYBRID_POOL_SIZE)
-    except RetrievalError as e:
+    except Exception as e:  # noqa: BLE001 - degradation boundary: fall back to dense-only
         logger.warning(
             f"BM25 lexical retrieval unavailable ({e}); degrading to dense-only for this query"
         )
@@ -709,7 +707,7 @@ def _load_source_documents(
     """
     try:
         return document_repository.get_by_ids(list({int(r.document_id) for r in search_results}))
-    except (ValueError, SQLAlchemyError):
+    except Exception:  # noqa: BLE001 - fallback contract: degrade to the chunk source names
         return {}
 
 

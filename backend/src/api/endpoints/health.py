@@ -134,7 +134,7 @@ async def disk_usage() -> dict[str, Any]:
                     }
                 else:
                     usage_info[name] = {"path": path, "error": "Directory does not exist"}
-            except OSError as e:
+            except Exception as e:  # noqa: BLE001 - health probe: per-directory best effort
                 usage_info[name] = {"path": path, "error": str(e)}
 
         return {"healthy": True, "disk_usage": usage_info, "timestamp": datetime.utcnow()}

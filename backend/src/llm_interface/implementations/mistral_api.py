@@ -14,17 +14,12 @@ from ..interfaces import (
     GenerationResponse,
     EmbeddingResponse,
     LLMAPIError,
-    LLMException,
     LLMRateLimitError,
     LLMInvalidRequestError,
 )
 from ...monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
-
-# A Mistral payload that does not have the documented shape (missing key,
-# empty list, unexpected type).
-_PAYLOAD_ERRORS = (KeyError, IndexError, TypeError, AttributeError)
 
 # Returned by _parse_stream_line for lines that carry no JSON payload (a JSON
 # payload may itself be null, so None cannot play this role).
@@ -200,9 +195,11 @@ class MistralAPIService(AbstractLLMService):
                 else:
                     raise last_exception from e
 
-            except (TimeoutError, ValueError) as e:
-                # Timeout outside aiohttp's own errors, malformed JSON body or
-                # Retry-After header
+            except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
+                # Re-raise LLM-specific exceptions without transformation
+                raise
+
+            except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
                 error_msg = f"Unexpected error: {str(e)}"
                 logger.error(error_msg)
                 raise LLMAPIError(error_msg) from e
@@ -305,7 +302,10 @@ class MistralAPIService(AbstractLLMService):
                 completion_tokens=completion_tokens,
             )
 
-        except _PAYLOAD_ERRORS as e:
+        except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
+            # Re-raise LLM-specific exceptions
+            raise
+        except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
             error_msg = f"Text generation failed: {str(e)}"
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
@@ -401,8 +401,9 @@ class MistralAPIService(AbstractLLMService):
                     finish_reason=finish_reason,
                 )
 
-        except (aiohttp.ClientError, TimeoutError, ValueError, *_PAYLOAD_ERRORS) as e:
-            # Network failure, undecodable stream line or unexpected chunk shape
+        except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
+            raise
+        except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
             error_msg = f"Streaming generation failed: {str(e)}"
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
@@ -486,7 +487,7 @@ class MistralAPIService(AbstractLLMService):
                     f"Batch {batch_num} completed: {len(batch_response.embeddings)} embeddings, {batch_response.usage_tokens} tokens"
                 )
 
-            except LLMException as e:
+            except Exception as e:  # noqa: BLE001 - any batch failure becomes LLMAPIError
                 error_msg = f"Embedding batch {batch_num}/{total_batches} failed: {str(e)}"
                 logger.error(error_msg)
                 raise LLMAPIError(error_msg) from e
@@ -567,7 +568,10 @@ class MistralAPIService(AbstractLLMService):
                 completion_tokens=0,
             )
 
-        except _PAYLOAD_ERRORS as e:
+        except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
+            # Re-raise LLM-specific exceptions
+            raise
+        except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
             error_msg = f"Embedding generation failed: {str(e)}"
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
@@ -587,7 +591,7 @@ class MistralAPIService(AbstractLLMService):
             logger.debug("Mistral API health check passed")
             return True
 
-        except LLMException as e:
+        except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unavailable
             logger.warning(f"Mistral API health check failed: {str(e)}")
             return False
 

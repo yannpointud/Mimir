@@ -110,7 +110,7 @@ def _read_stored_file(path: str | None, document_id: int) -> _StoredFile:
         )
         # Same extractors as during indexing
         stored_file.content = _extract_text(ExtractorFactory(), path)
-    except OSError as e:
+    except Exception as e:  # noqa: BLE001 - best effort: the reader view is served without file details
         logger.warning(f"Could not read file metadata for document {document_id}: {e}")
     return stored_file
 

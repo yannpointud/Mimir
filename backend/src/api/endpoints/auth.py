@@ -285,7 +285,7 @@ async def change_password(
 
     try:
         _update_env_file("ADMIN_PASSWORD_HASH", new_hash)
-    except (OSError, ValueError) as e:
+    except Exception as e:  # noqa: BLE001 - API boundary: any write failure becomes this 500
         logger.error(f"Failed to update .env file: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

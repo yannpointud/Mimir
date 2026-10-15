@@ -28,7 +28,6 @@ from typing import Any
 import bm25s
 
 from ..interfaces import (
-    INDEX_BACKEND_ERRORS,
     VectorStoreConnectionError,
     VectorStoreOperationError,
 )
@@ -101,7 +100,7 @@ class Bm25LexicalStore:
                     "BM25 lexical index rebuilt",
                     extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
                 )
-            except INDEX_BACKEND_ERRORS as e:
+            except Exception as e:  # noqa: BLE001 - any failure becomes VectorStoreOperationError
                 error_msg = f"Failed to rebuild BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -147,7 +146,7 @@ class Bm25LexicalStore:
                     (self._resolve_chunk_id(doc), float(score))
                     for doc, score in zip(results[0], scores[0], strict=False)
                 ]
-            except INDEX_BACKEND_ERRORS as e:
+            except Exception as e:  # noqa: BLE001 - any failure becomes VectorStoreOperationError
                 error_msg = f"Failed to query BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreOperationError(error_msg) from e
@@ -190,7 +189,7 @@ class Bm25LexicalStore:
                     extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
                 )
                 return True
-            except INDEX_BACKEND_ERRORS as e:
+            except Exception as e:  # noqa: BLE001 - any failure (e.g. EOFError on a truncated .npy) becomes VectorStoreConnectionError
                 error_msg = f"Failed to load BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreConnectionError(error_msg) from e
@@ -227,7 +226,7 @@ class Bm25LexicalStore:
             os.replace(target, backup)  # atomic: target aside
         try:
             os.replace(tmp_dir, target)  # atomic: new in place
-        except OSError:
+        except Exception:  # noqa: BLE001 - roll back on any failure, then re-raise
             if had_old:
                 os.replace(backup, target)  # roll back
             raise
@@ -254,7 +253,7 @@ class Bm25LexicalStore:
                 show_progress=False,
             )
             self._swap_dir_into_place(tmp_dir)
-        except INDEX_BACKEND_ERRORS:
+        except Exception:  # noqa: BLE001 - remove the temp directory on any failure, then re-raise
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
 
@@ -265,6 +264,6 @@ class Bm25LexicalStore:
         try:
             (Path(tmp_dir) / "empty.marker").write_text("empty\n", encoding="utf-8")
             self._swap_dir_into_place(tmp_dir)
-        except OSError:
+        except Exception:  # noqa: BLE001 - remove the temp directory on any failure, then re-raise
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise

@@ -27,7 +27,6 @@ from src.rag_core.implementations.bm25_store import Bm25LexicalStore
 from src.monitoring.rag_debug_logger import rag_debug_service
 from src.services.rag_service import RagService
 from src.monitoring.logger import setup_logger
-from src.shared.errors import RetrievalError
 
 logger = setup_logger(__name__)
 
@@ -121,8 +120,7 @@ def get_bm25_store() -> Bm25LexicalStore:
         _bm25_store = Bm25LexicalStore(index_path=settings.bm25_index_path)
         try:
             _bm25_store.load()
-        except RetrievalError as e:
-            # Never fail startup on a bad or missing index
+        except Exception as e:  # noqa: BLE001 - startup boundary: never fail on a bad/missing index
             logger.warning(f"BM25 lexical index failed to load, starting empty: {e}")
     return _bm25_store
 

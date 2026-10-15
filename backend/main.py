@@ -14,7 +14,7 @@ from src.config import settings
 from src.database.connection import init_database, db_manager
 from src.security.admin_password import resolve_admin_password
 from src.security.startup_validation import validate_production_secrets
-from src.shared.errors import BudgetExceeded, MimirError, RetrievalError
+from src.shared.errors import BudgetExceeded, MimirError
 from src.shared.models import ErrorResponse, HealthCheckResponse, RootResponse
 
 # Import API endpoints
@@ -199,7 +199,7 @@ def _ensure_bm25_index() -> None:
                 logger.info(
                     f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
                 )
-    except RetrievalError as bm25_startup_error:
+    except Exception as bm25_startup_error:  # noqa: BLE001 - startup boundary: never fail on a bad index
         logger.warning(
             f"BM25 startup rebuild failed - hybrid queries will degrade to "
             f"dense-only until next ingestion: {bm25_startup_error}"

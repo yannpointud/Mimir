@@ -141,23 +141,27 @@ class DocumentFileHandler(FileSystemEventHandler):
 
     def _wait_for_file_stability(self, file_path: str, max_wait: int = 5):
         """Wait for file to be stable (no size changes)."""
-        if not os.path.exists(file_path):
-            return
+        try:
+            if not os.path.exists(file_path):
+                return
 
-        previous_size = -1
-        waited: float = 0
+            previous_size = -1
+            waited: float = 0
 
-        while waited < max_wait:
-            try:
-                current_size = os.path.getsize(file_path)
-                if current_size == previous_size and current_size > 0:
+            while waited < max_wait:
+                try:
+                    current_size = os.path.getsize(file_path)
+                    if current_size == previous_size and current_size > 0:
+                        break
+                    previous_size = current_size
+                    time.sleep(0.5)
+                    waited += 0.5
+                except OSError:
+                    # File might be locked or deleted
                     break
-                previous_size = current_size
-                time.sleep(0.5)
-                waited += 0.5
-            except OSError:
-                # File might be locked or deleted
-                break
+
+        except Exception as e:  # noqa: BLE001 - best effort: the event is handled even if the wait fails
+            logger.debug(f"Error waiting for file stability: {e}")
 
 
 class FileWatcher:
@@ -227,8 +231,7 @@ class FileWatcher:
             logger.info("FileWatcher started successfully")
             return True
 
-        except (OSError, RuntimeError) as e:
-            # OSError: inotify watch limit; RuntimeError: observer thread state
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not started
             logger.error(f"Failed to start FileWatcher: {e}")
             return False
 
@@ -246,7 +249,7 @@ class FileWatcher:
             logger.info("FileWatcher stopped")
             return True
 
-        except RuntimeError as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not stopped
             logger.error(f"Error stopping FileWatcher: {e}")
             return False
 
@@ -283,7 +286,7 @@ class FileWatcher:
             logger.info(f"Added directory to watch list: {directory}")
             return True
 
-        except (OSError, RuntimeError) as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not added
             logger.error(f"Failed to add directory {directory}: {e}")
             return False
 
@@ -305,8 +308,7 @@ class FileWatcher:
 
             return True
 
-        except (OSError, RuntimeError) as e:
-            # Path.resolve() raises RuntimeError on a symlink loop
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not removed
             logger.error(f"Failed to remove directory {directory}: {e}")
             return False
 
@@ -330,7 +332,7 @@ class FileWatcher:
 
             logger.info(f"Found {len(existing_files)} existing files")
 
-        except OSError as e:
+        except Exception as e:  # noqa: BLE001 - best effort: return the files found so far
             logger.error(f"Error scanning existing files: {e}")
 
         return existing_files

@@ -3,7 +3,6 @@ Text extraction from various document formats
 Provides extractors for PDF, DOCX, TXT, and Markdown files
 """
 
-import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
@@ -11,13 +10,11 @@ from typing import Any
 # Import document processing libraries
 try:
     import pypdf
-    import pypdf.errors
 except ImportError:
     # Optional dependency: PDFExtractor checks for None before using it.
     pypdf = None  # type: ignore[assignment]
 
 try:
-    import docx
     from docx import Document as DocxDocument
 except ImportError:
     DocxDocument = None
@@ -32,22 +29,6 @@ from ..monitoring.logger import setup_logger
 from ..shared.errors import IngestionError
 
 logger = setup_logger(__name__)
-
-# What a parser raises on an unreadable or malformed file: disk errors,
-# decoding errors (ValueError), broken structures (KeyError, IndexError,
-# TypeError, AttributeError), invalid XML inside DOCX (lxml SyntaxError),
-# corrupt archives, unsupported features or runaway recursion (RuntimeError).
-_PARSER_ERRORS = (
-    OSError,
-    ValueError,
-    TypeError,
-    KeyError,
-    IndexError,
-    AttributeError,
-    SyntaxError,
-    RuntimeError,
-    zipfile.BadZipFile,
-)
 
 
 class ExtractionError(IngestionError):
@@ -121,7 +102,7 @@ class PDFExtractor(TextExtractor):
                     logger.warning(f"PDF is encrypted, attempting to decrypt: {file_path}")
                     try:
                         reader.decrypt("")  # Try empty password
-                    except (pypdf.errors.PyPdfError, *_PARSER_ERRORS) as exc:
+                    except Exception as exc:  # noqa: BLE001 - any decryption failure becomes ExtractionError
                         raise ExtractionError(f"Cannot decrypt encrypted PDF: {file_path}") from exc
 
                 # Extract text from each page
@@ -130,7 +111,7 @@ class PDFExtractor(TextExtractor):
                         page_text = page.extract_text()
                         if page_text.strip():  # Only add non-empty pages
                             text_parts.append(page_text)
-                    except (pypdf.errors.PyPdfError, *_PARSER_ERRORS) as e:
+                    except Exception as e:  # noqa: BLE001 - per-page best effort: a broken page is skipped
                         logger.warning(
                             f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}"
                         )
@@ -161,7 +142,7 @@ class PDFExtractor(TextExtractor):
 
             return extracted_text
 
-        except (ExtractionError, pypdf.errors.PyPdfError, *_PARSER_ERRORS) as e:
+        except Exception as e:  # noqa: BLE001 - any parser failure becomes ExtractionError
             error_msg = f"Failed to extract text from PDF {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
@@ -225,7 +206,7 @@ class DOCXExtractor(TextExtractor):
 
             return extracted_text
 
-        except (docx.opc.exceptions.OpcError, *_PARSER_ERRORS) as e:
+        except Exception as e:  # noqa: BLE001 - any parser failure becomes ExtractionError
             error_msg = f"Failed to extract text from DOCX {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
@@ -268,7 +249,7 @@ class TXTExtractor(TextExtractor):
 
             except UnicodeDecodeError:
                 continue
-            except OSError as e:
+            except Exception as e:  # noqa: BLE001 - best effort: try the next encoding
                 error_msg = (
                     f"Failed to read text file {file_path} with encoding {encoding}: {str(e)}"
                 )
@@ -327,7 +308,7 @@ class MarkdownExtractor(TextExtractor):
 
             return content
 
-        except _PARSER_ERRORS as e:
+        except Exception as e:  # noqa: BLE001 - any parser failure becomes ExtractionError
             error_msg = f"Failed to extract text from Markdown {file_path}: {str(e)}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e

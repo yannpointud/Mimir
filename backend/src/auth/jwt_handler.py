@@ -11,7 +11,6 @@ from typing import Any
 import logging
 import jwt  # PyJWT
 from pwdlib import PasswordHash
-from pwdlib.exceptions import PwdlibError
 from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
 from src.config import settings
@@ -52,7 +51,7 @@ class JWTHandler:
             encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
             logger.debug(f"Created JWT token with expiration: {expire}")
             return encoded_jwt
-        except (jwt.PyJWTError, TypeError, ValueError) as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             logger.error(f"Failed to create JWT token: {e}")
             raise
 
@@ -85,8 +84,7 @@ class JWTHandler:
         except jwt.InvalidTokenError as e:
             logger.warning(f"JWT token validation failed: {e}")
             return None
-        except (jwt.PyJWTError, TypeError, ValueError) as e:
-            # Key or algorithm problems (PyJWTError outside InvalidTokenError)
+        except Exception as e:  # noqa: BLE001 - fail closed: any other error rejects the token (401)
             logger.error(f"Unexpected error during token verification: {e}")
             return None
 
@@ -104,8 +102,7 @@ class JWTHandler:
 
         try:
             return self.pwd_context.verify(plain_password, hashed_password)
-        except (PwdlibError, ValueError, TypeError) as e:
-            # Unknown or malformed stored hash
+        except Exception as e:  # noqa: BLE001 - fail closed: any error denies the password
             logger.error(f"Password verification error: {e}")
             return False
 

@@ -57,24 +57,6 @@ class VectorStoreOperationError(VectorStoreException):
     pass
 
 
-# Low-level failures that index implementations translate into
-# VectorStoreException subclasses: FAISS reports its C++ errors as
-# RuntimeError, numpy, json and pydantic raise ValueError or TypeError,
-# metadata bookkeeping raises KeyError, IndexError or AttributeError (no
-# index loaded) and disk access raises OSError. A VectorStoreException raised
-# by a nested call is wrapped again with the context of the outer operation.
-INDEX_BACKEND_ERRORS = (
-    VectorStoreException,
-    RuntimeError,
-    ValueError,
-    TypeError,
-    KeyError,
-    IndexError,
-    AttributeError,
-    OSError,
-)
-
-
 class AbstractVectorStore(ABC):
     """
     Abstract base class for vector storage systems

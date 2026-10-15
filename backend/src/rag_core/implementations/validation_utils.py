@@ -6,16 +6,9 @@ from typing import Any
 from datetime import datetime
 import logging
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from ...shared.errors import RetrievalError
-from ..interfaces import INDEX_BACKEND_ERRORS
 
 logger = logging.getLogger(__name__)
-
-# Failures of either source: SQLite through SQLAlchemy, the vector index
-# through its own backend errors.
-_SOURCE_ERRORS = (SQLAlchemyError, *INDEX_BACKEND_ERRORS)
 
 
 class VectorStoreValidator:
@@ -95,7 +88,7 @@ class VectorStoreValidator:
 
             return validation_report
 
-        except _SOURCE_ERRORS as e:
+        except Exception as e:  # noqa: BLE001 - any failure becomes RetrievalError("Validation failed: ...")
             error_msg = f"Validation failed: {str(e)}"
             self.logger.error(error_msg)
             raise RetrievalError(error_msg) from e
@@ -116,7 +109,7 @@ class VectorStoreValidator:
                 }
                 for doc in documents
             }
-        except SQLAlchemyError as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             self.logger.error(f"Failed to get database documents: {e}")
             raise
 
@@ -144,7 +137,7 @@ class VectorStoreValidator:
 
                 return vector_docs
 
-        except INDEX_BACKEND_ERRORS as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             self.logger.error(f"Failed to get vector store documents: {e}")
             raise
 
@@ -252,7 +245,7 @@ class VectorStoreValidator:
             if fixes:
                 self.vector_store.persist()
 
-        except _SOURCE_ERRORS as e:
+        except Exception as e:  # noqa: BLE001 - best effort: the failure is reported as a fix_error entry
             self.logger.error(f"Failed to apply fixes: {e}")
             fixes.append(
                 {

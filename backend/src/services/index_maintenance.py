@@ -16,11 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.rag_core.implementations.validation_utils import VectorStoreValidator
-from src.shared.errors import RetrievalError
 from src.shared.models import ConsistencyValidationResponse
 
 logger = logging.getLogger(__name__)
@@ -53,7 +50,7 @@ async def remove_document_from_indexes(
         # Snapshot active chunks UNDER the FAISS lock.
         active_chunks = vector_store.snapshot_active_chunks()
         await asyncio.to_thread(bm25_store.rebuild, active_chunks)
-    except RetrievalError as bm25_error:
+    except Exception as bm25_error:  # noqa: BLE001 - best effort: the FAISS removal already succeeded
         logger.warning(f"BM25 rebuild after deletion failed - continuing anyway: {bm25_error}")
 
 
@@ -72,7 +69,7 @@ async def _clean_orphans_if_fragmented(vector_store: Any) -> None:
             logger.info(
                 f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed"
             )
-    except RetrievalError as cleanup_error:
+    except Exception as cleanup_error:  # noqa: BLE001 - best effort: independent of the BM25 resync that follows
         # The deletion itself already succeeded
         logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
 
@@ -190,7 +187,7 @@ def record_rebuild_failure(audit_repo: Any, error: Exception, admin_user: str) -
             success=False,
             additional_data={"error": str(error), "admin_user": admin_user},
         )
-    except SQLAlchemyError as audit_error:
+    except Exception as audit_error:  # noqa: BLE001 - best effort: the route still answers its rebuild 500
         # Admin traceability: never silence the audit failure either
         logger.warning(f"Failed to write audit log for rebuild failure: {audit_error}")
 
@@ -271,7 +268,7 @@ def _save_validation_report(validation_result: dict[str, Any], reports_dir: Path
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(validation_result, f, indent=2, default=str)
         logger.info(f"Validation report saved to {report_path}")
-    except (OSError, TypeError, ValueError) as e:
+    except Exception as e:  # noqa: BLE001 - best effort: the validation result is still returned
         logger.warning(f"Failed to save validation report: {e}")
     return report_path
 

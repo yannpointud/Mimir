@@ -334,9 +334,7 @@ class Settings(BaseSettings):
 # AttributeError on a None settings object.
 try:
     settings = Settings()
-except (ValueError, OSError) as config_error:
-    # pydantic validation errors are ValueErrors; OSError comes from creating
-    # the data directories.
+except Exception as config_error:  # noqa: BLE001 - startup boundary: any load failure is handled below
     import sys
 
     if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):

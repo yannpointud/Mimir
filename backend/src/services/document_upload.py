@@ -16,8 +16,6 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Protocol
 
-from sqlalchemy.exc import SQLAlchemyError
-
 from src.shared.models import sanitize_filename, validate_filename
 from src.services.errors import RequestRejectedError
 
@@ -214,7 +212,7 @@ class DocumentUpload:
         try:
             doc_repo.delete(document.id, force=True)
             file_path.unlink(missing_ok=True)
-        except (SQLAlchemyError, ValueError, OSError) as cleanup_error:
+        except Exception as cleanup_error:  # noqa: BLE001 - best-effort cleanup: the client still gets the 503
             logger.warning(
                 f"Failed to clean up after queue-full rejection "
                 f"(document_id={document.id}): {cleanup_error}"

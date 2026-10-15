@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 from typing import Any
 import numpy as np
-from sqlalchemy.exc import SQLAlchemyError
 
 from .extractors import ExtractorFactory, ExtractionError, UnsupportedFormatError
 from .chunking import ChunkingStrategy, ChunkingConfig
@@ -17,7 +16,7 @@ from .async_queue_manager import AsyncQueueManager
 from .queue_manager import IngestionTask
 
 from ..llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
-from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException
+from ..rag_core.interfaces import AbstractVectorStore, Chunk
 from ..database.repository import DocumentRepository
 from ..monitoring.logger import setup_logger
 from ..config import settings
@@ -147,7 +146,7 @@ class IngestionProcessor:
                         preserve=preserve,
                     )
                     document_id = str(document.id)
-                except ValueError as e:
+                except Exception as e:  # noqa: BLE001 - a duplicate is reported as not queued; anything else re-raised
                     if "already exists" in str(e).lower():
                         logger.warning(f"Document already exists with hash: {file_hash}")
                         return False
@@ -162,7 +161,7 @@ class IngestionProcessor:
                     logger.info(
                         f"Reprocessing existing document: {existing.filename} (ID: {document_id})"
                     )
-                except (ValueError, SQLAlchemyError) as e:
+                except Exception as e:  # noqa: BLE001 - never raise: any lookup failure means not queued
                     logger.error(
                         f"Failed to retrieve document {document_id} for reprocessing: {str(e)}"
                     )
@@ -196,7 +195,7 @@ class IngestionProcessor:
 
             return success
 
-        except (OSError, ValueError, SQLAlchemyError) as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure means not queued (returns False)
             logger.error(f"Failed to queue document {file_path}: {str(e)}")
             return False
 
@@ -246,7 +245,7 @@ class IngestionProcessor:
                 self.document_repository.update_status(
                     int(task.document_id), "error", error_message="Daily budget exceeded"
                 )
-            except (ValueError, SQLAlchemyError) as db_error:
+            except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             task.retry_count = task.max_retries
@@ -263,7 +262,7 @@ class IngestionProcessor:
                     "error",
                     error_message=error_msg[:500],  # Limit error message length
                 )
-            except (ValueError, SQLAlchemyError) as db_error:
+            except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             return False
@@ -312,7 +311,7 @@ class IngestionProcessor:
             # Step 3: Generate embeddings
             # Reserve the daily budget BEFORE the paid Mistral embedding call
             # (fail-closed): None means the effective daily cap is already
-            # exhausted, so raise a non-retriable BudgetExceededError instead
+            # exhausted, so raise a non-retriable BudgetExceeded instead
             # of ever calling embed().
             #
             # asyncio.to_thread on every reserve/release/record/finalize call
@@ -412,7 +411,7 @@ class IngestionProcessor:
 
         except BudgetExceeded:
             # Non-retriable fail-closed stop: propagate to _process_task's
-            # dedicated except BudgetExceededError branch, bypassing the
+            # dedicated except BudgetExceeded branch, bypassing the
             # retry loop entirely (a retry cannot succeed before the next reset).
             raise
 
@@ -473,7 +472,7 @@ class IngestionProcessor:
             active_chunks = self.vector_store.snapshot_active_chunks()
             await asyncio.to_thread(self.bm25_store.rebuild, active_chunks)
             self._bm25_dirty = False
-        except VectorStoreException as bm25_error:
+        except Exception as bm25_error:  # noqa: BLE001 - best effort: FAISS already holds the chunks
             logger.warning(f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}")
 
     def _extract_text(self, file_path: str) -> str:
