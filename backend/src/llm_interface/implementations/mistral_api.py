@@ -4,6 +4,7 @@ Provides integration with Mistral AI's API for text generation and embeddings
 """
 
 import asyncio
+import json
 import aiohttp
 import time
 from typing import Any
@@ -24,6 +25,50 @@ logger = setup_logger(__name__)
 # A Mistral payload that does not have the documented shape (missing key,
 # empty list, unexpected type).
 _PAYLOAD_ERRORS = (KeyError, IndexError, TypeError, AttributeError)
+
+# Returned by _parse_stream_line for lines that carry no JSON payload (a JSON
+# payload may itself be null, so None cannot play this role).
+_NO_CHUNK = object()
+
+
+def _parse_stream_line(line: bytes) -> Any:
+    """JSON payload of one SSE line of the stream, or _NO_CHUNK.
+
+    Blank lines, the final ``data: [DONE]`` marker, lines that are not
+    ``data:`` lines and payloads that are not valid JSON (logged) carry no
+    chunk. An undecodable line raises UnicodeDecodeError.
+    """
+    text = line.decode("utf-8").strip()
+    if not text or text == "data: [DONE]" or not text.startswith("data: "):
+        return _NO_CHUNK
+
+    json_str = text[6:]  # Remove "data: " prefix
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        logger.warning(f"Failed to parse streaming chunk: {json_str}")
+        return _NO_CHUNK
+
+
+def _first_choice_delta(chunk_data: Any) -> tuple[Any, Any]:
+    """Text delta and finish reason of the chunk's first choice, if any."""
+    if "choices" in chunk_data and len(chunk_data["choices"]) > 0:
+        choice = chunk_data["choices"][0]
+        delta = choice.get("delta", {})
+        return delta.get("content", ""), choice.get("finish_reason")
+    return "", None
+
+
+def _record_stream_usage(chunk_data: Any, usage_out: dict[str, Any] | None) -> None:
+    """Copy the real token usage into usage_out when the chunk carries it.
+
+    The final chunk carries usage with an empty choices list.
+    """
+    usage_data = chunk_data.get("usage")
+    if usage_data is not None and usage_out is not None:
+        usage_out["prompt_tokens"] = usage_data.get("prompt_tokens", 0)
+        usage_out["completion_tokens"] = usage_data.get("completion_tokens", 0)
+        usage_out["total_tokens"] = usage_data.get("total_tokens", 0)
 
 
 class MistralAPIService(AbstractLLMService):
@@ -292,7 +337,7 @@ class MistralAPIService(AbstractLLMService):
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
 
-    async def generate_stream(  # noqa: C901
+    async def generate_stream(
         self,
         prompt: str,
         system_prompt: str | None = None,
@@ -327,29 +372,8 @@ class MistralAPIService(AbstractLLMService):
         Yields:
             str: Text chunks as they are generated
         """
-        import json
-
         start_time = time.time()
-
-        # Build messages array
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        # Build request payload with stream enabled
-        payload = {
-            "model": self._model,
-            "messages": messages,
-            "temperature": temperature,
-            "stream": True,
-            # Without this, Mistral never sends a usage object in the stream at all.
-            "stream_options": {"include_usage": True},
-            **kwargs,
-        }
-
-        if max_tokens:
-            payload["max_tokens"] = max_tokens
+        payload = self._stream_payload(prompt, system_prompt, max_tokens, temperature, kwargs)
 
         logger.info(f"Starting streaming generation with model: {self._model}")
 
@@ -384,45 +408,20 @@ class MistralAPIService(AbstractLLMService):
 
                 # Read stream line by line
                 async for line in response.content:
-                    line = line.decode("utf-8").strip()
-
-                    if not line or line == "data: [DONE]":
+                    chunk_data = _parse_stream_line(line)
+                    if chunk_data is _NO_CHUNK:
                         continue
 
-                    if line.startswith("data: "):
-                        json_str = line[6:]  # Remove "data: " prefix
+                    content, chunk_finish_reason = _first_choice_delta(chunk_data)
+                    if content:
+                        full_content += content
+                        yield content
+                    if chunk_finish_reason:
+                        finish_reason = chunk_finish_reason
 
-                        try:
-                            chunk_data = json.loads(json_str)
-
-                            # Extract delta content
-                            if "choices" in chunk_data and len(chunk_data["choices"]) > 0:
-                                choice = chunk_data["choices"][0]
-                                delta = choice.get("delta", {})
-                                content = delta.get("content", "")
-
-                                if content:
-                                    full_content += content
-                                    yield content
-
-                                # Check for finish
-                                if choice.get("finish_reason"):
-                                    finish_reason = choice["finish_reason"]
-
-                            # The final chunk carries usage with an empty choices
-                            # list (already tolerated by the guard above, which
-                            # only requires len(choices) > 0 to read content).
-                            usage_data = chunk_data.get("usage")
-                            if usage_data is not None and usage_out is not None:
-                                usage_out["prompt_tokens"] = usage_data.get("prompt_tokens", 0)
-                                usage_out["completion_tokens"] = usage_data.get(
-                                    "completion_tokens", 0
-                                )
-                                usage_out["total_tokens"] = usage_data.get("total_tokens", 0)
-
-                        except json.JSONDecodeError:
-                            logger.warning(f"Failed to parse streaming chunk: {json_str}")
-                            continue
+                    # Read after the yield: a consumer that stops at this
+                    # chunk's content never records its usage.
+                    _record_stream_usage(chunk_data, usage_out)
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -446,6 +445,33 @@ class MistralAPIService(AbstractLLMService):
             error_msg = f"Streaming generation failed: {str(e)}"
             logger.error(error_msg)
             raise LLMAPIError(error_msg) from e
+
+    def _stream_payload(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        max_tokens: int | None,
+        temperature: float,
+        extra: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Request body of a streamed chat completion."""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = {
+            "model": self._model,
+            "messages": messages,
+            "temperature": temperature,
+            "stream": True,
+            # Without this, Mistral never sends a usage object in the stream at all.
+            "stream_options": {"include_usage": True},
+            **extra,
+        }
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        return payload
 
     async def embed(
         self, texts: list[str], session_id: str | None = None, rag_debug=None
