@@ -46,6 +46,9 @@ watchdog==3.0.0
 
 # Email
 aiosmtplib==3.0.1
+# Escalation email templates (imported at startup by email_service/smtp_client.py).
+# Was only present transitively through locust -> flask.
+jinja2==3.1.6
 
 # Rate Limiting
 slowapi==0.1.9
