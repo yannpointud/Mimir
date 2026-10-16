@@ -8,7 +8,6 @@ checking the status of various system components.
 import logging
 import os
 import shutil
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Response, status
@@ -21,6 +20,7 @@ from mimir.database.connection import get_db_session
 from mimir.database.models import Document
 from mimir.email_service.smtp_client import email_service
 from mimir.shared.models import HealthCheckResponse
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ async def health_check(
     """Comprehensive health check of all system components."""
     health_status: dict[str, Any] = {
         "status": "healthy",
-        "timestamp": datetime.utcnow(),
+        "timestamp": utc_now(),
         "version": settings.api_version,
         "environment": "production" if settings.is_production else "development",
         "checks": {},
@@ -124,7 +124,7 @@ async def disk_usage() -> dict[str, Any]:
             "free_gb": round(free / (1024**3), 2),
             "usage_percent": round((used / total) * 100, 1),
         }
-    return {"healthy": True, "disk_usage": usage_info, "timestamp": datetime.utcnow()}
+    return {"healthy": True, "disk_usage": usage_info, "timestamp": utc_now()}
 
 
 async def _check_database_health(db: Session) -> dict[str, Any]:

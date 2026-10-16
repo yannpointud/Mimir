@@ -11,7 +11,6 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any
-from datetime import datetime
 import asyncio
 import logging
 
@@ -33,6 +32,7 @@ from mimir.monitoring.rag_debug_logger import RagDebugService
 from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
 from mimir.cost.usage_tracker import UsageTracker
 from mimir.config import settings
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -464,7 +464,7 @@ async def _hybrid_retrieve(
         applied by the caller via _filter_dynamic_sources(mode="hybrid")).
     """
     logger.info("Hybrid retrieval enabled: fusing dense + BM25 pools via RRF")
-    start_search = datetime.utcnow()
+    start_search = utc_now()
 
     dense_pool = await asyncio.to_thread(
         vector_store.query,
@@ -498,7 +498,7 @@ async def _hybrid_retrieve(
         dense_pool, pre_included_chunks, fused_scores, vector_store
     )
 
-    search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
+    search_time = (utc_now() - start_search).total_seconds() * 1000
     logger.info(
         f"Hybrid fusion: dense={len(dense_pool)}, lexical={len(lexical_pool)}, "
         f"fused={len(search_results)} candidates"
@@ -629,14 +629,14 @@ async def _dense_retrieve(
     embedding_tokens: int,
 ) -> list[Any]:
     """Step 2, dense mode: cosine search, then merge the pre-included chunks."""
-    start_search = datetime.utcnow()
+    start_search = utc_now()
     search_results = await asyncio.to_thread(
         vector_store.query,
         vector=question_embedding,
         top_k=settings.max_sources * 2,
         filter_dict=None,
     )
-    search_time = (datetime.utcnow() - start_search).total_seconds() * 1000
+    search_time = (utc_now() - start_search).total_seconds() * 1000
 
     rag_debug.log_vector_search(
         session_id=session_id,

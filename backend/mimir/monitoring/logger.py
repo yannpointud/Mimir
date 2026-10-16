@@ -6,13 +6,13 @@ Provides consistent logging across all modules with rotation and multiple handle
 import logging
 import json
 import sys
-from datetime import datetime
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from typing import Any
 
 # Import settings for dynamic log level configuration
 from mimir.config import settings
+from mimir.shared.clock import utc_now
 
 
 class JSONFormatter(logging.Formatter):
@@ -20,7 +20,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_obj = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "level": record.levelname,
             "module": record.module,
             "function": record.funcName,

@@ -8,7 +8,6 @@ from mimir.shared.errors import NotFoundError
 import asyncio
 import tempfile
 from unittest.mock import Mock, patch, AsyncMock, mock_open
-from datetime import datetime
 from pathlib import Path
 from fastapi import HTTPException, status, UploadFile
 
@@ -21,23 +20,9 @@ from mimir.api.endpoints.documents import (
     reprocess_document,
     get_document_stats,
 )
+from mimir.shared.clock import utc_now
 
 
-@patch(
-    "mimir.shared.models.DocumentResponse.from_orm",
-    side_effect=lambda obj: Mock(
-        id=getattr(obj, "id", 1),
-        filename=getattr(obj, "filename", "test.pdf"),
-        status=getattr(obj, "status", "indexed"),
-        path=getattr(obj, "path", "/test"),
-        preserve=getattr(obj, "preserve", False),
-        file_hash=getattr(obj, "file_hash", "a" * 64),
-        error_message=getattr(obj, "error_message", None),
-        chunk_count=getattr(obj, "chunk_count", 5),
-        created_at=getattr(obj, "created_at", datetime.utcnow()),
-        indexed_at=getattr(obj, "indexed_at", datetime.utcnow()),
-    ),
-)
 class TestDocumentEndpoints:
     """Tests for document endpoints."""
 
@@ -55,8 +40,8 @@ class TestDocumentEndpoints:
             "status": "indexed",
             "error_message": None,
             "chunk_count": 5,
-            "created_at": datetime.utcnow(),
-            "indexed_at": datetime.utcnow(),
+            "created_at": utc_now(),
+            "indexed_at": utc_now(),
         }
 
         # Merge with provided kwargs
@@ -126,7 +111,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
 
         # Mock response to avoid inconsistent Pydantic validation
         mock_response = Mock()
-        mock_response.documents = []  # Will be populated after DocumentResponse.from_orm()
+        mock_response.documents = []  # Will be populated after DocumentResponse.model_validate()
         mock_response.total_count = 2
         mock_response.pagination = {"offset": 0, "limit": 20, "has_more": False}
         mock_doc_list_response.return_value = mock_response
@@ -221,7 +206,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
 
         # Assertions
         mock_doc_repo.get_by_id.assert_called_once_with(1)
-        # Result will be converted by DocumentResponse.from_orm()
+        # Result will be converted by DocumentResponse.model_validate()
 
     def test_get_document_not_found(self, mock_doc_repo):
         """Test document not found retrieval."""
@@ -417,7 +402,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
                 )
             )
 
-        assert exc_info.value.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+        assert exc_info.value.status_code == status.HTTP_413_CONTENT_TOO_LARGE
         assert "File too large" in str(exc_info.value.detail)
 
     @patch("mimir.api.endpoints.documents.settings")

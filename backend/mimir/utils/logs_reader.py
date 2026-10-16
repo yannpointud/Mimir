@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
         return datetime.fromisoformat(timestamp_str)
     except (ValueError, TypeError):
         # Fallback to current time if parsing fails
-        return datetime.utcnow()
+        return utc_now()
 
 
 def _load_json_object(line: str) -> dict[str, Any] | None:
@@ -293,7 +294,7 @@ def get_logs_summary() -> dict[str, Any]:
         "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
         "sources_available": ["ALL", "backend", "frontend"],
         "modules_available": get_available_modules()[:10],  # Top 10 modules
-        "last_updated": datetime.utcnow().isoformat() + "Z",
+        "last_updated": utc_now().isoformat() + "Z",
     }
 
     return summary

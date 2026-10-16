@@ -3,8 +3,8 @@ Validation utilities for detecting inconsistencies between SQLite and FAISS
 """
 
 from typing import Any
-from datetime import datetime
 import logging
+from mimir.shared.clock import utc_now
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class VectorStoreValidator:
 
     def validate_consistency(self, fix_issues: bool = False) -> dict[str, Any]:
         """Validate consistency between SQLite and FAISS."""
-        start_time = datetime.utcnow()
+        start_time = utc_now()
 
         self.logger.info("Starting comprehensive validation between SQLite and FAISS")
 
@@ -45,7 +45,7 @@ class VectorStoreValidator:
             fixes_applied = self._apply_fixes(issues)
 
         # 4. Final statistics
-        end_time = datetime.utcnow()
+        end_time = utc_now()
         duration = (end_time - start_time).total_seconds()
 
         validation_report = {

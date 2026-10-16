@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 import numpy as np
-from datetime import datetime
 
 # Imports du système
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
@@ -17,6 +16,7 @@ from mimir.rag_core.interfaces import Chunk
 from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
 from mimir.database.repository import DocumentRepository
 from mimir.database.models import Document  # noqa: F401
+from mimir.shared.clock import utc_now
 
 
 class TestOrphanCleanupIntegration:
@@ -180,8 +180,8 @@ class TestOrphanCleanupIntegration:
         existing_doc.status = "indexed"
         existing_doc.filename = "test.txt"
         existing_doc.chunk_count = 3
-        existing_doc.created_at = datetime.utcnow()
-        existing_doc.indexed_at = datetime.utcnow()
+        existing_doc.created_at = utc_now()
+        existing_doc.indexed_at = utc_now()
         existing_doc.preserve = False
         existing_doc.path = "/test/path"
 
@@ -302,7 +302,7 @@ class TestOrphanCleanupIntegration:
         vector_store.upsert(chunks)
 
         # Mesurer le temps de nettoyage
-        start_time = datetime.utcnow()
+        start_time = utc_now()
 
         # Supposer que seuls 10 documents existent (90% d'orphelins)
         existing_docs = {str(i) for i in range(10)}
@@ -310,7 +310,7 @@ class TestOrphanCleanupIntegration:
             existing_document_ids=existing_docs, create_backup=False
         )
 
-        end_time = datetime.utcnow()
+        end_time = utc_now()
         duration = (end_time - start_time).total_seconds()
 
         # Vérifier les résultats

@@ -2,7 +2,6 @@
 Shared pytest fixtures.
 """
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from mimir import config
-from mimir.config import Settings
 from mimir.database.connection import db_manager
 from mimir.database.models import Base
 from mimir.database.repository import create_repositories
@@ -56,57 +54,15 @@ def isolated_db_manager(tmp_path, monkeypatch):
     db_manager.configure(original_url)
 
 
-@pytest.fixture(scope="session")
-def test_settings():
-    """Test configuration with temporary database"""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        test_db_path = Path(temp_dir) / "test.db"
-
-        # Test configuration
-        test_config = {
-            "database_url": f"sqlite:///{test_db_path}",
-            "sqlite_wal_mode": False,  # Keep it simple for tests
-            "mistral_api_key": "test_key",
-            "jwt_secret_key": "test_secret_key",
-            "admin_password_hash": "$2b$12$test_hash",
-            "data_dir": str(Path(temp_dir) / "data"),
-            "upload_dir": str(Path(temp_dir) / "uploads"),
-            "log_level": "DEBUG",
-        }
-
-        yield Settings(**test_config)
-
-
-@pytest.fixture(scope="session")
-def test_engine(test_settings):
-    """Test database engine"""
-    engine = create_engine(
-        test_settings.database_url, echo=False, connect_args={"check_same_thread": False}
-    )
-
-    # Create tables
+@pytest.fixture
+def test_session(tmp_path):
+    """Session on a fresh SQLite database file, private to the test."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'test.db'}")
     Base.metadata.create_all(bind=engine)
-
-    yield engine
-
-    # Cleanup
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
-
-
-@pytest.fixture(scope="function")
-def test_session(test_engine):
-    """Test session with automatic rollback"""
-    connection = test_engine.connect()
-    transaction = connection.begin()
-
-    session = sessionmaker(bind=connection)()
-
+    session = sessionmaker(bind=engine)()
     yield session
-
     session.close()
-    transaction.rollback()
-    connection.close()
+    engine.dispose()
 
 
 @pytest.fixture

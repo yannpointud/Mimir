@@ -14,7 +14,6 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +30,7 @@ from mimir.rag_core.interfaces import (
     VectorStoreConnectionError,
     VectorStoreOperationError,
 )
+from mimir.shared.clock import utc_now
 
 logger = setup_logger(__name__)
 
@@ -143,7 +143,7 @@ class FaissVectorStore(AbstractVectorStore):
 
             start_idx = self.index.ntotal
             self.index.add(np.array([chunk.embedding for chunk in chunks], dtype=np.float32))
-            indexed_at = datetime.utcnow().isoformat()
+            indexed_at = utc_now().isoformat()
             for offset, chunk in enumerate(chunks):
                 chunk_id = start_idx + offset
                 self.metadata.append(
@@ -268,7 +268,7 @@ class FaissVectorStore(AbstractVectorStore):
                 logger.warning(f"Document {document_id} not found for deletion")
                 return False
 
-            deleted_at = datetime.utcnow().isoformat()
+            deleted_at = utc_now().isoformat()
             chunk_ids = self.document_to_chunks.pop(document_id)
             for chunk_id in chunk_ids:
                 self.metadata[chunk_id]["deleted"] = True
@@ -391,7 +391,7 @@ class FaissVectorStore(AbstractVectorStore):
                 metadata=self.metadata,
                 document_to_chunks=self.document_to_chunks,
                 stats=self._stats,
-                saved_at=datetime.utcnow().isoformat(),
+                saved_at=utc_now().isoformat(),
             )
             try:
                 self._atomic_write(self.index_path, lambda p: faiss.write_index(self.index, p))
@@ -455,7 +455,7 @@ class FaissVectorStore(AbstractVectorStore):
             {
                 "total_vectors": self.index.ntotal if self.index else 0,
                 "total_documents": len(self.document_to_chunks),
-                "last_updated": datetime.utcnow().isoformat(),
+                "last_updated": utc_now().isoformat(),
             }
         )
 
@@ -468,7 +468,7 @@ class FaissVectorStore(AbstractVectorStore):
             initial_stats = self._chunk_stats()
             logger.info(f"Starting orphan cleanup - Initial state: {initial_stats}")
             if create_backup:
-                self._create_backup(datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
+                self._create_backup(utc_now().strftime("%Y%m%d_%H%M%S"))
 
             orphaned_chunks, orphaned_docs = self._find_orphans(existing_document_ids)
             if not orphaned_chunks:
@@ -534,7 +534,7 @@ class FaissVectorStore(AbstractVectorStore):
     def _mark_orphans_deleted(
         self, orphaned_chunks: list[dict[str, Any]], orphaned_docs: set[str]
     ) -> int:
-        deleted_at = datetime.utcnow().isoformat()
+        deleted_at = utc_now().isoformat()
         for meta in orphaned_chunks:
             meta["deleted"] = True
             meta["deleted_at"] = deleted_at

@@ -6,11 +6,12 @@ These tests cover JWT token management and password hashing.
 
 import pytest
 from pwdlib.exceptions import UnknownHashError
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from freezegun import freeze_time
 import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWTHandler
 from mimir.auth.jwt_handler import JWTHandler
+from mimir.shared.clock import utc_now
 
 
 # --- Backward-compatibility fixtures (frozen BEFORE the PyJWT/pwdlib migration) ---
@@ -121,8 +122,8 @@ class TestCreateAccessToken:
         token = jwt_handler.create_access_token(data, expires_delta=custom_expiration)
 
         payload = jwt.decode(token, jwt_handler.secret_key, algorithms=[jwt_handler.algorithm])
-        expected_exp = datetime.utcnow() + custom_expiration
-        actual_exp = datetime.utcfromtimestamp(payload["exp"])
+        expected_exp = utc_now() + custom_expiration
+        actual_exp = datetime.fromtimestamp(payload["exp"], UTC).replace(tzinfo=None)
 
         # Verify expiration is correct (with a few seconds tolerance)
         assert abs((actual_exp - expected_exp).total_seconds()) < 5
@@ -363,38 +364,6 @@ class TestGetTokenExpiry:
             mock_settings.jwt_expiration_hours = 24
             return JWTHandler()
 
-    @freeze_time("2023-01-01 12:00:00")
-    def test_get_token_expiry_valid(self, jwt_handler):
-        """Test expiry extraction from a valid token."""
-        data = {"user_id": 123}
-        token = jwt_handler.create_access_token(data)
-
-        expiry = jwt_handler.get_token_expiry(token)
-
-        assert expiry is not None
-        assert isinstance(expiry, datetime)
-        expected_expiry = datetime.utcnow() + timedelta(hours=24)
-        assert abs((expiry - expected_expiry).total_seconds()) < 5
-
-    def test_get_token_expiry_invalid_token(self, jwt_handler):
-        """Test expiry extraction from an invalid token."""
-        invalid_token = "invalid.token"
-
-        expiry = jwt_handler.get_token_expiry(invalid_token)
-
-        assert expiry is None
-
-    def test_get_token_expiry_expired_token(self, jwt_handler):
-        """Test expiry extraction from an expired token."""
-        with freeze_time("2023-01-01 12:00:00"):
-            data = {"user_id": 123}
-            token = jwt_handler.create_access_token(data, expires_delta=timedelta(seconds=1))
-
-        # Token is expired, but we can still extract its expiration date
-        with freeze_time("2023-01-01 12:01:00"):
-            expiry = jwt_handler.get_token_expiry(token)
-            assert expiry is None  # verify_token returns None for expired token
-
 
 class TestJWTHandlerIntegration:
     """Integration tests for JWTHandler."""
@@ -428,9 +397,8 @@ class TestJWTHandlerIntegration:
         assert payload["username"] == "testuser"
 
         # Get the expiration
-        expiry = jwt_handler.get_token_expiry(token)
-        assert expiry is not None
-        assert expiry > datetime.utcnow()
+        expiry = datetime.fromtimestamp(jwt_handler.verify_token(token)["exp"], UTC)
+        assert expiry.replace(tzinfo=None) > utc_now()
 
     def test_password_hash_uniqueness(self, jwt_handler):
         """Test that the same password produces different hashes."""

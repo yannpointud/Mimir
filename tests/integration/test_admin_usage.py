@@ -8,8 +8,6 @@ for each test's lifetime, so synthetic usage/ledger rows never leak into the
 developer's real database.
 """
 
-from datetime import datetime
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,6 +16,7 @@ from mimir.auth.jwt_handler import jwt_handler
 from mimir.database.connection import db_manager
 from mimir.database.models import LlmBudgetLedger
 from mimir.database.repository import UsageRepository
+from mimir.shared.clock import utc_now
 
 
 USAGE_ROUTE = "/api/v1/admin/usage"
@@ -94,7 +93,7 @@ class TestGetUsageResponseShape:
     def test_admin_get_returns_200_with_expected_keys(
         self, test_app, isolated_db_manager, admin_token
     ):
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = utc_now().strftime("%Y-%m-%d")
         _seed_usage_and_ledger(today)
 
         client = TestClient(test_app)

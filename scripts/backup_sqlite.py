@@ -16,10 +16,10 @@ only the newest ``settings.sqlite_backup_max_count`` files are kept.
 import os
 import sqlite3
 import sys
-from datetime import datetime
 from pathlib import Path
 
 from mimir.config import settings
+from mimir.shared.clock import utc_now
 
 
 def _resolve_source_path(source_path=None) -> Path:
@@ -70,7 +70,7 @@ def backup(source_path=None, backup_dir=None, max_count=None) -> Path:
     _assert_within_data_tree(dest_dir)
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    timestamp = utc_now().strftime("%Y%m%dT%H%M%SZ")
     dest = dest_dir / f"mimir-{timestamp}.db"
 
     # Open the source read-only (uri mode=ro) so a concurrent writer is never

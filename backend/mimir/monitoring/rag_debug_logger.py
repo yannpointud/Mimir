@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 from typing import Any
 from pathlib import Path
+from mimir.shared.clock import utc_now
 
 
 def _make_json_serializable(obj):
@@ -85,7 +86,7 @@ class RagDebugService:
                 self._format_log(
                     {
                         "event_type": "debug_service_enabled",
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": utc_now().isoformat() + "Z",
                         "config": {
                             "log_prompts": self.log_prompts,
                             "log_context": self.log_context,
@@ -113,7 +114,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "user_request",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "question": question,
             "question_length": len(question),
@@ -153,7 +154,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "vector_search",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "embedding_tokens": embedding_tokens,
             "search_results": formatted_results,
@@ -179,7 +180,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "context_building",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "context_chunks": context_chunks,
             "context_length": len(context_text),
@@ -213,7 +214,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "llm_request",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "model": model,
             "user_question": user_question,
@@ -243,7 +244,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "llm_response",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "tokens_used": tokens_used,
             "duration_ms": round(duration_ms, 2),
@@ -274,7 +275,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "final_response",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "confidence_score": round(confidence_score, 3),
             "sources_count": sources_count,
@@ -299,7 +300,7 @@ class RagDebugService:
 
         log_data = {
             "event_type": "error",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utc_now().isoformat() + "Z",
             "session_id": session_id,
             "error_type": error_type,
             "error_message": error_message,

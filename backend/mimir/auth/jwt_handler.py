@@ -6,7 +6,7 @@ as well as password hashing/verification using Argon2 (with Bcrypt kept as a
 legacy verification-only hasher for pre-migration credentials).
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 import logging
 import jwt  # PyJWT
@@ -15,6 +15,7 @@ from pwdlib.exceptions import UnknownHashError
 from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
 from mimir.config import settings
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,11 @@ class JWTHandler:
 
         # Set expiration time
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = utc_now() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(hours=self.expiration_hours)
+            expire = utc_now() + timedelta(hours=self.expiration_hours)
 
-        to_encode.update({"exp": expire, "iat": datetime.utcnow(), "type": "access"})
+        to_encode.update({"exp": expire, "iat": utc_now(), "type": "access"})
 
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
@@ -97,13 +98,6 @@ class JWTHandler:
         except UnknownHashError:
             logger.error("Password verification failed: unrecognized hash format")
             return False
-
-    def get_token_expiry(self, token: str) -> datetime | None:
-        """Get the expiration time of a token."""
-        payload = self.verify_token(token)
-        if payload and "exp" in payload:
-            return datetime.utcfromtimestamp(payload["exp"])
-        return None
 
 
 # Global JWT handler instance

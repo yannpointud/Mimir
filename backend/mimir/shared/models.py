@@ -1,12 +1,17 @@
 """
-Shared Pydantic models for validation and serialization
-Used by APIs to ensure data consistency
+Pydantic models of the API requests and responses, and filename validation.
 """
 
-from pydantic import BaseModel, Field, validator, ConfigDict
-from typing import Any
+import os
+import re
+import unicodedata
 from datetime import datetime
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from mimir.shared.clock import utc_now
 
 
 class DocumentStatus(str, Enum):
@@ -16,25 +21,10 @@ class DocumentStatus(str, Enum):
     ERROR = "error"
 
 
-class UserType(str, Enum):
-    """User types for audit logging"""
-
-    ADMIN = "admin"
-    USER = "user"
-    SYSTEM = "system"
-
-
-# Base models
-
-
 class BaseResponse(BaseModel):
-    """Base response model with timestamps"""
-
-    model_config = ConfigDict(json_encoders={datetime: lambda v: v.isoformat()})
-
     success: bool = True
     message: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
 
 
 class PaginationModel(BaseModel):
@@ -44,34 +34,15 @@ class PaginationModel(BaseModel):
     desc_order: bool = Field(default=True)
 
 
-# Document models
-
-
 class DocumentBase(BaseModel):
     filename: str = Field(..., min_length=1, max_length=255)
     path: str | None = Field(None, max_length=500)
     preserve: bool = Field(default=False)
 
 
-class DocumentCreate(DocumentBase):
-    file_hash: str = Field(..., min_length=64, max_length=64)
-
-    @validator("file_hash")
-    def validate_hash(cls, v):
-        if not all(c in "0123456789abcdef" for c in v.lower()):
-            raise ValueError("Hash must be hexadecimal")
-        return v.lower()
-
-
-# Not used by any route (kept as is)
-class DocumentUpdate(BaseModel):
-    status: DocumentStatus | None = None
-    error_message: str | None = Field(None, max_length=1000)
-    chunk_count: int | None = Field(None, ge=0)
-    preserve: bool | None = None
-
-
 class DocumentResponse(DocumentBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     file_hash: str
     status: DocumentStatus
@@ -79,9 +50,6 @@ class DocumentResponse(DocumentBase):
     chunk_count: int
     created_at: datetime
     indexed_at: datetime | None = None
-
-    class Config:
-        from_attributes = True  # For SQLAlchemy compatibility
 
 
 class ChunkResponse(BaseModel):
@@ -91,25 +59,12 @@ class ChunkResponse(BaseModel):
     text: str
     metadata: dict[str, Any] | None = None
 
-    class Config:
-        from_attributes = True
 
-
-class DocumentWithChunksResponse(DocumentBase):
-    id: int
-    file_hash: str
-    status: DocumentStatus
-    error_message: str | None = None
-    chunk_count: int
-    created_at: datetime
-    indexed_at: datetime | None = None
+class DocumentWithChunksResponse(DocumentResponse):
     chunks: list[ChunkResponse] = []
-    content: str | None = None  # Original content if available
+    content: str | None = None  # Text extracted from the original file, if readable
     file_size: int | None = None
     mime_type: str | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class DocumentListResponse(BaseResponse):
@@ -118,75 +73,9 @@ class DocumentListResponse(BaseResponse):
     pagination: dict[str, Any]
 
 
-# Not used by any route (kept as is)
-class DocumentStatsResponse(BaseResponse):
-    stats: dict[str, Any]
-
-
-# Configuration models: not used by any route (kept as is)
-
-
-class ConfigurationBase(BaseModel):
-    key: str = Field(..., min_length=1, max_length=100)
-    value: str = Field(..., min_length=0)
-
-
-class ConfigurationCreate(ConfigurationBase):
-    pass
-
-
-class ConfigurationUpdate(BaseModel):
-    value: str = Field(..., min_length=0)
-
-
-class ConfigurationResponse(ConfigurationBase):
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class ConfigurationListResponse(BaseResponse):
-    configurations: list[ConfigurationResponse]
-
-
-# Audit models: not used by any route, the audit log endpoint returns
-# AuditLogPage below (kept as is)
-
-
-class AuditLogBase(BaseModel):
-    user_type: UserType
-    action: str = Field(..., min_length=1, max_length=100)
-    details: str | None = Field(None, max_length=1000)
-    ip_address: str | None = Field(None, max_length=45)
-    user_agent: str | None = None
-    success: bool = True
-
-
-class AuditLogCreate(AuditLogBase):
-    pass
-
-
-class AuditLogResponse(AuditLogBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class AuditLogListResponse(BaseResponse):
-    logs: list[AuditLogResponse]
-    total_count: int
-
-
-# Health check and error models (used by the health endpoint and main.py)
-
-
 class HealthCheckResponse(BaseResponse):
     status: str = Field(default="healthy")
     checks: dict[str, Any] = Field(default_factory=dict)
-    uptime_seconds: float | None = None
     version: str | None = None
 
 
@@ -195,28 +84,7 @@ class ErrorResponse(BaseModel):
     error_code: str
     error_message: str
     details: dict[str, Any] | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-
-# Specialized validation models: not used by any route (kept as is)
-
-
-class FileUploadValidation(BaseModel):
-    max_size_mb: int = Field(default=100, ge=1, le=1000)
-    allowed_extensions: list[str] = Field(default=[".pdf", ".docx", ".txt", ".md"], min_length=1)
-
-    @validator("allowed_extensions")
-    def validate_extensions(cls, v):
-        for ext in v:
-            if not ext.startswith("."):
-                raise ValueError("Extensions must start with a dot")
-        return [ext.lower() for ext in v]
-
-
-class DatabaseStatsResponse(BaseResponse):
-    table_counts: dict[str, int]
-    database_size_mb: float | None = None
-    last_backup: datetime | None = None
+    timestamp: datetime = Field(default_factory=utc_now)
 
 
 # Statistics, administration and maintenance responses.
@@ -418,40 +286,19 @@ class UsageResponse(BaseModel):
 
 
 def validate_filename(filename: str) -> bool:
-    """Validate a filename for security"""
-    import os
-    import re
-
-    # No relative or absolute paths
+    """Reject paths, control and shell-special characters, and empty or long names."""
     if os.path.isabs(filename) or ".." in filename:
         return False
-
-    # No dangerous characters
-    dangerous_chars = r'[<>:"|?*\x00-\x1f]'
-    if re.search(dangerous_chars, filename):
+    if re.search(r'[<>:"|?*\x00-\x1f]', filename):
         return False
-
-    # Reasonable length
     return 0 < len(filename) <= 255
 
 
 def sanitize_filename(filename: str) -> str:
-    import os
-    import re
-    import unicodedata
-
-    # Normalize Unicode
+    """Normalize the name, replace dangerous characters and cap its length at 255."""
     filename = unicodedata.normalize("NFKD", filename)
-
-    # Replace dangerous characters
-    filename = re.sub(r'[<>:"|?*\x00-\x1f]', "_", filename)
-
-    # Strip leading/trailing whitespace
-    filename = filename.strip()
-
-    # Limit the length
+    filename = re.sub(r'[<>:"|?*\x00-\x1f]', "_", filename).strip()
     if len(filename) > 255:
         name, ext = os.path.splitext(filename)
         filename = name[: 255 - len(ext)] + ext
-
     return filename

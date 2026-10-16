@@ -19,7 +19,6 @@ from fastapi import (
     Response,
 )
 from fastapi.responses import FileResponse
-from datetime import datetime
 import asyncio
 import logging
 import os
@@ -55,6 +54,7 @@ from mimir.services.document_reader import build_document_view
 from mimir.services.document_upload import DocumentUpload, UploadPolicy
 from mimir.services.errors import RequestRejectedError
 from mimir.config import settings
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ async def list_documents(
     documents, total_count = doc_repo.get_all_paginated(
         offset=pagination.offset, limit=pagination.limit, filters=filters, search=search
     )
-    document_responses = [DocumentResponse.from_orm(doc) for doc in documents]
+    document_responses = [DocumentResponse.model_validate(doc) for doc in documents]
     return DocumentListResponse(
         documents=document_responses,
         total_count=total_count,
@@ -119,7 +119,7 @@ async def get_document(
             detail=f"Document with ID {document_id} not found",
         )
 
-    return DocumentResponse.from_orm(document)
+    return DocumentResponse.model_validate(document)
 
 
 @reader_router.get("/{document_id}/full", response_model=DocumentWithChunksResponse)
@@ -219,7 +219,7 @@ async def upload_document(
     except RequestRejectedError as e:
         raise rejection_to_http(e) from e
     logger.info(f"Document uploaded successfully: {upload.filename} (ID: {document.id})")
-    return DocumentResponse.from_orm(document)
+    return DocumentResponse.model_validate(document)
 
 
 @router.delete("/{document_id}", response_model=BaseResponse)
@@ -251,7 +251,7 @@ async def delete_document(
     return BaseResponse(
         success=True,
         message=f"Document '{filename}' deleted successfully",
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -273,7 +273,7 @@ async def toggle_document_preservation(
         success=True,
     )
     logger.info(f"Document preservation toggled: {document.filename} -> {preserve}")
-    return DocumentResponse.from_orm(document)
+    return DocumentResponse.model_validate(document)
 
 
 @router.post("/{document_id}/reprocess", response_model=BaseResponse)
@@ -326,7 +326,7 @@ async def reprocess_document(
     return BaseResponse(
         success=True,
         message=f"Document '{document.filename}' queued for reprocessing",
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -363,7 +363,7 @@ async def get_document_stats(
             supported_extensions=sorted(settings.supported_file_extensions),
             max_file_size_mb=settings.max_file_size_mb,
         ),
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 

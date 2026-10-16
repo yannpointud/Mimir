@@ -6,7 +6,7 @@ trail, AI usage, logs and index maintenance.
 import logging
 import platform
 import sys
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import psutil
@@ -50,6 +50,7 @@ from mimir.shared.models import (
     UsageResponse,
 )
 from mimir.utils.logs_reader import get_logs, get_logs_summary
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ async def get_system_info(current_user: dict[str, Any] = Depends(require_admin))
         "services": {
             "email_configured": email_service.get_configuration_status()["configured"],
         },
-        "timestamp": datetime.utcnow(),
+        "timestamp": utc_now(),
     }
 
 
@@ -138,7 +139,7 @@ async def get_cache_stats(
             total_hits=total_hits,
             total_misses=main_stats["misses"] + chat_stats["misses"],
         ),
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -171,7 +172,7 @@ async def clear_cache(
     return BaseResponse(
         success=True,
         message=f"Cache cleared successfully. Removed {total_cleared} entries from {cache_type} cache(s).",
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -196,7 +197,7 @@ async def get_configuration(
     return AdminConfigurationResponse(
         database_config=mask_secrets({item.key: item.value for item in config_repo.get_all()}),
         application_config=ApplicationConfig(**mask_secrets(app_config)),
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -234,7 +235,7 @@ async def update_configuration(
     return BaseResponse(
         success=True,
         message=f"Configuration updated successfully. {len(updated_items)} items changed.",
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -249,7 +250,7 @@ async def get_audit_log(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> AuditLogPage:
     """Filtered audit trail (admin usernames, configuration values, client IPs)."""
-    filters: dict[str, Any] = {"since_date": datetime.utcnow() - timedelta(days=days_back)}
+    filters: dict[str, Any] = {"since_date": utc_now() - timedelta(days=days_back)}
     if action_filter:
         filters["action"] = action_filter
     if user_type_filter:
@@ -284,7 +285,7 @@ async def get_audit_log(
             success=success_filter,
             days_back=days_back,
         ),
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -305,7 +306,7 @@ async def get_usage(
         history=[DailyModelUsage(**row) for row in usage_repo.get_daily_history(days_back)],
         spent_today_eur=ledger.spent_eur if ledger else 0.0,
         daily_budget_eur=float(override.value) if override else settings.daily_budget_eur,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -334,7 +335,7 @@ async def test_email_service(
         if sent
         else "Failed to send test email. Check email service configuration."
     )
-    return BaseResponse(success=sent, message=message, timestamp=datetime.utcnow())
+    return BaseResponse(success=sent, message=message, timestamp=utc_now())
 
 
 @router.get("/logs", response_model=dict[str, Any])
@@ -365,7 +366,7 @@ async def get_system_logs(
             "limit": limit,
         },
         "summary": get_logs_summary(),
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": utc_now().isoformat() + "Z",
     }
 
 
@@ -387,4 +388,4 @@ async def rebuild_vector_store(
         index_maintenance.record_rebuild_failure(audit_repo, e, current_user["sub"])
         raise
     index_maintenance.record_rebuild(audit_repo, rebuild, current_user["sub"])
-    return BaseResponse(success=True, message=rebuild.message(), timestamp=datetime.utcnow())
+    return BaseResponse(success=True, message=rebuild.message(), timestamp=utc_now())

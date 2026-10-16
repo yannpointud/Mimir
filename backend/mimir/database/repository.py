@@ -8,12 +8,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import desc, asc, func, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
 
 from mimir.shared.errors import ConflictError, NotFoundError
 
 from mimir.database.models import Document, Configuration, AuditLog, LlmUsage, LlmBudgetLedger
+from mimir.shared.clock import utc_now
 
 
 logger = logging.getLogger(__name__)
@@ -204,7 +205,7 @@ class DocumentRepository(BaseRepository):
                 document.chunk_count = chunk_count
 
             if status == "indexed":
-                document.indexed_at = datetime.utcnow()
+                document.indexed_at = utc_now()
 
             self.session.commit()
 
@@ -309,7 +310,7 @@ class ConfigurationRepository(BaseRepository):
             config = self.get(key)
             if config:
                 config.value = value
-                config.updated_at = datetime.utcnow()
+                config.updated_at = utc_now()
             else:
                 config = Configuration(key=key, value=value)
                 self.session.add(config)
@@ -455,7 +456,7 @@ class AuditLogRepository(BaseRepository):
     def cleanup_old_logs(self, days_to_keep: int = 90) -> int:
         """Delete audit logs older than ``days_to_keep`` days and return how many were deleted."""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+            cutoff_date = utc_now() - timedelta(days=days_to_keep)
 
             deleted_count = (
                 self.session.query(AuditLog).filter(AuditLog.created_at < cutoff_date).delete()
@@ -531,7 +532,7 @@ class UsageRepository(BaseRepository):
             List of {model, calls, prompt_tokens, completion_tokens, total_tokens, cost_eur}
         """
         try:
-            today = datetime.utcnow().strftime("%Y-%m-%d")
+            today = utc_now().strftime("%Y-%m-%d")
 
             rows = (
                 self.session.query(
@@ -571,7 +572,7 @@ class UsageRepository(BaseRepository):
             List of {date, model, calls, tokens, cost_eur}
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            cutoff_date = utc_now() - timedelta(days=days_back)
             date_col = func.date(LlmUsage.created_at)
 
             rows = (
@@ -606,7 +607,7 @@ class UsageRepository(BaseRepository):
     def get_today_ledger(self) -> LlmBudgetLedger | None:
         """Retrieve today's budget ledger row, or None if it does not exist yet."""
         try:
-            today = datetime.utcnow().strftime("%Y-%m-%d")
+            today = utc_now().strftime("%Y-%m-%d")
             return self.session.query(LlmBudgetLedger).filter_by(date=today).first()
         except SQLAlchemyError as e:
             self._handle_db_error(e, "get today budget ledger")
@@ -620,7 +621,7 @@ class UsageRepository(BaseRepository):
             Number of deleted rows
         """
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+            cutoff_date = utc_now() - timedelta(days=days_to_keep)
 
             deleted_count = (
                 self.session.query(LlmUsage).filter(LlmUsage.created_at < cutoff_date).delete()

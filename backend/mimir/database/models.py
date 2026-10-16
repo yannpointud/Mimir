@@ -14,6 +14,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from datetime import datetime
 from typing import Any, Self
+from mimir.shared.clock import utc_now
 
 
 class Base(DeclarativeBase):
@@ -38,7 +39,7 @@ class Document(Base):
     chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     preserve: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False, index=True
+        DateTime, default=utc_now, nullable=False, index=True
     )
     indexed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -88,7 +89,7 @@ class Configuration(Base):
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False, index=True
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False, index=True
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -126,7 +127,7 @@ class AuditLog(Base):
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     success: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False, index=True
+        DateTime, default=utc_now, nullable=False, index=True
     )
 
     # Constraint on valid user types
@@ -198,7 +199,7 @@ class LlmUsage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False, index=True
+        DateTime, default=utc_now, nullable=False, index=True
     )
     call_type: Mapped[str] = mapped_column(String(20), nullable=False)
     model: Mapped[str] = mapped_column(String(100), nullable=False)

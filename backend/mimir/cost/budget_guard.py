@@ -15,12 +15,12 @@ session. This matters for two reasons:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
 
 from mimir.config import settings
 from mimir.database.connection import db_manager
 from mimir.database.repository import ConfigurationRepository, UsageRepository
 from mimir.shared.errors import BudgetExceeded
+from mimir.shared.clock import utc_now
 
 # Historical name of the budget-exhausted error, still imported by callers.
 BudgetExceededError = BudgetExceeded
@@ -78,7 +78,7 @@ class BudgetGuard:
         else:
             raise ValueError(f"Unknown call_type '{call_type}' for budget reservation")
 
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = utc_now().strftime("%Y-%m-%d")
 
         with db_manager.get_session_context() as session:
             cap_eur = self._effective_cap(session)

@@ -46,6 +46,7 @@ from mimir.services.chat_stream import (
     ChatStream,
     ReservationSettlement,
 )
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class ChatResponse(BaseModel):
     session_id: str
     response_time_ms: int
     cached: bool = False
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
 
 
 class EscalationRequest(BaseModel):
@@ -209,8 +210,8 @@ def _generate_cache_key(question: str) -> str:
 
 
 def _generate_escalation_id() -> str:
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    random_suffix = hashlib.md5(str(datetime.utcnow()).encode()).hexdigest()[:6]
+    timestamp = utc_now().strftime("%Y%m%d%H%M%S")
+    random_suffix = hashlib.md5(str(utc_now()).encode()).hexdigest()[:6]
     return f"ESC-{timestamp}-{random_suffix.upper()}"
 
 

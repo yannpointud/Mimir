@@ -4,7 +4,7 @@ Couvre la gestion d'erreurs, cas limites et fonctionnalités non testées
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import Mock, patch
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -17,6 +17,7 @@ from mimir.database.repository import (
     BaseRepository,
     create_repositories,
 )
+from mimir.shared.clock import utc_now
 
 
 class TestBaseRepository:
@@ -317,7 +318,7 @@ class TestAuditLogRepositoryMissingCoverage:
         repo = test_repositories["audit"]
 
         # Créer des logs anciens et récents
-        old_date = datetime.utcnow() - timedelta(days=100)
+        old_date = utc_now() - timedelta(days=100)
 
         # Créer un log récent
         repo.create_log("admin", "recent_action")

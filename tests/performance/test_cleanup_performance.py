@@ -10,13 +10,13 @@ import time
 import statistics
 from pathlib import Path
 import numpy as np
-from datetime import datetime
 from unittest.mock import Mock
 
 # System imports
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.rag_core.interfaces import Chunk
 from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
+from mimir.shared.clock import utc_now
 
 
 class TestCleanupPerformance:
@@ -237,8 +237,8 @@ class TestCleanupPerformance:
             doc.status = "indexed"
             doc.filename = f"doc_{i}.txt"
             doc.chunk_count = 8
-            doc.created_at = datetime.utcnow()
-            doc.indexed_at = datetime.utcnow()
+            doc.created_at = utc_now()
+            doc.indexed_at = utc_now()
             doc.preserve = False
             doc.path = f"/test/doc_{i}.txt"
             mock_docs.append(doc)
@@ -270,7 +270,7 @@ class TestCleanupPerformance:
 
         # Measure backup creation time
         start_time = time.time()
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
         vector_store._create_backup(timestamp)
         backup_time = time.time() - start_time
 
@@ -297,7 +297,7 @@ class TestCleanupPerformance:
         for meta in vector_store.metadata:
             if deleted_count < target_deleted:
                 meta["deleted"] = True
-                meta["deleted_at"] = datetime.utcnow().isoformat()
+                meta["deleted_at"] = utc_now().isoformat()
                 deleted_count += 1
 
         # Measure optimization performance

@@ -12,7 +12,6 @@ import json
 import logging
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -22,6 +21,7 @@ from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
 from mimir.database.repository import DocumentRepository
 from mimir.monitoring.rag_debug_logger import RagDebugService
 from mimir.services.rag_service import RagService
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ SSE_HEADERS = {
 
 def generate_session_id(question: str, client_ip: str) -> str:
     """Session id derived from the question, the client IP and the time."""
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = utc_now().isoformat()
     data = f"{question[:50]}:{client_ip}:{timestamp}"
     return hashlib.md5(data.encode()).hexdigest()[:16]
 
@@ -136,7 +136,7 @@ class ChatStream:
         Any failure becomes a generic error event; the reservation is settled
         exactly once whatever happens.
         """
-        start_time = datetime.utcnow()
+        start_time = utc_now()
         try:
             session_id = chat.session_id or generate_session_id(chat.question, chat.client_ip)
             yield sse_event({"type": "start", "session_id": session_id})
@@ -173,7 +173,7 @@ class ChatStream:
             ):
                 yield sse_event(convert_numpy_types(event))
 
-            response_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            response_time_ms = int((utc_now() - start_time).total_seconds() * 1000)
             logger.info(f"Streaming completed - session: {session_id}, time: {response_time_ms}ms")
 
         except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event

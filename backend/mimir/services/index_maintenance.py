@@ -12,7 +12,6 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from mimir.cache.lru_cache import cache_service, chat_cache_service
 from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
 from mimir.shared.models import ConsistencyValidationResponse
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ def validate_index_consistency(
         message=f"Validation completed: {total_issues} issues found (consistency score: {consistency_score:.1%})",
         validation_result=validation_result,
         report_path=str(report_path) if report_path else None,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
     )
 
 
@@ -200,7 +200,7 @@ def _save_validation_report(validation_result: dict[str, Any], reports_dir: Path
     report_path = None
     try:
         reports_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
         report_path = reports_dir / f"consistency_validation_{timestamp}.json"
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(validation_result, f, indent=2, default=str)

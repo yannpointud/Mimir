@@ -10,10 +10,10 @@ import random
 import time
 from typing import Any
 from collections.abc import Awaitable, Callable
-from datetime import datetime
 
 from mimir.ingestion.queue_manager import IngestionTask
 from mimir.monitoring.logger import setup_logger
+from mimir.shared.clock import utc_now
 
 logger = setup_logger(__name__)
 
@@ -81,7 +81,7 @@ class AsyncQueueManager:
         # Create and start worker task
         self.worker_task = asyncio.create_task(self._worker_loop(), name="IngestionWorker")
 
-        self.stats["started_at"] = datetime.utcnow()
+        self.stats["started_at"] = utc_now()
         self.stats["worker_active"] = True
 
         logger.info("Async queue manager started with worker task")
@@ -254,7 +254,7 @@ class AsyncQueueManager:
             self.stats["avg_processing_time"] = (
                 self.stats["total_processing_time"] / self.stats["tasks_processed"]
             )
-            self.stats["last_task_at"] = datetime.utcnow()
+            self.stats["last_task_at"] = utc_now()
 
             if success:
                 logger.info(

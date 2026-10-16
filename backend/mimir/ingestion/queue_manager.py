@@ -6,6 +6,7 @@ Provides data structures for document processing
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+from mimir.shared.clock import utc_now
 
 
 @dataclass
@@ -16,7 +17,7 @@ class IngestionTask:
     document_id: str
     retry_count: int = 0
     max_retries: int = 3
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def can_retry(self) -> bool:

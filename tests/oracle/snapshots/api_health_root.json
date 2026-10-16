@@ -73,7 +73,6 @@
       "status": "unhealthy",
       "success": true,
       "timestamp": "<timestamp>",
-      "uptime_seconds": null,
       "version": "v1"
     },
     "status": 503
