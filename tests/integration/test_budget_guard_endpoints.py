@@ -24,12 +24,12 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock
 
-from src import config as config_module
-from src.config import settings
-from src.cost.budget_guard import BudgetGuard
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
-from src.llm_interface.interfaces import EmbeddingResponse, GenerationResponse
+from mimir import config as config_module
+from mimir.config import settings
+from mimir.cost.budget_guard import BudgetGuard
+from mimir.database.connection import db_manager
+from mimir.database.models import Base, LlmUsage
+from mimir.llm_interface.interfaces import EmbeddingResponse, GenerationResponse
 
 
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
@@ -76,7 +76,7 @@ def isolated_db_manager():
 def client(isolated_db_manager):
     """TestClient running the real app lifespan (database init) against the
     isolated temporary SQLite file."""
-    from main import app
+    from mimir.main import app
 
     with TestClient(app) as test_client:
         yield test_client
@@ -141,15 +141,15 @@ def apply_mocked_llm():
     target get_rag_service. The real budget_guard / usage_tracker /
     rag_debug singletons are kept so the reservation is still settled and the
     llm_usage rows are still written to the isolated temporary database."""
-    from main import app
-    from src.api.dependencies import (
+    from mimir.main import app
+    from mimir.api.dependencies import (
         get_rag_service,
         get_rag_debug_service,
         get_budget_guard,
         get_usage_tracker,
         get_chat_cache_service,
     )
-    from src.services.rag_service import RagService
+    from mimir.services.rag_service import RagService
 
     mock_store = Mock()
     mock_store.query = Mock(return_value=[])
@@ -262,15 +262,15 @@ def apply_stream_rag(isolated_db_manager):
     The spy budget guard is used both by the route (reserve/release) and by
     the RagService (finalize), so a hit that releases (never finalizes) can be
     distinguished from a miss that finalizes."""
-    from main import app
-    from src.api.dependencies import (
+    from mimir.main import app
+    from mimir.api.dependencies import (
         get_rag_service,
         get_budget_guard,
         get_rag_debug_service,
         get_usage_tracker,
         get_chat_cache_service,
     )
-    from src.services.rag_service import RagService
+    from mimir.services.rag_service import RagService
 
     cache = get_chat_cache_service()
     cache.invalidate_all()
@@ -368,8 +368,8 @@ class TestBudgetExceededGate:
     def _reject_every_reservation(self, isolated_db_manager):
         """Override get_budget_guard with a stub whose reserve() always
         returns None (budget exhausted), regardless of the real ledger."""
-        from main import app
-        from src.api.dependencies import get_budget_guard
+        from mimir.main import app
+        from mimir.api.dependencies import get_budget_guard
 
         rejecting_guard = Mock(spec=BudgetGuard)
         rejecting_guard.reserve = Mock(return_value=None)

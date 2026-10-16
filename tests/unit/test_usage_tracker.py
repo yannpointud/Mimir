@@ -16,12 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from src import config as config_module
-from src.config import settings
-from src.cost.pricing import compute_cost_eur
-from src.cost.usage_tracker import UsageTracker
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
+from mimir import config as config_module
+from mimir.config import settings
+from mimir.cost.pricing import compute_cost_eur
+from mimir.cost.usage_tracker import UsageTracker
+from mimir.database.connection import db_manager
+from mimir.database.models import Base, LlmUsage
 
 
 @pytest.fixture

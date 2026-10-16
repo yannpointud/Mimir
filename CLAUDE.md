@@ -23,8 +23,9 @@ stop_servers.sh
 
 ```
 backend/
-├── main.py                          # FastAPI entry point
-├── src/
+├── alembic.ini                      # Alembic migrations config
+├── mimir/                           # Python package (pip install -e .)
+│   ├── main.py                      # FastAPI entry point
 │   ├── config.py                    # Pydantic settings (reads .env)
 │   ├── api/
 │   │   ├── endpoints/               # REST routes: chat, documents, admin, auth, health, logs
@@ -118,7 +119,7 @@ pytest tests/unit/ -v       # Unit only
 cd frontend && npx vitest   # Frontend tests
 
 # Quality (CI checks; local pytest also runs the 2 CPU-dependent oracle modules CI skips)
-bash scripts/local_ci.sh    # ruff check + ruff format --check + mypy backend/src + pytest + pip-audit
+bash scripts/local_ci.sh    # ruff check + ruff format --check + mypy backend/mimir + pytest + pip-audit
 
 # API docs
 http://localhost:8000/docs   # Swagger UI

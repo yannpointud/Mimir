@@ -10,7 +10,7 @@ document base stay behind the router-level require_admin guard.
 import pytest
 from fastapi.testclient import TestClient
 
-from src.auth.middleware import require_admin
+from mimir.auth.middleware import require_admin
 
 
 UNKNOWN_DOCUMENT_ID = 987654321
@@ -20,7 +20,7 @@ UNKNOWN_DOCUMENT_ID = 987654321
 def initialized_database():
     """Ensure database tables exist: TestClient without a `with` block does not
     run the app lifespan, so init_database() is never called."""
-    from src.database.connection import init_database
+    from mimir.database.connection import init_database
 
     init_database()
 
@@ -30,7 +30,7 @@ class TestReaderRoutesArePublic:
     404 from the endpoint itself, never 401/403 from an auth guard."""
 
     def test_reader_router_has_no_auth_guard(self):
-        from src.api.endpoints.documents import reader_router
+        from mimir.api.endpoints.documents import reader_router
 
         guard_callables = [dep.dependency for dep in reader_router.dependencies]
         assert require_admin not in guard_callables
@@ -52,7 +52,7 @@ class TestManagementRoutesStayAdminOnly:
     """The management router keeps its default-deny guard."""
 
     def test_management_router_has_router_level_guard(self):
-        from src.api.endpoints.documents import router
+        from mimir.api.endpoints.documents import router
 
         guard_callables = [dep.dependency for dep in router.dependencies]
         assert require_admin in guard_callables

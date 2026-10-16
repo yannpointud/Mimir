@@ -28,9 +28,9 @@ class TestDocumentIngestionWorkflow:
 
     def test_complete_text_document_workflow(self, temp_workspace, test_session):
         """Test the complete workflow for a text document"""
-        from src.ingestion.extractors import ExtractorFactory
-        from src.ingestion.chunking import ChunkingStrategy
-        from src.database.repository import DocumentRepository
+        from mimir.ingestion.extractors import ExtractorFactory
+        from mimir.ingestion.chunking import ChunkingStrategy
+        from mimir.database.repository import DocumentRepository
 
         # 1. Prepare a test document
         test_document = temp_workspace / "workflow_test.txt"
@@ -107,7 +107,7 @@ class TestDocumentIngestionWorkflow:
 
     def test_pdf_document_workflow_simulation(self, temp_workspace):
         """Simulated test of the workflow for a PDF document"""
-        from src.ingestion.extractors import ExtractionError, ExtractorFactory
+        from mimir.ingestion.extractors import ExtractionError, ExtractorFactory
 
         # A text file with a .pdf extension is not a readable PDF
         fake_pdf = temp_workspace / "fake_document.pdf"
@@ -118,7 +118,7 @@ class TestDocumentIngestionWorkflow:
 
     def test_unsupported_format_handling(self, temp_workspace):
         """Test handling of unsupported formats"""
-        from src.ingestion.extractors import ExtractorFactory, UnsupportedFormatError
+        from mimir.ingestion.extractors import ExtractorFactory, UnsupportedFormatError
 
         unsupported_file = temp_workspace / "test.unsupported"
         unsupported_file.write_text("Unsupported content", encoding="utf-8")
@@ -135,7 +135,7 @@ class TestChatWorkflowIntegration:
         client = TestClient(test_app)
 
         # Simulate a successful chat response
-        with patch("src.llm_interface.implementations.mistral_api.MistralAPIService") as mock_llm:
+        with patch("mimir.llm_interface.implementations.mistral_api.MistralAPIService") as mock_llm:
             # Configure the LLM mock
             mock_instance = mock_llm.return_value
             mock_instance.generate.return_value = AsyncMock()
@@ -144,7 +144,9 @@ class TestChatWorkflowIntegration:
             mock_instance.generate.return_value.finish_reason = "stop"
 
             # Simulate the vector store
-            with patch("src.rag_core.implementations.faiss_store.FaissVectorStore") as mock_vector:
+            with patch(
+                "mimir.rag_core.implementations.faiss_store.FaissVectorStore"
+            ) as mock_vector:
                 mock_vector_instance = mock_vector.return_value
                 mock_vector_instance.query.return_value = [
                     {
@@ -283,7 +285,7 @@ class TestErrorRecoveryWorkflow:
         client = TestClient(test_app)
 
         # Simulate a vector store error
-        with patch("src.rag_core.implementations.faiss_store.FaissVectorStore") as mock_vector:
+        with patch("mimir.rag_core.implementations.faiss_store.FaissVectorStore") as mock_vector:
             mock_instance = mock_vector.return_value
             mock_instance.query.side_effect = Exception("Vector store indisponible")
 

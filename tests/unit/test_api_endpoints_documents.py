@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from fastapi import HTTPException, status, UploadFile
 
-from backend.src.api.endpoints.documents import (
+from mimir.api.endpoints.documents import (
     list_documents,
     get_document,
     upload_document,
@@ -22,7 +22,7 @@ from backend.src.api.endpoints.documents import (
 
 
 @patch(
-    "backend.src.shared.models.DocumentResponse.from_orm",
+    "mimir.shared.models.DocumentResponse.from_orm",
     side_effect=lambda obj: Mock(
         id=getattr(obj, "id", 1),
         filename=getattr(obj, "filename", "test.pdf"),
@@ -93,7 +93,7 @@ class TestDocumentEndpoints:
 class TestListDocumentsEndpoint(TestDocumentEndpoints):
     """Tests for the document listing endpoint."""
 
-    @patch("backend.src.api.endpoints.documents.DocumentListResponse")
+    @patch("mimir.api.endpoints.documents.DocumentListResponse")
     def test_list_documents_success(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
         """Test successful document listing."""
 
@@ -140,7 +140,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         assert result == mock_response
         mock_doc_list_response.assert_called_once()
 
-    @patch("backend.src.api.endpoints.documents.DocumentListResponse")
+    @patch("mimir.api.endpoints.documents.DocumentListResponse")
     def test_list_documents_with_filters(
         self, mock_doc_list_response, mock_doc_repo, mock_pagination
     ):
@@ -172,7 +172,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
             offset=0, limit=20, filters={"status": "indexed"}, search="doc1"
         )
 
-    @patch("backend.src.api.endpoints.documents.DocumentListResponse")
+    @patch("mimir.api.endpoints.documents.DocumentListResponse")
     def test_list_documents_pagination(self, mock_doc_list_response, mock_doc_repo):
         """Test listing with pagination."""
 
@@ -271,11 +271,11 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         with tempfile.TemporaryDirectory() as temp_dir:
             yield temp_dir
 
-    @patch("backend.src.api.endpoints.documents.settings")
-    @patch("src.services.document_upload.Path")
-    @patch("src.services.document_upload.hashlib.sha256")
-    @patch("src.services.document_upload.validate_filename")
-    @patch("src.services.document_upload.sanitize_filename")
+    @patch("mimir.api.endpoints.documents.settings")
+    @patch("mimir.services.document_upload.Path")
+    @patch("mimir.services.document_upload.hashlib.sha256")
+    @patch("mimir.services.document_upload.validate_filename")
+    @patch("mimir.services.document_upload.sanitize_filename")
     def test_upload_document_success(
         self,
         mock_sanitize,
@@ -378,7 +378,7 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "No filename" in str(exc_info.value.detail)
 
-    @patch("src.services.document_upload.validate_filename")
+    @patch("mimir.services.document_upload.validate_filename")
     def test_upload_document_invalid_filename(
         self, mock_validate, mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
@@ -403,8 +403,8 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Invalid filename" in str(exc_info.value.detail)
 
-    @patch("backend.src.api.endpoints.documents.settings")
-    @patch("src.services.document_upload.validate_filename")
+    @patch("mimir.api.endpoints.documents.settings")
+    @patch("mimir.services.document_upload.validate_filename")
     def test_upload_document_file_too_large(
         self,
         mock_validate,
@@ -437,9 +437,9 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
         assert "File too large" in str(exc_info.value.detail)
 
-    @patch("backend.src.api.endpoints.documents.settings")
-    @patch("src.services.document_upload.validate_filename")
-    @patch("src.services.document_upload.sanitize_filename")
+    @patch("mimir.api.endpoints.documents.settings")
+    @patch("mimir.services.document_upload.validate_filename")
+    @patch("mimir.services.document_upload.sanitize_filename")
     def test_upload_document_unsupported_extension(
         self,
         mock_sanitize,
@@ -474,9 +474,9 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Unsupported file type" in str(exc_info.value.detail)
 
-    @patch("backend.src.api.endpoints.documents.settings")
-    @patch("src.services.document_upload.validate_filename")
-    @patch("src.services.document_upload.sanitize_filename")
+    @patch("mimir.api.endpoints.documents.settings")
+    @patch("mimir.services.document_upload.validate_filename")
+    @patch("mimir.services.document_upload.sanitize_filename")
     def test_upload_document_empty_file(
         self,
         mock_sanitize,
@@ -512,10 +512,10 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Empty file" in str(exc_info.value.detail)
 
-    @patch("backend.src.api.endpoints.documents.settings")
-    @patch("src.services.document_upload.validate_filename")
-    @patch("src.services.document_upload.sanitize_filename")
-    @patch("src.services.document_upload.hashlib.sha256")
+    @patch("mimir.api.endpoints.documents.settings")
+    @patch("mimir.services.document_upload.validate_filename")
+    @patch("mimir.services.document_upload.sanitize_filename")
+    @patch("mimir.services.document_upload.hashlib.sha256")
     def test_upload_document_duplicate(
         self,
         mock_sha256,
@@ -575,8 +575,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.delete.return_value = True
 
         with (
-            patch("backend.src.api.endpoints.documents.os.path.exists") as mock_exists,
-            patch("backend.src.api.endpoints.documents.os.remove") as mock_remove,
+            patch("mimir.api.endpoints.documents.os.path.exists") as mock_exists,
+            patch("mimir.api.endpoints.documents.os.remove") as mock_remove,
         ):
             mock_exists.return_value = True
 
@@ -655,8 +655,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.delete.return_value = True
 
         with (
-            patch("backend.src.api.endpoints.documents.os.path.exists") as mock_exists,
-            patch("backend.src.api.endpoints.documents.os.remove"),
+            patch("mimir.api.endpoints.documents.os.path.exists") as mock_exists,
+            patch("mimir.api.endpoints.documents.os.remove"),
         ):
             mock_exists.return_value = True
 
@@ -808,7 +808,7 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
 class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
     """Tests for the document statistics endpoint."""
 
-    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("mimir.api.endpoints.documents.settings")
     def test_get_document_stats_success(self, mock_settings, mock_doc_repo):
         """Test successful statistics retrieval."""
 
@@ -925,8 +925,8 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # 4. Forced deletion (because protected)
         with (
-            patch("backend.src.api.endpoints.documents.os.path.exists") as mock_exists,
-            patch("backend.src.api.endpoints.documents.os.remove"),
+            patch("mimir.api.endpoints.documents.os.path.exists") as mock_exists,
+            patch("mimir.api.endpoints.documents.os.remove"),
         ):
             mock_exists.return_value = True
             mock_document.preserve = True  # Document now protected
@@ -979,7 +979,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         }
         mock_vector_store.health_check.return_value = True
 
-        with patch("backend.src.api.endpoints.documents.settings") as mock_settings:
+        with patch("mimir.api.endpoints.documents.settings") as mock_settings:
             mock_settings.upload_dir = "/uploads"
             mock_settings.supported_file_extensions = {".pdf", ".txt"}
             mock_settings.max_file_size_mb = 10
@@ -995,7 +995,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         assert stats_result.total_chunks == 0
         assert stats_result.storage_info.max_file_size_mb == 10
 
-    @patch("backend.src.api.endpoints.documents.FileResponse")
+    @patch("mimir.api.endpoints.documents.FileResponse")
     def test_download_document_success(self, mock_file_response, mock_doc_repo):
         """Test successful document download."""
         # Mock document
@@ -1006,7 +1006,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # Mock file exists
         with patch("os.path.exists", return_value=True):
-            from backend.src.api.endpoints.documents import download_document
+            from mimir.api.endpoints.documents import download_document
 
             asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
 
@@ -1024,7 +1024,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         """Test document download - document not found."""
         mock_doc_repo.get_by_id.return_value = None
 
-        from backend.src.api.endpoints.documents import download_document
+        from mimir.api.endpoints.documents import download_document
 
         with pytest.raises(HTTPException) as exc_info:
             asyncio.run(download_document(document_id=999, doc_repo=mock_doc_repo))
@@ -1040,7 +1040,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # Mock file doesn't exist
         with patch("os.path.exists", return_value=False):
-            from backend.src.api.endpoints.documents import download_document
+            from mimir.api.endpoints.documents import download_document
 
             with pytest.raises(HTTPException) as exc_info:
                 asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
@@ -1048,7 +1048,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         assert exc_info.value.status_code == 404
         assert "Original document file not found on disk" in str(exc_info.value.detail)
 
-    @patch("backend.src.api.endpoints.documents.FileResponse")
+    @patch("mimir.api.endpoints.documents.FileResponse")
     def test_download_document_unknown_extension(self, mock_file_response, mock_doc_repo):
         """Test document download - unknown extension."""
         # Mock document with unknown extension
@@ -1061,7 +1061,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # Mock file exists
         with patch("os.path.exists", return_value=True):
-            from backend.src.api.endpoints.documents import download_document
+            from mimir.api.endpoints.documents import download_document
 
             asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
 
@@ -1075,7 +1075,7 @@ class TestUploadQueueFullCleanup:
     file must be rolled back, otherwise any retry of the same file hits 409
     (get_by_hash matches the orphaned pending record) and is never ingested."""
 
-    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("mimir.api.endpoints.documents.settings")
     def test_upload_queue_full_deletes_record_and_file(self, mock_settings):
         """queue_document() == False -> 503 + record deleted + file removed."""
         import hashlib

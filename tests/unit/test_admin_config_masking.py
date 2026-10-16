@@ -5,7 +5,7 @@ Verifies that mask_secrets fully masks all sensitive configuration keys
 with the shared MASKED_VALUE constant, without mutating the input dict.
 """
 
-from src.shared.constants import MASKED_VALUE, SENSITIVE_CONFIG_KEYS, mask_secrets
+from mimir.shared.constants import MASKED_VALUE, SENSITIVE_CONFIG_KEYS, mask_secrets
 
 
 class TestMaskSecrets:

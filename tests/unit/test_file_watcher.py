@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import pytest
 
-from backend.src.file_watcher.watcher import DocumentFileHandler, FileWatcher
+from mimir.file_watcher.watcher import DocumentFileHandler, FileWatcher
 
 
 class TestDocumentFileHandler:
@@ -143,9 +143,9 @@ class TestDocumentFileHandler:
         assert is_recent_created is False
         assert is_recent_modified is False
 
-    @patch("backend.src.file_watcher.watcher.time.sleep")
-    @patch("backend.src.file_watcher.watcher.os.path.getsize")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.time.sleep")
+    @patch("mimir.file_watcher.watcher.os.path.getsize")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_wait_for_file_stability_stable_file(self, mock_exists, mock_getsize, mock_sleep):
         """Test d'attente de stabilité pour un fichier stable."""
         mock_exists.return_value = True
@@ -156,9 +156,9 @@ class TestDocumentFileHandler:
 
         mock_sleep.assert_called_once_with(0.5)
 
-    @patch("backend.src.file_watcher.watcher.time.sleep")
-    @patch("backend.src.file_watcher.watcher.os.path.getsize")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.time.sleep")
+    @patch("mimir.file_watcher.watcher.os.path.getsize")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_wait_for_file_stability_growing_file(self, mock_exists, mock_getsize, mock_sleep):
         """Test d'attente pour un fichier en cours de croissance."""
         mock_exists.return_value = True
@@ -170,7 +170,7 @@ class TestDocumentFileHandler:
         # Devrait attendre jusqu'à stabilisation
         assert mock_sleep.call_count >= 2
 
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_wait_for_file_stability_nonexistent_file(self, mock_exists):
         """Test d'attente pour un fichier inexistant."""
         mock_exists.return_value = False
@@ -180,8 +180,8 @@ class TestDocumentFileHandler:
 
         # Devrait retourner immédiatement
 
-    @patch("backend.src.file_watcher.watcher.os.path.getsize")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.os.path.getsize")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_wait_for_file_stability_os_error(self, mock_exists, mock_getsize):
         """Test de gestion d'erreur OS."""
         mock_exists.return_value = True
@@ -194,7 +194,7 @@ class TestDocumentFileHandler:
     @patch.object(DocumentFileHandler, "_wait_for_file_stability")
     @patch.object(DocumentFileHandler, "_is_recently_processed")
     @patch.object(DocumentFileHandler, "_should_ignore_file")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_on_created_success(self, mock_exists, mock_ignore, mock_recent, mock_wait):
         """Test de gestion réussie d'un fichier créé."""
         mock_event = Mock()
@@ -262,7 +262,7 @@ class TestDocumentFileHandler:
     @patch.object(DocumentFileHandler, "_wait_for_file_stability")
     @patch.object(DocumentFileHandler, "_is_recently_processed")
     @patch.object(DocumentFileHandler, "_should_ignore_file")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_on_created_file_deleted(self, mock_exists, mock_ignore, mock_recent, mock_wait):
         """Test avec fichier supprimé avant traitement."""
         mock_event = Mock()
@@ -283,7 +283,7 @@ class TestDocumentFileHandler:
     @patch.object(DocumentFileHandler, "_wait_for_file_stability")
     @patch.object(DocumentFileHandler, "_is_recently_processed")
     @patch.object(DocumentFileHandler, "_should_ignore_file")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_on_created_callback_error(self, mock_exists, mock_ignore, mock_recent, mock_wait):
         """Test de gestion d'erreur dans le callback."""
         mock_event = Mock()
@@ -316,7 +316,7 @@ class TestDocumentFileHandler:
     @patch.object(DocumentFileHandler, "_wait_for_file_stability")
     @patch.object(DocumentFileHandler, "_is_recently_processed")
     @patch.object(DocumentFileHandler, "_should_ignore_file")
-    @patch("backend.src.file_watcher.watcher.os.path.exists")
+    @patch("mimir.file_watcher.watcher.os.path.exists")
     def test_on_modified_success(self, mock_exists, mock_ignore, mock_recent, mock_wait):
         """Test de gestion réussie d'un fichier modifié."""
         mock_event = Mock()
@@ -367,7 +367,7 @@ class TestFileWatcher:
         assert isinstance(watcher.handler, DocumentFileHandler)
         assert watcher.stats["files_processed"] == 0
 
-    @patch("backend.src.file_watcher.watcher.Observer")
+    @patch("mimir.file_watcher.watcher.Observer")
     def test_start_success(self, mock_observer_class, temp_dir):
         """Test de démarrage réussi du FileWatcher."""
         mock_observer = Mock()
@@ -400,7 +400,7 @@ class TestFileWatcher:
 
         assert result is False
 
-    @patch("backend.src.file_watcher.watcher.Observer")
+    @patch("mimir.file_watcher.watcher.Observer")
     def test_start_observer_error(self, mock_observer_class, temp_dir):
         """Test de gestion d'erreur au démarrage de l'observer."""
         mock_observer = Mock()
@@ -423,7 +423,7 @@ class TestFileWatcher:
 
         assert result is True
 
-    @patch("backend.src.file_watcher.watcher.Observer")
+    @patch("mimir.file_watcher.watcher.Observer")
     def test_stop_success(self, mock_observer_class, temp_dir):
         """Test d'arrêt réussi."""
         mock_observer = Mock()
@@ -439,7 +439,7 @@ class TestFileWatcher:
         mock_observer.stop.assert_called_once()
         mock_observer.join.assert_called_once_with(timeout=5)
 
-    @patch("backend.src.file_watcher.watcher.Observer")
+    @patch("mimir.file_watcher.watcher.Observer")
     def test_stop_error(self, mock_observer_class, temp_dir):
         """Test de gestion d'erreur à l'arrêt."""
         mock_observer = Mock()
@@ -499,7 +499,7 @@ class TestFileWatcher:
 
         assert result is True  # Succès mais pas de duplication
 
-    @patch("backend.src.file_watcher.watcher.Observer")
+    @patch("mimir.file_watcher.watcher.Observer")
     def test_add_directory_while_running(self, mock_observer_class, temp_dir):
         """Test d'ajout de répertoire pendant l'exécution."""
         mock_observer = Mock()
@@ -521,7 +521,7 @@ class TestFileWatcher:
         watcher = FileWatcher([], {".txt"}, Mock())
 
         # Passer un objet qui lèvera une erreur lors de Path()
-        with patch("backend.src.file_watcher.watcher.Path") as mock_path:
+        with patch("mimir.file_watcher.watcher.Path") as mock_path:
             mock_path.side_effect = Exception("Path error")
 
             result = watcher.add_directory("some_path")
@@ -549,7 +549,7 @@ class TestFileWatcher:
         """Test de gestion d'erreur lors de suppression."""
         watcher = FileWatcher([temp_dir], {".txt"}, Mock())
 
-        with patch("backend.src.file_watcher.watcher.Path") as mock_path:
+        with patch("mimir.file_watcher.watcher.Path") as mock_path:
             mock_path.side_effect = Exception("Path error")
 
             result = watcher.remove_directory("some_path")

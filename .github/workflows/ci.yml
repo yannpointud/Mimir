@@ -55,13 +55,16 @@ jobs:
       - name: Install locked dependencies
         run: pip install --require-hashes -r requirements-dev.lock
 
+      - name: Install the mimir package
+        run: pip install --no-deps -e .
+
       # Offline: fails when a pin of requirements*.txt is not the installed
       # (locked) version, e.g. after a Dependabot bump without a regenerated lock.
       - name: Check the lockfile matches requirements
         run: pip install -q --no-deps --no-index -r requirements-dev.txt
 
       - name: Type check
-        run: mypy backend/src
+        run: mypy backend/mimir
 
   pytest:
     name: pytest
@@ -78,6 +81,9 @@ jobs:
 
       - name: Install locked dependencies
         run: pip install --require-hashes -r requirements-dev.lock
+
+      - name: Install the mimir package
+        run: pip install --no-deps -e .
 
       - name: Run tests
         run: pytest

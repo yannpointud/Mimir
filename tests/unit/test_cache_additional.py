@@ -8,7 +8,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from backend.src.cache.lru_cache import CacheService
+from mimir.cache.lru_cache import CacheService
 
 
 class TestCacheServiceAdvanced:

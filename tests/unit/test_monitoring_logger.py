@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-from src.monitoring.logger import (
+from mimir.monitoring.logger import (
     JSONFormatter,
     ConsoleFormatter,
     setup_logger,
@@ -233,7 +233,7 @@ class TestLoggingHelpers:
 
     def test_log_api_request(self, mock_logger):
         """Test de log des requêtes API"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_api_request(method="POST", endpoint="/api/test", status_code=200)
 
             mock_logger.log.assert_called_once()
@@ -242,7 +242,7 @@ class TestLoggingHelpers:
 
     def test_log_search_query(self, mock_logger):
         """Test de log des requêtes de recherche"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_search_query(query="test search", results_count=5, duration_ms=200)
 
             mock_logger.info.assert_called_once()
@@ -251,7 +251,7 @@ class TestLoggingHelpers:
 
     def test_log_ingestion_event(self, mock_logger):
         """Test de log des événements d'ingestion"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_ingestion_event(document="doc.pdf", status="processed")
 
             mock_logger.info.assert_called_once()
@@ -260,7 +260,7 @@ class TestLoggingHelpers:
 
     def test_log_ingestion_event_with_error(self, mock_logger):
         """Test de log des événements d'ingestion avec erreur"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             # Les fonctions de log n'ont pas de paramètre success, elles logguent toujours en info
             log_ingestion_event(document="doc.pdf", status="failed")
 
@@ -268,7 +268,7 @@ class TestLoggingHelpers:
 
     def test_log_auth_event(self, mock_logger):
         """Test de log des événements d'authentification"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_auth_event(event="login_success")
 
             mock_logger.log.assert_called_once()
@@ -278,7 +278,7 @@ class TestLoggingHelpers:
     def test_log_performance(self, mock_logger):
         """Test de log des métriques de performance"""
         # log_performance est un décorateur, pas un gestionnaire de contexte
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
 
             @log_performance("search_operation")
             def test_function():
@@ -292,7 +292,7 @@ class TestLoggingHelpers:
 
     def test_log_llm_request(self, mock_logger):
         """Test de log des requêtes LLM"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_llm_request(
                 model="mistral-small", operation="generate", tokens=10, duration_ms=1500
             )
@@ -312,7 +312,7 @@ class TestAdditionalLoggerFunctions:
 
     def test_log_vector_operation(self, mock_logger):
         """Test de log des opérations vectorielles"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_vector_operation(operation="similarity_search", vector_count=1000, duration_ms=300)
 
             mock_logger.log.assert_called_once()
@@ -321,7 +321,7 @@ class TestAdditionalLoggerFunctions:
 
     def test_log_health_check(self, mock_logger):
         """Test de log des health checks"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_health_check(component="database", status="healthy")
 
             mock_logger.log.assert_called_once()
@@ -330,7 +330,7 @@ class TestAdditionalLoggerFunctions:
 
     def test_log_system_event(self, mock_logger):
         """Test de log des événements système"""
-        with patch("src.monitoring.logger.app_logger", mock_logger):
+        with patch("mimir.monitoring.logger.app_logger", mock_logger):
             log_system_event(event="service_startup")
 
             mock_logger.log.assert_called_once()

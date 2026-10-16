@@ -7,7 +7,7 @@ import tempfile
 import os
 from pathlib import Path
 
-from src.config import Settings
+from mimir.config import Settings
 
 
 class TestSettings:

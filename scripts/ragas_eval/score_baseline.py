@@ -70,7 +70,7 @@ def _resolve_metrics(names: list[str]):
     Import is deferred so ``--help`` works without ragas installed. Raises a
     clear error naming an unknown metric rather than a bare KeyError.
     """
-    from ragas.metrics import (  # noqa: E402
+    from ragas.metrics import (
         answer_relevancy,
         context_precision,
         context_recall,

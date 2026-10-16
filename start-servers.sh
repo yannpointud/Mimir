@@ -3,7 +3,7 @@
 echo "🚀 Démarrage des serveurs Mimir..."
 
 # Vérifier si les processus sont déjà en cours
-if pgrep -f "uvicorn main:app" > /dev/null; then
+if pgrep -f "uvicorn mimir.main:app" > /dev/null; then
     echo "⚠️  Le backend semble déjà en cours d'exécution"
 fi
 
@@ -16,7 +16,7 @@ mkdir -p logs
 
 echo "📡 Démarrage du backend (port 8000)..."
 cd /home/boby/Mimir/backend
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 > ../logs/uvicorn.log 2>&1 &
+python -m uvicorn mimir.main:app --reload --host 0.0.0.0 --port 8000 > ../logs/uvicorn.log 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > ../logs/backend.pid
 echo "✅ Backend démarré (PID: $BACKEND_PID)"

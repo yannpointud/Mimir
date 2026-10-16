@@ -24,8 +24,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.interfaces import Chunk
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk
 
 DIMENSION = 128
 INGESTION_BATCHES = 5

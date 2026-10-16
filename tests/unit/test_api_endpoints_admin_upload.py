@@ -12,7 +12,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from fastapi import HTTPException, status, UploadFile
 
-from backend.src.api.endpoints.admin import admin_upload_document
+from mimir.api.endpoints.admin import admin_upload_document
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def _run_admin_upload(mock_file, ingestion_processor=None):
 class TestAdminUploadInputValidation:
     """Size and empty-file guards, parity with /documents/upload."""
 
-    @patch("backend.src.api.endpoints.admin.settings")
+    @patch("mimir.api.endpoints.admin.settings")
     def test_admin_upload_file_too_large_returns_413(self, mock_settings, mock_upload_file):
         """A file above max_file_size_mb is rejected with 413 before read()."""
         mock_settings.max_file_size_mb = 5
@@ -63,9 +63,9 @@ class TestAdminUploadInputValidation:
         assert exc_info.value.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
         assert "File too large" in str(exc_info.value.detail)
 
-    @patch("src.database.repository.DocumentRepository")
-    @patch("src.database.connection.get_db_session")
-    @patch("backend.src.api.endpoints.admin.settings")
+    @patch("mimir.database.repository.DocumentRepository")
+    @patch("mimir.database.connection.get_db_session")
+    @patch("mimir.api.endpoints.admin.settings")
     def test_admin_upload_empty_file_returns_400(
         self, mock_settings, mock_get_db_session, mock_repo_cls, mock_upload_file, temp_upload_dir
     ):
@@ -91,9 +91,9 @@ class TestAdminUploadQueueFullCleanup:
     file must be rolled back, otherwise any retry of the same file hits 409
     (get_by_hash matches the orphaned pending record) and is never ingested."""
 
-    @patch("src.database.repository.DocumentRepository")
-    @patch("src.database.connection.get_db_session")
-    @patch("backend.src.api.endpoints.admin.settings")
+    @patch("mimir.database.repository.DocumentRepository")
+    @patch("mimir.database.connection.get_db_session")
+    @patch("mimir.api.endpoints.admin.settings")
     def test_admin_upload_queue_full_deletes_record_and_file(
         self, mock_settings, mock_get_db_session, mock_repo_cls, mock_upload_file, temp_upload_dir
     ):

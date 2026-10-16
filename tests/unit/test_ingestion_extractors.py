@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
 
-from src.ingestion.extractors import (
+from mimir.ingestion.extractors import (
     ExtractorFactory,
     TextExtractor,
     PDFExtractor,
@@ -289,7 +289,7 @@ class TestDOCXExtractor:
         extractor = DOCXExtractor()
         assert extractor is not None
 
-    @patch("src.ingestion.extractors.DocxDocument")
+    @patch("mimir.ingestion.extractors.DocxDocument")
     def test_docx_extraction_success(self, mock_document):
         """Test d'extraction DOCX réussie"""
         # Mock du document
@@ -310,7 +310,7 @@ class TestDOCXExtractor:
         assert "Second paragraph" in extracted_text
         assert mock_document.called
 
-    @patch("src.ingestion.extractors.DocxDocument")
+    @patch("mimir.ingestion.extractors.DocxDocument")
     def test_docx_extraction_error(self, mock_document):
         """Test d'erreur lors de l'extraction DOCX"""
         mock_document.side_effect = Exception("DOCX parsing error")
@@ -322,7 +322,7 @@ class TestDOCXExtractor:
 
         assert "DOCX parsing error" in str(exc_info.value)
 
-    @patch("src.ingestion.extractors.DocxDocument")
+    @patch("mimir.ingestion.extractors.DocxDocument")
     def test_docx_empty_document(self, mock_document):
         """Test DOCX vide"""
         mock_doc = Mock()
@@ -335,7 +335,7 @@ class TestDOCXExtractor:
 
         assert extracted_text.strip() == ""
 
-    @patch("src.ingestion.extractors.DocxDocument")
+    @patch("mimir.ingestion.extractors.DocxDocument")
     def test_docx_with_empty_paragraphs(self, mock_document):
         """Test DOCX avec paragraphes vides"""
         mock_doc = Mock()

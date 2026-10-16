@@ -9,7 +9,7 @@ flag-ON (structure-aware) -- then answering the frozen golden set through the
 real pipeline for each, ready for the SEPARATE-venv ragas scorer.
 
 Design (mirrors the two-stage / two-venv harness, WITHOUT editing run_pipeline.py):
-  - The flag must be toggled BEFORE ``src.config`` is imported (pydantic reads it
+  - The flag must be toggled BEFORE ``mimir.config`` is imported (pydantic reads it
     at import time). Two modes therefore run in two SEPARATE PROCESSES -- this
     script re-invokes itself with ``--stage answer --mode {baseline,structure}``
     and the right environment.
@@ -32,10 +32,10 @@ Security:
 
 Usage:
     # 1. Zero-token wiring check (safe to run anytime):
-    python scripts/ragas_eval/measure_chunking.py --dry-run
+    python -m scripts.ragas_eval.measure_chunking --dry-run
 
     # 2. Full measurement (operator-gated, spends tokens; runs both modes):
-    python scripts/ragas_eval/measure_chunking.py --run
+    python -m scripts.ragas_eval.measure_chunking --run
 
     # 3. Score each eval_input in the SEPARATE ragas venv:
     python scripts/ragas_eval/score_baseline.py \
@@ -46,7 +46,7 @@ Usage:
         --out scripts/ragas_eval/results/chunk_structure_run.json
 
     # 4. Write the adoption decision from the two score JSONs:
-    python scripts/ragas_eval/measure_chunking.py --summarize \
+    python -m scripts.ragas_eval.measure_chunking --summarize \
         --baseline-json scripts/ragas_eval/results/chunk_baseline_run.json \
         --structure-json scripts/ragas_eval/results/chunk_structure_run.json
 """
@@ -62,15 +62,8 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
-# sys.path bootstrap (same discipline as run_pipeline.py / ingest_corpus.py):
-# make the project root and the backend package importable whether this file is
-# run as a script or imported as the package module.
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent.parent
-_BACKEND_DIR = _PROJECT_ROOT / "backend"
-for _path in (_PROJECT_ROOT, _BACKEND_DIR):
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
 
 # The two modes: OFF is the frozen baseline, ON is structure-aware chunking.
 MODES = ("baseline", "structure")
@@ -142,7 +135,7 @@ def _dry_run() -> int:
     # 3. The config flag exists and its CURRENT default is False (byte-identical
     #    baseline until the delta is measured and adoption is decided).
     try:
-        from src.config import Settings  # noqa: E402
+        from mimir.config import Settings
 
         field = Settings.model_fields.get("structure_aware_chunking_enabled")
         if field is None:
@@ -174,10 +167,10 @@ def _dry_run() -> int:
             ok = False
 
     print("\nFull-run command sequence (operator-gated, spends Mistral tokens):")
-    print("  1. python scripts/ragas_eval/measure_chunking.py --run")
+    print("  1. python -m scripts.ragas_eval.measure_chunking --run")
     print("  2. score each eval_input_chunk_*.jsonl with score_baseline.py (ragas venv)")
     print(
-        "  3. python scripts/ragas_eval/measure_chunking.py --summarize "
+        "  3. python -m scripts.ragas_eval.measure_chunking --summarize "
         "--baseline-json ... --structure-json ..."
     )
 
@@ -199,11 +192,11 @@ async def _ingest_corpus_isolated() -> int:
     now-imported settings (the child's env already toggled the flag) and runs
     against the isolated data dir, so the mode starts from a clean, empty index.
     """
-    from src.config import settings
-    from src.database.connection import init_database, db_manager
-    from src.ingestion.processor import IngestionProcessor
-    from src.ingestion.chunking import ChunkingConfig
-    from src.api.dependencies import (
+    from mimir.config import settings
+    from mimir.database.connection import init_database, db_manager
+    from mimir.ingestion.processor import IngestionProcessor
+    from mimir.ingestion.chunking import ChunkingConfig
+    from mimir.api.dependencies import (
         get_llm_service,
         get_vector_store,
         get_document_repository,
@@ -296,10 +289,10 @@ async def _answer_golden_set(mode: str, limit: int | None) -> int:
         answer_via_stream,
     )
     from scripts.ragas_eval.golden_set_schema import load_golden_set
-    from src.api.dependencies import get_budget_guard, get_rag_service, get_vector_store
-    from src.config import settings
-    from src.database.connection import db_manager
-    from src.database.repository import DocumentRepository
+    from mimir.api.dependencies import get_budget_guard, get_rag_service, get_vector_store
+    from mimir.config import settings
+    from mimir.database.connection import db_manager
+    from mimir.database.repository import DocumentRepository
 
     entries = load_golden_set(_GOLDEN_SET)
     if limit is not None:
@@ -485,7 +478,7 @@ def _summarize(baseline_json: Path, structure_json: Path, out_path: Path) -> int
     if adopt:
         print(
             "NOTE: verdict ADOPT -- flip structure_aware_chunking_enabled default "
-            "to True in backend/src/config.py (human-confirmed step)."
+            "to True in backend/mimir/config.py (human-confirmed step)."
         )
     return 0
 

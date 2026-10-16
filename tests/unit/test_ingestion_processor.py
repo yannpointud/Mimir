@@ -9,12 +9,12 @@ import asyncio
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
 
-from src.ingestion.processor import IngestionProcessor, ProcessingError
-from src.ingestion.queue_manager import IngestionTask
-from src.ingestion.chunking import ChunkingConfig
-from src.llm_interface.interfaces import EmbeddingResponse, LLMException
-from src.rag_core.interfaces import Chunk
-from src.cost.budget_guard import BudgetReservation
+from mimir.ingestion.processor import IngestionProcessor, ProcessingError
+from mimir.ingestion.queue_manager import IngestionTask
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.llm_interface.interfaces import EmbeddingResponse, LLMException
+from mimir.rag_core.interfaces import Chunk
+from mimir.cost.budget_guard import BudgetReservation
 
 
 class TestIngestionProcessor:

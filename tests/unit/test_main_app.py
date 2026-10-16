@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from mimir.main import app
 
 
 class TestMainApp:
@@ -28,11 +28,11 @@ class TestMainApp:
         assert "version" in data
         assert data["status"] == "running"
 
-    @patch("src.api.endpoints.health._check_database_health")
-    @patch("src.api.endpoints.health._check_vector_store_health")
-    @patch("src.api.endpoints.health._check_llm_health")
-    @patch("src.api.endpoints.health._check_cache_health")
-    @patch("src.api.endpoints.health._check_email_health")
+    @patch("mimir.api.endpoints.health._check_database_health")
+    @patch("mimir.api.endpoints.health._check_vector_store_health")
+    @patch("mimir.api.endpoints.health._check_llm_health")
+    @patch("mimir.api.endpoints.health._check_cache_health")
+    @patch("mimir.api.endpoints.health._check_email_health")
     def test_health_check_success(
         self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
     ):
@@ -55,11 +55,11 @@ class TestMainApp:
         assert data["checks"]["database"]["healthy"] is True
         assert data["checks"]["vector_store"]["healthy"] is True
 
-    @patch("src.api.endpoints.health._check_database_health")
-    @patch("src.api.endpoints.health._check_vector_store_health")
-    @patch("src.api.endpoints.health._check_llm_health")
-    @patch("src.api.endpoints.health._check_cache_health")
-    @patch("src.api.endpoints.health._check_email_health")
+    @patch("mimir.api.endpoints.health._check_database_health")
+    @patch("mimir.api.endpoints.health._check_vector_store_health")
+    @patch("mimir.api.endpoints.health._check_llm_health")
+    @patch("mimir.api.endpoints.health._check_cache_health")
+    @patch("mimir.api.endpoints.health._check_email_health")
     def test_health_check_failure(
         self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
     ):

@@ -42,18 +42,18 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from src import config as config_module
-from src.config import settings
-from src.cost.budget_guard import BudgetReservation
-from src.cost.usage_tracker import UsageTracker
-from src.database.connection import db_manager
-from src.database.models import Base
-from src.database.repository import DocumentRepository
-from src.ingestion.chunking import ChunkingConfig
-from src.ingestion.processor import IngestionProcessor
-from src.llm_interface.interfaces import EmbeddingResponse, LLMAPIError
-from src.rag_core.implementations.bm25_store import Bm25LexicalStore
-from src.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir import config as config_module
+from mimir.config import settings
+from mimir.cost.budget_guard import BudgetReservation
+from mimir.cost.usage_tracker import UsageTracker
+from mimir.database.connection import db_manager
+from mimir.database.models import Base
+from mimir.database.repository import DocumentRepository
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor
+from mimir.llm_interface.interfaces import EmbeddingResponse, LLMAPIError
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 
 ORACLE_DIR = Path(__file__).resolve().parent
 CORPUS_DIR = ORACLE_DIR / "corpus"
@@ -439,10 +439,10 @@ class OracleEnv:
     """A fully isolated Mimir instance driven through the FastAPI app."""
 
     def __init__(self, tmp: Path):
-        from main import app
-        from src.api import dependencies
-        from src.auth.jwt_handler import jwt_handler
-        from src.services.rag_service import RagService
+        from mimir.main import app
+        from mimir.api import dependencies
+        from mimir.auth.jwt_handler import jwt_handler
+        from mimir.services.rag_service import RagService
 
         self.tmp = tmp
         self.tmp_root = str(tmp)
@@ -552,7 +552,7 @@ class OracleEnv:
 
     def ingest_corpus(self) -> dict[str, int]:
         """Upload the fixed corpus, ingest it and return filename -> document id."""
-        from src.api.middleware.rate_limit import limiter
+        from mimir.api.middleware.rate_limit import limiter
 
         ids = {}
         limiter_enabled = limiter.enabled
@@ -611,7 +611,7 @@ def _restore_db_manager(saved) -> None:
 
 
 def _make_env() -> OracleEnv:
-    from src.auth.jwt_handler import jwt_handler
+    from mimir.auth.jwt_handler import jwt_handler
 
     tmp = Path(tempfile.mkdtemp(prefix="mimir_oracle_"))
     saved_settings = {name: getattr(settings, name) for name in _PATCHED_SETTINGS}
@@ -633,7 +633,7 @@ def _make_env() -> OracleEnv:
         Path(directory).mkdir(parents=True, exist_ok=True)
     saved_db = _redirect_db_manager(f"sqlite:///{tmp / 'data' / 'sqlite' / 'oracle.db'}")
 
-    from src.cache.lru_cache import cache_service, chat_cache_service
+    from mimir.cache.lru_cache import cache_service, chat_cache_service
 
     cache_service.invalidate_all()
     chat_cache_service.invalidate_all()
@@ -645,7 +645,7 @@ def _make_env() -> OracleEnv:
 
 
 def _teardown_env(env: OracleEnv) -> None:
-    from src.cache.lru_cache import cache_service, chat_cache_service
+    from mimir.cache.lru_cache import cache_service, chat_cache_service
 
     env.close()
     cache_service.invalidate_all()

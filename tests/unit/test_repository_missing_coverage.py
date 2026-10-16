@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.src.database.repository import (
+from mimir.database.repository import (
     DocumentRepository,
     ConfigurationRepository,
     AuditLogRepository,

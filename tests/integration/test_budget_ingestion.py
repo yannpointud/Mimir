@@ -25,14 +25,14 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src import config as config_module
-from src.cost.budget_guard import BudgetExceededError, BudgetGuard, BudgetReservation
-from src.cost.usage_tracker import UsageTracker
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
-from src.ingestion.processor import IngestionProcessor
-from src.ingestion.queue_manager import IngestionTask
-from src.llm_interface.interfaces import EmbeddingResponse
+from mimir import config as config_module
+from mimir.cost.budget_guard import BudgetExceededError, BudgetGuard, BudgetReservation
+from mimir.cost.usage_tracker import UsageTracker
+from mimir.database.connection import db_manager
+from mimir.database.models import Base, LlmUsage
+from mimir.ingestion.processor import IngestionProcessor
+from mimir.ingestion.queue_manager import IngestionTask
+from mimir.llm_interface.interfaces import EmbeddingResponse
 
 
 @pytest.fixture

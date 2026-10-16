@@ -4,7 +4,7 @@ Tests unitaires pour les modèles de tâches d'ingestion
 
 from datetime import datetime
 
-from src.ingestion.queue_manager import IngestionTask
+from mimir.ingestion.queue_manager import IngestionTask
 
 
 class TestIngestionTask:

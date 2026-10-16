@@ -8,13 +8,13 @@ et notifications du système Mimir.
 import pytest
 from unittest.mock import patch, AsyncMock
 
-from backend.src.email_service.smtp_client import EmailService
+from mimir.email_service.smtp_client import EmailService
 
 
 class TestEmailServiceInit:
     """Tests pour l'initialisation du service email."""
 
-    @patch("backend.src.email_service.smtp_client.settings")
+    @patch("mimir.email_service.smtp_client.settings")
     def test_init_with_full_config(self, mock_settings):
         """Test d'initialisation avec configuration complète."""
         mock_settings.smtp_host = "smtp.example.com"
@@ -34,7 +34,7 @@ class TestEmailServiceInit:
         assert service.escalation_email == "support@example.com"
         assert service.from_email == "user@example.com"
 
-    @patch("backend.src.email_service.smtp_client.settings")
+    @patch("mimir.email_service.smtp_client.settings")
     def test_init_with_incomplete_config(self, mock_settings):
         """Test d'initialisation avec configuration incomplète."""
         mock_settings.smtp_host = None
@@ -44,7 +44,7 @@ class TestEmailServiceInit:
         mock_settings.smtp_use_tls = True
         mock_settings.escalation_email = "support@example.com"
 
-        with patch("backend.src.email_service.smtp_client.logger") as mock_logger:
+        with patch("mimir.email_service.smtp_client.logger") as mock_logger:
             EmailService()
             mock_logger.warning.assert_called_once()
 
@@ -55,7 +55,7 @@ class TestEmailServiceConfiguration:
     @pytest.fixture
     def configured_email_service(self):
         """Service email configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -67,7 +67,7 @@ class TestEmailServiceConfiguration:
     @pytest.fixture
     def unconfigured_email_service(self):
         """Service email non configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = None
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -86,7 +86,7 @@ class TestEmailServiceConfiguration:
 
     def test_is_configured_false_missing_user(self):
         """Test avec utilisateur manquant."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = None
@@ -98,7 +98,7 @@ class TestEmailServiceConfiguration:
 
     def test_is_configured_false_missing_escalation_email(self):
         """Test avec email d'escalation manquant."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -115,7 +115,7 @@ class TestSendEscalationEmail:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -144,7 +144,7 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_not_configured(self):
         """Test d'envoi avec service non configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = None
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = None
@@ -198,7 +198,7 @@ class TestSendEmail:
     @pytest.fixture
     def email_service(self):
         """Fixture pour EmailService configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -210,7 +210,7 @@ class TestSendEmail:
     @pytest.mark.asyncio
     async def test_send_email_success(self, email_service):
         """Test d'envoi d'email réussi."""
-        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
+        with patch("mimir.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp = AsyncMock()
             mock_smtp_class.return_value = mock_smtp
 
@@ -230,7 +230,7 @@ class TestSendEmail:
     @pytest.mark.asyncio
     async def test_send_email_multiple_recipients(self, email_service):
         """Test d'envoi à plusieurs destinataires."""
-        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
+        with patch("mimir.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp = AsyncMock()
             mock_smtp_class.return_value = mock_smtp
 
@@ -247,7 +247,7 @@ class TestSendEmail:
     @pytest.mark.asyncio
     async def test_send_email_exception(self, email_service):
         """Test de gestion d'exception."""
-        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
+        with patch("mimir.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp_class.side_effect = Exception("Connection failed")
 
             result = await email_service._send_email(
@@ -265,7 +265,7 @@ class TestSendEmail:
             {"filename": "document.pdf", "content": b"PDF content", "mime_type": "application/pdf"}
         ]
 
-        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
+        with patch("mimir.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp = AsyncMock()
             mock_smtp_class.return_value = mock_smtp
 
@@ -286,7 +286,7 @@ class TestContentGeneration:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -407,7 +407,7 @@ class TestNotificationEmail:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -437,7 +437,7 @@ class TestNotificationEmail:
     @pytest.mark.asyncio
     async def test_send_notification_email_not_configured(self):
         """Test avec service non configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = None
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = None
@@ -495,7 +495,7 @@ class TestIntegration:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
+        with patch("mimir.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"

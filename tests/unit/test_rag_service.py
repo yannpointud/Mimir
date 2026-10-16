@@ -1,12 +1,9 @@
 """
 White-box unit tests for the RAG pipeline (RagService).
 
-These tests drive the streaming pipeline function directly, in its home
-backend/src/services/rag_service.py. The non-stream pipeline was removed once
-its only consumers -- the RAGAS harness and the /chat/ route -- were migrated to
-the stream, so answer_stream() is now the single pipeline. This file asserts its
-base output contract (numbered answer chunks + a terminal done event) by
-draining the SSE events into a result, exactly as the RAGAS adapter does.
+These tests drive answer_stream(), the single RAG pipeline, and assert its
+base output contract (numbered answer chunks and a terminal done event) by
+draining the SSE events into a result, as the RAGAS adapter does.
 
 Mock-based: AsyncMock LLM service, Mock vector store / document repository /
 rag_debug. No real Mistral API call, no real FAISS index.
@@ -15,8 +12,8 @@ rag_debug. No real Mistral API call, no real FAISS index.
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
-from backend.src.rag_core.interfaces import SearchResult
-from src.services.rag_service import _process_question_with_rag_stream
+from mimir.rag_core.interfaces import SearchResult
+from mimir.services.rag_service import _process_question_with_rag_stream
 
 
 def _sr(chunk_id, document_id, text, source, score):
@@ -104,7 +101,7 @@ class TestStreamPipelineContract:
         llm, vs, docs, dbg = _base_mocks()
         vs.query.return_value = [_sr(1, "10", "extrait pertinent", "a.txt", 0.80)]
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
             events = asyncio.run(
                 _drain(
@@ -134,7 +131,7 @@ class TestStreamPipelineContract:
         llm, vs, docs, dbg = _base_mocks()
         vs.query.return_value = []
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
             events = asyncio.run(
                 _drain(

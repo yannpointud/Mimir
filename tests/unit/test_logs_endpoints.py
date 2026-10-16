@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 from fastapi import HTTPException
 
-from src.api.endpoints.logs import (
+from mimir.api.endpoints.logs import (
     FrontendLogEntry,
     LogResponse,
     receive_frontend_log,
@@ -67,7 +67,7 @@ class TestReceiveFrontendLog:
     """Tests pour l'endpoint receive_frontend_log."""
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_receive_log_success_info(self, mock_logger):
         """Test réception d'un log INFO avec succès."""
         log_entry = FrontendLogEntry(
@@ -86,7 +86,7 @@ class TestReceiveFrontendLog:
         assert "[app] Test message" in call_args[0][1]
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_receive_log_success_error(self, mock_logger):
         """Test réception d'un log ERROR avec succès."""
         log_entry = FrontendLogEntry(
@@ -104,7 +104,7 @@ class TestReceiveFrontendLog:
         assert "[auth] Login failed" in call_args[0][1]
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_receive_log_with_optional_fields(self, mock_logger):
         """Test réception d'un log avec tous les champs optionnels."""
         log_entry = FrontendLogEntry(
@@ -133,7 +133,7 @@ class TestReceiveFrontendLog:
         assert extra_fields["props"] == {"id": 123}
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_receive_log_unknown_level(self, mock_logger):
         """Test réception d'un log avec un niveau inconnu."""
         log_entry = FrontendLogEntry(
@@ -149,7 +149,7 @@ class TestReceiveFrontendLog:
         assert call_args[0][0] == 20  # logging.INFO
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_receive_log_debug_level(self, mock_logger):
         """Test réception d'un log DEBUG."""
         log_entry = FrontendLogEntry(
@@ -165,7 +165,7 @@ class TestReceiveFrontendLog:
         assert call_args[0][0] == 10  # logging.DEBUG
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_receive_log_critical_level(self, mock_logger):
         """Test réception d'un log CRITICAL."""
         log_entry = FrontendLogEntry(
@@ -184,8 +184,8 @@ class TestReceiveFrontendLog:
         assert call_args[0][0] == 50  # logging.CRITICAL
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
-    @patch("src.api.endpoints.logs.logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.logger")
     async def test_receive_log_exception_handling(self, mock_backend_logger, mock_frontend_logger):
         """Test gestion d'exception lors du traitement du log."""
         mock_frontend_logger.log.side_effect = Exception("Logging failed")
@@ -206,7 +206,7 @@ class TestFrontendLoggingHealth:
     """Tests pour l'endpoint frontend_logging_health."""
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_health_check_success(self, mock_logger):
         """Test health check avec succès."""
         # Simuler un logger avec handlers
@@ -224,7 +224,7 @@ class TestFrontendLoggingHealth:
         assert "timestamp" in result
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_health_check_no_handlers(self, mock_logger):
         """Test health check sans handlers configurés."""
         mock_logger.handlers = []
@@ -238,7 +238,7 @@ class TestFrontendLoggingHealth:
         assert result["log_level"] == "WARNING"
 
     @pytest.mark.asyncio
-    @patch("src.api.endpoints.logs.frontend_logger")
+    @patch("mimir.api.endpoints.logs.frontend_logger")
     async def test_health_check_exception(self, mock_logger):
         """Test health check avec exception."""
         # Simuler une exception lors de l'accès aux handlers

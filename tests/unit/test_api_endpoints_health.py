@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 from fastapi import HTTPException, status, Response
 from sqlalchemy.orm import Session
 
-from backend.src.api.endpoints.health import health_check, disk_usage
+from mimir.api.endpoints.health import health_check, disk_usage
 
 
 class TestHealthCheckEndpoint:
@@ -19,12 +19,12 @@ class TestHealthCheckEndpoint:
         """Mock session de base de données."""
         return Mock(spec=Session)
 
-    @patch("backend.src.api.endpoints.health._check_database_health")
-    @patch("backend.src.api.endpoints.health._check_vector_store_health")
-    @patch("backend.src.api.endpoints.health._check_llm_health")
-    @patch("backend.src.api.endpoints.health._check_cache_health")
-    @patch("backend.src.api.endpoints.health._check_email_health")
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health._check_database_health")
+    @patch("mimir.api.endpoints.health._check_vector_store_health")
+    @patch("mimir.api.endpoints.health._check_llm_health")
+    @patch("mimir.api.endpoints.health._check_cache_health")
+    @patch("mimir.api.endpoints.health._check_email_health")
+    @patch("mimir.api.endpoints.health.settings")
     def test_health_check_all_healthy(
         self, mock_settings, mock_email, mock_cache, mock_llm, mock_vector, mock_db, mock_db_session
     ):
@@ -55,12 +55,12 @@ class TestHealthCheckEndpoint:
         assert "cache" in result.checks
         assert "email_service" in result.checks
 
-    @patch("backend.src.api.endpoints.health._check_database_health")
-    @patch("backend.src.api.endpoints.health._check_vector_store_health")
-    @patch("backend.src.api.endpoints.health._check_llm_health")
-    @patch("backend.src.api.endpoints.health._check_cache_health")
-    @patch("backend.src.api.endpoints.health._check_email_health")
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health._check_database_health")
+    @patch("mimir.api.endpoints.health._check_vector_store_health")
+    @patch("mimir.api.endpoints.health._check_llm_health")
+    @patch("mimir.api.endpoints.health._check_cache_health")
+    @patch("mimir.api.endpoints.health._check_email_health")
+    @patch("mimir.api.endpoints.health.settings")
     def test_health_check_some_unhealthy(
         self, mock_settings, mock_email, mock_cache, mock_llm, mock_vector, mock_db, mock_db_session
     ):
@@ -95,7 +95,7 @@ class TestHealthCheckEndpoint:
         assert "vector_store" in result.checks
         assert result.checks["vector_store"]["healthy"] is True
 
-    @patch("backend.src.api.endpoints.health._check_database_health")
+    @patch("mimir.api.endpoints.health._check_database_health")
     def test_health_check_exception_handling(self, mock_db, mock_db_session):
         """Test de gestion d'exception dans health check."""
 
@@ -112,7 +112,7 @@ class TestHealthCheckEndpoint:
 class TestDiskUsageEndpoint:
     """Tests pour l'endpoint d'usage disque."""
 
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     @patch("shutil.disk_usage")
     @patch("os.path.exists")
     def test_disk_usage_success(self, mock_exists, mock_disk_usage, mock_settings):
@@ -140,7 +140,7 @@ class TestDiskUsageEndpoint:
         assert result["disk_usage"]["data_dir"]["total_gb"] == 931.32  # 1TB en GB
         assert result["disk_usage"]["data_dir"]["usage_percent"] == 50.0
 
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     @patch("os.path.exists")
     def test_disk_usage_directory_not_exists(self, mock_exists, mock_settings):
         """Test d'usage disque avec répertoire inexistant."""
@@ -162,7 +162,7 @@ class TestDiskUsageEndpoint:
         assert result["disk_usage"]["data_dir"]["error"] == "Directory does not exist"
 
     @patch("os.path.dirname")
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     @patch("shutil.disk_usage")
     @patch("os.path.exists")
     def test_disk_usage_exception_handling(
@@ -194,10 +194,10 @@ class TestHealthHelperFunctions:
         """Mock session de base de données."""
         return Mock(spec=Session)
 
-    @patch("backend.src.api.endpoints.health.text")
+    @patch("mimir.api.endpoints.health.text")
     def test_check_database_health_success(self, mock_text, mock_db_session):
         """Test de vérification santé base de données réussie."""
-        from backend.src.api.endpoints.health import _check_database_health
+        from mimir.api.endpoints.health import _check_database_health
 
         # Configuration des mocks
         mock_result = Mock()
@@ -213,10 +213,10 @@ class TestHealthHelperFunctions:
         assert result["connection"] == "ok"
         assert result["document_count"] == 10
 
-    @patch("backend.src.api.endpoints.health.text")
+    @patch("mimir.api.endpoints.health.text")
     def test_check_database_health_query_failure(self, mock_text, mock_db_session):
         """Test de vérification santé base de données avec échec de requête."""
-        from backend.src.api.endpoints.health import _check_database_health
+        from mimir.api.endpoints.health import _check_database_health
 
         # Configuration des mocks
         mock_db_session.execute.side_effect = Exception("Connection failed")
@@ -229,11 +229,11 @@ class TestHealthHelperFunctions:
         assert result["connection"] == "failed"
         assert "error" in result
 
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     @patch("os.path.exists")
     def test_check_vector_store_health_initialized(self, mock_exists, mock_settings):
         """Test de vérification santé vector store initialisé."""
-        from backend.src.api.endpoints.health import _check_vector_store_health
+        from mimir.api.endpoints.health import _check_vector_store_health
 
         # Configuration des mocks
         mock_settings.faiss_index_path = "/path/to/index"
@@ -248,11 +248,11 @@ class TestHealthHelperFunctions:
         assert result["index_file"] == "exists"
         assert result["metadata_file"] == "exists"
 
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     @patch("os.path.exists")
     def test_check_vector_store_health_not_initialized(self, mock_exists, mock_settings):
         """Test de vérification santé vector store non initialisé."""
-        from backend.src.api.endpoints.health import _check_vector_store_health
+        from mimir.api.endpoints.health import _check_vector_store_health
 
         # Configuration des mocks
         mock_settings.faiss_index_path = "/path/to/index"
@@ -267,10 +267,10 @@ class TestHealthHelperFunctions:
         assert result["index_file"] == "not_initialized"
         assert "normal for new installation" in result["note"]
 
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     def test_check_llm_health_configured(self, mock_settings):
         """Test de vérification santé LLM avec API configurée."""
-        from backend.src.api.endpoints.health import _check_llm_health
+        from mimir.api.endpoints.health import _check_llm_health
 
         # Configuration des mocks
         mock_settings.mistral_api_key = "test_api_key"
@@ -286,10 +286,10 @@ class TestHealthHelperFunctions:
         assert result["provider"] == "mistral"
         assert result["model"] == "mistral-small-latest"
 
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health.settings")
     def test_check_llm_health_not_configured(self, mock_settings):
         """Test de vérification santé LLM sans API configurée."""
-        from backend.src.api.endpoints.health import _check_llm_health
+        from mimir.api.endpoints.health import _check_llm_health
 
         # Configuration des mocks
         mock_settings.mistral_api_key = None
@@ -303,11 +303,11 @@ class TestHealthHelperFunctions:
         assert result["api_configured"] is False
         assert "API key not configured" in result["note"]
 
-    @patch("backend.src.cache.lru_cache.cache_service")
-    @patch("backend.src.cache.lru_cache.chat_cache_service")
+    @patch("mimir.cache.lru_cache.cache_service")
+    @patch("mimir.cache.lru_cache.chat_cache_service")
     def test_check_cache_health_success(self, mock_chat_cache, mock_cache):
         """Test de vérification santé cache réussie."""
-        from backend.src.api.endpoints.health import _check_cache_health
+        from mimir.api.endpoints.health import _check_cache_health
 
         # Configuration des mocks
         mock_cache.get.return_value = "test_data"
@@ -323,11 +323,11 @@ class TestHealthHelperFunctions:
         assert "main_cache" in result
         assert "chat_cache" in result
 
-    @patch("src.cache.lru_cache.chat_cache_service")
-    @patch("src.cache.lru_cache.cache_service")
+    @patch("mimir.cache.lru_cache.chat_cache_service")
+    @patch("mimir.cache.lru_cache.cache_service")
     def test_check_cache_health_failure(self, mock_cache, mock_chat_cache):
         """Test de vérification santé cache en échec."""
-        from backend.src.api.endpoints.health import _check_cache_health
+        from mimir.api.endpoints.health import _check_cache_health
 
         # Configuration du mock pour lever une exception lors du set (premier appel)
         mock_cache.set.side_effect = Exception("Cache unavailable")
@@ -339,10 +339,10 @@ class TestHealthHelperFunctions:
         assert result["healthy"] is False
         assert "error" in result
 
-    @patch("src.email_service.smtp_client.email_service")
+    @patch("mimir.email_service.smtp_client.email_service")
     def test_check_email_health_configured(self, mock_email_service):
         """Test de vérification santé email configuré."""
-        from backend.src.api.endpoints.health import _check_email_health
+        from mimir.api.endpoints.health import _check_email_health
 
         # Configuration du mock
         mock_email_service.get_configuration_status.return_value = {
@@ -359,10 +359,10 @@ class TestHealthHelperFunctions:
         assert result["configuration"]["configured"] is True
         assert "Email service configured" in result["note"]
 
-    @patch("src.email_service.smtp_client.email_service")
+    @patch("mimir.email_service.smtp_client.email_service")
     def test_check_email_health_not_configured(self, mock_email_service):
         """Test de vérification santé email non configuré."""
-        from backend.src.api.endpoints.health import _check_email_health
+        from mimir.api.endpoints.health import _check_email_health
 
         # Configuration du mock
         mock_email_service.get_configuration_status.return_value = {"configured": False}
@@ -379,12 +379,12 @@ class TestHealthHelperFunctions:
 class TestHealthIntegration:
     """Tests d'intégration pour les endpoints de santé."""
 
-    @patch("backend.src.api.endpoints.health._check_database_health")
-    @patch("backend.src.api.endpoints.health._check_vector_store_health")
-    @patch("backend.src.api.endpoints.health._check_llm_health")
-    @patch("backend.src.api.endpoints.health._check_cache_health")
-    @patch("backend.src.api.endpoints.health._check_email_health")
-    @patch("backend.src.api.endpoints.health.settings")
+    @patch("mimir.api.endpoints.health._check_database_health")
+    @patch("mimir.api.endpoints.health._check_vector_store_health")
+    @patch("mimir.api.endpoints.health._check_llm_health")
+    @patch("mimir.api.endpoints.health._check_cache_health")
+    @patch("mimir.api.endpoints.health._check_email_health")
+    @patch("mimir.api.endpoints.health.settings")
     def test_health_check_comprehensive_scenario(
         self, mock_settings, mock_email, mock_cache, mock_llm, mock_vector, mock_db
     ):

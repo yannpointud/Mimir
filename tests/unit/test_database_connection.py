@@ -9,7 +9,7 @@ import sqlite3
 import pytest
 from unittest.mock import Mock, patch
 
-from backend.src.database.connection import (
+from mimir.database.connection import (
     DatabaseManager,
     configure_sqlite_performance,
     db_manager,
@@ -31,7 +31,7 @@ class TestConfigureSqlitePerformance:
         mock_connection.cursor.return_value = mock_cursor
 
         # Mock des settings avec WAL activé
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings.sqlite_wal_mode = True
 
             configure_sqlite_performance(mock_connection, None)
@@ -56,7 +56,7 @@ class TestConfigureSqlitePerformance:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings.sqlite_wal_mode = False
 
             configure_sqlite_performance(mock_connection, None)
@@ -72,7 +72,7 @@ class TestConfigureSqlitePerformance:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        with patch("backend.src.database.connection.config.settings", None):
+        with patch("mimir.database.connection.config.settings", None):
             configure_sqlite_performance(mock_connection, None)
 
             # Vérifier que les optimisations de base sont appliquées
@@ -104,9 +104,9 @@ class TestDatabaseManager:
         assert manager1 is manager2
         assert isinstance(manager1, DatabaseManager)
 
-    @patch("backend.src.database.connection.create_engine")
-    @patch("backend.src.database.connection.sessionmaker")
-    @patch("backend.src.database.connection.event.listen")
+    @patch("mimir.database.connection.create_engine")
+    @patch("mimir.database.connection.sessionmaker")
+    @patch("mimir.database.connection.event.listen")
     def test_initialize_database_success(self, mock_listen, mock_sessionmaker, mock_create_engine):
         """Test initialisation réussie de la base de données"""
         mock_engine = Mock()
@@ -114,7 +114,7 @@ class TestDatabaseManager:
         mock_session_factory = Mock()
         mock_sessionmaker.return_value = mock_session_factory
 
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings.database_url_sync = "sqlite:///test.db"
 
             DatabaseManager()
@@ -136,7 +136,7 @@ class TestDatabaseManager:
             # Vérifier la création de la session factory
             mock_sessionmaker.assert_called_once()
 
-    @patch("backend.src.database.connection.create_engine")
+    @patch("mimir.database.connection.create_engine")
     def test_initialize_database_failure(self, mock_create_engine):
         """Test échec d'initialisation de la base de données"""
         mock_create_engine.side_effect = Exception("Database connection failed")
@@ -203,7 +203,7 @@ class TestDatabaseManager:
             mock_session.rollback.assert_called_once()
             mock_session.close.assert_called_once()
 
-    @patch("backend.src.database.connection.Base.metadata.create_all")
+    @patch("mimir.database.connection.Base.metadata.create_all")
     def test_create_tables_success(self, mock_create_all):
         """Test création réussie des tables"""
         manager = DatabaseManager()
@@ -214,7 +214,7 @@ class TestDatabaseManager:
 
             mock_create_all.assert_called_once_with(bind=mock_engine)
 
-    @patch("backend.src.database.connection.Base.metadata.create_all")
+    @patch("mimir.database.connection.Base.metadata.create_all")
     def test_create_tables_failure(self, mock_create_all):
         """Test échec de création des tables"""
         mock_create_all.side_effect = Exception("Table creation failed")
@@ -224,7 +224,7 @@ class TestDatabaseManager:
         with pytest.raises(Exception, match="Table creation failed"):
             manager.create_tables()
 
-    @patch("backend.src.database.connection.Base.metadata.drop_all")
+    @patch("mimir.database.connection.Base.metadata.drop_all")
     def test_drop_tables_success(self, mock_drop_all):
         """Test suppression réussie des tables"""
         manager = DatabaseManager()
@@ -312,7 +312,7 @@ class TestInitializationFunctions:
         """Test initialisation réussie de la base de données"""
         mock_health_check.return_value = True
 
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings._ensure_directories = Mock()
 
             init_database()
@@ -327,7 +327,7 @@ class TestInitializationFunctions:
         """Test initialisation avec échec du health check"""
         mock_health_check.return_value = False
 
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings._ensure_directories = Mock()
 
             with pytest.raises(RuntimeError, match="Database health check failed"):
@@ -336,7 +336,7 @@ class TestInitializationFunctions:
     def test_init_database_no_settings(self):
         """Test initialisation sans settings configuré"""
         with (
-            patch("backend.src.database.connection.config.settings", None),
+            patch("mimir.database.connection.config.settings", None),
             patch.object(db_manager, "create_tables"),
             patch.object(db_manager, "health_check", return_value=True),
         ):
@@ -347,7 +347,7 @@ class TestInitializationFunctions:
     @patch.object(db_manager, "create_tables")
     def test_reset_database_success(self, mock_create_tables, mock_drop_tables):
         """Test reset réussi de la base de données"""
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings.is_production = False
 
             reset_database()
@@ -357,7 +357,7 @@ class TestInitializationFunctions:
 
     def test_reset_database_production_protection(self):
         """Test protection contre reset en production"""
-        with patch("backend.src.database.connection.config.settings") as mock_settings:
+        with patch("mimir.database.connection.config.settings") as mock_settings:
             mock_settings.is_production = True
 
             with pytest.raises(RuntimeError, match="Database reset not allowed in production"):
@@ -366,7 +366,7 @@ class TestInitializationFunctions:
     def test_reset_database_no_settings(self):
         """Test reset sans settings configuré"""
         with (
-            patch("backend.src.database.connection.config.settings", None),
+            patch("mimir.database.connection.config.settings", None),
             patch.object(db_manager, "drop_tables"),
             patch.object(db_manager, "create_tables"),
         ):

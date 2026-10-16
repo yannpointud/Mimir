@@ -5,7 +5,7 @@ Tests pour les dépendances FastAPI.
 import pytest
 from unittest.mock import Mock, patch
 
-from src.api.dependencies import (
+from mimir.api.dependencies import (
     get_llm_service,
     get_vector_store,
     get_ingestion_processor,
@@ -18,12 +18,12 @@ class TestLLMServiceSingleton:
 
     def setup_method(self):
         """Reset du singleton avant chaque test."""
-        import src.api.dependencies
+        import mimir.api.dependencies
 
-        src.api.dependencies._llm_service = None
+        mimir.api.dependencies._llm_service = None
 
-    @patch("src.api.dependencies.settings")
-    @patch("src.api.dependencies.MistralAPIService")
+    @patch("mimir.api.dependencies.settings")
+    @patch("mimir.api.dependencies.MistralAPIService")
     def test_get_llm_service_first_call(self, mock_mistral_class, mock_settings):
         """Test première création du service LLM."""
         mock_settings.mistral_api_key = "test_key"
@@ -44,8 +44,8 @@ class TestLLMServiceSingleton:
             retry_delay=1.0,
         )
 
-    @patch("src.api.dependencies.settings")
-    @patch("src.api.dependencies.MistralAPIService")
+    @patch("mimir.api.dependencies.settings")
+    @patch("mimir.api.dependencies.MistralAPIService")
     def test_get_llm_service_singleton_behavior(self, mock_mistral_class, mock_settings):
         """Test comportement singleton - même instance retournée."""
         mock_service_instance = Mock()
@@ -67,12 +67,12 @@ class TestVectorStoreSingleton:
 
     def setup_method(self):
         """Reset du singleton avant chaque test."""
-        import src.api.dependencies
+        import mimir.api.dependencies
 
-        src.api.dependencies._vector_store = None
+        mimir.api.dependencies._vector_store = None
 
-    @patch("src.api.dependencies.settings")
-    @patch("src.api.dependencies.FaissVectorStore")
+    @patch("mimir.api.dependencies.settings")
+    @patch("mimir.api.dependencies.FaissVectorStore")
     def test_get_vector_store_first_call(self, mock_faiss_class, mock_settings):
         """Test première création du vector store."""
         mock_settings.embedding_dimension = 768
@@ -94,8 +94,8 @@ class TestVectorStoreSingleton:
             index_type="FlatL2",
         )
 
-    @patch("src.api.dependencies.settings")
-    @patch("src.api.dependencies.FaissVectorStore")
+    @patch("mimir.api.dependencies.settings")
+    @patch("mimir.api.dependencies.FaissVectorStore")
     def test_get_vector_store_singleton_behavior(self, mock_faiss_class, mock_settings):
         """Test comportement singleton du vector store."""
         mock_store_instance = Mock()
@@ -117,9 +117,9 @@ class TestIngestionProcessorManagement:
 
     def setup_method(self):
         """Reset du processeur avant chaque test."""
-        import src.api.dependencies
+        import mimir.api.dependencies
 
-        src.api.dependencies._ingestion_processor = None
+        mimir.api.dependencies._ingestion_processor = None
 
     def test_get_ingestion_processor_not_initialized(self):
         """Test erreur quand processeur non initialisé."""

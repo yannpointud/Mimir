@@ -43,7 +43,7 @@ Négatives
 - Les échantillons sont petits (40 ou 60 questions, un seul run par configuration). Les résultats valent pour le corpus de test, pas pour un corpus de production, et la stabilité d'un run à l'autre n'est pas mesurée.
 - Les runs sont longs (exécution en série) et coûteux en tokens.
 - Depuis que `hybrid_search_enabled` vaut `True` par défaut, `run_pipeline.py --retrieval-mode dense` ne mesure le chemin dense que si `HYBRID_SEARCH_ENABLED=false` est défini (environnement ou `.env`) : sinon il rejoue le mode hybride.
-- `rerank_adoption_decision.md` cite des fichiers de résultats (`rerank_*.json`) absents de `results/`, et aucun code de reranking n'est présent dans `backend/src` : ses chiffres ne sont pas vérifiables dans le dépôt.
+- `rerank_adoption_decision.md` cite des fichiers de résultats (`rerank_*.json`) absents de `results/`, et aucun code de reranking n'est présent dans `backend/mimir` : ses chiffres ne sont pas vérifiables dans le dépôt.
 
 ## Où dans le code
 
@@ -52,4 +52,4 @@ Négatives
 - `scripts/ragas_eval/golden_set_schema.py` : `GoldenSetEntry`, `load_golden_set`, `validate_golden_set`, `ADVERSARIAL_REFERENCE`
 - `scripts/ragas_eval/generate_golden_set.py`, `exact_term_check.py`, `calibrate_rrf_threshold.py`, `measure_chunking.py`
 - `scripts/ragas_eval/requirements-ragas.txt` ; résultats dans `scripts/ragas_eval/results/`
-- `backend/src/services/rag_service.py` : `RagService.answer_stream` (point d'entrée commun à l'API et à l'évaluation)
+- `backend/mimir/services/rag_service.py` : `RagService.answer_stream` (point d'entrée commun à l'API et à l'évaluation)

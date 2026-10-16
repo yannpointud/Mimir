@@ -3,8 +3,8 @@ Tests unitaires pour le chunking de texte intelligent
 """
 
 import pytest
-from src.ingestion.chunking import ChunkingStrategy, ChunkingConfig
-from src.ingestion.extractors import MarkdownExtractor
+from mimir.ingestion.chunking import ChunkingStrategy, ChunkingConfig
+from mimir.ingestion.extractors import MarkdownExtractor
 
 
 class TestChunkingConfig:
@@ -516,7 +516,7 @@ class TestSectionTitleThreadingIntoMetadata:
 
     def _new_processor(self):
         # Bypass __init__ (heavy deps): _create_chunks uses only its arguments.
-        from src.ingestion.processor import IngestionProcessor
+        from mimir.ingestion.processor import IngestionProcessor
 
         return IngestionProcessor.__new__(IngestionProcessor)
 
@@ -534,7 +534,7 @@ class TestSectionTitleThreadingIntoMetadata:
                 "section_title": "Section A",
             }
         ]
-        result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "src.md", {})
+        result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "mimir.md", {})
 
         assert len(result) == 1
         assert result[0].metadata["section_title"] == "Section A"
@@ -553,7 +553,7 @@ class TestSectionTitleThreadingIntoMetadata:
                 "char_count": 11,
             }
         ]
-        result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "src.md", {})
+        result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "mimir.md", {})
 
         assert len(result) == 1
         assert result[0].metadata.get("section_title") is None

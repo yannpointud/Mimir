@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from fastapi import HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
-from backend.src.auth.middleware import (
+from mimir.auth.middleware import (
     JWTBearer,
     get_current_user,
     require_admin,
@@ -43,7 +43,7 @@ class TestJWTBearer:
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
+            with patch("mimir.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_payload = {"user_type": "admin", "exp": 1234567890}
                 mock_jwt_handler.verify_token.return_value = mock_payload
 
@@ -84,7 +84,7 @@ class TestJWTBearer:
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
+            with patch("mimir.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_jwt_handler.verify_token.return_value = None
 
                 bearer = JWTBearer()
@@ -119,7 +119,7 @@ class TestJWTBearer:
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
+            with patch("mimir.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_jwt_handler.verify_token.side_effect = Exception("JWT processing error")
 
                 bearer = JWTBearer()
@@ -276,7 +276,7 @@ class TestMiddlewareIntegration:
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
+            with patch("mimir.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_payload = {
                     "user_type": "admin",
                     "sub": "admin123",
@@ -317,7 +317,7 @@ class TestMiddlewareIntegration:
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch("backend.src.auth.middleware.jwt_handler") as mock_jwt_handler:
+            with patch("mimir.auth.middleware.jwt_handler") as mock_jwt_handler:
                 mock_payload = {
                     "user_type": "user",
                     "sub": "user123",
@@ -359,7 +359,7 @@ class TestMiddlewareIntegration:
             )
             mock_parent_call.return_value = mock_credentials
 
-            with patch("backend.src.auth.middleware.logger") as mock_logger:
+            with patch("mimir.auth.middleware.logger") as mock_logger:
                 bearer = JWTBearer()
 
                 with pytest.raises(HTTPException):

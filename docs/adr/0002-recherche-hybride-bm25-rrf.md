@@ -41,11 +41,11 @@ Négatives
 
 ## Où dans le code
 
-- `backend/src/rag_core/fusion.py` : `reciprocal_rank_fusion`
-- `backend/src/rag_core/tokenizer_fr.py` : `light_french_tokenizer`
-- `backend/src/rag_core/implementations/bm25_store.py` : `Bm25LexicalStore` (`rebuild`, `query`, `load`, `_swap_dir_into_place`)
-- `backend/src/rag_core/interfaces.py` : protocole `LexicalIndex`
-- `backend/src/services/rag_service.py` : `_retrieve`, `_hybrid_retrieve`, `_merge_and_attach_rrf_scores`, `_filter_dynamic_sources`, `_calculate_rrf_confidence`
-- `backend/src/config.py` : `hybrid_search_enabled`, `rrf_k`, `rrf_score_threshold`, `bm25_index_path`
-- `backend/src/ingestion/processor.py` : `_maybe_rebuild_bm25_on_drain` ; `backend/src/services/index_maintenance.py` : `remove_document_from_indexes`, `rebuild_indexes` ; `backend/main.py` : `_ensure_bm25_index`
-- `backend/src/api/dependencies.py` : `get_bm25_store`
+- `backend/mimir/rag_core/fusion.py` : `reciprocal_rank_fusion`
+- `backend/mimir/rag_core/tokenizer_fr.py` : `light_french_tokenizer`
+- `backend/mimir/rag_core/implementations/bm25_store.py` : `Bm25LexicalStore` (`rebuild`, `query`, `load`, `_swap_dir_into_place`)
+- `backend/mimir/rag_core/interfaces.py` : protocole `LexicalIndex`
+- `backend/mimir/services/rag_service.py` : `_retrieve`, `_hybrid_retrieve`, `_merge_and_attach_rrf_scores`, `_filter_dynamic_sources`, `_calculate_rrf_confidence`
+- `backend/mimir/config.py` : `hybrid_search_enabled`, `rrf_k`, `rrf_score_threshold`, `bm25_index_path`
+- `backend/mimir/ingestion/processor.py` : `_maybe_rebuild_bm25_on_drain` ; `backend/mimir/services/index_maintenance.py` : `remove_document_from_indexes`, `rebuild_indexes` ; `backend/mimir/main.py` : `_ensure_bm25_index`
+- `backend/mimir/api/dependencies.py` : `get_bm25_store`

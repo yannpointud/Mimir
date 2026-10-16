@@ -10,7 +10,7 @@ guard on the /admin prefix.
 import pytest
 from fastapi.testclient import TestClient
 
-from src.auth.jwt_handler import jwt_handler
+from mimir.auth.jwt_handler import jwt_handler
 
 
 AUDIT_LOG_ROUTE = "/api/v1/admin/audit-log"
@@ -20,7 +20,7 @@ AUDIT_LOG_ROUTE = "/api/v1/admin/audit-log"
 def initialized_database():
     """Ensure database tables exist: TestClient without a `with` block does not
     run the app lifespan, so init_database() is never called."""
-    from src.database.connection import init_database
+    from mimir.database.connection import init_database
 
     init_database()
 
@@ -109,8 +109,8 @@ class TestAdminRouterDefaultDeny:
 
     def test_admin_router_has_router_level_guard(self):
         """The APIRouter itself declares the require_admin dependency."""
-        from src.api.endpoints.admin import router
-        from src.auth.middleware import require_admin
+        from mimir.api.endpoints.admin import router
+        from mimir.auth.middleware import require_admin
 
         guard_callables = [dep.dependency for dep in router.dependencies]
         assert require_admin in guard_callables

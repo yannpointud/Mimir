@@ -6,7 +6,7 @@ Ces tests couvrent la configuration du middleware CORS.
 
 from unittest.mock import Mock, patch
 
-from backend.src.api.middleware.cors import configure_cors_middleware
+from mimir.api.middleware.cors import configure_cors_middleware
 
 
 class TestConfigureCorsMiddleware:
@@ -16,7 +16,7 @@ class TestConfigureCorsMiddleware:
         """Test de configuration CORS en production."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = None  # Pas d'origines personnalisées
 
@@ -48,7 +48,7 @@ class TestConfigureCorsMiddleware:
         """Test de configuration CORS en production avec origines personnalisées."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = "https://example.com,https://app.example.com"
 
@@ -67,7 +67,7 @@ class TestConfigureCorsMiddleware:
         """Test de configuration CORS en développement."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
@@ -91,7 +91,7 @@ class TestConfigureCorsMiddleware:
         """Test des méthodes HTTP autorisées."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
@@ -107,7 +107,7 @@ class TestConfigureCorsMiddleware:
         """Test des headers autorisés."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
@@ -132,7 +132,7 @@ class TestConfigureCorsMiddleware:
         """Test des headers exposés."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
@@ -147,7 +147,7 @@ class TestConfigureCorsMiddleware:
         """Test de la configuration allow_credentials."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
@@ -160,7 +160,7 @@ class TestConfigureCorsMiddleware:
         """Test de la configuration max_age."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app)
@@ -174,8 +174,8 @@ class TestConfigureCorsMiddleware:
         mock_app = Mock()
 
         with (
-            patch("backend.src.api.middleware.cors.settings") as mock_settings,
-            patch("backend.src.api.middleware.cors.logger") as mock_logger,
+            patch("mimir.api.middleware.cors.settings") as mock_settings,
+            patch("mimir.api.middleware.cors.logger") as mock_logger,
         ):
             mock_settings.is_production = True
             mock_settings.allowed_origins = None
@@ -193,8 +193,8 @@ class TestConfigureCorsMiddleware:
         mock_app = Mock()
 
         with (
-            patch("backend.src.api.middleware.cors.settings") as mock_settings,
-            patch("backend.src.api.middleware.cors.logger") as mock_logger,
+            patch("mimir.api.middleware.cors.settings") as mock_settings,
+            patch("mimir.api.middleware.cors.logger") as mock_logger,
         ):
             mock_settings.is_production = False
 
@@ -210,7 +210,7 @@ class TestConfigureCorsMiddleware:
         """Test du parsing des origines personnalisées."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             # Test avec espaces et virgules
             mock_settings.allowed_origins = (
@@ -231,7 +231,7 @@ class TestConfigureCorsMiddleware:
         """Test avec origines personnalisées vides."""
         mock_app = Mock()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = ""  # Chaîne vide
 
@@ -253,7 +253,7 @@ class TestCorsIntegration:
 
         app = FastAPI()
 
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             # La configuration ne devrait pas lever d'erreur
@@ -268,14 +268,14 @@ class TestCorsIntegration:
         mock_app_dev = Mock()
 
         # Configuration production
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = True
             mock_settings.allowed_origins = None
 
             configure_cors_middleware(mock_app_prod)
 
         # Configuration développement
-        with patch("backend.src.api.middleware.cors.settings") as mock_settings:
+        with patch("mimir.api.middleware.cors.settings") as mock_settings:
             mock_settings.is_production = False
 
             configure_cors_middleware(mock_app_dev)

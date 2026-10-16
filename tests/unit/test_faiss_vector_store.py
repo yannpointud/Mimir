@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from pydantic import ValidationError
 
-from backend.src.rag_core.interfaces import (
+from mimir.rag_core.interfaces import (
     AbstractVectorStore,
     Chunk,
     SearchResult,
@@ -21,7 +21,7 @@ from backend.src.rag_core.interfaces import (
     VectorStoreConnectionError,
     VectorStoreOperationError,
 )
-from backend.src.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
 
 
 class TestAbstractVectorStore:
@@ -364,7 +364,7 @@ class TestFaissVectorStore:
 
         with (
             patch(
-                "backend.src.rag_core.implementations.faiss_store.os.replace",
+                "mimir.rag_core.implementations.faiss_store.os.replace",
                 side_effect=flaky_replace,
             ),
             pytest.raises(VectorStoreConnectionError),

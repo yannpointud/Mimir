@@ -16,11 +16,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from src import config as config_module
-from src.auth.jwt_handler import jwt_handler
-from src.database.connection import db_manager
-from src.database.models import Base, LlmBudgetLedger
-from src.database.repository import UsageRepository
+from mimir import config as config_module
+from mimir.auth.jwt_handler import jwt_handler
+from mimir.database.connection import db_manager
+from mimir.database.models import Base, LlmBudgetLedger
+from mimir.database.repository import UsageRepository
 
 
 USAGE_ROUTE = "/api/v1/admin/usage"

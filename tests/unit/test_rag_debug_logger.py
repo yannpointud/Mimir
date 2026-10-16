@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.monitoring.rag_debug_logger import RagDebugService, _make_json_serializable
+from mimir.monitoring.rag_debug_logger import RagDebugService, _make_json_serializable
 
 
 class TestMakeJsonSerializable:
@@ -52,7 +52,7 @@ class TestRagDebugService:
     @pytest.fixture
     def debug_service(self):
         """Fixture pour créer un service de debug"""
-        with patch("src.monitoring.rag_debug_logger.Path.mkdir"):
+        with patch("mimir.monitoring.rag_debug_logger.Path.mkdir"):
             service = RagDebugService()
             return service
 

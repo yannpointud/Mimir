@@ -54,8 +54,8 @@ def _record(env, response) -> dict[str, Any]:
 
 
 def _repo_dependency(env, repo_factory_name: str, failing: Iterable[str]):
-    from src.api import dependencies
-    from src.database.connection import db_manager
+    from mimir.api import dependencies
+    from mimir.database.connection import db_manager
 
     real_factory = getattr(dependencies, repo_factory_name)
     sessions = []
@@ -69,7 +69,7 @@ def _repo_dependency(env, repo_factory_name: str, failing: Iterable[str]):
 
 
 def test_failure_responses(oracle_env):
-    from src.api import dependencies
+    from mimir.api import dependencies
 
     env = oracle_env
     client = env.client

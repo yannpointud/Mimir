@@ -9,14 +9,14 @@ import time  # noqa: F401
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock  # noqa: F401
 
-from src.monitoring.logger import (
+from mimir.monitoring.logger import (
     setup_logger,
     log_ingestion_event,
     log_search_query,
     log_api_request,
 )
-from src.llm_interface.implementations.mistral_api import MistralAPIService
-from src.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.llm_interface.implementations.mistral_api import MistralAPIService
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 
 
 class TestLoggingIntegration:
@@ -67,7 +67,7 @@ class TestLoggingIntegration:
     def test_faiss_store_logging(self, temp_log_dir):
         """Test du logging dans FaissVectorStore"""
         import numpy as np
-        from src.rag_core.interfaces import Chunk
+        from mimir.rag_core.interfaces import Chunk
 
         # Créer un store FAISS temporaire
         index_path = temp_log_dir / "test.index"
@@ -117,8 +117,8 @@ class TestLoggingIntegration:
 
     def test_ingestion_pipeline_logging(self, temp_log_dir):
         """Test du logging dans le pipeline d'ingestion"""
-        from src.ingestion.extractors import ExtractorFactory
-        from src.ingestion.chunking import ChunkingStrategy
+        from mimir.ingestion.extractors import ExtractorFactory
+        from mimir.ingestion.chunking import ChunkingStrategy
 
         # Créer un fichier de test
         test_file = temp_log_dir / "logging_test.txt"
@@ -206,8 +206,8 @@ class TestJalon2AcceptanceCriteria:
         assert faiss_store.dimension == 128
 
         # 3. Ingestion Components
-        from src.ingestion.extractors import ExtractorFactory
-        from src.ingestion.chunking import ChunkingStrategy
+        from mimir.ingestion.extractors import ExtractorFactory
+        from mimir.ingestion.chunking import ChunkingStrategy
 
         extractor_factory = ExtractorFactory()
         supported_extensions = extractor_factory.get_supported_extensions()
@@ -222,7 +222,7 @@ class TestJalon2AcceptanceCriteria:
 
     def test_jalon2_text_extraction_workflow(self, temp_workspace):
         """Critère: Le système peut extraire du texte des formats supportés"""
-        from src.ingestion.extractors import ExtractorFactory
+        from mimir.ingestion.extractors import ExtractorFactory
 
         factory = ExtractorFactory()
 
@@ -245,7 +245,7 @@ class TestJalon2AcceptanceCriteria:
 
     def test_jalon2_chunking_workflow(self, temp_workspace):
         """Critère: Le système peut découper intelligemment les textes"""
-        from src.ingestion.chunking import ChunkingStrategy, ChunkingConfig
+        from mimir.ingestion.chunking import ChunkingStrategy, ChunkingConfig
 
         # Texte assez long pour nécessiter plusieurs chunks (doit dépasser max_chunk_size de 3000)
         long_text = "This is a test document. " * 150  # ~3750 caractères
@@ -274,7 +274,7 @@ class TestJalon2AcceptanceCriteria:
     def test_jalon2_vector_storage_workflow(self, temp_workspace):
         """Critère: Le système peut stocker et rechercher des vecteurs"""
         import numpy as np
-        from src.rag_core.interfaces import Chunk
+        from mimir.rag_core.interfaces import Chunk
 
         # Créer un store FAISS
         index_path = temp_workspace / "workflow.index"
@@ -362,9 +362,9 @@ class TestJalon2AcceptanceCriteria:
     def test_jalon2_end_to_end_pipeline(self, temp_workspace):
         """Test d'acceptation complet du pipeline Jalon 2"""
         import numpy as np
-        from src.ingestion.extractors import ExtractorFactory
-        from src.ingestion.chunking import ChunkingStrategy
-        from src.rag_core.interfaces import Chunk
+        from mimir.ingestion.extractors import ExtractorFactory
+        from mimir.ingestion.chunking import ChunkingStrategy
+        from mimir.rag_core.interfaces import Chunk
 
         # 1. Préparation des données
         test_document = temp_workspace / "end_to_end_test.txt"

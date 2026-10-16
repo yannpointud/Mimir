@@ -12,7 +12,7 @@ import json
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
-from src.llm_interface.implementations.mistral_api import MistralAPIService
+from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 
 
 @pytest.fixture

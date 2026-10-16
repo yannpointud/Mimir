@@ -296,7 +296,7 @@ def test_admin_responses(oracle_env):
     admin = env.admin_headers
     results = {}
 
-    from src.cache.lru_cache import cache_service, chat_cache_service
+    from mimir.cache.lru_cache import cache_service, chat_cache_service
 
     cache_service.invalidate_all()
     chat_cache_service.invalidate_all()

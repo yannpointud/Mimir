@@ -22,7 +22,7 @@ import time
 import httpx
 import pytest
 
-from src.api.dependencies import get_vector_store
+from mimir.api.dependencies import get_vector_store
 
 # Response threshold: /health must answer well before the simulated 1s FAISS
 # operation completes. 300ms leaves generous margin for CI jitter while still

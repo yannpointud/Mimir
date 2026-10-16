@@ -38,15 +38,7 @@ from pathlib import Path
 from typing import Any
 from collections.abc import Sequence
 
-# sys.path bootstrap (same discipline as generate_golden_set.py): make the
-# project root and the backend package importable whether this file is run as a
-# script or imported as the package module (unit tests import the pure helper).
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent.parent
-_BACKEND_DIR = _PROJECT_ROOT / "backend"
-for _path in (_PROJECT_ROOT, _BACKEND_DIR):
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
 
 # Mistral free-tier rate limit is ~1 request/second. Throttle the query loop
 # below this ceiling so a real run never hits HTTP 429. This is on TOP of the
@@ -233,7 +225,7 @@ def _dense_document_ids(question: str, embedding, vector_store, settings) -> lis
     sources x2, then ``_filter_dynamic_sources(mode="dense")``) so the collected
     document_ids match what the live dense pipeline would surface.
     """
-    from src.services.rag_service import _filter_dynamic_sources
+    from mimir.services.rag_service import _filter_dynamic_sources
 
     search_results = vector_store.query(
         vector=embedding,
@@ -253,12 +245,12 @@ def _hybrid_document_ids(question: str, embedding, vector_store, bm25_store, set
     without the generation step, so the collected document_ids match the live
     hybrid pipeline's sources.
     """
-    from src.services.rag_service import (
+    from mimir.services.rag_service import (
         _HYBRID_POOL_SIZE,
         _filter_dynamic_sources,
         _merge_and_attach_rrf_scores,
     )
-    from src.rag_core.fusion import reciprocal_rank_fusion
+    from mimir.rag_core.fusion import reciprocal_rank_fusion
 
     dense_pool = vector_store.query(
         vector=embedding,
@@ -346,8 +338,8 @@ def main(argv: list[str] | None = None) -> int:
     # Deferred imports: pulling these at module top would drag the backend
     # service stack in for a bare --help. Providers build the same singletons
     # the API uses.
-    from src.config import settings
-    from src.api.dependencies import (
+    from mimir.config import settings
+    from mimir.api.dependencies import (
         get_budget_guard,
         get_bm25_store,
         get_llm_service,

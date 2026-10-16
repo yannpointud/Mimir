@@ -81,9 +81,9 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 
 ```
 backend/
-├── main.py                    # Point d'entrée FastAPI
-├── scripts/init_db.py         # Initialisation de la base
-└── src/
+├── alembic.ini                # Migrations Alembic
+└── mimir/
+    ├── main.py                # Point d'entrée FastAPI
     ├── api/
     │   ├── endpoints/         # Routes REST (chat, documents, admin, auth, health, logs)
     │   ├── middleware/        # CORS, rate limiting
@@ -157,7 +157,7 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 
 | Périmètre | Fichiers | Lignes de code |
 | --- | ---: | ---: |
-| Backend : `backend/src`, `backend/main.py`, `backend/scripts` (Python) | 77 | 9 484 |
+| Backend : `backend/mimir`, `backend/mimir/main.py`, `scripts` (Python) | 77 | 9 484 |
 | Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 39 | 5 152 |
 | **Code applicatif** | **116** | **14 636** |
 | Tests backend : `tests/` (Python) | 87 | 14 167 |
@@ -166,7 +166,7 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 | Outillage : `scripts/` (Python, Bash) | 16 | 2 013 |
 
 ```bash
-pygount --format=summary --suffix=py backend/src backend/main.py backend/scripts
+pygount --format=summary --suffix=py backend/mimir scripts
 pygount --format=summary --merge-embedded-languages --folders-to-skip='...,test' \
   --names-to-skip='...,*.test.js,*.test.jsx' frontend/src
 pygount --format=summary --suffix=py tests
@@ -199,13 +199,15 @@ source venv/bin/activate  # Linux/Mac
 pip install -r ../requirements-dev.txt
 # ou, versions et hachages figés :
 # pip install --require-hashes -r ../requirements-dev.lock
+# Installer le package mimir en mode éditable
+pip install --no-deps -e ..
 
 # Créer le fichier .env
 cp .env.example .env
 # Éditer .env : MISTRAL_API_KEY, JWT_SECRET_KEY et le mot de passe admin (voir Configuration)
 
 # Lancer le serveur
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn mimir.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 #### 2. Frontend
@@ -364,16 +366,16 @@ python -m pytest tests/performance/ -v
 cd frontend && npx vitest run
 ```
 
-La couverture de `backend/src` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
+La couverture de `backend/mimir` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
 
-La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
+La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
 
 Les tests de caractérisation (`tests/oracle/`) figent le comportement observable dans des instantanés JSON : contrat OpenAPI, réponses JSON, événements SSE, classement de la recherche et découpage en chunks. Ils se régénèrent avec `ORACLE_UPDATE=1 pytest tests/oracle`, uniquement pour un changement de comportement voulu, en relisant le diff.
 
 ## 🔍 Qualité et CI
 
 - **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90 ; complexité cyclomatique maximale 15).
-- **Typage** : mypy en mode normal sur `backend/src` (`mypy backend/src`), sans erreur.
+- **Typage** : mypy en mode normal sur `backend/mimir` (`mypy backend/mimir`), sans erreur.
 - **Tests** : pytest 9 (pytest-asyncio, pytest-cov), vitest côté frontend.
 - **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.lock`, sans exclusion.
 - **Mesures ponctuelles** : radon (complexité), pygount (lignes de code), mutmut (tests de mutation de `rag_core/fusion.py`, `ingestion/chunking.py` et `rag_core/tokenizer_fr.py`, configuré dans `pyproject.toml`).

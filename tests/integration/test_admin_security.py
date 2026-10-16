@@ -9,9 +9,9 @@ masked values resubmitted by the frontend.
 import pytest
 from fastapi.testclient import TestClient
 
-from src.auth.jwt_handler import jwt_handler
-from src.config import settings
-from src.shared.constants import MASKED_VALUE
+from mimir.auth.jwt_handler import jwt_handler
+from mimir.config import settings
+from mimir.shared.constants import MASKED_VALUE
 
 
 CONFIG_ROUTES = [
@@ -24,7 +24,7 @@ CONFIG_ROUTES = [
 def initialized_database():
     """Ensure database tables exist: TestClient without a `with` block does not
     run the app lifespan, so init_database() is never called."""
-    from src.database.connection import init_database
+    from mimir.database.connection import init_database
 
     init_database()
 

@@ -5,18 +5,13 @@ Common fixtures and test configuration
 
 import pytest
 import tempfile
-import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import sys
 
-# Add backend to PATH
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../backend"))
-
-from src.config import Settings
-from src.database.models import Base
-from src.database.repository import create_repositories
+from mimir.config import Settings
+from mimir.database.models import Base
+from mimir.database.repository import create_repositories
 
 
 @pytest.fixture(scope="session")
@@ -124,7 +119,7 @@ def disable_rate_limiter():
     Teardown restores the original enabled flag and resets the in-memory
     counters so no state leaks between tests.
     """
-    from src.api.middleware.rate_limit import limiter
+    from mimir.api.middleware.rate_limit import limiter
 
     original_enabled = limiter.enabled
     limiter.enabled = False
@@ -139,7 +134,7 @@ def disable_rate_limiter():
 @pytest.fixture
 def test_app():
     """Test FastAPI application"""
-    from src.config import settings
+    from mimir.config import settings
 
     # Override settings for tests
     original_values = {}
@@ -150,7 +145,7 @@ def test_app():
         original_values[key] = getattr(settings, key)
         setattr(settings, key, value)
 
-    from main import app
+    from mimir.main import app
 
     yield app
 

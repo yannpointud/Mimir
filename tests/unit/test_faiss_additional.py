@@ -11,8 +11,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from backend.src.rag_core.implementations.faiss_store import FaissVectorStore
-from backend.src.rag_core.interfaces import Chunk, VectorStoreOperationError
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk, VectorStoreOperationError
 
 
 class TestFaissVectorStoreAdditional:
@@ -323,7 +323,7 @@ class TestBackupRotation:
         # Rotate with max_backups=2
         mock_settings = Mock()
         mock_settings.faiss_max_backups = 2
-        with patch("backend.src.config.settings", mock_settings):
+        with patch("mimir.config.settings", mock_settings):
             store._rotate_backups()
 
         assert len(list(temp_dir.glob("index*.backup_*"))) == 2
@@ -347,7 +347,7 @@ class TestBackupRotation:
 
         mock_settings = Mock()
         mock_settings.faiss_max_backups = 2
-        with patch("backend.src.config.settings", mock_settings):
+        with patch("mimir.config.settings", mock_settings):
             store._rotate_backups()
 
         remaining = sorted(temp_dir.glob("index*.backup_*"), key=lambda f: f.stat().st_mtime)
@@ -366,7 +366,7 @@ class TestBackupRotation:
 
         mock_settings = Mock()
         mock_settings.faiss_max_backups = 4
-        with patch("backend.src.config.settings", mock_settings):
+        with patch("mimir.config.settings", mock_settings):
             store._rotate_backups()
 
         assert len(list(temp_dir.glob("index*.backup_*"))) == 2
@@ -376,7 +376,7 @@ class TestBackupRotation:
         """Rotation failure should be logged but not propagate"""
         store, _ = store_with_data
 
-        with patch("backend.src.config.settings", None):
+        with patch("mimir.config.settings", None):
             # settings=None triggers AttributeError, should not propagate
             store._rotate_backups()
 

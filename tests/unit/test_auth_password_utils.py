@@ -5,7 +5,7 @@ Ces tests couvrent toutes les fonctions de validation et génération de mots de
 """
 
 import pytest
-from backend.src.auth.password_utils import (
+from mimir.auth.password_utils import (
     validate_password_strength,
     has_sequential_chars,
     calculate_password_strength,

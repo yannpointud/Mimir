@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 from datetime import datetime
 
-from backend.src.shared.models import (
+from mimir.shared.models import (
     PaginationModel,
     BaseResponse,
     DocumentResponse,
@@ -144,7 +144,7 @@ class TestDocumentModels:
 
     def test_validate_filename_valid(self):
         """Test validation de nom de fichier valide"""
-        from src.shared.models import validate_filename
+        from mimir.shared.models import validate_filename
 
         assert validate_filename("test.pdf") is True
         assert validate_filename("document_2024.txt") is True
@@ -152,21 +152,21 @@ class TestDocumentModels:
 
     def test_validate_filename_absolute_path(self):
         """Test validation avec chemin absolu - doit échouer"""
-        from src.shared.models import validate_filename
+        from mimir.shared.models import validate_filename
 
         assert validate_filename("/absolute/path/file.pdf") is False
         assert validate_filename("C:\\Windows\\file.txt") is False
 
     def test_validate_filename_relative_path(self):
         """Test validation avec chemin relatif - doit échouer"""
-        from src.shared.models import validate_filename
+        from mimir.shared.models import validate_filename
 
         assert validate_filename("../../../etc/passwd") is False
         assert validate_filename("subdir/../file.txt") is False
 
     def test_validate_filename_dangerous_chars(self):
         """Test validation avec caractères dangereux"""
-        from src.shared.models import validate_filename
+        from mimir.shared.models import validate_filename
 
         assert validate_filename("file<script>.pdf") is False
         assert validate_filename("file|pipe.txt") is False
@@ -174,7 +174,7 @@ class TestDocumentModels:
 
     def test_validate_filename_length(self):
         """Test validation de la longueur du nom"""
-        from src.shared.models import validate_filename
+        from mimir.shared.models import validate_filename
 
         # Nom vide
         assert validate_filename("") is False

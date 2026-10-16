@@ -19,7 +19,7 @@ Design constraints (Mistral free tier = 1 request/second HARD):
 Retrieval mode:
   - ``--retrieval-mode dense`` (default) measures the frozen dense-only baseline.
   - ``--retrieval-mode hybrid`` sets ``HYBRID_SEARCH_ENABLED`` in the environment
-    BEFORE ``src.config`` is imported, so the same harness can later score the
+    BEFORE ``mimir.config`` is imported, so the same harness can later score the
     hybrid path without a code change. The baseline itself is dense.
 
 Running the real answering pass consumes Mistral tokens and is a separate,
@@ -35,21 +35,12 @@ from pathlib import Path
 from typing import Any
 from collections.abc import Awaitable, Callable, Sequence
 
-# sys.path bootstrap (same discipline as scripts/backup_sqlite.py and
-# generate_golden_set.py): make the project root and the backend package
-# importable whether this file is run as a script or imported as the package
-# module scripts.ragas_eval.run_pipeline (unit tests).
-_SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent.parent
-_BACKEND_DIR = _PROJECT_ROOT / "backend"
-for _path in (_PROJECT_ROOT, _BACKEND_DIR):
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
-
-from scripts.ragas_eval.golden_set_schema import (  # noqa: E402
+from scripts.ragas_eval.golden_set_schema import (
     GoldenSetEntry,
     load_golden_set,
 )
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
 
 # Mistral free-tier rate limit is ~1 request/second. Throttle the answer loop
 # below this ceiling so a real run never hits HTTP 429. This is ON TOP of the
@@ -250,13 +241,13 @@ def main(argv: list[str] | None = None) -> int:
     key from the environment) are deferred past argument parsing so ``--help``
     never imports FastAPI nor touches any secret. When ``--retrieval-mode
     hybrid`` is requested, ``HYBRID_SEARCH_ENABLED`` is exported BEFORE
-    ``src.config`` is imported so the flag is picked up by pydantic settings.
+    ``mimir.config`` is imported so the flag is picked up by pydantic settings.
     """
     args = _build_arg_parser().parse_args(argv)
 
     import os
 
-    # Toggle the hybrid flag BEFORE importing src.config: pydantic BaseSettings
+    # Toggle the hybrid flag BEFORE importing mimir.config: pydantic BaseSettings
     # reads it at import time (case-insensitive). Default dense leaves the env
     # untouched so the frozen baseline is measured on the dense-only path.
     if args.retrieval_mode == "hybrid":
@@ -264,15 +255,15 @@ def main(argv: list[str] | None = None) -> int:
 
     # Deferred imports: pulling these at module top would drag FastAPI in for a
     # bare --help. Providers build the same singletons the API uses.
-    from src.api.dependencies import (  # noqa: E402
+    from mimir.api.dependencies import (
         get_budget_guard,
         get_bm25_store,
         get_rag_service,
         get_vector_store,
     )
-    from src.config import settings  # noqa: E402
-    from src.database.connection import db_manager  # noqa: E402
-    from src.database.repository import DocumentRepository  # noqa: E402
+    from mimir.config import settings
+    from mimir.database.connection import db_manager
+    from mimir.database.repository import DocumentRepository
 
     entries = load_golden_set(args.golden_set)
     if args.limit is not None:

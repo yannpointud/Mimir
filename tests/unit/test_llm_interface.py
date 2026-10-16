@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import Mock, patch, AsyncMock
 import aiohttp
 
-from src.llm_interface.interfaces import (
+from mimir.llm_interface.interfaces import (
     AbstractLLMService,
     GenerationResponse,
     EmbeddingResponse,
@@ -15,7 +15,7 @@ from src.llm_interface.interfaces import (
     LLMRateLimitError,
     LLMInvalidRequestError,
 )
-from src.llm_interface.implementations.mistral_api import MistralAPIService
+from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 
 
 class TestAbstractLLMService:

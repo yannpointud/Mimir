@@ -10,7 +10,7 @@ for the anti-TOCTOU proof, which needs independent connections instead).
 
 from datetime import datetime, timedelta
 
-from src.database.models import LlmUsage
+from mimir.database.models import LlmUsage
 
 
 class TestCreateUsageEntryAndTodayByModel:

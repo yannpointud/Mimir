@@ -15,10 +15,10 @@ import pytest
 from unittest.mock import Mock, AsyncMock
 from fastapi.testclient import TestClient
 
-from src.api.middleware.rate_limit import limiter
-from src.auth.jwt_handler import jwt_handler
-from src.config import settings
-from src.llm_interface.interfaces import EmbeddingResponse
+from mimir.api.middleware.rate_limit import limiter
+from mimir.auth.jwt_handler import jwt_handler
+from mimir.config import settings
+from mimir.llm_interface.interfaces import EmbeddingResponse
 
 
 LOGIN_ROUTE = "/api/v1/auth/login"
@@ -32,7 +32,7 @@ BAD_LOGIN_PAYLOAD = {"username": "admin", "password": "wrong-password"}
 def initialized_database():
     """Ensure database tables exist: tests that use TestClient without a
     `with` block never run the app lifespan, so init_database() is needed."""
-    from src.database.connection import init_database
+    from mimir.database.connection import init_database
 
     init_database()
 
@@ -46,7 +46,7 @@ def rate_limited_client():
     disables it and resets again so no state leaks into other tests.
     The `with` block executes the app lifespan (database, services).
     """
-    from main import app
+    from mimir.main import app
 
     limiter.enabled = True
     limiter.reset()
@@ -79,15 +79,15 @@ def mocked_rag():
     vector store. The real budget_guard / usage_tracker / rag_debug / chat_cache
     singletons are kept so the reservation is still settled and the usage row is
     still written."""
-    from main import app
-    from src.api.dependencies import (
+    from mimir.main import app
+    from mimir.api.dependencies import (
         get_rag_service,
         get_rag_debug_service,
         get_budget_guard,
         get_usage_tracker,
         get_chat_cache_service,
     )
-    from src.services.rag_service import RagService
+    from mimir.services.rag_service import RagService
 
     mock_llm = Mock()
     mock_llm.embed = AsyncMock(

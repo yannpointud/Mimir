@@ -32,11 +32,11 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock
 
-from src import config as config_module
-from src.config import settings
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
-from src.llm_interface.interfaces import EmbeddingResponse
+from mimir import config as config_module
+from mimir.config import settings
+from mimir.database.connection import db_manager
+from mimir.database.models import Base, LlmUsage
+from mimir.llm_interface.interfaces import EmbeddingResponse
 
 
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
@@ -157,7 +157,7 @@ def isolated_db_manager():
 def _clear_stream_cache():
     """The ChatCacheService is a process-wide singleton; clear it around every
     test so cache state never leaks across tests."""
-    from src.api.dependencies import get_chat_cache_service
+    from mimir.api.dependencies import get_chat_cache_service
 
     cache = get_chat_cache_service()
     cache.invalidate_all()
@@ -170,7 +170,7 @@ def _clear_stream_cache():
 @pytest.fixture
 def client(isolated_db_manager):
     """TestClient running the real app lifespan against the isolated db."""
-    from main import app
+    from mimir.main import app
 
     with TestClient(app) as test_client:
         yield test_client
@@ -184,15 +184,15 @@ def rag_with_mocks(isolated_db_manager):
     and assert Mistral call counts. Keeps the real budget_guard / usage_tracker
     / rag_debug singletons and the singleton chat cache (shared with the
     route's read)."""
-    from main import app
-    from src.api.dependencies import (
+    from mimir.main import app
+    from mimir.api.dependencies import (
         get_rag_service,
         get_rag_debug_service,
         get_budget_guard,
         get_usage_tracker,
         get_chat_cache_service,
     )
-    from src.services.rag_service import RagService
+    from mimir.services.rag_service import RagService
 
     mock_llm, embed_calls, gen_calls = _make_mock_llm()
 
@@ -321,13 +321,13 @@ class TestStreamCacheAntiPartial:
 
     @pytest.mark.asyncio
     async def test_disconnect_before_done_stores_no_entry(self, isolated_db_manager):
-        from src.api.dependencies import (
+        from mimir.api.dependencies import (
             get_rag_debug_service,
             get_budget_guard,
             get_usage_tracker,
             get_chat_cache_service,
         )
-        from src.services.rag_service import RagService
+        from mimir.services.rag_service import RagService
 
         cache = get_chat_cache_service()
         cache.invalidate_all()

@@ -9,7 +9,7 @@ Covers:
   from a subset (simulating a document delete) that drops the removed chunks.
 
 Fixture style mirrors tests/unit/test_faiss_vector_store.py (tempdir persistence,
-absolute backend.src.* imports, pytest.raises for error paths).
+absolute mimir.* imports, pytest.raises for error paths).
 """
 
 import tempfile
@@ -18,9 +18,9 @@ from pathlib import Path
 
 import pytest
 
-from backend.src.rag_core.tokenizer_fr import light_french_tokenizer
-from backend.src.rag_core.implementations.bm25_store import Bm25LexicalStore
-from backend.src.rag_core.interfaces import VectorStoreOperationError
+from mimir.rag_core.tokenizer_fr import light_french_tokenizer
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.interfaces import VectorStoreOperationError
 
 
 # --------------------------------------------------------------------------- #

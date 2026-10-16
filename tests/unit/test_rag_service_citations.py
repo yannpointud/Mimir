@@ -22,8 +22,8 @@ Mock/synthetic only: no real Mistral call, no real embeddings.
 import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 
-from backend.src.rag_core.interfaces import SearchResult
-from src.services.rag_service import _process_question_with_rag_stream
+from mimir.rag_core.interfaces import SearchResult
+from mimir.services.rag_service import _process_question_with_rag_stream
 
 
 def _sr(chunk_id, document_id, text, source, score):
@@ -135,7 +135,7 @@ class TestStreamCitationEvent:
         captured = {}
         llm.generate_stream = _make_generate_stream(captured)
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
             events = asyncio.run(
                 _drain_stream(
@@ -179,7 +179,7 @@ class TestStreamCitationEvent:
         captured = {}
         llm.generate_stream = _make_generate_stream(captured, chunks=("Aucune source.",))
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
             events = asyncio.run(
                 _drain_stream(
@@ -214,7 +214,7 @@ class TestSystemPromptCitationRule:
     """MIMIR_SYSTEM_PROMPT carries the [N]-citation instruction."""
 
     def test_prompt_instructs_bracket_n_and_forbids_invented_numbers(self):
-        from src.services.rag_service import MIMIR_SYSTEM_PROMPT
+        from mimir.services.rag_service import MIMIR_SYSTEM_PROMPT
 
         assert "[N]" in MIMIR_SYSTEM_PROMPT
         # No-invented-number rule present (French wording per existing prompt).

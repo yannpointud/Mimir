@@ -8,7 +8,7 @@ per-model billing. Zero Mistral calls -- pure function only.
 
 import pytest
 
-from src.cost.pricing import compute_cost_eur
+from mimir.cost.pricing import compute_cost_eur
 
 
 PRICE_TABLE = {

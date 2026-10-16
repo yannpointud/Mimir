@@ -11,7 +11,7 @@ ruff check .
 ruff format --check .
 
 echo "== mypy =="
-mypy backend/src
+mypy backend/mimir
 
 echo "== pytest =="
 pytest

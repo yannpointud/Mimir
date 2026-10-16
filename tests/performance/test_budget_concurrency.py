@@ -25,10 +25,10 @@ from pathlib import Path
 
 import pytest
 
-from src import config as config_module
-from src.database.connection import db_manager
-from src.database.models import Base, LlmBudgetLedger
-from src.database.repository import UsageRepository
+from mimir import config as config_module
+from mimir.database.connection import db_manager
+from mimir.database.models import Base, LlmBudgetLedger
+from mimir.database.repository import UsageRepository
 
 ESTIMATE_EUR = 1.0
 CAP_EUR = 5.0  # affords exactly 5 reservations of ESTIMATE_EUR

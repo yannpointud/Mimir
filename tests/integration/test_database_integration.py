@@ -9,9 +9,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base
-from src.database.repository import AuditLogRepository, ConfigurationRepository, DocumentRepository
-from src.shared.models import DocumentStatus
+from mimir.database.models import Base
+from mimir.database.repository import (
+    AuditLogRepository,
+    ConfigurationRepository,
+    DocumentRepository,
+)
+from mimir.shared.models import DocumentStatus
 
 
 @pytest.fixture

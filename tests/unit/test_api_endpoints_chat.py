@@ -7,7 +7,7 @@ import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from pydantic import ValidationError
 
-from backend.src.api.endpoints.chat import (
+from mimir.api.endpoints.chat import (
     escalate_to_human,
     get_session_history,
     clear_session_history,
@@ -140,8 +140,8 @@ class TestEscalationEndpoint:
         """Mock email service."""
         return AsyncMock()
 
-    @patch("backend.src.api.endpoints.chat._generate_escalation_id")
-    @patch("backend.src.api.endpoints.chat._extract_sources_from_history")
+    @patch("mimir.api.endpoints.chat._generate_escalation_id")
+    @patch("mimir.api.endpoints.chat._extract_sources_from_history")
     def test_escalate_to_human_success(
         self, mock_extract_sources, mock_escalation_id, mock_request, mock_email_service
     ):
@@ -175,7 +175,7 @@ class TestEscalationEndpoint:
         assert "transmise à notre équipe" in result.message
         mock_email_service.send_escalation_email.assert_called_once()
 
-    @patch("backend.src.api.endpoints.chat._generate_escalation_id")
+    @patch("mimir.api.endpoints.chat._generate_escalation_id")
     def test_escalate_to_human_email_failure(
         self, mock_escalation_id, mock_request, mock_email_service
     ):
@@ -213,7 +213,7 @@ class TestEscalationEndpoint:
         escalation_request = EscalationRequest(question="Question complexe")
         current_user = {"sub": "admin", "user_type": "admin"}
 
-        with patch("backend.src.api.endpoints.chat._generate_escalation_id") as mock_id:
+        with patch("mimir.api.endpoints.chat._generate_escalation_id") as mock_id:
             mock_id.return_value = "ESC-20231201-ABC123"
 
             # Call the function
@@ -297,7 +297,7 @@ class TestChatHelperFunctions:
 
     def test_get_client_ip_forwarded(self):
         """Test IP extraction with X-Forwarded-For header."""
-        from backend.src.api.endpoints.chat import _get_client_ip
+        from mimir.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
         mock_request.headers = {"X-Forwarded-For": "192.168.1.100, 10.0.0.1"}
@@ -308,7 +308,7 @@ class TestChatHelperFunctions:
 
     def test_get_client_ip_real_ip(self):
         """Test IP extraction with X-Real-IP header."""
-        from backend.src.api.endpoints.chat import _get_client_ip
+        from mimir.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
         mock_request.headers = {"X-Real-IP": "192.168.1.200"}
@@ -319,7 +319,7 @@ class TestChatHelperFunctions:
 
     def test_get_client_ip_direct(self):
         """Test direct IP extraction."""
-        from backend.src.api.endpoints.chat import _get_client_ip
+        from mimir.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
         mock_request.headers = {}
@@ -330,7 +330,7 @@ class TestChatHelperFunctions:
 
     def test_get_client_ip_no_client(self):
         """Test IP extraction without client."""
-        from backend.src.api.endpoints.chat import _get_client_ip
+        from mimir.api.endpoints.chat import _get_client_ip
 
         mock_request = Mock()
         mock_request.headers = {}
@@ -341,7 +341,7 @@ class TestChatHelperFunctions:
 
     def test_generate_session_id(self):
         """Test session ID generation."""
-        from src.services.chat_stream import generate_session_id
+        from mimir.services.chat_stream import generate_session_id
 
         session_id = generate_session_id("Test question", "127.0.0.1")
 
@@ -350,7 +350,7 @@ class TestChatHelperFunctions:
 
     def test_generate_cache_key(self):
         """Test cache key generation."""
-        from backend.src.api.endpoints.chat import _generate_cache_key
+        from mimir.api.endpoints.chat import _generate_cache_key
 
         cache_key = _generate_cache_key("Test Question")
 
@@ -366,7 +366,7 @@ class TestChatHelperFunctions:
 
     def test_generate_escalation_id(self):
         """Test escalation ID generation."""
-        from backend.src.api.endpoints.chat import _generate_escalation_id
+        from mimir.api.endpoints.chat import _generate_escalation_id
 
         escalation_id = _generate_escalation_id()
 
@@ -376,7 +376,7 @@ class TestChatHelperFunctions:
 
     def test_extract_sources_from_history_with_sources(self):
         """Test source extraction from history with sources."""
-        from backend.src.api.endpoints.chat import _extract_sources_from_history
+        from mimir.api.endpoints.chat import _extract_sources_from_history
 
         chat_history = [
             {"type": "user", "message": "Question"},
@@ -400,7 +400,7 @@ class TestChatHelperFunctions:
 
     def test_extract_sources_from_history_no_sources(self):
         """Test source extraction from history without sources."""
-        from backend.src.api.endpoints.chat import _extract_sources_from_history
+        from mimir.api.endpoints.chat import _extract_sources_from_history
 
         chat_history = [
             {"type": "user", "message": "Question"},
@@ -412,7 +412,7 @@ class TestChatHelperFunctions:
 
     def test_extract_sources_from_history_empty(self):
         """Test source extraction from empty history."""
-        from backend.src.api.endpoints.chat import _extract_sources_from_history
+        from mimir.api.endpoints.chat import _extract_sources_from_history
 
         sources = _extract_sources_from_history([])
         assert sources == []
@@ -421,7 +421,7 @@ class TestChatHelperFunctions:
 class TestChatIntegration:
     """Integration tests for chat endpoints."""
 
-    @patch("backend.src.api.endpoints.chat._generate_escalation_id")
+    @patch("mimir.api.endpoints.chat._generate_escalation_id")
     def test_full_escalation_workflow(self, mock_escalation_id):
         """Test full escalation workflow."""
 

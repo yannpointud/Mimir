@@ -14,9 +14,9 @@ from datetime import datetime
 from unittest.mock import Mock
 
 # System imports
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.interfaces import Chunk
-from src.rag_core.implementations.validation_utils import VectorStoreValidator
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk
+from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
 
 
 class TestCleanupPerformance:

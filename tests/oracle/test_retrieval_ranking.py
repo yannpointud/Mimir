@@ -18,9 +18,9 @@ from typing import Any
 
 import pytest
 
-from src.config import settings
-from src.database.connection import db_manager
-from src.database.repository import DocumentRepository
+from mimir.config import settings
+from mimir.database.connection import db_manager
+from mimir.database.repository import DocumentRepository
 from tests.oracle.harness import QUESTIONS, assert_snapshot, fake_embedding
 
 

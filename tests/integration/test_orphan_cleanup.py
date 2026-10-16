@@ -12,11 +12,11 @@ import numpy as np
 from datetime import datetime
 
 # Imports du système
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.interfaces import Chunk
-from src.rag_core.implementations.validation_utils import VectorStoreValidator
-from src.database.repository import DocumentRepository
-from src.database.models import Document  # noqa: F401
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk
+from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
+from mimir.database.repository import DocumentRepository
+from mimir.database.models import Document  # noqa: F401
 
 
 class TestOrphanCleanupIntegration:
