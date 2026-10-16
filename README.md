@@ -1,6 +1,6 @@
 # Mimir - Chatbot Documentaire d'Entreprise
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.133-teal.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
@@ -25,9 +25,8 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 ### Module Administration
 - Authentification sécurisée (JWT)
 - Upload manuel de documents (PDF, DOCX, TXT, MD)
-- Liste et gestion des documents indexés
+- Liste et gestion des documents indexés (recherche, filtre par statut, tri par colonne)
 - Nettoyage automatique des chunks orphelins (rebuild index)
-- Test de l'email d'escalade (SMTP configuré par variables d'environnement)
 - Changement du mot de passe admin
 - Indicateurs de santé système en temps réel
 - Tableau de bord avec métriques d'utilisation
@@ -156,12 +155,12 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 
 | Périmètre | Fichiers | Lignes de code |
 | --- | ---: | ---: |
-| Backend : `backend/mimir`, `scripts` (Python) | 88 | 9 007 |
-| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 42 | 5 141 |
-| **Code applicatif** | **130** | **14 148** |
-| Tests backend : `tests/` (Python) | 85 | 12 119 |
-| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 16 | 1 475 |
-| **Tests** | **101** | **13 594** |
+| Backend : `backend/mimir`, `scripts` (Python) | 88 | 9 033 |
+| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 42 | 5 182 |
+| **Code applicatif** | **130** | **14 215** |
+| Tests backend : `tests/` (Python) | 86 | 12 218 |
+| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 16 | 1 498 |
+| **Tests** | **102** | **13 716** |
 | Outillage : `scripts/` (Python, Bash) | 16 | 1 963 |
 
 ```bash
@@ -318,9 +317,9 @@ Accédez à l'interface admin via http://localhost:3000/admin et connectez-vous 
 ### 2. Upload de Documents
 
 **Upload manuel :**
-- Naviguez vers "Documents" dans l'admin
-- Cliquez sur "Upload Document"
-- Sélectionnez vos fichiers (PDF, DOCX, TXT, MD)
+- Ouvrez l'onglet « Importer » de l'administration
+- Déposez ou sélectionnez vos fichiers (PDF, DOCX, TXT, MD)
+- Suivez leur indexation dans l'onglet « Documents »
 
 
 ### 3. Chat avec le Bot
@@ -360,7 +359,7 @@ cd frontend && npx vitest run
 
 La couverture de `backend/mimir` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
 
-La suite compte 911 tests pytest (720 unitaires, 147 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 92,17 %, seuil bloquant à 85 % dans `pytest.ini`) et 148 tests vitest (15 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Toute la suite tourne sur des chemins de données temporaires, jamais sur `backend/data/`.
+La suite compte 921 tests pytest (727 unitaires, 150 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 92,18 %, seuil bloquant à 85 % dans `pytest.ini`) et 150 tests vitest (15 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Toute la suite tourne sur des chemins de données temporaires, jamais sur `backend/data/`.
 
 Les tests de caractérisation (`tests/oracle/`) figent le comportement observable dans des instantanés JSON : contrat OpenAPI, réponses JSON, événements SSE, classement de la recherche et découpage en chunks. Ils se régénèrent avec `ORACLE_UPDATE=1 pytest tests/oracle`, uniquement pour un changement de comportement voulu, en relisant le diff.
 
@@ -511,7 +510,7 @@ Les chunks orphelins sont des chunks vectoriels qui existent dans FAISS mais don
 
 **Solution :**
 ```bash
-# Via l'interface admin : bouton "Rebuild Index"
+# Via l'interface admin : onglet « Monitoring », bouton « Reconstruire l'index »
 # Ou via API :
 curl -X POST http://localhost:8000/api/v1/admin/vector-store/rebuild \
   -H "Authorization: Bearer $ADMIN_TOKEN"

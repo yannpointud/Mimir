@@ -10,7 +10,7 @@ Le dossier scripts/ contient les scripts de tests de developpements temporaire
 Tous les commentaires dans le code doivent etres en anglais
 Pour lancer serveur et arreter : 
 start-servers.sh
-stop_servers.sh
+stop-servers.sh
 
 
 ## Stack
@@ -76,13 +76,13 @@ frontend/
 │   ├── services/api.js              # Axios client (all API calls)
 │   ├── hooks/                       # useAuth (auth context + JWT), useDocumentsList (admin documents list)
 │   ├── utils/                       # storage.js, logger.js, auth.js, helpers.js
-│   └── test/                        # vitest tests (148 tests)
+│   └── test/                        # vitest tests (150 tests)
 └── package.json
 
-tests/                               # pytest test suite (911 tests, run from the repo root)
+tests/                               # pytest test suite (921 tests, run from the repo root)
 ├── conftest.py                      # Shared fixtures (temporary data paths for the whole run)
-├── unit/                            # Unit tests (720)
-├── integration/                     # API + workflow tests (147)
+├── unit/                            # Unit tests (727)
+├── integration/                     # API + workflow tests (150)
 ├── oracle/                          # Characterization snapshots (32)
 └── performance/                     # Cleanup, budget and FAISS concurrency tests (12)
 
