@@ -37,6 +37,7 @@ def initialized_database():
     """Ensure database tables exist: tests that use TestClient without a
     `with` block never run the app lifespan, so init_database() is needed."""
     from src.database.connection import init_database
+
     init_database()
 
 
@@ -73,9 +74,11 @@ def test_live_stays_200_when_mistral_down(client):
 def test_ready_200_when_all_dependencies_healthy(client):
     """Readiness returns 200 with status "ready" and an empty unhealthy list
     when every dependency check reports healthy."""
-    with patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())), \
-            patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())), \
-            patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())):
+    with (
+        patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+        patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+        patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+    ):
         response = client.get(READY_ROUTE)
 
     assert response.status_code == 200
@@ -88,9 +91,11 @@ def test_ready_200_when_all_dependencies_healthy(client):
 def test_ready_503_when_mistral_down(client):
     """A Mistral outage (LLM check unhealthy) must fail /ready with 503 and list
     "llm_api" among the unhealthy components."""
-    with patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_unhealthy())), \
-            patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())), \
-            patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())):
+    with (
+        patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_unhealthy())),
+        patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+        patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+    ):
         response = client.get(READY_ROUTE)
 
     assert response.status_code == 503

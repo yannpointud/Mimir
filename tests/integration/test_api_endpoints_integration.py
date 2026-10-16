@@ -88,10 +88,7 @@ class TestAuthenticationIntegration:
         """Test du flow complet de connexion réussie"""
         client = TestClient(test_app)
 
-        login_data = {
-            "username": "admin",
-            "password": "admin123"
-        }
+        login_data = {"username": "admin", "password": "admin123"}
 
         response = client.post("/api/v1/auth/login", json=login_data)
 
@@ -117,23 +114,19 @@ class TestAuthenticationIntegration:
         client = TestClient(test_app)
 
         # Cas 1: Mot de passe incorrect
-        response = client.post("/api/v1/auth/login", json={
-            "username": "admin",
-            "password": "wrong_password"
-        })
+        response = client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "wrong_password"}
+        )
         assert response.status_code == 401
 
         # Cas 2: Username incorrect
-        response = client.post("/api/v1/auth/login", json={
-            "username": "wrong_user",
-            "password": "admin123"
-        })
+        response = client.post(
+            "/api/v1/auth/login", json={"username": "wrong_user", "password": "admin123"}
+        )
         assert response.status_code == 401
 
         # Cas 3: Données manquantes
-        response = client.post("/api/v1/auth/login", json={
-            "username": "admin"
-        })
+        response = client.post("/api/v1/auth/login", json={"username": "admin"})
         assert response.status_code == 422
 
     def test_protected_endpoint_without_auth(self, test_app):
@@ -144,7 +137,7 @@ class TestAuthenticationIntegration:
             ("GET", "/api/v1/admin/system-info"),
             ("GET", "/api/v1/admin/cache/stats"),
             ("GET", "/api/v1/documents/"),
-            ("POST", "/api/v1/admin/cache/clear")
+            ("POST", "/api/v1/admin/cache/clear"),
         ]
 
         for method, endpoint in protected_endpoints:
@@ -166,7 +159,7 @@ class TestChatEndpointIntegration:
         chat_request = {
             "question": "Qu'est-ce que Mimir ?",
             "context_limit": 3,
-            "include_sources": True
+            "include_sources": True,
         }
 
         start_time = time.time()
@@ -194,18 +187,16 @@ class TestChatEndpointIntegration:
         session_id = "test_session_123"
 
         # Première question
-        response1 = client.post("/api/v1/chat/stream", json={
-            "question": "Bonjour",
-            "session_id": session_id
-        })
+        response1 = client.post(
+            "/api/v1/chat/stream", json={"question": "Bonjour", "session_id": session_id}
+        )
         assert response1.status_code == 200
         events1 = _sse_events(response1.text)
 
         # Deuxième question avec même session
-        response2 = client.post("/api/v1/chat/stream", json={
-            "question": "Peux-tu répéter ?",
-            "session_id": session_id
-        })
+        response2 = client.post(
+            "/api/v1/chat/stream", json={"question": "Peux-tu répéter ?", "session_id": session_id}
+        )
         assert response2.status_code == 200
         events2 = _sse_events(response2.text)
 
@@ -219,23 +210,17 @@ class TestChatEndpointIntegration:
         client = TestClient(test_app)
 
         # Question vide
-        response = client.post("/api/v1/chat/stream", json={
-            "question": "",
-            "context_limit": 5
-        })
+        response = client.post("/api/v1/chat/stream", json={"question": "", "context_limit": 5})
         assert response.status_code == 422
 
         # Question manquante
-        response = client.post("/api/v1/chat/stream", json={
-            "context_limit": 5
-        })
+        response = client.post("/api/v1/chat/stream", json={"context_limit": 5})
         assert response.status_code == 422
 
         # Context limit invalide
-        response = client.post("/api/v1/chat/stream", json={
-            "question": "Test",
-            "context_limit": -1
-        })
+        response = client.post(
+            "/api/v1/chat/stream", json={"question": "Test", "context_limit": -1}
+        )
         assert response.status_code == 422
 
     def test_chat_escalation_endpoint(self, test_app):
@@ -247,8 +232,8 @@ class TestChatEndpointIntegration:
             "session_id": "escalation_test_123",
             "chat_history": [
                 {"type": "user", "content": "Question précédente"},
-                {"type": "assistant", "content": "Réponse automatique"}
-            ]
+                {"type": "assistant", "content": "Réponse automatique"},
+            ],
         }
 
         response = client.post("/api/v1/chat/escalate", json=escalation_request)
@@ -269,10 +254,9 @@ class TestAdminEndpointsIntegration:
     def admin_token(self, test_app):
         """Fixture pour obtenir un token admin valide"""
         client = TestClient(test_app)
-        response = client.post("/api/v1/auth/login", json={
-            "username": "admin",
-            "password": "admin123"
-        })
+        response = client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
+        )
         if response.status_code == 200:
             return response.json()["access_token"]
         return None
@@ -288,10 +272,9 @@ class TestDocumentEndpointsIntegration:
     def admin_token(self, test_app):
         """Fixture pour obtenir un token admin valide"""
         client = TestClient(test_app)
-        response = client.post("/api/v1/auth/login", json={
-            "username": "admin",
-            "password": "admin123"
-        })
+        response = client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
+        )
         if response.status_code == 200:
             return response.json()["access_token"]
         return None
@@ -420,9 +403,7 @@ class TestSecurityIntegration:
         ]
 
         for malicious_input in malicious_inputs:
-            response = client.post("/api/v1/chat/stream", json={
-                "question": malicious_input
-            })
+            response = client.post("/api/v1/chat/stream", json={"question": malicious_input})
             # Doit soit réussir normalement, soit échouer proprement
             assert response.status_code in [200, 422]
 

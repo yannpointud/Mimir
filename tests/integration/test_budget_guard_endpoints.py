@@ -15,6 +15,7 @@ db_manager so BudgetGuard/UsageTracker (which open their own sessions via
 the real db_manager singleton, not the test_session fixture) never touch
 the developer's real database. Zero real Mistral API calls.
 """
+
 import shutil
 import tempfile
 from pathlib import Path
@@ -76,6 +77,7 @@ def client(isolated_db_manager):
     """TestClient running the real app lifespan (database init) against the
     isolated temporary SQLite file."""
     from main import app
+
     with TestClient(app) as test_client:
         yield test_client
 
@@ -141,8 +143,11 @@ def apply_mocked_llm():
     llm_usage rows are still written to the isolated temporary database."""
     from main import app
     from src.api.dependencies import (
-        get_rag_service, get_rag_debug_service, get_budget_guard,
-        get_usage_tracker, get_chat_cache_service,
+        get_rag_service,
+        get_rag_debug_service,
+        get_budget_guard,
+        get_usage_tracker,
+        get_chat_cache_service,
     )
     from src.services.rag_service import RagService
 
@@ -204,9 +209,7 @@ def _mock_llm_counting():
     async def fake_generate_stream(*args, usage_out=None, **kwargs):
         counters["generate_stream"] += 1
         if usage_out is not None:
-            usage_out.update(
-                {"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
-            )
+            usage_out.update({"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23})
         yield "mocked "
         yield "answer"
 
@@ -261,8 +264,11 @@ def apply_stream_rag(isolated_db_manager):
     distinguished from a miss that finalizes."""
     from main import app
     from src.api.dependencies import (
-        get_rag_service, get_budget_guard, get_rag_debug_service,
-        get_usage_tracker, get_chat_cache_service,
+        get_rag_service,
+        get_budget_guard,
+        get_rag_debug_service,
+        get_usage_tracker,
+        get_chat_cache_service,
     )
     from src.services.rag_service import RagService
 
@@ -402,15 +408,15 @@ class TestNormalStreamUsageRecording:
     estimated=False, and finalizes the reservation instead of leaking it
     (exactly-one-chat-row happy path)."""
 
-    def test_normal_stream_call_records_embedding_and_chat_rows(
-        self, client, apply_mocked_llm
-    ):
+    def test_normal_stream_call_records_embedding_and_chat_rows(self, client, apply_mocked_llm):
         # stream_usage set so the final SSE chunk carries real usage: the chat
         # row is priced from real tokens (estimated=False), not the finally
         # fallback estimate.
-        apply_mocked_llm(_mock_llm(
-            stream_usage={"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
-        ))
+        apply_mocked_llm(
+            _mock_llm(
+                stream_usage={"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
+            )
+        )
 
         with client.stream(
             "POST",
@@ -473,9 +479,11 @@ class TestStreamingUsageRecording:
         """Counterpart happy path: when the final SSE chunk DOES carry real
         usage, the chat row is estimated=False (proves the two branches of
         the finally block are mutually exclusive, exactly one row each)."""
-        apply_mocked_llm(_mock_llm(
-            stream_usage={"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
-        ))
+        apply_mocked_llm(
+            _mock_llm(
+                stream_usage={"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
+            )
+        )
 
         with client.stream(
             "POST",

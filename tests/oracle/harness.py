@@ -22,8 +22,8 @@ Everything is hermetic and deterministic:
 Volatile values (timestamps, durations, tokens, generated ids, temporary
 paths) are neutralised by :func:`normalize` before comparison.
 
-Snapshots are written only when ``ORACLE_UPDATE=1`` is set; the files are then
-frozen by ``docs/cleanup/ORACLE.sha256``.
+Snapshots are written only when ``ORACLE_UPDATE=1`` is set; regenerate them
+only for an intended behavior change, and review the snapshot diff.
 """
 
 import asyncio
@@ -37,7 +37,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -65,7 +65,7 @@ FAKE_CHAT_MODEL = "mistral-small-latest"
 FAKE_EMBED_MODEL = "mistral-embed"
 
 # The ten fixed questions shared by the SSE and retrieval oracles.
-QUESTIONS: List[str] = [
+QUESTIONS: list[str] = [
     "Combien de jours de télétravail sont autorisés par semaine ?",
     "Quelle est la procédure pour déclarer une note de frais ?",
     "Que faire en cas de perte d'un ordinateur portable ?",
@@ -79,7 +79,7 @@ QUESTIONS: List[str] = [
 ]
 
 # Corpus documents, in upload order (document ids follow this order).
-CORPUS_FILES: List[str] = [
+CORPUS_FILES: list[str] = [
     "politique_teletravail.md",
     "guide_securite_informatique.txt",
     "procedure_notes_de_frais.md",
@@ -95,11 +95,70 @@ CORPUS_FILES: List[str] = [
 
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
-_STOPWORDS = frozenset("""
-a à au aux avec c ce ces cet cette d dans de des du elle elles en est et être
-il ils j l la le les leur leurs m mais n ne nous on ou où par pas pour qu que
-quel quelle quelles quels qui s sa se ses son sont sur t un une vous y
-""".split())
+_STOPWORDS = frozenset(
+    [
+        "a",
+        "à",
+        "au",
+        "aux",
+        "avec",
+        "c",
+        "ce",
+        "ces",
+        "cet",
+        "cette",
+        "d",
+        "dans",
+        "de",
+        "des",
+        "du",
+        "elle",
+        "elles",
+        "en",
+        "est",
+        "et",
+        "être",
+        "il",
+        "ils",
+        "j",
+        "l",
+        "la",
+        "le",
+        "les",
+        "leur",
+        "leurs",
+        "m",
+        "mais",
+        "n",
+        "ne",
+        "nous",
+        "on",
+        "ou",
+        "où",
+        "par",
+        "pas",
+        "pour",
+        "qu",
+        "que",
+        "quel",
+        "quelle",
+        "quelles",
+        "quels",
+        "qui",
+        "s",
+        "sa",
+        "se",
+        "ses",
+        "son",
+        "sont",
+        "sur",
+        "t",
+        "un",
+        "une",
+        "vous",
+        "y",
+    ]
+)
 
 # Share of the squared norm carried by a direction common to every text:
 # cosine = _COMMON_WEIGHT + (1 - _COMMON_WEIGHT) * cosine_of_word_bags, so
@@ -108,7 +167,7 @@ quel quelle quelles quels qui s sa se ses son sont sur t un une vous y
 _COMMON_WEIGHT = 0.4
 
 
-def fake_embedding(text: str, dim: Optional[int] = None) -> List[float]:
+def fake_embedding(text: str, dim: int | None = None) -> list[float]:
     """Deterministic bag-of-words embedding (unit L2 norm).
 
     Each lower-cased non-stopword token is hashed (SHA-256, never Python's
@@ -143,8 +202,8 @@ class FakeLLMService:
     def __init__(self, fail_embed: bool = False, fail_after_first_chunk: bool = False):
         self.fail_embed = fail_embed
         self.fail_after_first_chunk = fail_after_first_chunk
-        self.embed_calls: List[List[str]] = []
-        self.generate_calls: List[Dict[str, Any]] = []
+        self.embed_calls: list[list[str]] = []
+        self.generate_calls: list[dict[str, Any]] = []
 
     @property
     def model_name(self) -> str:
@@ -166,18 +225,26 @@ class FakeLLMService:
             completion_tokens=0,
         )
 
-    async def generate_stream(self, prompt, system_prompt=None, max_tokens=None,
-                              temperature=None, session_id=None, rag_debug=None,
-                              usage_out=None, **kwargs):
-        self.generate_calls.append({
-            "prompt": prompt,
-            "system_prompt": system_prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        })
-        digest = hashlib.sha256(
-            f"{system_prompt}\n---\n{prompt}".encode("utf-8")
-        ).hexdigest()[:16]
+    async def generate_stream(
+        self,
+        prompt,
+        system_prompt=None,
+        max_tokens=None,
+        temperature=None,
+        session_id=None,
+        rag_debug=None,
+        usage_out=None,
+        **kwargs,
+    ):
+        self.generate_calls.append(
+            {
+                "prompt": prompt,
+                "system_prompt": system_prompt,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+        )
+        digest = hashlib.sha256(f"{system_prompt}\n---\n{prompt}".encode()).hexdigest()[:16]
         context_items = len(re.findall(r"^\[\d+\] ", system_prompt or "", re.MULTILINE))
         yield "Réponse fondée sur "
         if self.fail_after_first_chunk:
@@ -196,7 +263,7 @@ class FakeBudgetGuard:
 
     def __init__(self, exhausted: bool = False):
         self.exhausted = exhausted
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     def reserve(self, kind):
         self.calls.append(f"reserve:{kind}")
@@ -220,7 +287,7 @@ class FakeUsageTracker:
     """
 
     def __init__(self):
-        self.calls: List[Dict[str, Any]] = []
+        self.calls: list[dict[str, Any]] = []
 
     def record(self, *args, **kwargs):
         bound = inspect.signature(UsageTracker.record).bind(None, *args, **kwargs)
@@ -235,7 +302,7 @@ class RecordingRagDebug:
     """Records every rag_debug call (method name, args, kwargs)."""
 
     def __init__(self):
-        self.calls: List[tuple] = []
+        self.calls: list[tuple] = []
 
     def __getattr__(self, name):
         if name.startswith("__"):
@@ -259,18 +326,35 @@ class RecordingRagDebug:
 # --------------------------------------------------------------------------
 
 VOLATILE_KEYS = {
-    "timestamp", "created_at", "updated_at", "indexed_at", "last_updated",
-    "access_token", "token_issued_at", "token_expires_at", "iat", "exp",
-    "session_id", "escalation_id", "response_time_ms", "duration_ms",
-    "duration_seconds", "search_time_ms", "processing_time", "started_at",
-    "completed_at", "validation_timestamp", "report_path", "date",
+    "timestamp",
+    "created_at",
+    "updated_at",
+    "indexed_at",
+    "last_updated",
+    "access_token",
+    "token_issued_at",
+    "token_expires_at",
+    "iat",
+    "exp",
+    "session_id",
+    "escalation_id",
+    "response_time_ms",
+    "duration_ms",
+    "duration_seconds",
+    "search_time_ms",
+    "processing_time",
+    "started_at",
+    "completed_at",
+    "validation_timestamp",
+    "report_path",
+    "date",
 }
 
 _ISO_TS_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
 _DURATION_RE = re.compile(r"Completed in \d+ms")
 
 
-def normalize(value: Any, tmp_root: Optional[str] = None) -> Any:
+def normalize(value: Any, tmp_root: str | None = None) -> Any:
     """Neutralise volatile values so snapshots stay deterministic."""
     if isinstance(value, dict):
         out = {}
@@ -318,13 +402,13 @@ def assert_snapshot(name: str, actual: Any) -> None:
     assert json.loads(serialized) == expected, f"oracle snapshot mismatch: {path.name}"
 
 
-def parse_sse(body: str) -> List[Dict[str, Any]]:
+def parse_sse(body: str) -> list[dict[str, Any]]:
     """Decode every ``data:`` line of an SSE body."""
     events = []
     for line in body.splitlines():
         line = line.strip()
         if line.startswith("data:"):
-            events.append(json.loads(line[len("data:"):].strip()))
+            events.append(json.loads(line[len("data:") :].strip()))
     return events
 
 
@@ -333,10 +417,21 @@ def parse_sse(body: str) -> List[Dict[str, Any]]:
 # --------------------------------------------------------------------------
 
 _PATCHED_SETTINGS = (
-    "database_url", "data_dir", "upload_dir", "watch_folder", "faiss_index_path",
-    "faiss_metadata_path", "bm25_index_path", "sqlite_backup_dir", "mistral_api_key",
-    "mistral_model", "mistral_embedding_model", "admin_password_hash", "environment",
-    "hybrid_search_enabled", "filename_pre_inclusion",
+    "database_url",
+    "data_dir",
+    "upload_dir",
+    "watch_folder",
+    "faiss_index_path",
+    "faiss_metadata_path",
+    "bm25_index_path",
+    "sqlite_backup_dir",
+    "mistral_api_key",
+    "mistral_model",
+    "mistral_embedding_model",
+    "admin_password_hash",
+    "environment",
+    "hybrid_search_enabled",
+    "filename_pre_inclusion",
 )
 
 
@@ -413,7 +508,7 @@ class OracleEnv:
         )
         return self.processor
 
-    def document_statuses(self) -> Dict[int, str]:
+    def document_statuses(self) -> dict[int, str]:
         session = db_manager.get_session()
         try:
             return {doc.id: doc.status for doc in DocumentRepository(session).get_all()}
@@ -428,7 +523,9 @@ class OracleEnv:
             await processor.start()
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
-                busy = [s for s in self.document_statuses().values() if s in ("pending", "indexing")]
+                busy = [
+                    s for s in self.document_statuses().values() if s in ("pending", "indexing")
+                ]
                 if not busy and processor.get_queue_size() == 0:
                     break
                 await asyncio.sleep(0.05)
@@ -438,8 +535,13 @@ class OracleEnv:
         self._processor_session.close()
         self.new_processor()
 
-    def upload(self, path: Path, route: str = "/api/v1/documents/upload",
-               preserve: bool = False, content: Optional[bytes] = None):
+    def upload(
+        self,
+        path: Path,
+        route: str = "/api/v1/documents/upload",
+        preserve: bool = False,
+        content: bytes | None = None,
+    ):
         data = path.read_bytes() if content is None else content
         return self.client.post(
             route,
@@ -448,7 +550,7 @@ class OracleEnv:
             data={"preserve": "true" if preserve else "false"},
         )
 
-    def ingest_corpus(self) -> Dict[str, int]:
+    def ingest_corpus(self) -> dict[str, int]:
         """Upload the fixed corpus, ingest it and return filename -> document id."""
         from src.api.middleware.rate_limit import limiter
 
@@ -466,7 +568,7 @@ class OracleEnv:
         assert set(self.document_statuses().values()) == {"indexed"}
         return ids
 
-    def stream(self, question: str, **extra) -> List[Dict[str, Any]]:
+    def stream(self, question: str, **extra) -> list[dict[str, Any]]:
         payload = {"question": question, "include_sources": True}
         payload.update(extra)
         with self.client.stream("POST", "/api/v1/chat/stream", json=payload) as response:
@@ -478,10 +580,7 @@ class OracleEnv:
         for key in self._overrides:
             self.app.dependency_overrides.pop(key, None)
         self.client.close()
-        try:
-            self._processor_session.close()
-        except Exception:
-            pass
+        self._processor_session.close()
 
 
 def _redirect_db_manager(database_url: str):
@@ -535,6 +634,7 @@ def _make_env() -> OracleEnv:
     saved_db = _redirect_db_manager(f"sqlite:///{tmp / 'data' / 'sqlite' / 'oracle.db'}")
 
     from src.cache.lru_cache import cache_service, chat_cache_service
+
     cache_service.invalidate_all()
     chat_cache_service.invalidate_all()
 

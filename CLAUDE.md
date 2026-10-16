@@ -82,8 +82,8 @@ frontend/
 tests/                               # pytest test suite (1036 tests, run from the repo root)
 ├── conftest.py                      # Shared fixtures
 ├── unit/                            # Unit tests (838)
-├── integration/                     # API + workflow tests (154, frozen)
-├── oracle/                          # Characterization snapshots (32, frozen)
+├── integration/                     # API + workflow tests
+├── oracle/                          # Characterization snapshots
 └── performance/                     # Cleanup performance tests (12)
 
 scripts/
@@ -95,7 +95,7 @@ scripts/
 docs/adr/                            # Architecture decision records
 ```
 
-`tests/oracle/` and `tests/integration/` are characterization tests whose SHA-256 sums are listed in `docs/cleanup/ORACLE.sha256`. The FAISS snapshots of `tests/oracle/test_retrieval_ranking.py` and `test_chat_stream_events.py` depend on the CPU SIMD level (generated on AVX-512): on another CPU some of them fail without any regression, and GitHub CI skips them (`docs/cleanup/DECISIONS.md` DF.12).
+`tests/oracle/` pins the observable behavior (OpenAPI contract, JSON responses, SSE events, retrieval ranking, chunks) in JSON snapshots. Regenerate them with `ORACLE_UPDATE=1 pytest tests/oracle` only for an intended behavior change, and review the snapshot diff.
 
 ## Key Patterns
 - **Repository pattern** for all DB access (`database/repository.py`)

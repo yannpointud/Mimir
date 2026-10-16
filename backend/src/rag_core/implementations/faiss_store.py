@@ -28,6 +28,11 @@ from ...monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# FAISS distances carry float32 noise (~1e-7) that depends on the SIMD build of
+# the host CPU. Similarity scores are rounded so that ranking and threshold
+# checks give the same result on every machine.
+_SIMILARITY_DECIMALS = 6
+
 
 class MetadataPayload(BaseModel):
     """Versioned JSON payload for FAISS metadata persistence.
@@ -303,10 +308,8 @@ class FaissVectorStore(AbstractVectorStore):
                     if idx < 0 or idx >= len(self.metadata):
                         continue
 
-                    # Convert distance to similarity score
-                    # For L2 distance, similarity = 1 / (1 + distance)
-                    # Alternative: similarity = max(0, 1 - distance/2) for normalized vectors
-                    similarity = max(0, 1 - dist / 2)
+                    # Normalized vectors: squared L2 distance maps to cosine similarity
+                    similarity = round(max(0.0, 1.0 - float(dist) / 2), _SIMILARITY_DECIMALS)
 
                     # Apply similarity threshold. Default (similarity_floor is
                     # None) keeps the exact dense-only semantics; hybrid mode
@@ -342,12 +345,10 @@ class FaissVectorStore(AbstractVectorStore):
                     )
                     results.append(result)
 
-                    # Stop if we have enough results
-                    if len(results) >= top_k:
-                        break
-
-                # Sort by similarity (highest first)
-                results.sort(key=lambda x: x.similarity_score, reverse=True)
+                # Highest similarity first; chunk_id breaks ties deterministically
+                # before the pool is cut to top_k.
+                results.sort(key=lambda r: (-r.similarity_score, r.chunk_id))
+                results = results[:top_k]
 
                 duration_ms = (time.time() - start_time) * 1000
 

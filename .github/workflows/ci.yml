@@ -79,15 +79,8 @@ jobs:
       - name: Install locked dependencies
         run: pip install --require-hashes -r requirements-dev.lock
 
-      # The dense-retrieval and SSE snapshots of tests/oracle depend on FAISS
-      # float rounding, which varies with the CPU's SIMD level (they were
-      # generated on an AVX-512 machine and also fail on the original code
-      # elsewhere). They run in docs/cleanup/quality_gate.sh, not on runners.
       - name: Run tests
-        run: >-
-          pytest
-          --ignore=tests/oracle/test_retrieval_ranking.py
-          --ignore=tests/oracle/test_chat_stream_events.py
+        run: pytest
 
   pip-audit:
     name: pip-audit

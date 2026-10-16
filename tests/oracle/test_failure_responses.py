@@ -8,7 +8,8 @@ the JSON body (or the SSE events) returned to the client in each case.
 """
 
 from contextlib import contextmanager
-from typing import Any, Dict, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 from tests.oracle.harness import FIXTURES_DIR, assert_snapshot, normalize
 
@@ -16,7 +17,7 @@ from tests.oracle.harness import FIXTURES_DIR, assert_snapshot, normalize
 class _Failing:
     """Proxy raising RuntimeError on the listed methods, delegating the rest."""
 
-    def __init__(self, target: Any, failing: Iterable[str], result: Dict[str, Any] = None):
+    def __init__(self, target: Any, failing: Iterable[str], result: dict[str, Any] = None):
         self._target = target
         self._failing = set(failing)
         self._result = result or {}
@@ -26,8 +27,10 @@ class _Failing:
             value = self._result[name]
             return lambda *args, **kwargs: value
         if name in self._failing:
+
             def _raise(*args, **kwargs):
                 raise RuntimeError(f"oracle failure in {name}")
+
             return _raise
         return getattr(self._target, name)
 
@@ -46,7 +49,7 @@ def _override(env, dependency, factory):
             overrides[dependency] = previous
 
 
-def _record(env, response) -> Dict[str, Any]:
+def _record(env, response) -> dict[str, Any]:
     return {"status": response.status_code, "body": normalize(response.json(), env.tmp_root)}
 
 
@@ -100,9 +103,13 @@ def test_failure_responses(oracle_env):
         session.close()
 
     # --- audit / configuration / usage repository failures --------------
-    dep, factory, sessions = _repo_dependency(env, "get_audit_log_repository", ["create_log", "get_logs_paginated"])
+    dep, factory, sessions = _repo_dependency(
+        env, "get_audit_log_repository", ["create_log", "get_logs_paginated"]
+    )
     with _override(env, dep, factory):
-        results["cache clear"] = _record(env, client.post("/api/v1/admin/cache/clear", headers=admin))
+        results["cache clear"] = _record(
+            env, client.post("/api/v1/admin/cache/clear", headers=admin)
+        )
         results["audit log"] = _record(env, client.get("/api/v1/admin/audit-log", headers=admin))
         results["login with failing audit"] = {
             "status": client.post(
@@ -124,13 +131,22 @@ def test_failure_responses(oracle_env):
     for session in sessions:
         session.close()
 
-    dep, factory, sessions = _repo_dependency(env, "get_configuration_repository", ["get_all", "set", "get"])
+    dep, factory, sessions = _repo_dependency(
+        env, "get_configuration_repository", ["get_all", "set", "get"]
+    )
     with _override(env, dep, factory):
-        results["configuration get"] = _record(env, client.get("/api/v1/admin/configuration", headers=admin))
-        results["configuration put"] = _record(
-            env, client.put("/api/v1/admin/configuration", headers=admin, json={"maintenance_mode": "true"})
+        results["configuration get"] = _record(
+            env, client.get("/api/v1/admin/configuration", headers=admin)
         )
-        results["usage with failing config"] = _record(env, client.get("/api/v1/admin/usage", headers=admin))
+        results["configuration put"] = _record(
+            env,
+            client.put(
+                "/api/v1/admin/configuration", headers=admin, json={"maintenance_mode": "true"}
+            ),
+        )
+        results["usage with failing config"] = _record(
+            env, client.get("/api/v1/admin/usage", headers=admin)
+        )
     for session in sessions:
         session.close()
 
@@ -161,7 +177,9 @@ def test_failure_responses(oracle_env):
     )
 
     # --- ingestion queue failures -------------------------------------------
-    full_queue = _Failing(env.processor, [], result={"queue_document": False, "get_queue_size": 50000})
+    full_queue = _Failing(
+        env.processor, [], result={"queue_document": False, "get_queue_size": 50000}
+    )
     with _override(env, dependencies.get_ingestion_processor, lambda: full_queue):
         results["upload queue full"] = _record(env, env.upload(FIXTURES_DIR / "sample.md"))
         results["admin upload queue full"] = _record(
@@ -178,9 +196,7 @@ def test_failure_responses(oracle_env):
         results["reprocess queue full"] = _record(env, client.post(reprocess_route, headers=admin))
     broken_queue = _Failing(env.processor, ["queue_document"])
     with _override(env, dependencies.get_ingestion_processor, lambda: broken_queue):
-        results["upload queue error"] = _record(
-            env, env.upload(FIXTURES_DIR / "sample.pdf")
-        )
+        results["upload queue error"] = _record(env, env.upload(FIXTURES_DIR / "sample.pdf"))
         results["admin upload queue error"] = _record(
             env, env.upload(FIXTURES_DIR / "sample.docx", route="/api/v1/admin/documents/upload")
         )

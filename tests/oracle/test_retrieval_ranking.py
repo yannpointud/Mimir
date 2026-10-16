@@ -14,7 +14,7 @@ rounded to absorb float noise.
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -24,7 +24,7 @@ from src.database.repository import DocumentRepository
 from tests.oracle.harness import QUESTIONS, assert_snapshot, fake_embedding
 
 
-def _hit(result) -> List[Any]:
+def _hit(result) -> list[Any]:
     return [
         str(result.document_id),
         int(result.chunk_index),
@@ -33,7 +33,7 @@ def _hit(result) -> List[Any]:
     ]
 
 
-def _candidates(env) -> List[List[Any]]:
+def _candidates(env) -> list[list[Any]]:
     recorded = env.rag_debug.last("log_vector_search")
     assert recorded is not None, "retrieval debug log was not called"
     args, kwargs = recorded
@@ -41,12 +41,13 @@ def _candidates(env) -> List[List[Any]]:
     return [_hit(r) for r in results]
 
 
-def _pipeline(env, question: str, hybrid: bool) -> Dict[str, Any]:
+def _pipeline(env, question: str, hybrid: bool) -> dict[str, Any]:
     saved = settings.hybrid_search_enabled
     settings.hybrid_search_enabled = hybrid
     env.rag_debug.calls.clear()
     session = db_manager.get_session()
     try:
+
         async def _collect():
             events = []
             async for event in env.rag_service.answer_stream(
@@ -87,7 +88,9 @@ def test_retrieval_ranking_for_fixed_questions(oracle_corpus_env, index):
     }
     result = {
         "question": question,
-        "store_dense_default_threshold": [_hit(r) for r in env.vector_store.query(vector, top_k=10)],
+        "store_dense_default_threshold": [
+            _hit(r) for r in env.vector_store.query(vector, top_k=10)
+        ],
         "store_dense_raw_pool": [
             _hit(r) for r in env.vector_store.query(vector, top_k=10, similarity_floor=0.0)
         ],

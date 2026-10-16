@@ -17,6 +17,7 @@ tests/integration/test_budget_guard_endpoints.py). The fail-closed and
 release-on-failure cases use mocked budget_guard/usage_tracker injected via
 the IngestionProcessor constructor -- no real DB session is ever opened.
 """
+
 import shutil
 import tempfile
 from pathlib import Path
@@ -106,18 +107,20 @@ def _single_chunk_task(document_id="123"):
 def _patched_pipeline(processor, text="Sample text for budget test"):
     """Context manager patching extraction/chunking so the pipeline reaches
     the embeddings step with exactly one chunk."""
-    return patch.object(processor, '_extract_text', return_value=text), patch.object(
+    return patch.object(processor, "_extract_text", return_value=text), patch.object(
         processor.chunking_strategy,
-        'chunk_text',
-        return_value=[{
-            "text": "chunk",
-            "chunk_index": 0,
-            "total_chunks": 1,
-            "start_char": 0,
-            "end_char": 5,
-            "word_count": 1,
-            "char_count": 5,
-        }],
+        "chunk_text",
+        return_value=[
+            {
+                "text": "chunk",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "start_char": 0,
+                "end_char": 5,
+                "word_count": 1,
+                "char_count": 5,
+            }
+        ],
     )
 
 
@@ -155,13 +158,13 @@ class TestBudgetFailClosed:
         mock_llm.embed.assert_not_called()
 
         mock_document_repository.update_status.assert_any_call(
-            123, 'error', error_message="Daily budget exceeded"
+            123, "error", error_message="Daily budget exceeded"
         )
         # Last call must be the fail-closed status update, not a generic
         # "Processing pipeline failed" message.
         last_call = mock_document_repository.update_status.call_args_list[-1]
-        assert last_call.args[1] == 'error'
-        assert last_call.kwargs.get('error_message') == "Daily budget exceeded"
+        assert last_call.args[1] == "error"
+        assert last_call.kwargs.get("error_message") == "Daily budget exceeded"
 
         # Non-retriable: the task's retry budget was exhausted so the async
         # queue worker loop will not re-queue it.
@@ -191,9 +194,8 @@ class TestBudgetFailClosed:
         task = _single_chunk_task()
         extract_patch, chunk_patch = _patched_pipeline(processor)
 
-        with extract_patch, chunk_patch:
-            with pytest.raises(BudgetExceededError):
-                await processor._process_document_pipeline(task)
+        with extract_patch, chunk_patch, pytest.raises(BudgetExceededError):
+            await processor._process_document_pipeline(task)
 
         mock_llm.embed.assert_not_called()
 

@@ -21,6 +21,7 @@ def initialized_database():
     """Ensure database tables exist: TestClient without a `with` block does not
     run the app lifespan, so init_database() is never called."""
     from src.database.connection import init_database
+
     init_database()
 
 
@@ -34,10 +35,13 @@ class TestReaderRoutesArePublic:
         guard_callables = [dep.dependency for dep in reader_router.dependencies]
         assert require_admin not in guard_callables
 
-    @pytest.mark.parametrize("route", [
-        f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/full",
-        f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/download",
-    ])
+    @pytest.mark.parametrize(
+        "route",
+        [
+            f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/full",
+            f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/download",
+        ],
+    )
     def test_reader_routes_reached_anonymously(self, test_app, route):
         client = TestClient(test_app)
         response = client.get(route)
@@ -53,15 +57,18 @@ class TestManagementRoutesStayAdminOnly:
         guard_callables = [dep.dependency for dep in router.dependencies]
         assert require_admin in guard_callables
 
-    @pytest.mark.parametrize("method,route", [
-        ("GET", "/api/v1/documents/"),
-        ("GET", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}"),
-        ("GET", "/api/v1/documents/stats/overview"),
-        ("DELETE", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}"),
-        ("PATCH", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/preserve?preserve=true"),
-        ("POST", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/reprocess"),
-        ("POST", "/api/v1/documents/maintenance/validate-consistency"),
-    ])
+    @pytest.mark.parametrize(
+        "method,route",
+        [
+            ("GET", "/api/v1/documents/"),
+            ("GET", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}"),
+            ("GET", "/api/v1/documents/stats/overview"),
+            ("DELETE", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}"),
+            ("PATCH", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/preserve?preserve=true"),
+            ("POST", f"/api/v1/documents/{UNKNOWN_DOCUMENT_ID}/reprocess"),
+            ("POST", "/api/v1/documents/maintenance/validate-consistency"),
+        ],
+    )
     def test_management_routes_reject_anonymous_access(self, test_app, method, route):
         client = TestClient(test_app)
         response = client.request(method, route)

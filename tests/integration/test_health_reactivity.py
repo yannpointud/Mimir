@@ -48,6 +48,7 @@ async def test_health_responds_during_heavy_faiss_operation(test_app):
     original_query = store.query
     store.query = _slow_query
     try:
+
         async def run_heavy_faiss_call():
             # This mirrors the target pattern for every real call site: the
             # blocking store method dispatched via asyncio.to_thread.

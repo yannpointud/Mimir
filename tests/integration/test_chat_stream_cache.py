@@ -22,6 +22,7 @@ Depends(get_rag_service), so the override targets get_rag_service; the
 route and the service share the singleton ChatCacheService so a write by the
 service is visible to the route's read.
 """
+
 import json
 import shutil
 import tempfile
@@ -74,9 +75,7 @@ def _make_mock_llm():
     async def fake_generate_stream(*args, usage_out=None, **kwargs):
         gen_calls["n"] += 1
         if usage_out is not None:
-            usage_out.update(
-                {"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
-            )
+            usage_out.update({"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23})
         yield "mocked "
         yield "answer"
 
@@ -93,7 +92,7 @@ def _parse_sse_events(body: str):
     for line in body.splitlines():
         line = line.strip()
         if line.startswith("data:"):
-            events.append(json.loads(line[len("data:"):].strip()))
+            events.append(json.loads(line[len("data:") :].strip()))
     return events
 
 
@@ -187,8 +186,11 @@ def rag_with_mocks(isolated_db_manager):
     route's read)."""
     from main import app
     from src.api.dependencies import (
-        get_rag_service, get_rag_debug_service, get_budget_guard,
-        get_usage_tracker, get_chat_cache_service,
+        get_rag_service,
+        get_rag_debug_service,
+        get_budget_guard,
+        get_usage_tracker,
+        get_chat_cache_service,
     )
     from src.services.rag_service import RagService
 
@@ -235,9 +237,7 @@ class TestStreamCacheHitReplay:
     """Test 1: repeated question served from cache, indistinguishable SSE
     sequence, no Mistral generate call on the hit."""
 
-    def test_second_call_replays_identical_sequence_without_mistral(
-        self, client, rag_with_mocks
-    ):
+    def test_second_call_replays_identical_sequence_without_mistral(self, client, rag_with_mocks):
         _mock_store, _embed_calls, gen_calls = rag_with_mocks
         question = "What is Mimir stream cache?"
 
@@ -247,9 +247,7 @@ class TestStreamCacheHitReplay:
         cached_body = _stream_body(client, question)
         gen_after_second = gen_calls["n"]
 
-        fresh_types, fresh_answer, fresh_done = _normalise_sequence(
-            _parse_sse_events(fresh_body)
-        )
+        fresh_types, fresh_answer, fresh_done = _normalise_sequence(_parse_sse_events(fresh_body))
         cached_types, cached_answer, cached_done = _normalise_sequence(
             _parse_sse_events(cached_body)
         )
@@ -324,7 +322,9 @@ class TestStreamCacheAntiPartial:
     @pytest.mark.asyncio
     async def test_disconnect_before_done_stores_no_entry(self, isolated_db_manager):
         from src.api.dependencies import (
-            get_rag_debug_service, get_budget_guard, get_usage_tracker,
+            get_rag_debug_service,
+            get_budget_guard,
+            get_usage_tracker,
             get_chat_cache_service,
         )
         from src.services.rag_service import RagService

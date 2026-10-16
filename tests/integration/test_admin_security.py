@@ -25,6 +25,7 @@ def initialized_database():
     """Ensure database tables exist: TestClient without a `with` block does not
     run the app lifespan, so init_database() is never called."""
     from src.database.connection import init_database
+
     init_database()
 
 

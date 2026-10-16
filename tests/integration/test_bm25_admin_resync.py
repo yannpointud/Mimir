@@ -148,9 +148,7 @@ def _docs_from_bm25(vector_store, bm25_store, term):
     """
     hits = bm25_store.query(term, top_k=50)
     return {
-        vector_store.metadata[chunk_id]["document_id"]
-        for chunk_id, score in hits
-        if score > 0.0
+        vector_store.metadata[chunk_id]["document_id"] for chunk_id, score in hits if score > 0.0
     }
 
 

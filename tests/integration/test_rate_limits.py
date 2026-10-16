@@ -33,6 +33,7 @@ def initialized_database():
     """Ensure database tables exist: tests that use TestClient without a
     `with` block never run the app lifespan, so init_database() is needed."""
     from src.database.connection import init_database
+
     init_database()
 
 
@@ -80,8 +81,11 @@ def mocked_rag():
     still written."""
     from main import app
     from src.api.dependencies import (
-        get_rag_service, get_rag_debug_service, get_budget_guard,
-        get_usage_tracker, get_chat_cache_service,
+        get_rag_service,
+        get_rag_debug_service,
+        get_budget_guard,
+        get_usage_tracker,
+        get_chat_cache_service,
     )
     from src.services.rag_service import RagService
 
@@ -124,9 +128,7 @@ def mocked_rag():
 class TestLoginRateLimit:
     """N+1 -> 429 on POST /auth/login, keyed per IP, with Retry-After."""
 
-    def test_login_n_plus_one_returns_429_with_retry_after(
-        self, rate_limited_client, monkeypatch
-    ):
+    def test_login_n_plus_one_returns_429_with_retry_after(self, rate_limited_client, monkeypatch):
         """3 requests under a patched limit of 3 get the normal 401 refusal;
         the 4th gets 429 with a Retry-After header."""
         monkeypatch.setattr(settings, "rate_limit_login_per_minute", 3)
@@ -145,9 +147,7 @@ class TestLoginRateLimit:
 class TestChatRateLimit:
     """N+1 -> 429 on POST /chat/stream, keyed per JWT user with IP fallback."""
 
-    def test_chat_stream_n_plus_one_returns_429(
-        self, rate_limited_client, mocked_rag, monkeypatch
-    ):
+    def test_chat_stream_n_plus_one_returns_429(self, rate_limited_client, mocked_rag, monkeypatch):
         """2 streams under a patched limit of 2 return 200; the 3rd is
         rejected with 429 BEFORE any SSE byte is produced."""
         monkeypatch.setattr(settings, "rate_limit_chat_per_minute", 2)
@@ -165,9 +165,7 @@ class TestChatRateLimit:
 class TestUploadRateLimit:
     """N+1 -> 429 on POST /documents/upload (the route UploadZone calls)."""
 
-    def test_upload_n_plus_one_returns_429(
-        self, rate_limited_client, admin_token, monkeypatch
-    ):
+    def test_upload_n_plus_one_returns_429(self, rate_limited_client, admin_token, monkeypatch):
         """2 uploads under a patched limit of 2 get a business-level status
         (the hit is counted at wrapper entry, before the body); the 3rd gets
         429. An invalid extension is used on purpose so the request is
@@ -178,16 +176,12 @@ class TestUploadRateLimit:
         files = {"file": ("rate_limit_probe.exe", b"probe content", "text/plain")}
 
         for _ in range(2):
-            response = rate_limited_client.post(
-                UPLOAD_ROUTE, headers=headers, files=files
-            )
+            response = rate_limited_client.post(UPLOAD_ROUTE, headers=headers, files=files)
             # Under the limit: business validation status, never 429
             assert response.status_code in (200, 201, 400, 409, 422)
             assert response.status_code != 429
 
-        response = rate_limited_client.post(
-            UPLOAD_ROUTE, headers=headers, files=files
-        )
+        response = rate_limited_client.post(UPLOAD_ROUTE, headers=headers, files=files)
         assert response.status_code == 429
         assert "retry-after" in {k.lower() for k in response.headers}
 
@@ -195,9 +189,7 @@ class TestUploadRateLimit:
 class TestSseStreamUnderLimit:
     """Roadmap criterion: a full SSE stream under the limit passes intact."""
 
-    def test_sse_stream_completes_under_default_limit(
-        self, rate_limited_client, mocked_rag
-    ):
+    def test_sse_stream_completes_under_default_limit(self, rate_limited_client, mocked_rag):
         """With the default chat limit (20/min, unpatched), a single stream
         returns 200 and is consumed to the very end: start event, generated
         chunk and done event all present, zero 429, zero truncation."""

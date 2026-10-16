@@ -15,11 +15,6 @@ extend-exclude = [
     "frontend",
     ".venv",
     "venv",
-    # Frozen characterization tests: their SHA-256 sums are pinned in
-    # docs/cleanup/ORACLE.sha256, so neither the formatter nor any autofix
-    # may rewrite them.
-    "tests/oracle",
-    "tests/integration",
 ]
 
 [tool.ruff.lint]

@@ -368,7 +368,7 @@ La couverture de `backend/src` est calculée à chaque exécution de pytest (rap
 
 La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
 
-Les instantanés FAISS de `tests/oracle/test_retrieval_ranking.py` et `tests/oracle/test_chat_stream_events.py` dépendent du jeu d'instructions SIMD du processeur. Ils ont été générés sur une machine AVX-512 ; sur un autre processeur (AVX2, Apple Silicon...), 7 à 11 de ces tests peuvent échouer sans régression, car le code d'origine échoue de la même façon (voir `docs/cleanup/DECISIONS.md`, DF.12). La CI GitHub les ignore.
+Les tests de caractérisation (`tests/oracle/`) figent le comportement observable dans des instantanés JSON : contrat OpenAPI, réponses JSON, événements SSE, classement de la recherche et découpage en chunks. Ils se régénèrent avec `ORACLE_UPDATE=1 pytest tests/oracle`, uniquement pour un changement de comportement voulu, en relisant le diff.
 
 ## 🔍 Qualité et CI
 

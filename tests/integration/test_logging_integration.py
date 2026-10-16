@@ -9,7 +9,12 @@ import time  # noqa: F401
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock  # noqa: F401
 
-from src.monitoring.logger import setup_logger, log_ingestion_event, log_search_query, log_api_request
+from src.monitoring.logger import (
+    setup_logger,
+    log_ingestion_event,
+    log_search_query,
+    log_api_request,
+)
 from src.llm_interface.implementations.mistral_api import MistralAPIService
 from src.rag_core.implementations.faiss_store import FaissVectorStore
 
@@ -43,26 +48,17 @@ class TestLoggingIntegration:
 
         # Test log_ingestion_event
         log_ingestion_event(
-            document="test.pdf",
-            status="processing",
-            chunk_count=5,
-            duration_ms=1250.0
+            document="test.pdf", status="processing", chunk_count=5, duration_ms=1250.0
         )
 
         # Test log_search_query
         log_search_query(
-            query="test query",
-            results_count=3,
-            duration_ms=150,
-            similarity_threshold=0.7
+            query="test query", results_count=3, duration_ms=150, similarity_threshold=0.7
         )
 
         # Test log_api_request
         log_api_request(
-            endpoint="/v1/chat/completions",
-            method="POST",
-            status_code=200,
-            duration_ms=500.0
+            endpoint="/v1/chat/completions", method="POST", status_code=200, duration_ms=500.0
         )
 
         # Si on arrive ici sans exception, les helpers fonctionnent correctement
@@ -81,7 +77,7 @@ class TestLoggingIntegration:
             dimension=128,
             index_path=str(index_path),
             metadata_path=str(metadata_path),
-            similarity_threshold=0.5
+            similarity_threshold=0.5,
         )
 
         # Créer un chunk de test
@@ -92,7 +88,7 @@ class TestLoggingIntegration:
             chunk_index=0,
             total_chunks=1,
             source="logging_test.txt",
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         # Test des opérations avec logging
@@ -154,8 +150,8 @@ class TestLoggingIntegration:
                 log_ingestion_event(
                     document=f"worker_{worker_id}_test_{i}.txt",
                     status="processing",
-                    chunk_count=i+1,
-                    duration_ms=(0.1 * (i+1)) * 1000
+                    chunk_count=i + 1,
+                    duration_ms=(0.1 * (i + 1)) * 1000,
                 )
                 time.sleep(0.01)  # Petit délai
 
@@ -205,9 +201,7 @@ class TestJalon2AcceptanceCriteria:
         metadata_path = temp_workspace / "acceptance.pkl"
 
         faiss_store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
         assert faiss_store.dimension == 128
 
@@ -217,10 +211,10 @@ class TestJalon2AcceptanceCriteria:
 
         extractor_factory = ExtractorFactory()
         supported_extensions = extractor_factory.get_supported_extensions()
-        assert '.pdf' in supported_extensions
-        assert '.docx' in supported_extensions
-        assert '.txt' in supported_extensions
-        assert '.md' in supported_extensions
+        assert ".pdf" in supported_extensions
+        assert ".docx" in supported_extensions
+        assert ".txt" in supported_extensions
+        assert ".md" in supported_extensions
 
         chunking_strategy = ChunkingStrategy()
         assert chunking_strategy.config.chunk_size == 1000
@@ -235,7 +229,7 @@ class TestJalon2AcceptanceCriteria:
         # Test TXT
         txt_file = temp_workspace / "test.txt"
         txt_content = "This is a text file for acceptance testing. It contains multiple sentences."
-        txt_file.write_text(txt_content, encoding='utf-8')
+        txt_file.write_text(txt_content, encoding="utf-8")
 
         extracted_txt = factory.extract_text(str(txt_file))
         assert txt_content in extracted_txt
@@ -243,7 +237,7 @@ class TestJalon2AcceptanceCriteria:
         # Test MD
         md_file = temp_workspace / "test.md"
         md_content = "# Test Document\n\nThis is a markdown document for testing."
-        md_file.write_text(md_content, encoding='utf-8')
+        md_file.write_text(md_content, encoding="utf-8")
 
         extracted_md = factory.extract_text(str(md_file))
         assert "Test Document" in extracted_md
@@ -258,10 +252,7 @@ class TestJalon2AcceptanceCriteria:
 
         # Configuration selon les spécifications Jalon 2
         config = ChunkingConfig(
-            chunk_size=1000,
-            overlap=120,
-            preserve_sentences=True,
-            preserve_paragraphs=True
+            chunk_size=1000, overlap=120, preserve_sentences=True, preserve_paragraphs=True
         )
 
         strategy = ChunkingStrategy(config)
@@ -272,10 +263,13 @@ class TestJalon2AcceptanceCriteria:
 
         # Chaque chunk doit respecter les critères
         for chunk in chunks:
-            assert chunk['char_count'] <= config.max_chunk_size
-            assert chunk['char_count'] >= config.min_chunk_size or chunk['chunk_index'] == chunk['total_chunks'] - 1
-            assert len(chunk['text'].strip()) > 0
-            assert chunk['chunk_index'] < chunk['total_chunks']
+            assert chunk["char_count"] <= config.max_chunk_size
+            assert (
+                chunk["char_count"] >= config.min_chunk_size
+                or chunk["chunk_index"] == chunk["total_chunks"] - 1
+            )
+            assert len(chunk["text"].strip()) > 0
+            assert chunk["chunk_index"] < chunk["total_chunks"]
 
     def test_jalon2_vector_storage_workflow(self, temp_workspace):
         """Critère: Le système peut stocker et rechercher des vecteurs"""
@@ -290,7 +284,7 @@ class TestJalon2AcceptanceCriteria:
             dimension=128,
             index_path=str(index_path),
             metadata_path=str(metadata_path),
-            similarity_threshold=0.5
+            similarity_threshold=0.5,
         )
 
         # Créer des chunks de test avec embeddings
@@ -304,7 +298,7 @@ class TestJalon2AcceptanceCriteria:
                 chunk_index=0,
                 total_chunks=1,
                 source=f"acceptance_{i}.txt",
-                metadata={"test_id": i, "category": "acceptance"}
+                metadata={"test_id": i, "category": "acceptance"},
             )
             test_chunks.append(chunk)
 
@@ -328,9 +322,7 @@ class TestJalon2AcceptanceCriteria:
 
         # Test de chargement dans un nouveau store
         new_store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         load_success = new_store.load()
@@ -347,10 +339,7 @@ class TestJalon2AcceptanceCriteria:
 
         # Test de log d'ingestion
         log_ingestion_event(
-            document="acceptance_test.pdf",
-            status="completed",
-            chunk_count=10,
-            duration_ms=2500.0
+            document="acceptance_test.pdf", status="completed", chunk_count=10, duration_ms=2500.0
         )
 
         # Test de log de recherche
@@ -358,15 +347,12 @@ class TestJalon2AcceptanceCriteria:
             query="acceptance test query",
             results_count=5,
             duration_ms=120,
-            similarity_threshold=0.7
+            similarity_threshold=0.7,
         )
 
         # Test de log API
         log_api_request(
-            endpoint="/v1/embeddings",
-            method="POST",
-            status_code=200,
-            duration_ms=800.0
+            endpoint="/v1/embeddings", method="POST", status_code=200, duration_ms=800.0
         )
 
         # Si on arrive ici sans exception, le logging fonctionne
@@ -397,7 +383,7 @@ class TestJalon2AcceptanceCriteria:
 
         L'avenir de l'IA s'annonce prometteur avec des développements constants.
         """
-        test_document.write_text(document_content, encoding='utf-8')
+        test_document.write_text(document_content, encoding="utf-8")
 
         # 2. Extraction
         factory = ExtractorFactory()
@@ -409,7 +395,12 @@ class TestJalon2AcceptanceCriteria:
         strategy = ChunkingStrategy()
         chunks_data = strategy.chunk_text(extracted_text, source=str(test_document))
         assert len(chunks_data) >= 1
-        log_ingestion_event(document="end_to_end_test.txt", status="chunked", chunk_count=len(chunks_data), duration_ms=500.0)
+        log_ingestion_event(
+            document="end_to_end_test.txt",
+            status="chunked",
+            chunk_count=len(chunks_data),
+            duration_ms=500.0,
+        )
 
         # 4. Simulation d'embeddings (normalement généré par Mistral)
         chunks = []
@@ -418,13 +409,13 @@ class TestJalon2AcceptanceCriteria:
             simulated_embedding = np.random.rand(128).astype(np.float32)
 
             chunk = Chunk(
-                text=chunk_data['text'],
+                text=chunk_data["text"],
                 embedding=simulated_embedding,
                 document_id="e2e_doc",
-                chunk_index=chunk_data['chunk_index'],
-                total_chunks=chunk_data['total_chunks'],
+                chunk_index=chunk_data["chunk_index"],
+                total_chunks=chunk_data["total_chunks"],
                 source=str(test_document),
-                metadata=chunk_data
+                metadata=chunk_data,
             )
             chunks.append(chunk)
 
@@ -433,14 +424,17 @@ class TestJalon2AcceptanceCriteria:
         metadata_path = temp_workspace / "e2e.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         success = store.upsert(chunks)
         assert success is True
-        log_ingestion_event(document="end_to_end_test.txt", status="indexed", chunk_count=len(chunks), duration_ms=1200.0)
+        log_ingestion_event(
+            document="end_to_end_test.txt",
+            status="indexed",
+            chunk_count=len(chunks),
+            duration_ms=1200.0,
+        )
 
         # 6. Recherche vectorielle
         query_vector = chunks[0].embedding + 0.05  # Similaire au premier chunk
@@ -456,9 +450,7 @@ class TestJalon2AcceptanceCriteria:
 
         # Test de récupération complète
         new_store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         new_store.load()
@@ -466,4 +458,9 @@ class TestJalon2AcceptanceCriteria:
         assert len(recovery_results) > 0
 
         # Si tous ces tests passent, le pipeline Jalon 2 est fonctionnel
-        log_ingestion_event(document="end_to_end_test.txt", status="pipeline_completed", chunk_count=len(chunks), duration_ms=3000.0)
+        log_ingestion_event(
+            document="end_to_end_test.txt",
+            status="pipeline_completed",
+            chunk_count=len(chunks),
+            duration_ms=3000.0,
+        )

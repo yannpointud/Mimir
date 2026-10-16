@@ -17,22 +17,22 @@
       "type": "chunk"
     },
     {
-      "content": "[prompt:f495e9d9e9090b1f]",
+      "content": "[prompt:ec2778e0c297f9ba]",
       "type": "chunk"
     },
     {
       "citations": {
         "1": {
-          "chunk_index": 1,
-          "chunk_text": "Messagerie et hameçonnage Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.\n\nSupports amovibles\n\nLes clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.\n\nMises à jour\n\nLes postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.",
+          "chunk_index": 0,
+          "chunk_text": "Guide de sécurité informatique\n\nMots de passe\n\nChaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.\n\nPerte ou vol de matériel\n\nEn cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.\n\nMessagerie et hameçonnage",
           "document_id": 2,
           "filename": "guide_securite_informatique.txt",
           "similarity_score": 0.032,
           "total_chunks": 2
         },
         "2": {
-          "chunk_index": 0,
-          "chunk_text": "Guide de sécurité informatique\n\nMots de passe\n\nChaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.\n\nPerte ou vol de matériel\n\nEn cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.\n\nMessagerie et hameçonnage",
+          "chunk_index": 1,
+          "chunk_text": "Messagerie et hameçonnage Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.\n\nSupports amovibles\n\nLes clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.\n\nMises à jour\n\nLes postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.",
           "document_id": 2,
           "filename": "guide_securite_informatique.txt",
           "similarity_score": 0.032,
@@ -67,19 +67,19 @@
     },
     {
       "cached": false,
-      "confidence_score": 0.93,
+      "confidence_score": 0.94,
       "sources": [
         {
-          "chunk_index": 1,
-          "chunk_text": "Messagerie et hameçonnage Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.\n\nSupports amovibles\n\nLes clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.\n\nMises à jour\n\nLes postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.",
+          "chunk_index": 0,
+          "chunk_text": "Guide de sécurité informatique\n\nMots de passe\n\nChaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.\n\nPerte ou vol de matériel\n\nEn cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.\n\nMessagerie et hameçonnage",
           "document_id": 2,
           "filename": "guide_securite_informatique.txt",
           "similarity_score": 0.032,
           "total_chunks": 2
         },
         {
-          "chunk_index": 0,
-          "chunk_text": "Guide de sécurité informatique\n\nMots de passe\n\nChaque mot de passe doit comporter au moins douze caractères, dont une majuscule, une minuscule, un chiffre et un caractère spécial. Les mots de passe sont renouvelés tous les quatre-vingt-dix jours. Il est interdit de réutiliser l'un des cinq derniers mots de passe. L'authentification à deux facteurs est obligatoire pour la messagerie et pour l'accès au VPN.\n\nPerte ou vol de matériel\n\nEn cas de perte ou de vol d'un ordinateur portable ou d'un téléphone professionnel, le salarié prévient immédiatement le support informatique au poste 4400, puis dépose plainte auprès des autorités dans les quarante-huit heures. Le support procède au blocage à distance de l'appareil et à la révocation des certificats. Une copie du récépissé de plainte est transmise au service des achats pour le remplacement du matériel.\n\nMessagerie et hameçonnage",
+          "chunk_index": 1,
+          "chunk_text": "Messagerie et hameçonnage Les courriels suspects ne doivent jamais être ouverts. Le salarié utilise le bouton Signaler un hameçonnage de la messagerie, qui transmet automatiquement le message à l'équipe sécurité. Aucune pièce jointe exécutable n'est acceptée par la passerelle de messagerie.\n\nSupports amovibles\n\nLes clés USB personnelles sont interdites sur les postes de travail. Les supports fournis par l'entreprise sont chiffrés et doivent être restitués au départ du salarié.\n\nMises à jour\n\nLes postes reçoivent les correctifs de sécurité chaque mardi soir. Un redémarrage est exigé au plus tard le jeudi suivant ; à défaut, le poste redémarre automatiquement à vingt heures.",
           "document_id": 2,
           "filename": "guide_securite_informatique.txt",
           "similarity_score": 0.032,

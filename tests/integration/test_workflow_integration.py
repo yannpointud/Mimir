@@ -61,7 +61,7 @@ class TestDocumentIngestionWorkflow:
         pertinentes dans sa base de connaissances et générera une réponse
         appropriée.
         """
-        test_document.write_text(document_content, encoding='utf-8')
+        test_document.write_text(document_content, encoding="utf-8")
 
         # 2. Text extraction
         extractor_factory = ExtractorFactory()
@@ -73,30 +73,26 @@ class TestDocumentIngestionWorkflow:
 
         # 3. Text chunking
         chunking_strategy = ChunkingStrategy()
-        chunks = chunking_strategy.chunk_text(
-            extracted_text,
-            source=str(test_document)
-        )
+        chunks = chunking_strategy.chunk_text(extracted_text, source=str(test_document))
 
         assert len(chunks) >= 1
 
         # Verify chunk structure
         for chunk in chunks:
-            assert 'text' in chunk
-            assert 'chunk_index' in chunk
-            assert 'total_chunks' in chunk
-            assert 'char_count' in chunk
-            assert len(chunk['text']) > 0
+            assert "text" in chunk
+            assert "chunk_index" in chunk
+            assert "total_chunks" in chunk
+            assert "char_count" in chunk
+            assert len(chunk["text"]) > 0
 
         # 4. Database registration
         import hashlib
+
         file_hash = hashlib.md5(document_content.encode()).hexdigest()
 
         doc_repo = DocumentRepository(test_session)
         document = doc_repo.create(
-            filename="workflow_test.txt",
-            file_hash=file_hash,
-            path=str(test_document)
+            filename="workflow_test.txt", file_hash=file_hash, path=str(test_document)
         )
 
         assert document is not None
@@ -111,37 +107,24 @@ class TestDocumentIngestionWorkflow:
 
     def test_pdf_document_workflow_simulation(self, temp_workspace):
         """Simulated test of the workflow for a PDF document"""
-        from src.ingestion.extractors import ExtractorFactory
+        from src.ingestion.extractors import ExtractionError, ExtractorFactory
 
-        # Simulate a PDF file (by creating a text file with .pdf extension)
+        # A text file with a .pdf extension is not a readable PDF
         fake_pdf = temp_workspace / "fake_document.pdf"
-        fake_pdf.write_text("Contenu simulé d'un PDF pour test d'intégration", encoding='utf-8')
+        fake_pdf.write_text("Simulated PDF content", encoding="utf-8")
 
-        extractor_factory = ExtractorFactory()
-
-        # The system should try to extract text
-        try:
-            extracted_text = extractor_factory.extract_text(str(fake_pdf))
-            # If extraction works with the fake PDF
-            assert len(extracted_text) >= 0
-        except Exception:
-            # If extraction fails with the fake PDF (expected behavior)
-            # Verify the error is handled gracefully
-            pass
+        with pytest.raises(ExtractionError):
+            ExtractorFactory().extract_text(str(fake_pdf))
 
     def test_unsupported_format_handling(self, temp_workspace):
         """Test handling of unsupported formats"""
-        from src.ingestion.extractors import ExtractorFactory
+        from src.ingestion.extractors import ExtractorFactory, UnsupportedFormatError
 
-        # Create a file with an unsupported extension
         unsupported_file = temp_workspace / "test.unsupported"
-        unsupported_file.write_text("Contenu non supporté", encoding='utf-8')
+        unsupported_file.write_text("Unsupported content", encoding="utf-8")
 
-        extractor_factory = ExtractorFactory()
-
-        # Verify the system handles the error gracefully
-        with pytest.raises(Exception):
-            extractor_factory.extract_text(str(unsupported_file))
+        with pytest.raises(UnsupportedFormatError):
+            ExtractorFactory().extract_text(str(unsupported_file))
 
 
 class TestChatWorkflowIntegration:
@@ -152,7 +135,7 @@ class TestChatWorkflowIntegration:
         client = TestClient(test_app)
 
         # Simulate a successful chat response
-        with patch('src.llm_interface.implementations.mistral_api.MistralAPIService') as mock_llm:
+        with patch("src.llm_interface.implementations.mistral_api.MistralAPIService") as mock_llm:
             # Configure the LLM mock
             mock_instance = mock_llm.return_value
             mock_instance.generate.return_value = AsyncMock()
@@ -161,13 +144,13 @@ class TestChatWorkflowIntegration:
             mock_instance.generate.return_value.finish_reason = "stop"
 
             # Simulate the vector store
-            with patch('src.rag_core.implementations.faiss_store.FaissVectorStore') as mock_vector:
+            with patch("src.rag_core.implementations.faiss_store.FaissVectorStore") as mock_vector:
                 mock_vector_instance = mock_vector.return_value
                 mock_vector_instance.query.return_value = [
                     {
-                        'text': 'Contexte pertinent pour la réponse',
-                        'source': 'guide_utilisateur.pdf',
-                        'similarity_score': 0.85
+                        "text": "Contexte pertinent pour la réponse",
+                        "source": "guide_utilisateur.pdf",
+                        "similarity_score": 0.85,
                     }
                 ]
 
@@ -175,7 +158,7 @@ class TestChatWorkflowIntegration:
                 chat_request = {
                     "question": "Comment utiliser Mimir ?",
                     "context_limit": 3,
-                    "include_sources": True
+                    "include_sources": True,
                 }
 
                 response = client.post("/api/v1/chat/stream", json=chat_request)
@@ -198,15 +181,14 @@ class TestChatWorkflowIntegration:
         questions = [
             "Bonjour, je découvre Mimir",
             "Peux-tu m'expliquer le RAG ?",
-            "Comment configurer le système ?"
+            "Comment configurer le système ?",
         ]
 
         start_events = []
         for question in questions:
-            response = client.post("/api/v1/chat/stream", json={
-                "question": question,
-                "session_id": session_id
-            })
+            response = client.post(
+                "/api/v1/chat/stream", json={"question": question, "session_id": session_id}
+            )
 
             assert response.status_code == 200
             events = _sse_events(response.text)
@@ -227,14 +209,14 @@ class TestChatWorkflowIntegration:
             {"type": "assistant", "content": "Puis-je vous aider avec l'installation ?"},
             {"type": "user", "content": "Ça ne fonctionne toujours pas"},
             {"type": "assistant", "content": "Essayez de redémarrer le service"},
-            {"type": "user", "content": "J'ai besoin d'aide humaine"}
+            {"type": "user", "content": "J'ai besoin d'aide humaine"},
         ]
 
         escalation_request = {
             "question": "Le système ne démarre pas après l'installation",
             "session_id": "escalation_session_123",
             "chat_history": chat_history,
-            "user_email": "user@example.com"
+            "user_email": "user@example.com",
         }
 
         response = client.post("/api/v1/chat/escalate", json=escalation_request)
@@ -257,10 +239,9 @@ class TestAdminWorkflowIntegration:
         client = TestClient(test_app)
 
         # Authentication attempt
-        login_response = client.post("/api/v1/auth/login", json={
-            "username": "admin",
-            "password": "admin123"
-        })
+        login_response = client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
+        )
 
         if login_response.status_code == 200:
             token = login_response.json()["access_token"]
@@ -291,9 +272,7 @@ class TestErrorRecoveryWorkflow:
         client = TestClient(test_app)
 
         # The system must handle LLM unavailability gracefully
-        response = client.post("/api/v1/chat/stream", json={
-            "question": "Test question"
-        })
+        response = client.post("/api/v1/chat/stream", json={"question": "Test question"})
 
         # The system must either succeed with a degraded response (200),
         # or return an appropriate error (500/503)
@@ -304,13 +283,13 @@ class TestErrorRecoveryWorkflow:
         client = TestClient(test_app)
 
         # Simulate a vector store error
-        with patch('src.rag_core.implementations.faiss_store.FaissVectorStore') as mock_vector:
+        with patch("src.rag_core.implementations.faiss_store.FaissVectorStore") as mock_vector:
             mock_instance = mock_vector.return_value
             mock_instance.query.side_effect = Exception("Vector store indisponible")
 
-            response = client.post("/api/v1/chat/stream", json={
-                "question": "Test avec vector store en erreur"
-            })
+            response = client.post(
+                "/api/v1/chat/stream", json={"question": "Test avec vector store en erreur"}
+            )
 
             # The system must handle the error gracefully
             assert response.status_code in [200, 500, 503]
@@ -330,18 +309,23 @@ class TestConcurrencyWorkflow:
         def chat_worker(worker_id):
             """Worker performing a chat request"""
             start_time = time.time()
-            response = client.post("/api/v1/chat/stream", json={
-                "question": f"Question du worker {worker_id}",
-                "session_id": f"concurrent_session_{worker_id}"
-            })
+            response = client.post(
+                "/api/v1/chat/stream",
+                json={
+                    "question": f"Question du worker {worker_id}",
+                    "session_id": f"concurrent_session_{worker_id}",
+                },
+            )
             duration = time.time() - start_time
 
-            results.append({
-                "worker_id": worker_id,
-                "status_code": response.status_code,
-                "duration": duration,
-                "success": response.status_code == 200
-            })
+            results.append(
+                {
+                    "worker_id": worker_id,
+                    "status_code": response.status_code,
+                    "duration": duration,
+                    "success": response.status_code == 200,
+                }
+            )
 
         # Launch 5 chat requests in parallel
         threads = []

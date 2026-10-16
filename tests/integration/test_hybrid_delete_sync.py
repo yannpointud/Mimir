@@ -15,7 +15,7 @@ import hashlib
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import numpy as np
 import pytest

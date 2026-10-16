@@ -14,6 +14,7 @@ prove:
 The real production database (backend/data/sqlite/mimir.db) is never touched:
 everything lives under a data/ subtree of tmp_path.
 """
+
 import importlib.util
 import sqlite3
 from pathlib import Path
@@ -125,12 +126,8 @@ def test_rotation_keeps_only_max_count(tmp_path):
     # a unique, monotonically increasing timestamp so every iteration leaves a
     # distinct file for rotation to prune.
     for i in range(max_count + 2):
-        backup_mod.backup(
-            source_path=source, backup_dir=backup_dir, max_count=max_count
-        )
-        newest = max(
-            backup_dir.glob("mimir-*.db"), key=lambda p: p.stat().st_mtime
-        )
+        backup_mod.backup(source_path=source, backup_dir=backup_dir, max_count=max_count)
+        newest = max(backup_dir.glob("mimir-*.db"), key=lambda p: p.stat().st_mtime)
         unique = backup_dir / f"mimir-2020010{i}T000000Z.db"
         if newest.name != unique.name:
             newest.rename(unique)
