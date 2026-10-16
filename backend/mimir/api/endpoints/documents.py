@@ -87,7 +87,7 @@ reader_router = APIRouter(
 
 
 @router.get("/", response_model=DocumentListResponse)
-async def list_documents(
+def list_documents(
     pagination: PaginationModel = Depends(),
     status_filter: str | None = Query(None, description="Filter by document status"),
     search: str | None = Query(None, description="Search in filenames"),
@@ -112,7 +112,7 @@ async def list_documents(
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(
+def get_document(
     document_id: int, doc_repo: DocumentRepository = Depends(get_document_repository)
 ) -> DocumentResponse:
     """Get specific document by ID."""
@@ -141,7 +141,7 @@ async def get_document_with_chunks(
 
 
 @reader_router.get("/{document_id}/download")
-async def download_document(
+def download_document(
     document_id: int, doc_repo: DocumentRepository = Depends(get_document_repository)
 ) -> FileResponse:
     """Download the original document file."""
@@ -261,7 +261,7 @@ async def delete_document(
 
 
 @router.patch("/{document_id}/preserve", response_model=DocumentResponse)
-async def toggle_document_preservation(
+def toggle_document_preservation(
     document_id: int,
     preserve: bool = Query(..., description="New preservation status"),
     current_user: dict[str, Any] = Depends(get_current_user),
@@ -282,7 +282,7 @@ async def toggle_document_preservation(
 
 
 @router.post("/{document_id}/reprocess", response_model=BaseResponse)
-async def reprocess_document(
+def reprocess_document(
     document_id: int,
     current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),

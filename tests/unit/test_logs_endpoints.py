@@ -72,7 +72,7 @@ class TestReceiveFrontendLog:
             timestamp="2023-12-01T10:00:00Z", level="INFO", module="app", message="Test message"
         )
 
-        response = await receive_frontend_log(log_entry)
+        response = receive_frontend_log(log_entry)
 
         assert response.status == "success"
         assert response.message == "Log entry stored successfully"
@@ -91,7 +91,7 @@ class TestReceiveFrontendLog:
             timestamp="2023-12-01T10:00:00Z", level="ERROR", module="auth", message="Login failed"
         )
 
-        response = await receive_frontend_log(log_entry)
+        response = receive_frontend_log(log_entry)
 
         assert response.status == "success"
         assert response.message == "Log entry stored successfully"
@@ -116,7 +116,7 @@ class TestReceiveFrontendLog:
             extra_data={"component": "UserTable", "props": {"id": 123}},
         )
 
-        response = await receive_frontend_log(log_entry)
+        response = receive_frontend_log(log_entry)
 
         assert response.status == "success"
 
@@ -138,7 +138,7 @@ class TestReceiveFrontendLog:
             timestamp="2023-12-01T10:00:00Z", level="UNKNOWN", module="app", message="Test message"
         )
 
-        response = await receive_frontend_log(log_entry)
+        response = receive_frontend_log(log_entry)
 
         assert response.status == "success"
 
@@ -154,7 +154,7 @@ class TestReceiveFrontendLog:
             timestamp="2023-12-01T10:00:00Z", level="DEBUG", module="debug", message="Debug info"
         )
 
-        response = await receive_frontend_log(log_entry)
+        response = receive_frontend_log(log_entry)
 
         assert response.status == "success"
 
@@ -173,7 +173,7 @@ class TestReceiveFrontendLog:
             message="Critical error",
         )
 
-        response = await receive_frontend_log(log_entry)
+        response = receive_frontend_log(log_entry)
 
         assert response.status == "success"
 

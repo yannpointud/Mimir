@@ -117,10 +117,8 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_doc_list_response.return_value = mock_response
 
         # Call the function
-        result = asyncio.run(
-            list_documents(
-                pagination=mock_pagination, status_filter=None, search=None, doc_repo=mock_doc_repo
-            )
+        result = list_documents(
+            pagination=mock_pagination, status_filter=None, search=None, doc_repo=mock_doc_repo
         )
 
         # Assertions
@@ -144,13 +142,11 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_doc_list_response.return_value = mock_response
 
         # Call the function
-        result = asyncio.run(
-            list_documents(
-                pagination=mock_pagination,
-                status_filter="indexed",
-                search="doc1",
-                doc_repo=mock_doc_repo,
-            )
+        result = list_documents(
+            pagination=mock_pagination,
+            status_filter="indexed",
+            search="doc1",
+            doc_repo=mock_doc_repo,
         )
 
         # Assertions
@@ -181,10 +177,8 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_doc_list_response.return_value = mock_response
 
         # Call the function
-        result = asyncio.run(
-            list_documents(
-                pagination=mock_pagination, status_filter=None, search=None, doc_repo=mock_doc_repo
-            )
+        result = list_documents(
+            pagination=mock_pagination, status_filter=None, search=None, doc_repo=mock_doc_repo
         )
 
         # Assertions
@@ -202,7 +196,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.get_by_id.return_value = mock_document
 
         # Call the function
-        asyncio.run(get_document(document_id=1, doc_repo=mock_doc_repo))
+        get_document(document_id=1, doc_repo=mock_doc_repo)
 
         # Assertions
         mock_doc_repo.get_by_id.assert_called_once_with(1)
@@ -216,7 +210,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(get_document(document_id=999, doc_repo=mock_doc_repo))
+            get_document(document_id=999, doc_repo=mock_doc_repo)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert "999" in str(exc_info.value.detail)
@@ -694,14 +688,12 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
         mock_doc_repo.update_preserve_status.return_value = updated_doc
 
         # Call the function
-        asyncio.run(
-            toggle_document_preservation(
-                document_id=1,
-                preserve=True,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo,
-            )
+        toggle_document_preservation(
+            document_id=1,
+            preserve=True,
+            current_user=mock_current_user,
+            doc_repo=mock_doc_repo,
+            audit_repo=mock_audit_repo,
         )
 
         # Assertions
@@ -716,14 +708,12 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
         mock_doc_repo.update_preserve_status.side_effect = NotFoundError("Document 999 not found")
 
         with pytest.raises(NotFoundError):
-            asyncio.run(
-                toggle_document_preservation(
-                    document_id=999,
-                    preserve=True,
-                    current_user=mock_current_user,
-                    doc_repo=mock_doc_repo,
-                    audit_repo=mock_audit_repo,
-                )
+            toggle_document_preservation(
+                document_id=999,
+                preserve=True,
+                current_user=mock_current_user,
+                doc_repo=mock_doc_repo,
+                audit_repo=mock_audit_repo,
             )
         mock_audit_repo.create_log.assert_not_called()
 
@@ -743,14 +733,12 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
         mock_ingestion_processor.queue_document.return_value = True
 
         # Call the function
-        result = asyncio.run(
-            reprocess_document(
-                document_id=1,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo,
-                ingestion_processor=mock_ingestion_processor,
-            )
+        result = reprocess_document(
+            document_id=1,
+            current_user=mock_current_user,
+            doc_repo=mock_doc_repo,
+            audit_repo=mock_audit_repo,
+            ingestion_processor=mock_ingestion_processor,
         )
 
         # Assertions
@@ -768,13 +756,11 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                reprocess_document(
-                    document_id=999,
-                    current_user=mock_current_user,
-                    doc_repo=mock_doc_repo,
-                    audit_repo=mock_audit_repo,
-                )
+            reprocess_document(
+                document_id=999,
+                current_user=mock_current_user,
+                doc_repo=mock_doc_repo,
+                audit_repo=mock_audit_repo,
             )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
@@ -862,28 +848,24 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         mock_vector_store.delete.return_value = True
 
         # 1. Document retrieval (skip upload as too complex to mock)
-        get_result = asyncio.run(get_document(document_id=1, doc_repo=mock_doc_repo))
+        get_result = get_document(document_id=1, doc_repo=mock_doc_repo)
 
         # 2. Preservation toggle
-        preserve_result = asyncio.run(
-            toggle_document_preservation(
-                document_id=1,
-                preserve=True,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo,
-            )
+        preserve_result = toggle_document_preservation(
+            document_id=1,
+            preserve=True,
+            current_user=mock_current_user,
+            doc_repo=mock_doc_repo,
+            audit_repo=mock_audit_repo,
         )
 
         # 3. Reprocessing
-        reprocess_result = asyncio.run(
-            reprocess_document(
-                document_id=1,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo,
-                ingestion_processor=mock_ingestion_processor,
-            )
+        reprocess_result = reprocess_document(
+            document_id=1,
+            current_user=mock_current_user,
+            doc_repo=mock_doc_repo,
+            audit_repo=mock_audit_repo,
+            ingestion_processor=mock_ingestion_processor,
         )
 
         # 4. Forced deletion (because protected)
@@ -972,7 +954,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         with patch("os.path.exists", return_value=True):
             from mimir.api.endpoints.documents import download_document
 
-            asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
+            download_document(document_id=1, doc_repo=mock_doc_repo)
 
         # Assertions
         mock_doc_repo.get_by_id.assert_called_once_with(1)
@@ -991,7 +973,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         from mimir.api.endpoints.documents import download_document
 
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(download_document(document_id=999, doc_repo=mock_doc_repo))
+            download_document(document_id=999, doc_repo=mock_doc_repo)
 
         assert exc_info.value.status_code == 404
         assert "Document with ID 999 not found" in str(exc_info.value.detail)
@@ -1007,7 +989,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             from mimir.api.endpoints.documents import download_document
 
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
+                download_document(document_id=1, doc_repo=mock_doc_repo)
 
         assert exc_info.value.status_code == 404
         assert "Original document file not found on disk" in str(exc_info.value.detail)
@@ -1027,7 +1009,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         with patch("os.path.exists", return_value=True):
             from mimir.api.endpoints.documents import download_document
 
-            asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
+            download_document(document_id=1, doc_repo=mock_doc_repo)
 
         # Verify default mime type is used
         call_args = mock_file_response.call_args

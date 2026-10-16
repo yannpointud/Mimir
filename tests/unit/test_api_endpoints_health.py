@@ -76,7 +76,7 @@ class TestDiskUsage:
         monkeypatch.setattr(config.settings, "data_dir", str(tmp_path))
         monkeypatch.setattr(config.settings, "upload_dir", str(tmp_path / "missing"))
 
-        result = asyncio.run(health.disk_usage())
+        result = health.disk_usage()
 
         assert result["healthy"] is True
         assert result["disk_usage"]["data_dir"]["total_gb"] > 0

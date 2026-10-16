@@ -45,7 +45,7 @@ router = APIRouter(
 
 
 @router.post("/frontend", response_model=LogResponse)
-async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
+def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
     """Receive and store a frontend log entry.
 
     This endpoint accepts log entries from the frontend application

@@ -11,7 +11,6 @@ Everything is imported through the ``src.`` namespace, like the modules under
 test import each other, so patches and singletons hit the same module objects.
 """
 
-import asyncio
 from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -355,7 +354,7 @@ class TestRestoredFallbacks:
             mock_settings.data_dir = str(tmp_path)
             mock_settings.upload_dir = str(tmp_path)
             mock_settings.faiss_index_path = str(tmp_path / "index.bin")
-            result = asyncio.run(health.disk_usage())
+            result = health.disk_usage()
 
         assert result["healthy"] is True
         assert result["disk_usage"]["data_dir"] == {"path": str(tmp_path), "error": "boom"}

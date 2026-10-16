@@ -103,7 +103,7 @@ async def cache_health() -> dict[str, Any]:
 
 
 @router.get("/disk-usage", response_model=dict[str, Any])
-async def disk_usage() -> dict[str, Any]:
+def disk_usage() -> dict[str, Any]:
     """Disk usage of the data directories."""
     data_dirs = {
         "data_dir": settings.data_dir,

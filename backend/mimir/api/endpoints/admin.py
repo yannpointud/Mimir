@@ -72,7 +72,7 @@ router = APIRouter(
 
 
 @router.get("/system-info", response_model=dict[str, Any])
-async def get_system_info(current_user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+def get_system_info(current_user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     """Platform, hardware and application information."""
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
@@ -144,7 +144,7 @@ async def get_cache_stats(
 
 
 @router.post("/cache/clear", response_model=BaseResponse)
-async def clear_cache(
+def clear_cache(
     cache_type: str = Query("all", description="Cache type to clear (all, main, chat)"),
     current_user: dict[str, Any] = Depends(require_admin),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
@@ -177,7 +177,7 @@ async def clear_cache(
 
 
 @router.get("/config", response_model=AdminConfigurationResponse)
-async def get_configuration(
+def get_configuration(
     current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
 ) -> AdminConfigurationResponse:
@@ -202,7 +202,7 @@ async def get_configuration(
 
 
 @router.put("/config", response_model=BaseResponse)
-async def update_configuration(
+def update_configuration(
     config_updates: dict[str, str],
     current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
@@ -240,7 +240,7 @@ async def update_configuration(
 
 
 @router.get("/audit-log", response_model=AuditLogPage)
-async def get_audit_log(
+def get_audit_log(
     pagination: PaginationModel = Depends(),
     action_filter: str | None = Query(None, description="Filter by action type"),
     user_type_filter: str | None = Query(None, description="Filter by user type"),
@@ -290,7 +290,7 @@ async def get_audit_log(
 
 
 @router.get("/usage", response_model=UsageResponse)
-async def get_usage(
+def get_usage(
     days_back: int = Query(30, ge=1, le=90, description="Number of days of history to return"),
     current_user: dict[str, Any] = Depends(require_admin),
     usage_repo: UsageRepository = Depends(get_usage_repository),
@@ -339,7 +339,7 @@ async def test_email_service(
 
 
 @router.get("/logs", response_model=dict[str, Any])
-async def get_system_logs(
+def get_system_logs(
     level: str | None = Query(None, description="Log level filter (ALL, DEBUG, INFO, WARN, ERROR)"),
     source: str | None = Query(None, description="Source filter (ALL, backend, frontend)"),
     module: str | None = Query(None, description="Module name filter"),
