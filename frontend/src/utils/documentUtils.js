@@ -1,4 +1,7 @@
 import { documentsAPI } from '../services/api';
+import { createLogger } from './logger';
+
+const logger = createLogger('DocumentUtils');
 
 /**
  * Opens a document in a new browser tab, falling back to a download when the
@@ -61,11 +64,11 @@ export const validateChunkIndexes = (relevantChunks, documentChunks) => {
 
   const isValid = matchingCount === relevantChunks.length;
 
-  console.log(`[DocumentUtils] Validation chunk_index: ${matchingCount}/${relevantChunks.length} correspondent`, {
+  logger.debug(`chunk_index validation: ${matchingCount}/${relevantChunks.length} match`, {
     isValid,
     matchingCount,
     totalRelevant: relevantChunks.length,
-    missingIndexes: missingIndexes.length > 0 ? missingIndexes : 'aucun'
+    missingIndexes
   });
 
   return {

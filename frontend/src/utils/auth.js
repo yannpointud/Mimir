@@ -1,5 +1,9 @@
 // Authentication management utilities
 
+import { createLogger } from './logger';
+
+const logger = createLogger('Auth');
+
 export const AUTH_TOKEN_KEY = 'authToken';
 export const USER_KEY = 'user';
 
@@ -10,7 +14,7 @@ const safeLocalStorage = {
       const item = localStorage.getItem(key);
       return item && item !== 'undefined' ? item : null;
     } catch (error) {
-      console.error(`Erreur lors de la lecture de ${key}:`, error);
+      logger.error(`Failed to read ${key} from localStorage`, error);
       return null;
     }
   },
@@ -19,7 +23,7 @@ const safeLocalStorage = {
       localStorage.setItem(key, value);
       return true;
     } catch (error) {
-      console.error(`Erreur lors de l'écriture de ${key}:`, error);
+      logger.error(`Failed to write ${key} to localStorage`, error);
       return false;
     }
   },
@@ -28,7 +32,7 @@ const safeLocalStorage = {
       localStorage.removeItem(key);
       return true;
     } catch (error) {
-      console.error(`Erreur lors de la suppression de ${key}:`, error);
+      logger.error(`Failed to remove ${key} from localStorage`, error);
       return false;
     }
   }
@@ -61,7 +65,7 @@ export const getUser = () => {
     }
     return null;
   } catch (error) {
-    console.error('Erreur lors du parsing des données utilisateur:', error);
+    logger.error('Failed to parse the stored user', error);
     // Clean up corrupted data
     removeUser();
     return null;
@@ -73,7 +77,7 @@ export const setUser = (user) => {
   try {
     return safeLocalStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch (error) {
-    console.error('Erreur lors de la sérialisation des données utilisateur:', error);
+    logger.error('Failed to serialize the user', error);
     return false;
   }
 };
@@ -114,7 +118,7 @@ export const parseJWT = (token) => {
     );
     return JSON.parse(jsonPayload);
   } catch (error) {
-    console.error('Erreur lors du parsing du JWT:', error);
+    logger.error('Failed to parse the JWT', error);
     return null;
   }
 };

@@ -1,5 +1,8 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { createLogger } from './logger';
+
+const logger = createLogger('Helpers');
 
 // Utility to merge CSS classes with Tailwind
 export function cn(...inputs) {
@@ -152,7 +155,7 @@ export const copyToClipboard = async (text) => {
     await navigator.clipboard.writeText(text);
     return true;
   } catch (error) {
-    console.error('Erreur lors de la copie:', error);
+    logger.error('Clipboard copy failed', error);
     // Fallback for older browsers
     try {
       const textArea = document.createElement('textarea');
@@ -163,7 +166,7 @@ export const copyToClipboard = async (text) => {
       document.body.removeChild(textArea);
       return true;
     } catch (fallbackError) {
-      console.error('Erreur lors de la copie (fallback):', fallbackError);
+      logger.error('Clipboard copy fallback failed', fallbackError);
       return false;
     }
   }
@@ -239,7 +242,7 @@ export const safeGetProperty = (obj, path, fallback = null) => {
       return current && current[key] !== undefined ? current[key] : fallback;
     }, obj);
   } catch (error) {
-    console.warn(`Erreur lors de l'accès à la propriété ${path}:`, error);
+    logger.warn(`Failed to read the property ${path}`, { error: error.message });
     return fallback;
   }
 };

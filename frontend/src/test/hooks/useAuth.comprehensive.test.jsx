@@ -148,8 +148,8 @@ describe('useAuth - Tests Complets', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Erreur lors de la vérification de l\'authentification:',
-        expect.any(String)
+        expect.stringContaining('Authentication check failed'),
+        expect.objectContaining({ module: 'AuthContext' })
       );
       expect(authUtils.logout).toHaveBeenCalled();
       expect(result.current.isAuthenticated).toBe(false);
@@ -215,8 +215,8 @@ describe('useAuth - Tests Complets', () => {
       });
       expect(result.current.isAuthenticated).toBe(false);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Erreur lors de la connexion:',
-        expect.any(String)
+        expect.stringContaining('Login failed'),
+        expect.objectContaining({ module: 'AuthContext' })
       );
     });
 
@@ -310,8 +310,8 @@ describe('useAuth - Tests Complets', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Erreur lors de la déconnexion:',
-        expect.any(String)
+        expect.stringContaining('Logout failed'),
+        expect.objectContaining({ module: 'AuthContext' })
       );
       expect(authUtils.logout).toHaveBeenCalled();
       expect(result.current.isAuthenticated).toBe(false);
@@ -360,8 +360,8 @@ describe('useAuth - Tests Complets', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Erreur lors du rafraîchissement du token:',
-        expect.any(String)
+        expect.stringContaining('Token refresh failed'),
+        expect.objectContaining({ module: 'AuthContext' })
       );
       expect(authUtils.logout).toHaveBeenCalled();
       expect(refreshResult).toBe(false);

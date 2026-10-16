@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import Modal from '../Common/Modal';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('DocumentsList');
 
 const DocumentsList = () => {
   const { onRefresh, refreshTrigger } = useOutletContext();
@@ -80,7 +83,7 @@ const DocumentsList = () => {
 
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
-      console.error('Erreur lors du chargement des documents:', error);
+      logger.error('Failed to load the documents', error);
       setError(getErrorMessage(error));
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
@@ -95,7 +98,7 @@ const DocumentsList = () => {
       setErrorCount(response.total_count || 0);
     } catch (error) {
       // Non-critical: leave the previous count on failure
-      console.error('Erreur lors du comptage des documents en erreur:', error);
+      logger.error('Failed to count the failed documents', error);
     }
   }, []);
 
@@ -157,7 +160,7 @@ const DocumentsList = () => {
       onRefresh?.();
 
     } catch (error) {
-      console.error('Erreur lors de la relance des documents en erreur:', error);
+      logger.error('Failed to retry the failed documents', error);
       setError(getErrorMessage(error));
     } finally {
       setRetryingAll(false);
@@ -181,7 +184,7 @@ const DocumentsList = () => {
       setSelectedDocument(null);
 
     } catch (error) {
-      console.error('Erreur lors de la suppression:', error);
+      logger.error('Failed to delete the document', error);
       setError(getErrorMessage(error));
     } finally {
       setActionLoading(false);
@@ -198,7 +201,7 @@ const DocumentsList = () => {
       onRefresh?.();
 
     } catch (error) {
-      console.error('Erreur lors de la modification:', error);
+      logger.error('Failed to update the document', error);
       setError(getErrorMessage(error));
     } finally {
       setActionLoading(false);
@@ -216,7 +219,7 @@ const DocumentsList = () => {
       onRefresh?.();
 
     } catch (error) {
-      console.error('Erreur lors du retraitement:', error);
+      logger.error('Failed to reprocess the document', error);
       setError(getErrorMessage(error));
     } finally {
       setActionLoading(false);

@@ -142,7 +142,7 @@ export const chatAPI = {
                       break;
                   }
                 } catch (parseError) {
-                  console.error('Failed to parse SSE event:', jsonStr, parseError);
+                  apiLogger.error('Failed to parse SSE event', parseError, { event: jsonStr });
                 }
               }
             }

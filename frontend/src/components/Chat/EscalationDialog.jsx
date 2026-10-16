@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Mail, Send, Info } from 'lucide-react';
 import { isValidEmail, createMailtoLink, cn } from '../../utils/helpers';
 import Modal from '../Common/Modal';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('EscalationDialog');
 
 const MESSAGE_MAX_LENGTH = 1000;
 
@@ -53,7 +56,7 @@ const EscalationDialog = ({ isOpen, onClose, onEscalate, chatHistory }) => {
     try {
       await onEscalate(userEmail, message.trim());
     } catch (error) {
-      console.error('Erreur lors de l\'escalade:', error);
+      logger.error('Escalation failed', error);
     } finally {
       setIsSubmitting(false);
     }

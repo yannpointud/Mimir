@@ -16,6 +16,9 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 
 import { adminAPI, authAPI } from '../../services/api';
 import { getErrorMessage, cn } from '../../utils/helpers';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ConfigPanel');
 
 const ConfigPanel = () => {
   const [config, setConfig] = useState(null);
@@ -54,7 +57,7 @@ const ConfigPanel = () => {
       setSystemInfo(systemData);
 
     } catch (error) {
-      console.error('Erreur lors du chargement de la configuration:', error);
+      logger.error('Failed to load the configuration', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
