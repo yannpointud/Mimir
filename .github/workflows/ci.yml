@@ -110,3 +110,36 @@ jobs:
         run: |
           pip-audit -r requirements-dev.lock --require-hashes --disable-pip
           pip-audit -r requirements.lock --require-hashes --disable-pip
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
+      # Production dependencies only: the dev toolchain never reaches the
+      # image. Moderate advisories that need a major upgrade are tolerated.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
