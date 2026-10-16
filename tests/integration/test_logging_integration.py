@@ -71,7 +71,7 @@ class TestLoggingIntegration:
 
         # Créer un store FAISS temporaire
         index_path = temp_log_dir / "test.index"
-        metadata_path = temp_log_dir / "test.pkl"
+        metadata_path = temp_log_dir / "test.json"
 
         store = FaissVectorStore(
             dimension=128,
@@ -198,7 +198,7 @@ class TestJalon2AcceptanceCriteria:
 
         # 2. FAISS Vector Store
         index_path = temp_workspace / "acceptance.index"
-        metadata_path = temp_workspace / "acceptance.pkl"
+        metadata_path = temp_workspace / "acceptance.json"
 
         faiss_store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -278,7 +278,7 @@ class TestJalon2AcceptanceCriteria:
 
         # Créer un store FAISS
         index_path = temp_workspace / "workflow.index"
-        metadata_path = temp_workspace / "workflow.pkl"
+        metadata_path = temp_workspace / "workflow.json"
 
         store = FaissVectorStore(
             dimension=128,
@@ -421,7 +421,7 @@ class TestJalon2AcceptanceCriteria:
 
         # 5. Stockage vectoriel
         index_path = temp_workspace / "e2e.index"
-        metadata_path = temp_workspace / "e2e.pkl"
+        metadata_path = temp_workspace / "e2e.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)

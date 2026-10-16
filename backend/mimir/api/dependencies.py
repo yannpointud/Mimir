@@ -24,6 +24,7 @@ from mimir.config import settings
 from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.interfaces import VectorStoreConnectionError
 from mimir.monitoring.rag_debug_logger import rag_debug_service
 from mimir.services.rag_service import RagService
 from mimir.monitoring.logger import setup_logger
@@ -120,7 +121,8 @@ def get_bm25_store() -> Bm25LexicalStore:
         _bm25_store = Bm25LexicalStore(index_path=settings.bm25_index_path)
         try:
             _bm25_store.load()
-        except Exception as e:  # noqa: BLE001 - startup boundary: never fail on a bad/missing index
+        except VectorStoreConnectionError as e:
+            # BM25 is derived from FAISS: the startup rebuild restores it
             logger.warning(f"BM25 lexical index failed to load, starting empty: {e}")
     return _bm25_store
 

@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from mimir.cache.lru_cache import cache_service, chat_cache_service
 from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
 from mimir.shared.models import ConsistencyValidationResponse
@@ -29,49 +31,18 @@ _CLEANUP_DELETED_RATIO = 0.20
 async def remove_document_from_indexes(
     vector_store: Any, bm25_store: Any, document_id: int, filename: str
 ) -> None:
-    """Remove a document's chunks from FAISS, then resync BM25 from FAISS.
+    """Remove a document's chunks from FAISS, then rebuild BM25 from FAISS.
 
-    Orphan cleanup and BM25 failures are logged and never fail the deletion;
-    a failure of the FAISS removal itself propagates to the caller.
+    FAISS compacts itself when deletions accumulate; BM25 is rebuilt from the
+    resulting snapshot, so the chunk ids reflect any compaction.
     """
     vector_deleted = await asyncio.to_thread(vector_store.delete, str(document_id))
     if not vector_deleted:
         logger.warning(f"Failed to remove document chunks from vector store: {filename}")
         return
-
     logger.info(f"Document chunks removed from vector store: {filename} (ID: {document_id})")
-    await _clean_orphans_if_fragmented(vector_store)
-
-    # Rebuild the BM25 lexical index from the FAISS source of truth. This is
-    # the SECOND single-writer call site (the ingestion worker is the first);
-    # no separate writer keeps the two indexes in sync. Metadata is read AFTER
-    # the orphan cleanup so the chunk ids reflect any optimization.
-    try:
-        # Snapshot active chunks UNDER the FAISS lock.
-        active_chunks = vector_store.snapshot_active_chunks()
-        await asyncio.to_thread(bm25_store.rebuild, active_chunks)
-    except Exception as bm25_error:  # noqa: BLE001 - best effort: the FAISS removal already succeeded
-        logger.warning(f"BM25 rebuild after deletion failed - continuing anyway: {bm25_error}")
-
-
-async def _clean_orphans_if_fragmented(vector_store: Any) -> None:
-    """Preventive orphan cleanup once too many vectors are marked deleted."""
-    try:
-        stats = await asyncio.to_thread(vector_store.get_stats)
-        deleted_ratio = stats.get("deleted_vectors", 0) / max(stats.get("total_vectors", 1), 1)
-        if deleted_ratio > _CLEANUP_DELETED_RATIO:
-            logger.info(
-                f"Triggering orphan cleanup after deletion (deleted ratio: {deleted_ratio:.2%})"
-            )
-            cleanup_result = await asyncio.to_thread(
-                vector_store.clean_orphans, create_backup=False
-            )
-            logger.info(
-                f"Orphan cleanup completed: {cleanup_result.get('cleaned_chunks', 0)} orphans removed"
-            )
-    except Exception as cleanup_error:  # noqa: BLE001 - best effort: independent of the BM25 resync that follows
-        # The deletion itself already succeeded
-        logger.warning(f"Orphan cleanup after deletion failed: {cleanup_error}")
+    active_chunks = vector_store.snapshot_active_chunks()
+    await asyncio.to_thread(bm25_store.rebuild, active_chunks)
 
 
 @dataclass
@@ -117,7 +88,7 @@ async def rebuild_indexes(vector_store: Any, bm25_store: Any, document_repo: Any
         vector_store.rebuild_vector_store,
         force_rebuild=True,
         cleanup_orphans=True,
-        existing_document_ids=_existing_document_ids(document_repo),
+        existing_document_ids={str(doc.id) for doc in document_repo.get_all()},
     )
 
     # Resync the BM25 lexical index from the freshly optimized FAISS snapshot
@@ -134,21 +105,6 @@ async def rebuild_indexes(vector_store: Any, bm25_store: Any, document_repo: Any
     chat_cache_service.invalidate_all()
 
     return IndexRebuild(stats_before, stats_after, rebuild_result, duration_ms)
-
-
-def _existing_document_ids(document_repo: Any) -> set[str] | None:
-    """Ids of the documents still in the database, None if they cannot be listed.
-
-    Taken from the request's repository so the orphan cleanup uses the same
-    database as the request, instead of the store opening its own global
-    DatabaseManager connection. On failure the store applies its own lookup
-    and fallback.
-    """
-    try:
-        return {str(doc.id) for doc in document_repo.get_all()}
-    except Exception as e:  # noqa: BLE001 - best effort: the store falls back to its own document lookup
-        logger.error(f"Failed to list documents for orphan cleanup: {str(e)}")
-        return None
 
 
 def record_rebuild(audit_repo: Any, rebuild: IndexRebuild, admin_user: str) -> None:
@@ -179,8 +135,8 @@ def record_rebuild_failure(audit_repo: Any, error: Exception, admin_user: str) -
             ip_address="system",
             success=False,
         )
-    except Exception as audit_error:  # noqa: BLE001 - best effort: the route still answers its rebuild 500
-        # Admin traceability: never silence the audit failure either
+    except SQLAlchemyError as audit_error:
+        # The rebuild error itself propagates: do not replace it with this one
         logger.warning(f"Failed to write audit log for rebuild failure: {audit_error}")
 
 
@@ -249,7 +205,7 @@ def _save_validation_report(validation_result: dict[str, Any], reports_dir: Path
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(validation_result, f, indent=2, default=str)
         logger.info(f"Validation report saved to {report_path}")
-    except Exception as e:  # noqa: BLE001 - best effort: the validation result is still returned
+    except OSError as e:
         logger.warning(f"Failed to save validation report: {e}")
     return report_path
 

@@ -35,7 +35,7 @@ def make_settings(tmp_path):
             "data_dir": str(tmp_path / "data"),
             "upload_dir": str(tmp_path / "uploads"),
             "faiss_index_path": str(tmp_path / "faiss" / "index.bin"),
-            "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.pkl"),
+            "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.json"),
         }
         base.update(overrides)
         return Settings(**base)

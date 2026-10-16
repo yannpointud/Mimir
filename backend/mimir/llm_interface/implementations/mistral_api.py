@@ -182,7 +182,7 @@ class MistralAPIService(AbstractLLMService):
                         logger.error(error_msg)
                         raise LLMAPIError(error_msg)
 
-            except aiohttp.ClientError as e:
+            except (aiohttp.ClientError, TimeoutError) as e:
                 error_msg = f"Network error: {str(e)}"
                 logger.error(error_msg)
                 last_exception = LLMAPIError(error_msg)
@@ -194,15 +194,6 @@ class MistralAPIService(AbstractLLMService):
                     continue
                 else:
                     raise last_exception from e
-
-            except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
-                # Re-raise LLM-specific exceptions without transformation
-                raise
-
-            except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
-                error_msg = f"Unexpected error: {str(e)}"
-                logger.error(error_msg)
-                raise LLMAPIError(error_msg) from e
 
         # Should not reach here
         if last_exception:
@@ -253,62 +244,53 @@ class MistralAPIService(AbstractLLMService):
                 parameters={"temperature": temperature, "max_tokens": max_tokens, **kwargs},
             )
 
-        try:
-            response = await self._make_request("chat/completions", payload)
+        response = await self._make_request("chat/completions", payload)
 
-            # Extract response data
-            choice = response["choices"][0]
-            content = choice["message"]["content"]
-            finish_reason = choice.get("finish_reason", "unknown")
+        # Extract response data
+        choice = response["choices"][0]
+        content = choice["message"]["content"]
+        finish_reason = choice.get("finish_reason", "unknown")
 
-            # Usage information (split for per-model input/output cost accounting)
-            usage = response.get("usage", {})
-            usage_tokens = usage.get("total_tokens", 0)
-            prompt_tokens = usage.get("prompt_tokens", 0)
-            completion_tokens = usage.get("completion_tokens", 0)
+        # Usage information (split for per-model input/output cost accounting)
+        usage = response.get("usage", {})
+        usage_tokens = usage.get("total_tokens", 0)
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
 
-            duration_ms = (time.time() - start_time) * 1000
+        duration_ms = (time.time() - start_time) * 1000
 
-            logger.info(
-                f"Text generation successful: {usage_tokens} tokens, "
-                f"{duration_ms:.1f}ms, finish: {finish_reason}",
-                extra={
-                    "extra_fields": {
-                        "model": self._model,
-                        "tokens": usage_tokens,
-                        "duration_ms": duration_ms,
-                        "finish_reason": finish_reason,
-                        "type": "text_generation",
-                    }
-                },
-            )
+        logger.info(
+            f"Text generation successful: {usage_tokens} tokens, "
+            f"{duration_ms:.1f}ms, finish: {finish_reason}",
+            extra={
+                "extra_fields": {
+                    "model": self._model,
+                    "tokens": usage_tokens,
+                    "duration_ms": duration_ms,
+                    "finish_reason": finish_reason,
+                    "type": "text_generation",
+                }
+            },
+        )
 
-            # Log LLM response if RAG debug is enabled
-            if rag_debug and session_id:
-                rag_debug.log_llm_response(
-                    session_id=session_id,
-                    response=content,
-                    tokens_used=usage_tokens,
-                    duration_ms=duration_ms,
-                    finish_reason=finish_reason,
-                )
-
-            return GenerationResponse(
-                content=content,
-                model=self._model,
-                usage_tokens=usage_tokens,
+        # Log LLM response if RAG debug is enabled
+        if rag_debug and session_id:
+            rag_debug.log_llm_response(
+                session_id=session_id,
+                response=content,
+                tokens_used=usage_tokens,
+                duration_ms=duration_ms,
                 finish_reason=finish_reason,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
             )
 
-        except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
-            # Re-raise LLM-specific exceptions
-            raise
-        except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
-            error_msg = f"Text generation failed: {str(e)}"
-            logger.error(error_msg)
-            raise LLMAPIError(error_msg) from e
+        return GenerationResponse(
+            content=content,
+            model=self._model,
+            usage_tokens=usage_tokens,
+            finish_reason=finish_reason,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
 
     async def generate_stream(
         self,
@@ -401,12 +383,8 @@ class MistralAPIService(AbstractLLMService):
                     finish_reason=finish_reason,
                 )
 
-        except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
-            raise
-        except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
-            error_msg = f"Streaming generation failed: {str(e)}"
-            logger.error(error_msg)
-            raise LLMAPIError(error_msg) from e
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise LLMAPIError(f"Streaming generation failed: {e}") from e
 
     def _stream_payload(
         self,
@@ -475,22 +453,16 @@ class MistralAPIService(AbstractLLMService):
 
             logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch_texts)} texts)")
 
-            try:
-                batch_response = await self._embed_batch(
-                    batch_texts, session_id=session_id, rag_debug=rag_debug
-                )
-                all_embeddings.extend(batch_response.embeddings)
-                total_usage_tokens += batch_response.usage_tokens
-                total_prompt_tokens += batch_response.prompt_tokens
+            batch_response = await self._embed_batch(
+                batch_texts, session_id=session_id, rag_debug=rag_debug
+            )
+            all_embeddings.extend(batch_response.embeddings)
+            total_usage_tokens += batch_response.usage_tokens
+            total_prompt_tokens += batch_response.prompt_tokens
 
-                logger.debug(
-                    f"Batch {batch_num} completed: {len(batch_response.embeddings)} embeddings, {batch_response.usage_tokens} tokens"
-                )
-
-            except Exception as e:  # noqa: BLE001 - any batch failure becomes LLMAPIError
-                error_msg = f"Embedding batch {batch_num}/{total_batches} failed: {str(e)}"
-                logger.error(error_msg)
-                raise LLMAPIError(error_msg) from e
+            logger.debug(
+                f"Batch {batch_num} completed: {len(batch_response.embeddings)} embeddings, {batch_response.usage_tokens} tokens"
+            )
 
         duration_ms = (time.time() - start_time) * 1000
 
@@ -530,51 +502,42 @@ class MistralAPIService(AbstractLLMService):
 
         payload = {"model": self._embedding_model, "input": texts, "encoding_format": "float"}
 
-        try:
-            response = await self._make_request("embeddings", payload)
+        response = await self._make_request("embeddings", payload)
 
-            # Extract embeddings
-            embeddings_data = response["data"]
-            embeddings = [item["embedding"] for item in embeddings_data]
+        # Extract embeddings
+        embeddings_data = response["data"]
+        embeddings = [item["embedding"] for item in embeddings_data]
 
-            # Usage information (embeddings have no completion tokens)
-            usage = response.get("usage", {})
-            usage_tokens = usage.get("total_tokens", 0)
-            prompt_tokens = usage.get("prompt_tokens", 0)
+        # Usage information (embeddings have no completion tokens)
+        usage = response.get("usage", {})
+        usage_tokens = usage.get("total_tokens", 0)
+        prompt_tokens = usage.get("prompt_tokens", 0)
 
-            duration_ms = (time.time() - start_time) * 1000
+        duration_ms = (time.time() - start_time) * 1000
 
-            # Log for single batch
-            if len(embeddings) == len(texts):
-                logger.info(
-                    f"Embedding generation successful: {len(embeddings)} embeddings, "
-                    f"{usage_tokens} tokens, {duration_ms:.1f}ms",
-                    extra={
-                        "extra_fields": {
-                            "model": self._embedding_model,
-                            "embedding_count": len(embeddings),
-                            "tokens": usage_tokens,
-                            "duration_ms": duration_ms,
-                            "type": "embedding_generation",
-                        }
-                    },
-                )
-
-            return EmbeddingResponse(
-                embeddings=embeddings,
-                model=self._embedding_model,
-                usage_tokens=usage_tokens,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=0,
+        # Log for single batch
+        if len(embeddings) == len(texts):
+            logger.info(
+                f"Embedding generation successful: {len(embeddings)} embeddings, "
+                f"{usage_tokens} tokens, {duration_ms:.1f}ms",
+                extra={
+                    "extra_fields": {
+                        "model": self._embedding_model,
+                        "embedding_count": len(embeddings),
+                        "tokens": usage_tokens,
+                        "duration_ms": duration_ms,
+                        "type": "embedding_generation",
+                    }
+                },
             )
 
-        except (LLMAPIError, LLMRateLimitError, LLMInvalidRequestError):
-            # Re-raise LLM-specific exceptions
-            raise
-        except Exception as e:  # noqa: BLE001 - any other failure becomes LLMAPIError
-            error_msg = f"Embedding generation failed: {str(e)}"
-            logger.error(error_msg)
-            raise LLMAPIError(error_msg) from e
+        return EmbeddingResponse(
+            embeddings=embeddings,
+            model=self._embedding_model,
+            usage_tokens=usage_tokens,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=0,
+        )
 
     async def health_check(self) -> bool:
         """Check if Mistral API is available"""

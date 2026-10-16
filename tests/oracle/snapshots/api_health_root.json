@@ -41,8 +41,7 @@
         "database": {
           "connection": "ok",
           "document_count": 0,
-          "healthy": true,
-          "response_time_ms": "<response_time_ms>"
+          "healthy": true
         },
         "email_service": {
           "configuration": {
@@ -112,8 +111,7 @@
     "body": {
       "connection": "ok",
       "document_count": 0,
-      "healthy": true,
-      "response_time_ms": "<response_time_ms>"
+      "healthy": true
     },
     "status": 200
   },
@@ -159,8 +157,7 @@
         "database": {
           "connection": "ok",
           "document_count": 0,
-          "healthy": true,
-          "response_time_ms": "<response_time_ms>"
+          "healthy": true
         },
         "llm_api": {
           "api_configured": true,

@@ -148,7 +148,7 @@ class TestFaissVectorStore:
     def test_faiss_store_initialization(self, temp_dir):
         """Test d'initialisation du store FAISS"""
         index_path = temp_dir / "test.index"
-        metadata_path = temp_dir / "test.pkl"
+        metadata_path = temp_dir / "test.json"
 
         store = FaissVectorStore(
             dimension=128,
@@ -160,18 +160,14 @@ class TestFaissVectorStore:
 
         assert store.dimension == 128
         assert store.index_path == index_path
-        # metadata_path is normalized to .json regardless of the extension
-        # passed in (write target); legacy_metadata_path keeps the .pkl form
-        # for transparent migration fallback (see faiss_store.py __init__).
-        assert store.metadata_path == metadata_path.with_suffix(".json")
-        assert store.legacy_metadata_path == metadata_path.with_suffix(".pkl")
+        assert store.metadata_path == metadata_path
         assert store.similarity_threshold == 0.7
         assert store.index_type == "FlatL2"
 
     def test_faiss_store_upsert(self, temp_dir, sample_chunks):
         """Test d'ajout de chunks"""
         index_path = temp_dir / "test.index"
-        metadata_path = temp_dir / "test.pkl"
+        metadata_path = temp_dir / "test.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -189,7 +185,7 @@ class TestFaissVectorStore:
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "opt.index"),
-            metadata_path=str(temp_dir / "opt.pkl"),
+            metadata_path=str(temp_dir / "opt.json"),
         )
 
         # 3 documents x 2 chunks -> chunk ids 0..5
@@ -234,7 +230,7 @@ class TestFaissVectorStore:
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "snap.index"),
-            metadata_path=str(temp_dir / "snap.pkl"),
+            metadata_path=str(temp_dir / "snap.json"),
         )
         store.metadata = [
             {"chunk_id": 0, "text": "active one", "deleted": False},
@@ -250,7 +246,7 @@ class TestFaissVectorStore:
     def test_faiss_store_query_empty(self, temp_dir):
         """Test de requête sur store vide"""
         index_path = temp_dir / "empty.index"
-        metadata_path = temp_dir / "empty.pkl"
+        metadata_path = temp_dir / "empty.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -264,7 +260,7 @@ class TestFaissVectorStore:
     def test_faiss_store_health_check(self, temp_dir):
         """Test de health check"""
         index_path = temp_dir / "health.index"
-        metadata_path = temp_dir / "health.pkl"
+        metadata_path = temp_dir / "health.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -277,7 +273,7 @@ class TestFaissVectorStore:
     def test_faiss_store_stats(self, temp_dir):
         """Test des statistiques"""
         index_path = temp_dir / "stats.index"
-        metadata_path = temp_dir / "stats.pkl"
+        metadata_path = temp_dir / "stats.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -291,7 +287,7 @@ class TestFaissVectorStore:
     def test_faiss_store_persist_load(self, temp_dir):
         """Test de persistance et chargement"""
         index_path = temp_dir / "persist.index"
-        metadata_path = temp_dir / "persist.pkl"
+        metadata_path = temp_dir / "persist.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -397,7 +393,7 @@ class TestFaissVectorStore:
     def test_faiss_store_delete(self, temp_dir, sample_chunks):
         """Test de suppression de documents"""
         index_path = temp_dir / "delete.index"
-        metadata_path = temp_dir / "delete.pkl"
+        metadata_path = temp_dir / "delete.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -418,7 +414,7 @@ class TestFaissVectorStore:
         mock_index_class.return_value = mock_index
 
         index_path = temp_dir / "mock.index"
-        metadata_path = temp_dir / "mock.pkl"
+        metadata_path = temp_dir / "mock.json"
 
         FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -430,7 +426,7 @@ class TestFaissVectorStore:
     def test_faiss_store_invalid_dimension(self, temp_dir):
         """Test avec dimension invalide"""
         index_path = temp_dir / "invalid.index"
-        metadata_path = temp_dir / "invalid.pkl"
+        metadata_path = temp_dir / "invalid.json"
 
         # Test avec dimension négative - le code actuel n'empêche pas cela
         # donc on teste que l'initialisation se fait sans erreur
@@ -453,7 +449,7 @@ class TestFaissIntegration:
     def test_basic_workflow(self, temp_dir):
         """Test de workflow basique"""
         index_path = temp_dir / "workflow.index"
-        metadata_path = temp_dir / "workflow.pkl"
+        metadata_path = temp_dir / "workflow.json"
 
         # Créer le store
         store = FaissVectorStore(
@@ -507,7 +503,7 @@ class TestFaissIntegration:
         import threading
 
         index_path = temp_dir / "thread.index"
-        metadata_path = temp_dir / "thread.pkl"
+        metadata_path = temp_dir / "thread.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)

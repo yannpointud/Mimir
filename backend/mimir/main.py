@@ -29,6 +29,7 @@ from mimir.api.responses import budget_exceeded_response
 # Import services
 from mimir.cache.lru_cache import cache_service, chat_cache_service
 from mimir.email_service.smtp_client import email_service
+from mimir.monitoring.alerting import setup_alerting
 from mimir.monitoring.logger import setup_logger
 from mimir.ingestion.processor import IngestionProcessor
 from mimir.ingestion.chunking import ChunkingConfig
@@ -70,54 +71,25 @@ class CustomJSONResponse(JSONResponse):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager: initialization at startup, cleanup at shutdown."""
-    # Startup
     logger.info("Starting Mimir application - API & Services...")
-
-    try:
-        # Derive the effective admin hash from ADMIN_PASSWORD first, so the
-        # default-secret checks below run against the hash actually used at runtime.
-        resolve_admin_password(settings)
-
-        # Fail fast on default secrets before any service initialization
-        validate_production_secrets(settings)
-
-        # Database initialization
-        init_database()
-        logger.info("Database initialized successfully")
-
-        _log_services_status()
-
-        # Attach the fingerprinted SMTP error alerter to app_logger.
-        # Idempotent and guarded internally; a failure here must not abort startup.
-        from mimir.monitoring.alerting import setup_alerting
-
-        setup_alerting()
-
-        await _start_ingestion()
-
-        logger.info("Application startup completed successfully")
-
-    except Exception as e:  # noqa: BLE001 - startup boundary: log any failure, then re-raise
-        logger.error(f"Failed to initialize application: {e}")
-        raise
+    # The effective admin hash comes from ADMIN_PASSWORD first, so the
+    # default-secret checks run against the hash actually used at runtime.
+    resolve_admin_password(settings)
+    validate_production_secrets(settings)
+    init_database()
+    _log_services_status()
+    setup_alerting()
+    await _start_ingestion()
+    logger.info("Application startup completed successfully")
 
     yield
 
-    # Shutdown
     logger.info("Shutting down Mimir application...")
-
-    try:
-        # Cache cleanup
-        cache_service.invalidate_all()
-        chat_cache_service.invalidate_all()
-        logger.info("Cache services cleaned up")
-
-        await _stop_ingestion()
-        await _close_llm_service()
-
-        logger.info("Application shutdown completed")
-    except Exception as e:  # noqa: BLE001 - shutdown boundary: never fail the server stop
-        logger.error(f"Error during shutdown: {e}")
+    cache_service.invalidate_all()
+    chat_cache_service.invalidate_all()
+    await _stop_ingestion()
+    await _close_llm_service()
+    logger.info("Application shutdown completed")
 
 
 def _log_services_status() -> None:
@@ -136,75 +108,52 @@ def _log_services_status() -> None:
 
 
 async def _start_ingestion() -> None:
-    """Start the ingestion processor and queue the pending documents.
-
-    Non-blocking: the API starts even if ingestion cannot.
-    """
+    """Start the ingestion processor and queue the pending documents."""
     global ingestion_processor
-    try:
-        # section_title_tracking is defaulted from the settings flag here
-        # (single caller-side default): when structure_aware_chunking_enabled
-        # is False (current default), chunking output stays byte-identical.
-        chunking_config = ChunkingConfig(
-            chunk_size=settings.max_chunk_size,
-            overlap=settings.chunk_overlap,
-            section_title_tracking=settings.structure_aware_chunking_enabled,
+    chunking_config = ChunkingConfig(
+        chunk_size=settings.max_chunk_size,
+        overlap=settings.chunk_overlap,
+        section_title_tracking=settings.structure_aware_chunking_enabled,
+    )
+
+    # Get database session
+    from mimir.database.connection import db_manager
+
+    with db_manager.get_session_context() as session:
+        document_repo = get_document_repository(session)
+
+        ingestion_processor = IngestionProcessor(
+            llm_service=get_llm_service(),
+            vector_store=get_vector_store(),
+            document_repository=document_repo,
+            chunking_config=chunking_config,
+            max_file_size_mb=settings.max_file_size_mb,
+            max_chunks_per_doc=settings.max_chunks_per_doc,
+            bm25_store=get_bm25_store(),
         )
+        await ingestion_processor.start()
+        logger.info("Ingestion processor started successfully")
 
-        # Get database session
-        from mimir.database.connection import db_manager
+        _ensure_bm25_index()
 
-        with db_manager.get_session_context() as session:
-            document_repo = get_document_repository(session)
+        # Make the processor available to API endpoints
+        set_ingestion_processor(ingestion_processor)
 
-            ingestion_processor = IngestionProcessor(
-                llm_service=get_llm_service(),
-                vector_store=get_vector_store(),
-                document_repository=document_repo,
-                chunking_config=chunking_config,
-                max_file_size_mb=settings.max_file_size_mb,
-                max_chunks_per_doc=settings.max_chunks_per_doc,
-                bm25_store=get_bm25_store(),
-            )
-            await ingestion_processor.start()
-            logger.info("Ingestion processor started successfully")
-
-            _ensure_bm25_index()
-
-            # Make the processor available to API endpoints
-            set_ingestion_processor(ingestion_processor)
-
-            _queue_pending_documents(document_repo, ingestion_processor)
-
-    except Exception as e:  # noqa: BLE001 - startup boundary: the API starts even if ingestion cannot
-        logger.error(f"Failed to initialize ingestion processor: {e}")
+        _queue_pending_documents(document_repo, ingestion_processor)
 
 
 def _ensure_bm25_index() -> None:
-    """Rebuild the BM25 lexical index at startup when it is missing on disk.
+    """Rebuild the BM25 index from FAISS when it is missing or unreadable on disk.
 
-    It is a derived artifact rebuilt from the FAISS source of truth only at
-    ingestion/deletion; on a cold start or an upgrade of an existing FAISS
-    install it may be missing. With hybrid search enabled by default, a
-    missing BM25 index would otherwise force every query to degrade to
-    dense-only until the next ingestion. Non-fatal: the per-query dense-only
-    fallback in RagService remains the safety net.
+    BM25 is derived from the FAISS chunks; without this, every hybrid query
+    would degrade to dense-only until the next ingestion.
     """
-    try:
-        _vs = get_vector_store()
-        _bm25 = get_bm25_store()
-        if not _bm25.load():
-            _active = _vs.snapshot_active_chunks()
-            if _active:
-                _bm25.rebuild(_active)
-                logger.info(
-                    f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
-                )
-    except Exception as bm25_startup_error:  # noqa: BLE001 - startup boundary: never fail on a bad index
-        logger.warning(
-            f"BM25 startup rebuild failed - hybrid queries will degrade to "
-            f"dense-only until next ingestion: {bm25_startup_error}"
-        )
+    bm25_store = get_bm25_store()
+    if bm25_store.is_built:
+        return
+    active_chunks = get_vector_store().snapshot_active_chunks()
+    bm25_store.rebuild(active_chunks)
+    logger.info(f"BM25 lexical index rebuilt at startup from {len(active_chunks)} active chunks")
 
 
 def _queue_pending_documents(document_repo, processor) -> None:

@@ -33,7 +33,7 @@ class TestCleanupPerformance:
     def vector_store(self, temp_dir):
         """FaissVectorStore instance for tests"""
         index_path = os.path.join(temp_dir, "perf_index.bin")
-        metadata_path = os.path.join(temp_dir, "perf_metadata.pkl")
+        metadata_path = os.path.join(temp_dir, "perf_metadata.json")
 
         store = FaissVectorStore(
             dimension=384,
@@ -334,7 +334,7 @@ class TestCleanupStressTest:
     @pytest.fixture
     def vector_store(self, temp_dir):
         index_path = os.path.join(temp_dir, "stress_index.bin")
-        metadata_path = os.path.join(temp_dir, "stress_metadata.pkl")
+        metadata_path = os.path.join(temp_dir, "stress_metadata.json")
 
         store = FaissVectorStore(
             dimension=384,

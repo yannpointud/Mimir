@@ -3,6 +3,7 @@ Unit tests for authentication endpoints.
 """
 
 import pytest
+from sqlalchemy.exc import OperationalError
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException, status
@@ -184,13 +185,15 @@ class TestAuthHelperFunctions:
         mock_audit_repo.create_log.assert_called_once()
 
     def test_log_auth_event_exception(self):
-        """Test exception handling during logging."""
+        """An audit write failure is logged, not raised."""
         from mimir.api.endpoints.auth import _log_auth_event
 
         mock_audit_repo = Mock()
-        mock_audit_repo.create_log.side_effect = Exception("Database error")
+        mock_audit_repo.create_log.side_effect = OperationalError(
+            "INSERT", {}, Exception("database is locked")
+        )
 
-        # The audit failure is swallowed: no exception reaches the caller
+        # A database failure of the audit write never locks the admin out
         asyncio.run(
             _log_auth_event(
                 audit_repo=mock_audit_repo,

@@ -11,7 +11,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from mimir.ingestion.extractors import ExtractorFactory
+from mimir.ingestion.extractors import ExtractionError, ExtractorFactory
 from mimir.services.errors import RequestRejectedError
 from mimir.shared.models import ChunkResponse, DocumentWithChunksResponse
 
@@ -71,30 +71,27 @@ async def build_document_view(
 async def _load_chunks(vector_store: Any, document_id: int) -> list[ChunkResponse]:
     """Chunks of the document in index order; those built before a failure are kept."""
     chunk_responses: list[ChunkResponse] = []
-    try:
-        all_chunks = await asyncio.to_thread(vector_store.get_document_chunks, str(document_id))
-        chunk_indexes = []
-        for i, chunk in enumerate(all_chunks):
-            # The original chunk_index is always present in the FAISS metadata
-            chunk_indexes.append(chunk.chunk_index)
-            chunk_responses.append(
-                ChunkResponse(
-                    id=i,  # Position only: chunks have no database id
-                    document_id=document_id,
-                    chunk_index=chunk.chunk_index,
-                    text=chunk.text,
-                    metadata=chunk.metadata if hasattr(chunk, "metadata") else {},
-                )
+    all_chunks = await asyncio.to_thread(vector_store.get_document_chunks, str(document_id))
+    chunk_indexes = []
+    for i, chunk in enumerate(all_chunks):
+        # The original chunk_index is always present in the FAISS metadata
+        chunk_indexes.append(chunk.chunk_index)
+        chunk_responses.append(
+            ChunkResponse(
+                id=i,  # Position only: chunks have no database id
+                document_id=document_id,
+                chunk_index=chunk.chunk_index,
+                text=chunk.text,
+                metadata=chunk.metadata if hasattr(chunk, "metadata") else {},
             )
+        )
 
-        if chunk_indexes:
-            logger.info(
-                f"Document {document_id} chunks loaded: {len(chunk_indexes)} chunks, chunk_indexes: {chunk_indexes[:10]}"
-            )
-        else:
-            logger.warning(f"Document {document_id}: No chunks found in vector store")
-    except Exception as e:  # noqa: BLE001 - best effort: the reader view is served without chunks
-        logger.warning(f"Could not retrieve chunks for document {document_id}: {e}")
+    if chunk_indexes:
+        logger.info(
+            f"Document {document_id} chunks loaded: {len(chunk_indexes)} chunks, chunk_indexes: {chunk_indexes[:10]}"
+        )
+    else:
+        logger.warning(f"Document {document_id}: No chunks found in vector store")
     return chunk_responses
 
 
@@ -110,7 +107,7 @@ def _read_stored_file(path: str | None, document_id: int) -> _StoredFile:
         )
         # Same extractors as during indexing
         stored_file.content = _extract_text(ExtractorFactory(), path)
-    except Exception as e:  # noqa: BLE001 - best effort: the reader view is served without file details
+    except OSError as e:
         logger.warning(f"Could not read file metadata for document {document_id}: {e}")
     return stored_file
 
@@ -122,6 +119,6 @@ def _extract_text(extractor_factory: ExtractorFactory, path: str) -> str | None:
             f"Successfully extracted text from {path} ({len(content) if content else 0} characters)"
         )
         return content
-    except Exception as extraction_error:  # noqa: BLE001 - best effort: parsers may fail on any file; served without content
+    except ExtractionError as extraction_error:
         logger.warning(f"Could not extract text from {path}: {extraction_error}")
         return None

@@ -571,6 +571,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                     current_user=mock_current_user,
                     doc_repo=mock_doc_repo,
                     audit_repo=mock_audit_repo,
+                    vector_store=Mock(),
+                    bm25_store=Mock(),
                 )
             )
 
@@ -596,6 +598,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                     current_user=mock_current_user,
                     doc_repo=mock_doc_repo,
                     audit_repo=mock_audit_repo,
+                    vector_store=Mock(),
+                    bm25_store=Mock(),
                 )
             )
 
@@ -619,6 +623,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                     current_user=mock_current_user,
                     doc_repo=mock_doc_repo,
                     audit_repo=mock_audit_repo,
+                    vector_store=Mock(),
+                    bm25_store=Mock(),
                 )
             )
 
@@ -651,6 +657,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                     current_user=mock_current_user,
                     doc_repo=mock_doc_repo,
                     audit_repo=mock_audit_repo,
+                    vector_store=Mock(),
+                    bm25_store=Mock(),
                 )
             )
 
@@ -677,6 +685,8 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
                     current_user=mock_current_user,
                     doc_repo=mock_doc_repo,
                     audit_repo=mock_audit_repo,
+                    vector_store=Mock(),
+                    bm25_store=Mock(),
                 )
             )
 
@@ -907,6 +917,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
                     doc_repo=mock_doc_repo,
                     audit_repo=mock_audit_repo,
                     vector_store=mock_vector_store,
+                    bm25_store=Mock(),
                 )
             )
 

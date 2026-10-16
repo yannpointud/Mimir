@@ -11,6 +11,7 @@ from typing import Any
 import logging
 import jwt  # PyJWT
 from pwdlib import PasswordHash
+from pwdlib.exceptions import UnknownHashError
 from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
 from mimir.config import settings
@@ -47,13 +48,7 @@ class JWTHandler:
 
         to_encode.update({"exp": expire, "iat": datetime.utcnow(), "type": "access"})
 
-        try:
-            encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
-            logger.debug(f"Created JWT token with expiration: {expire}")
-            return encoded_jwt
-        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
-            logger.error(f"Failed to create JWT token: {e}")
-            raise
+        return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
     def verify_token(self, token: str) -> dict[str, Any] | None:
         """Verify and decode a JWT token."""
@@ -81,11 +76,8 @@ class JWTHandler:
         except jwt.ExpiredSignatureError:
             logger.warning("JWT token has expired")
             return None
-        except jwt.InvalidTokenError as e:
+        except jwt.PyJWTError as e:
             logger.warning(f"JWT token validation failed: {e}")
-            return None
-        except Exception as e:  # noqa: BLE001 - fail closed: any other error rejects the token (401)
-            logger.error(f"Unexpected error during token verification: {e}")
             return None
 
     def hash_password(self, password: str) -> str:
@@ -102,8 +94,8 @@ class JWTHandler:
 
         try:
             return self.pwd_context.verify(plain_password, hashed_password)
-        except Exception as e:  # noqa: BLE001 - fail closed: any error denies the password
-            logger.error(f"Password verification error: {e}")
+        except UnknownHashError:
+            logger.error("Password verification failed: unrecognized hash format")
             return False
 
     def get_token_expiry(self, token: str) -> datetime | None:

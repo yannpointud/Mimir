@@ -9,18 +9,39 @@ the JSON body (or the SSE events) returned to the client in each case.
 
 from contextlib import contextmanager
 from typing import Any
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+
+from sqlalchemy.exc import OperationalError
 
 from tests.oracle.harness import FIXTURES_DIR, assert_snapshot, normalize
 
 
-class _Failing:
-    """Proxy raising RuntimeError on the listed methods, delegating the rest."""
+def _runtime_error(name: str) -> Exception:
+    return RuntimeError(f"oracle failure in {name}")
 
-    def __init__(self, target: Any, failing: Iterable[str], result: dict[str, Any] = None):
+
+def _database_error(name: str) -> Exception:
+    return OperationalError(name, {}, Exception(f"oracle failure in {name}"))
+
+
+class _Failing:
+    """Proxy raising on the listed methods, delegating the rest.
+
+    Repositories fail with a SQLAlchemy error, like a real database outage;
+    the other components with a RuntimeError, as FAISS does.
+    """
+
+    def __init__(
+        self,
+        target: Any,
+        failing: Iterable[str],
+        result: dict[str, Any] | None = None,
+        error: Callable[[str], Exception] = _runtime_error,
+    ):
         self._target = target
         self._failing = set(failing)
         self._result = result or {}
+        self._error = error
 
     def __getattr__(self, name):
         if name in self._result:
@@ -29,7 +50,7 @@ class _Failing:
         if name in self._failing:
 
             def _raise(*args, **kwargs):
-                raise RuntimeError(f"oracle failure in {name}")
+                raise self._error(name)
 
             return _raise
         return getattr(self._target, name)
@@ -63,7 +84,7 @@ def _repo_dependency(env, repo_factory_name: str, failing: Iterable[str]):
     def factory():
         session = db_manager.get_session()
         sessions.append(session)
-        return _Failing(real_factory(session), failing)
+        return _Failing(real_factory(session), failing, error=_database_error)
 
     return real_factory, factory, sessions
 

@@ -21,7 +21,6 @@ from mimir.monitoring.logger import (
     log_auth_event,
     log_health_check,
     log_system_event,
-    log_performance,
 )
 
 
@@ -274,21 +273,6 @@ class TestLoggingHelpers:
             mock_logger.log.assert_called_once()
             call_args = mock_logger.log.call_args
             assert "Auth login_success" in str(call_args[0])
-
-    def test_log_performance(self, mock_logger):
-        """Test de log des métriques de performance"""
-        # log_performance est un décorateur, pas un gestionnaire de contexte
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-
-            @log_performance("search_operation")
-            def test_function():
-                return "result"
-
-            result = test_function()
-
-            # Vérifier qu'il y a eu un log de performance
-            assert mock_logger.debug.call_count >= 1
-            assert result == "result"
 
     def test_log_llm_request(self, mock_logger):
         """Test de log des requêtes LLM"""

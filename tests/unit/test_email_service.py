@@ -5,6 +5,7 @@ Ce module teste les fonctionnalités d'envoi d'emails pour les escalations
 et notifications du système Mimir.
 """
 
+import aiosmtplib
 import pytest
 from unittest.mock import patch, AsyncMock
 
@@ -173,7 +174,10 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_exception(self, email_service):
         """Test de gestion d'exception."""
-        with patch.object(email_service, "_send_email", side_effect=Exception("SMTP Error")):
+        with patch(
+            "mimir.email_service.smtp_client.aiosmtplib.SMTP",
+            side_effect=aiosmtplib.SMTPConnectError("SMTP Error"),
+        ):
             result = await email_service.send_escalation_email(
                 user_question="How do I reset my password?", chat_history=[]
             )
@@ -248,7 +252,7 @@ class TestSendEmail:
     async def test_send_email_exception(self, email_service):
         """Test de gestion d'exception."""
         with patch("mimir.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
-            mock_smtp_class.side_effect = Exception("Connection failed")
+            mock_smtp_class.side_effect = aiosmtplib.SMTPConnectError("Connection failed")
 
             result = await email_service._send_email(
                 to_emails=["recipient@example.com"],

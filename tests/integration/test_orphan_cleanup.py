@@ -33,7 +33,7 @@ class TestOrphanCleanupIntegration:
     def vector_store(self, temp_dir):
         """Instance de FaissVectorStore pour les tests"""
         index_path = os.path.join(temp_dir, "test_index.bin")
-        metadata_path = os.path.join(temp_dir, "test_metadata.pkl")
+        metadata_path = os.path.join(temp_dir, "test_metadata.json")
 
         store = FaissVectorStore(
             dimension=384,
@@ -244,14 +244,9 @@ class TestOrphanCleanupIntegration:
             if meta.get("document_id") == "orphan":
                 meta["deleted"] = True
 
-        # Isolate the orphan detection from the ambient DatabaseManager singleton:
-        # _get_existing_document_ids() queries the shared DB session, whose state
-        # leaks across the full test suite (a prior test can bind it to the real
-        # mimir.db). Pin the valid document ids so this test is deterministic and
-        # only the pre-marked "orphan" chunks are cleaned.
-        with patch.object(vector_store, "_get_existing_document_ids", return_value={"valid"}):
-            # Exécuter la reconstruction avec nettoyage
-            result = vector_store.rebuild_vector_store(force_rebuild=True, cleanup_orphans=True)
+        result = vector_store.rebuild_vector_store(
+            {"valid"}, force_rebuild=True, cleanup_orphans=True
+        )
 
         # Vérifier les résultats
         assert result["rebuild_performed"] == True
@@ -268,16 +263,13 @@ class TestOrphanCleanupIntegration:
         chunks = [self.create_test_chunk("test", i) for i in range(2)]
         vector_store.upsert(chunks)
 
-        # Simuler une erreur lors de la création du backup
-        with patch.object(vector_store, "_create_backup", side_effect=Exception("Backup failed")):
-            # Le nettoyage doit continuer malgré l'échec du backup
-            result = vector_store.clean_orphans(
-                existing_document_ids=set(),  # Tout supprimer
-                create_backup=True,
-            )
-
-            # Vérifier que le nettoyage a quand même eu lieu
-            assert result["cleaned_chunks"] == 2
+        # No cleanup without its backup: the chunks stay untouched
+        with (
+            patch.object(vector_store, "_create_backup", side_effect=OSError("disk full")),
+            pytest.raises(OSError),
+        ):
+            vector_store.clean_orphans(existing_document_ids=set(), create_backup=True)
+        assert vector_store.get_stats()["active_vectors"] == 2
 
     def test_concurrent_access_safety(self, vector_store):
         """Test de la sécurité en cas d'accès concurrent (thread-safety)"""
@@ -345,7 +337,7 @@ class TestOrphanCleanupEdgeCases:
     def vector_store(self, temp_dir):
         """Instance de FaissVectorStore pour les tests"""
         index_path = os.path.join(temp_dir, "test_index.bin")
-        metadata_path = os.path.join(temp_dir, "test_metadata.pkl")
+        metadata_path = os.path.join(temp_dir, "test_metadata.json")
 
         store = FaissVectorStore(
             dimension=384,

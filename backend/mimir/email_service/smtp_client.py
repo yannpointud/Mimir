@@ -45,65 +45,55 @@ class EmailService:
         context_sources: list[str] | None = None,
     ) -> bool:
         """Send escalation email to support team."""
-        try:
-            if not self._is_configured():
-                logger.error("Email service not configured for escalation")
-                return False
-
-            # Generate email content
-            subject = f"Mimir Chat Escalation - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            html_content = self._generate_escalation_html(
-                user_question, chat_history, user_info, context_sources
-            )
-            text_content = self._generate_escalation_text(
-                user_question, chat_history, user_info, context_sources
-            )
-
-            # Send email
-            success = await self._send_email(
-                to_emails=[self.escalation_email],
-                subject=subject,
-                html_content=html_content,
-                text_content=text_content,
-            )
-
-            if success:
-                logger.info(f"Escalation email sent successfully to {self.escalation_email}")
-            else:
-                logger.error("Failed to send escalation email")
-
-            return success
-
-        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not sent
-            logger.error(f"Error sending escalation email: {e}")
+        if not self._is_configured():
+            logger.error("Email service not configured for escalation")
             return False
+
+        # Generate email content
+        subject = f"Mimir Chat Escalation - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        html_content = self._generate_escalation_html(
+            user_question, chat_history, user_info, context_sources
+        )
+        text_content = self._generate_escalation_text(
+            user_question, chat_history, user_info, context_sources
+        )
+
+        # Send email
+        success = await self._send_email(
+            to_emails=[self.escalation_email],
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+        )
+
+        if success:
+            logger.info(f"Escalation email sent successfully to {self.escalation_email}")
+        else:
+            logger.error("Failed to send escalation email")
+
+        return success
 
     async def send_notification_email(
         self, to_email: str, subject: str, message: str, is_html: bool = False
     ) -> bool:
         """Send a general notification email."""
-        try:
-            if not self._is_configured():
-                logger.error("Email service not configured")
-                return False
-
-            if is_html:
-                success = await self._send_email(
-                    to_emails=[to_email], subject=subject, html_content=message
-                )
-            else:
-                success = await self._send_email(
-                    to_emails=[to_email], subject=subject, text_content=message
-                )
-
-            if success:
-                logger.info(f"Notification email sent to {to_email}")
-
-            return success
-
-        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not sent
-            logger.error(f"Error sending notification email: {e}")
+        if not self._is_configured():
+            logger.error("Email service not configured")
             return False
+
+        if is_html:
+            success = await self._send_email(
+                to_emails=[to_email], subject=subject, html_content=message
+            )
+        else:
+            success = await self._send_email(
+                to_emails=[to_email], subject=subject, text_content=message
+            )
+
+        if success:
+            logger.info(f"Notification email sent to {to_email}")
+
+        return success
 
     async def _send_email(
         self,
@@ -152,22 +142,17 @@ class EmailService:
 
             return True
 
-        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not sent
+        except (aiosmtplib.SMTPException, OSError, TimeoutError) as e:
             logger.error(f"SMTP send error: {e}")
             return False
 
     def _add_attachment(self, message: MIMEMultipart, attachment: dict[str, Any]):
         """Add an attachment (dict with 'filename', 'content', 'mime_type') to the message."""
-        try:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment["content"])
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition", f"attachment; filename= {attachment['filename']}"
-            )
-            message.attach(part)
-        except Exception as e:  # noqa: BLE001 - best effort: the email is sent without this attachment
-            logger.error(f"Error adding attachment: {e}")
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment["content"])
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f"attachment; filename= {attachment['filename']}")
+        message.attach(part)
 
     def _generate_escalation_html(
         self,

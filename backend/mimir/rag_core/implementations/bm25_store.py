@@ -70,37 +70,37 @@ class Bm25LexicalStore:
             VectorStoreOperationError: If the index build/persist fails.
         """
         with self._lock:
-            try:
-                texts = [c["text"] for c in active_chunks]
-                self._chunk_ids = [c["chunk_id"] for c in active_chunks]
+            texts = [c["text"] for c in active_chunks]
+            self._chunk_ids = [c["chunk_id"] for c in active_chunks]
 
-                if not texts:
-                    # Empty corpus: nothing to index, keep an in-memory empty
-                    # store (query() returns []). Persist an empty marker so a
-                    # later load() is consistent.
-                    self._retriever = None
-                    self._built = True
-                    self._persist_empty()
-                    logger.info("BM25 lexical index rebuilt with an empty corpus")
-                    return
-
-                corpus_tokens = light_french_tokenizer(texts)
-                retriever = bm25s.BM25()
-                retriever.index(corpus_tokens, show_progress=False)
-                self._retriever = retriever
+            if not texts:
+                # Empty corpus: nothing to index, keep an in-memory empty
+                # store (query() returns []). Persist an empty marker so a
+                # later load() is consistent.
+                self._retriever = None
                 self._built = True
+                self._persist_empty()
+                logger.info("BM25 lexical index rebuilt with an empty corpus")
+                return
 
-                # Persist atomically (index dir + chunk_id corpus).
-                self._persist(retriever)
+            corpus_tokens = light_french_tokenizer(texts)
+            retriever = bm25s.BM25()
+            retriever.index(corpus_tokens, show_progress=False)
+            self._retriever = retriever
+            self._built = True
 
-                logger.info(
-                    "BM25 lexical index rebuilt",
-                    extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
-                )
-            except Exception as e:  # noqa: BLE001 - any failure becomes VectorStoreOperationError
-                error_msg = f"Failed to rebuild BM25 lexical index: {str(e)}"
-                logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg) from e
+            # Persist atomically (index dir + chunk_id corpus).
+            self._persist(retriever)
+
+            logger.info(
+                "BM25 lexical index rebuilt",
+                extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
+            )
+
+    @property
+    def is_built(self) -> bool:
+        """True once the index was rebuilt or loaded."""
+        return self._built
 
     def query(self, question: str, top_k: int = 50) -> list[tuple[int, float]]:
         """Query the lexical index for the most relevant chunks.
@@ -121,32 +121,26 @@ class Bm25LexicalStore:
                 raise VectorStoreOperationError(
                     "BM25 lexical index queried before rebuild()/load()"
                 )
-            try:
-                # Empty corpus or a query that tokenizes to nothing -> no hits.
-                if not self._chunk_ids or self._retriever is None:
-                    return []
+            if not self._chunk_ids or self._retriever is None:
+                return []
 
-                query_tokens = light_french_tokenizer([question])
-                if not query_tokens[0]:
-                    return []
+            query_tokens = light_french_tokenizer([question])
+            if not query_tokens[0]:
+                return []
 
-                k = min(top_k, len(self._chunk_ids))
-                if k <= 0:
-                    return []
+            k = min(top_k, len(self._chunk_ids))
+            if k <= 0:
+                return []
 
-                results, scores = self._retriever.retrieve(query_tokens, k=k, show_progress=False)
-                # bm25s.retrieve returns integer corpus positions when no corpus
-                # is attached (fresh rebuild) but the corpus objects themselves
-                # when one was loaded (load_corpus=True). Resolve both shapes to
-                # the real chunk_id.
-                return [
-                    (self._resolve_chunk_id(doc), float(score))
-                    for doc, score in zip(results[0], scores[0], strict=False)
-                ]
-            except Exception as e:  # noqa: BLE001 - any failure becomes VectorStoreOperationError
-                error_msg = f"Failed to query BM25 lexical index: {str(e)}"
-                logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg) from e
+            results, scores = self._retriever.retrieve(query_tokens, k=k, show_progress=False)
+            # bm25s.retrieve returns integer corpus positions when no corpus
+            # is attached (fresh rebuild) but the corpus objects themselves
+            # when one was loaded (load_corpus=True). Resolve both shapes to
+            # the real chunk_id.
+            return [
+                (self._resolve_chunk_id(doc), float(score))
+                for doc, score in zip(results[0], scores[0], strict=False)
+            ]
 
     def load(self) -> bool:
         """Load the persisted index (and chunk_id mapping) from disk.
@@ -186,7 +180,8 @@ class Bm25LexicalStore:
                     extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
                 )
                 return True
-            except Exception as e:  # noqa: BLE001 - any failure (e.g. EOFError on a truncated .npy) becomes VectorStoreConnectionError
+            # numpy raises EOFError on a truncated .npy, ValueError on bad JSON
+            except (OSError, ValueError, EOFError) as e:
                 error_msg = f"Failed to load BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
                 raise VectorStoreConnectionError(error_msg) from e
@@ -223,7 +218,7 @@ class Bm25LexicalStore:
             os.replace(target, backup)  # atomic: target aside
         try:
             os.replace(tmp_dir, target)  # atomic: new in place
-        except Exception:  # noqa: BLE001 - roll back on any failure, then re-raise
+        except BaseException:
             if had_old:
                 os.replace(backup, target)  # roll back
             raise
@@ -250,7 +245,7 @@ class Bm25LexicalStore:
                 show_progress=False,
             )
             self._swap_dir_into_place(tmp_dir)
-        except Exception:  # noqa: BLE001 - remove the temp directory on any failure, then re-raise
+        except BaseException:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
 
@@ -261,6 +256,6 @@ class Bm25LexicalStore:
         try:
             (Path(tmp_dir) / "empty.marker").write_text("empty\n", encoding="utf-8")
             self._swap_dir_into_place(tmp_dir)
-        except Exception:  # noqa: BLE001 - remove the temp directory on any failure, then re-raise
+        except BaseException:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise

@@ -271,7 +271,7 @@ class IngestionProcessor:
             logger.debug(f"Generating embeddings for {len(chunks_data)} chunks")
             try:
                 embedding_response = await self._generate_embeddings(chunks_data)
-            except Exception:  # noqa: BLE001 - refund on any failure, then re-raise unchanged
+            except BaseException:
                 # No embedding call actually succeeded -- refund the
                 # reservation and let the original error propagate to the
                 # outer except blocks below.
@@ -418,7 +418,7 @@ class IngestionProcessor:
             active_chunks = self.vector_store.snapshot_active_chunks()
             await asyncio.to_thread(self.bm25_store.rebuild, active_chunks)
             self._bm25_dirty = False
-        except Exception as bm25_error:  # noqa: BLE001 - best effort: FAISS already holds the chunks
+        except OSError as bm25_error:
             logger.warning(f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}")
 
     def _extract_text(self, file_path: str) -> str:

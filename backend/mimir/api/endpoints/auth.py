@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 import logging
 
 from pathlib import Path
@@ -274,24 +275,18 @@ def _update_env_file(key: str, value: str) -> None:
 
 def _authenticate_admin(username: str, password: str) -> bool:
     """Authenticate admin credentials against configured password."""
-    try:
-        # For MVP, we use single admin account with configurable password
-        expected_username = "admin"
-        expected_password_hash = settings.admin_password_hash
+    expected_username = "admin"
+    expected_password_hash = settings.admin_password_hash
 
-        if username != expected_username:
-            return False
-
-        if not expected_password_hash:
-            logger.error("Admin password hash not configured")
-            return False
-
-        # Verify password against hash
-        return jwt_handler.verify_password(password, expected_password_hash)
-
-    except Exception as e:  # noqa: BLE001 - fail closed: any error denies authentication
-        logger.error(f"Authentication error: {e}")
+    if username != expected_username:
         return False
+
+    if not expected_password_hash:
+        logger.error("Admin password hash not configured")
+        return False
+
+    # Verify password against hash
+    return jwt_handler.verify_password(password, expected_password_hash)
 
 
 async def _log_auth_event(
@@ -310,6 +305,6 @@ async def _log_auth_event(
             ip_address=ip_address,
             success=success,
         )
-    except Exception as e:  # noqa: BLE001 - best effort: an audit failure must not break authentication
+    except SQLAlchemyError as e:
+        # An audit write failure must not lock the admin out
         logger.error(f"Failed to log auth event: {e}")
-        # Don't raise exception - logging failures shouldn't break auth flow

@@ -57,99 +57,95 @@ def _parse_timestamp(timestamp_str: str) -> datetime:
         return datetime.utcnow()
 
 
+def _load_json_object(line: str) -> dict[str, Any] | None:
+    """Decode a JSON log line; None when it is not a JSON object."""
+    try:
+        data = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _parse_backend_log_line(line: str) -> LogEntry | None:
     """Parse a single line from backend app.log"""
-    try:
-        log_data = json.loads(line.strip())
+    log_data = _load_json_object(line)
+    if log_data is None:
+        return None
 
-        # Extract basic fields
-        timestamp = log_data.get("timestamp", "")
-        level = log_data.get("level", "INFO")
-        module = log_data.get("module", "unknown")
+    # Extract basic fields
+    timestamp = log_data.get("timestamp", "")
+    level = log_data.get("level", "INFO")
+    module = log_data.get("module", "unknown")
+    message = log_data.get("message", "")
+
+    # Extract details (everything except basic fields)
+    details = {
+        k: v for k, v in log_data.items() if k not in ["timestamp", "level", "module", "message"]
+    }
+
+    return LogEntry(
+        timestamp=timestamp,
+        level=level,
+        source="backend",
+        module=module,
+        message=message,
+        details=details,
+    )
+
+
+def _parse_frontend_log_line(line: str) -> LogEntry | None:
+    """Parse a single line from frontend.log"""
+    log_data = _load_json_object(line)
+    if log_data is None:
+        return None
+
+    # Extract basic fields
+    timestamp = log_data.get("timestamp", "")
+    level = log_data.get("level", "INFO")
+
+    # Frontend logs have different structure
+    if "extra_fields" in log_data:
+        extra = log_data["extra_fields"]
+        module = extra.get("frontend_module", "frontend")
+
+        # Extract message from log entry
         message = log_data.get("message", "")
+        # Remove module prefix if present in message
+        if message.startswith(f"[{module}]"):
+            message = message[len(f"[{module}]") :].strip()
 
-        # Extract details (everything except basic fields)
+        # Build details from extra fields
+        details = {
+            k: v for k, v in extra.items() if k not in ["frontend_module", "frontend_timestamp"]
+        }
+    else:
+        # Fallback parsing
+        module = log_data.get("module", "frontend")
+        message = log_data.get("message", "")
         details = {
             k: v
             for k, v in log_data.items()
             if k not in ["timestamp", "level", "module", "message"]
         }
 
-        return LogEntry(
-            timestamp=timestamp,
-            level=level,
-            source="backend",
-            module=module,
-            message=message,
-            details=details,
-        )
-    except Exception as e:  # noqa: BLE001 - per-line best effort: an unparsable line is skipped
-        logger.debug(f"Failed to parse backend log line: {e}")
-        return None
-
-
-def _parse_frontend_log_line(line: str) -> LogEntry | None:
-    """Parse a single line from frontend.log"""
-    try:
-        log_data = json.loads(line.strip())
-
-        # Extract basic fields
-        timestamp = log_data.get("timestamp", "")
-        level = log_data.get("level", "INFO")
-
-        # Frontend logs have different structure
-        if "extra_fields" in log_data:
-            extra = log_data["extra_fields"]
-            module = extra.get("frontend_module", "frontend")
-
-            # Extract message from log entry
-            message = log_data.get("message", "")
-            # Remove module prefix if present in message
-            if message.startswith(f"[{module}]"):
-                message = message[len(f"[{module}]") :].strip()
-
-            # Build details from extra fields
-            details = {
-                k: v for k, v in extra.items() if k not in ["frontend_module", "frontend_timestamp"]
-            }
-        else:
-            # Fallback parsing
-            module = log_data.get("module", "frontend")
-            message = log_data.get("message", "")
-            details = {
-                k: v
-                for k, v in log_data.items()
-                if k not in ["timestamp", "level", "module", "message"]
-            }
-
-        return LogEntry(
-            timestamp=timestamp,
-            level=level,
-            source="frontend",
-            module=module,
-            message=message,
-            details=details,
-        )
-    except Exception as e:  # noqa: BLE001 - per-line best effort: an unparsable line is skipped
-        logger.debug(f"Failed to parse frontend log line: {e}")
-        return None
+    return LogEntry(
+        timestamp=timestamp,
+        level=level,
+        source="frontend",
+        module=module,
+        message=message,
+        details=details,
+    )
 
 
 def _read_log_file(file_path: Path, max_lines: int = 1000) -> list[str]:
     """Read last N lines from log file efficiently"""
     try:
-        if not file_path.exists():
-            return []
-
-        lines = []
-        with open(file_path, encoding="utf-8") as f:
-            # Read all lines for now, optimize later if needed
-            all_lines = f.readlines()
-            # Take last max_lines
-            lines = all_lines[-max_lines:] if len(all_lines) > max_lines else all_lines
-
-        return lines
-    except Exception as e:  # noqa: BLE001 - fallback contract of the logs endpoint: no lines
+        with open(file_path, encoding="utf-8", errors="replace") as f:
+            return f.readlines()[-max_lines:]
+    except FileNotFoundError:
+        return []
+    except OSError as e:
         logger.error(f"Failed to read log file {file_path}: {e}")
         return []
 
@@ -227,102 +223,77 @@ def get_logs(
     Returns:
         Tuple of (filtered_logs, total_count)
     """
-    try:
-        # Limit bounds checking
-        limit = max(1, min(limit, 200))
+    limit = max(1, min(limit, 200))
 
-        all_logs = []
+    all_logs = []
 
-        # Read backend logs if not filtered to frontend only
-        if not source or source.lower() in ["all", "backend"]:
-            backend_lines = _read_log_file(BACKEND_LOG, max_lines=2000)
-            for line in backend_lines:
-                log_entry = _parse_backend_log_line(line)
-                if log_entry:
-                    all_logs.append(log_entry)
+    # Read backend logs if not filtered to frontend only
+    if not source or source.lower() in ["all", "backend"]:
+        backend_lines = _read_log_file(BACKEND_LOG, max_lines=2000)
+        for line in backend_lines:
+            log_entry = _parse_backend_log_line(line)
+            if log_entry:
+                all_logs.append(log_entry)
 
-        # Read frontend logs if not filtered to backend only
-        if not source or source.lower() in ["all", "frontend"]:
-            frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=1000)
-            for line in frontend_lines:
-                log_entry = _parse_frontend_log_line(line)
-                if log_entry:
-                    all_logs.append(log_entry)
+    # Read frontend logs if not filtered to backend only
+    if not source or source.lower() in ["all", "frontend"]:
+        frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=1000)
+        for line in frontend_lines:
+            log_entry = _parse_frontend_log_line(line)
+            if log_entry:
+                all_logs.append(log_entry)
 
-        # Apply filters
-        filtered_logs = _apply_filters(all_logs, level, source, module, search, since)
+    # Apply filters
+    filtered_logs = _apply_filters(all_logs, level, source, module, search, since)
 
-        # Sort by timestamp (newest first)
-        filtered_logs.sort(key=lambda x: _parse_timestamp(x.timestamp), reverse=True)
+    # Sort by timestamp (newest first)
+    filtered_logs.sort(key=lambda x: _parse_timestamp(x.timestamp), reverse=True)
 
-        # Apply limit
-        limited_logs = filtered_logs[:limit]
+    # Apply limit
+    limited_logs = filtered_logs[:limit]
 
-        # Convert to dictionaries
-        result_logs = [log.to_dict() for log in limited_logs]
+    # Convert to dictionaries
+    result_logs = [log.to_dict() for log in limited_logs]
 
-        logger.info(f"Retrieved {len(result_logs)} logs (filtered from {len(all_logs)} total)")
+    logger.info(f"Retrieved {len(result_logs)} logs (filtered from {len(all_logs)} total)")
 
-        return result_logs, len(filtered_logs)
-
-    except Exception as e:  # noqa: BLE001 - fallback contract of the logs endpoint: no logs
-        logger.error(f"Error retrieving logs: {e}")
-        return [], 0
+    return result_logs, len(filtered_logs)
 
 
 def get_available_modules() -> list[str]:
     """Get list of available modules from recent logs"""
-    try:
-        modules = set()
+    modules = set()
 
-        # Get modules from backend logs
-        backend_lines = _read_log_file(BACKEND_LOG, max_lines=500)
-        for line in backend_lines:
-            log_entry = _parse_backend_log_line(line)
-            if log_entry:
-                modules.add(log_entry.module)
+    # Get modules from backend logs
+    backend_lines = _read_log_file(BACKEND_LOG, max_lines=500)
+    for line in backend_lines:
+        log_entry = _parse_backend_log_line(line)
+        if log_entry:
+            modules.add(log_entry.module)
 
-        # Get modules from frontend logs
-        frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=200)
-        for line in frontend_lines:
-            log_entry = _parse_frontend_log_line(line)
-            if log_entry:
-                modules.add(log_entry.module)
+    # Get modules from frontend logs
+    frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=200)
+    for line in frontend_lines:
+        log_entry = _parse_frontend_log_line(line)
+        if log_entry:
+            modules.add(log_entry.module)
 
-        return sorted(list(modules))
-
-    except Exception as e:  # noqa: BLE001 - fallback contract of the logs endpoint: no modules
-        logger.error(f"Error getting available modules: {e}")
-        return []
+    return sorted(list(modules))
 
 
 def get_logs_summary() -> dict[str, Any]:
     """Get summary statistics about available logs"""
-    try:
-        # Count recent logs by level and source
-        backend_lines = _read_log_file(BACKEND_LOG, max_lines=1000)
-        frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=500)
+    backend_lines = _read_log_file(BACKEND_LOG, max_lines=1000)
+    frontend_lines = _read_log_file(FRONTEND_LOG, max_lines=500)
 
-        summary = {
-            "backend_logs_count": len(backend_lines),
-            "frontend_logs_count": len(frontend_lines),
-            "total_logs_count": len(backend_lines) + len(frontend_lines),
-            "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
-            "sources_available": ["ALL", "backend", "frontend"],
-            "modules_available": get_available_modules()[:10],  # Top 10 modules
-            "last_updated": datetime.utcnow().isoformat() + "Z",
-        }
+    summary = {
+        "backend_logs_count": len(backend_lines),
+        "frontend_logs_count": len(frontend_lines),
+        "total_logs_count": len(backend_lines) + len(frontend_lines),
+        "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
+        "sources_available": ["ALL", "backend", "frontend"],
+        "modules_available": get_available_modules()[:10],  # Top 10 modules
+        "last_updated": datetime.utcnow().isoformat() + "Z",
+    }
 
-        return summary
-
-    except Exception as e:  # noqa: BLE001 - fallback contract of the logs endpoint
-        logger.error(f"Error getting logs summary: {e}")
-        return {
-            "backend_logs_count": 0,
-            "frontend_logs_count": 0,
-            "total_logs_count": 0,
-            "levels_available": ["ALL", "DEBUG", "INFO", "WARN", "ERROR"],
-            "sources_available": ["ALL", "backend", "frontend"],
-            "modules_available": [],
-            "last_updated": datetime.utcnow().isoformat() + "Z",
-        }
+    return summary

@@ -249,12 +249,8 @@ class TXTExtractor(TextExtractor):
 
             except UnicodeDecodeError:
                 continue
-            except Exception as e:  # noqa: BLE001 - best effort: try the next encoding
-                error_msg = (
-                    f"Failed to read text file {file_path} with encoding {encoding}: {str(e)}"
-                )
-                logger.warning(error_msg)
-                continue
+            except OSError as e:
+                raise ExtractionError(f"Failed to extract text from {file_path}: {e}") from e
 
         # If all encodings failed
         error_msg = (

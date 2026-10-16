@@ -5,7 +5,7 @@
         "path": "/api/v1/admin/audit-log"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in get_logs_paginated",
+      "error_message": "(builtins.Exception) oracle failure in get_logs_paginated\n[SQL: get_logs_paginated]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -17,7 +17,7 @@
         "path": "/api/v1/admin/cache/clear"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in create_log",
+      "error_message": "(builtins.Exception) oracle failure in create_log\n[SQL: create_log]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -29,7 +29,7 @@
         "path": "/api/v1/admin/config"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in get_all",
+      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -41,7 +41,7 @@
         "path": "/api/v1/admin/config"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in set",
+      "error_message": "(builtins.Exception) oracle failure in set\n[SQL: set]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -61,11 +61,15 @@
   },
   "delete with failing store": {
     "body": {
-      "message": "Document 'sample.txt' deleted successfully",
-      "success": true,
+      "details": {
+        "path": "/api/v1/documents/1"
+      },
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in delete",
+      "success": false,
       "timestamp": "<timestamp>"
     },
-    "status": 200
+    "status": 500
   },
   "documents after delete with failing store": {
     "body": {
@@ -130,7 +134,7 @@
         "path": "/api/v1/documents/"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in get_all_paginated",
+      "error_message": "(builtins.Exception) oracle failure in get_all_paginated\n[SQL: get_all_paginated]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -142,7 +146,7 @@
         "path": "/api/v1/documents/stats/overview"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in get_statistics",
+      "error_message": "(builtins.Exception) oracle failure in get_statistics\n[SQL: get_statistics]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -150,22 +154,15 @@
   },
   "full with failing store": {
     "body": {
-      "chunk_count": 2,
-      "chunks": [],
-      "content": "Charte d'utilisation des salles de réunion\n\nLes salles de réunion du siège sont réservées via l'agenda partagé. Une réservation ne peut excéder une demi-journée, sauf pour les séminaires validés par la direction. Toute réservation non honorée dans les quinze minutes est automatiquement libérée afin de permettre à d'autres équipes d'utiliser la salle.\n\nÉquipements disponibles. Chaque salle dispose d'un écran de projection, d'un système de visioconférence et d'un tableau blanc. Les salles Orion et Véga disposent en outre d'une caméra grand angle adaptée aux réunions hybrides de plus de dix participants. Les télécommandes et les câbles d'adaptation ne doivent pas quitter la salle.\n\nRègles de vie. Les participants laissent la salle propre et rangée, effacent le tableau blanc et éteignent les équipements à la fin de la réunion. La nourriture est tolérée uniquement dans la salle Polaris, équipée d'un point d'eau. Les incidents techniques sont signalés au support au poste 4400.\n\nConfidentialité. Les documents imprimés ne doivent jamais être laissés dans une salle après une réunion. Les réunions portant sur des sujets confidentiels se tiennent dans les salles fermées du troisième étage, dont les parois vitrées sont équipées de films occultants.\n\nRéunions hybrides. L'organisateur vérifie la connexion vidéo cinq minutes avant le début de la réunion. Il partage l'ordre du jour dans l'invitation et désigne un animateur pour donner la parole aux participants à distance. Le compte rendu est diffusé dans les quarante-huit heures sur l'espace documentaire de l'équipe.\n\nPriorités de réservation. Les comités de direction et les entretiens de recrutement sont prioritaires sur les autres réunions. En cas de conflit, l'assistante de direction arbitre et propose une salle de remplacement de capacité équivalente.\n",
-      "created_at": "<created_at>",
-      "error_message": null,
-      "file_hash": "f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1",
-      "file_size": 1889,
-      "filename": "sample.txt",
-      "id": 1,
-      "indexed_at": "<indexed_at>",
-      "mime_type": "text/plain",
-      "path": "<TMP>/data/documents/f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1_sample.txt",
-      "preserve": false,
-      "status": "indexed"
+      "details": {
+        "path": "/api/v1/documents/1/full"
+      },
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_document_chunks",
+      "success": false,
+      "timestamp": "<timestamp>"
     },
-    "status": 200
+    "status": 500
   },
   "login with failing audit": {
     "status": 401
@@ -178,11 +175,15 @@
   },
   "rebuild with failing document listing": {
     "body": {
-      "message": "Vector index rebuilt successfully. Optimized from 2 to 2 vectors. Completed in <N>ms.",
-      "success": true,
+      "details": {
+        "path": "/api/v1/admin/vector-store/rebuild"
+      },
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "success": false,
       "timestamp": "<timestamp>"
     },
-    "status": 200
+    "status": 500
   },
   "rebuild with failing store": {
     "body": {
@@ -308,7 +309,7 @@
         "path": "/api/v1/admin/usage"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in get_today_by_model",
+      "error_message": "(builtins.Exception) oracle failure in get_today_by_model\n[SQL: get_today_by_model]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -320,7 +321,7 @@
         "path": "/api/v1/admin/usage"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "oracle failure in get",
+      "error_message": "(builtins.Exception) oracle failure in get\n[SQL: get]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -332,7 +333,7 @@
         "path": "/api/v1/documents/maintenance/validate-consistency"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "Validation failed: oracle failure in get_all",
+      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },

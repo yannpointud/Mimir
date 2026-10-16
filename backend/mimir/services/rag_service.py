@@ -16,12 +16,18 @@ import asyncio
 import logging
 
 import numpy as np
+from sqlalchemy.exc import SQLAlchemyError
 from rapidfuzz import fuzz
 
 from mimir.cache.lru_cache import ChatCacheService
 from mimir.database.repository import DocumentRepository
 from mimir.llm_interface.interfaces import AbstractLLMService, EmbeddingResponse
-from mimir.rag_core.interfaces import AbstractVectorStore, LexicalIndex, SearchResult
+from mimir.rag_core.interfaces import (
+    AbstractVectorStore,
+    LexicalIndex,
+    SearchResult,
+    VectorStoreOperationError,
+)
 from mimir.rag_core.fusion import reciprocal_rank_fusion
 from mimir.monitoring.rag_debug_logger import RagDebugService
 from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
@@ -474,7 +480,7 @@ async def _hybrid_retrieve(
     # the exception break an otherwise-working engine.
     try:
         lexical_pool = await asyncio.to_thread(bm25_store.query, question, _HYBRID_POOL_SIZE)
-    except Exception as e:  # noqa: BLE001 - degradation boundary: fall back to dense-only
+    except VectorStoreOperationError as e:
         logger.warning(
             f"BM25 lexical retrieval unavailable ({e}); degrading to dense-only for this query"
         )
@@ -698,12 +704,12 @@ def _load_source_documents(
 ) -> dict[int, Any]:
     """Load every distinct source document in one query.
 
-    Avoids one get_by_id() per chunk (chunks frequently share a document). Any
+    Avoids one get_by_id() per chunk (chunks frequently share a document). A
     database error degrades to the chunk source names.
     """
     try:
         return document_repository.get_by_ids(list({int(r.document_id) for r in search_results}))
-    except Exception:  # noqa: BLE001 - fallback contract: degrade to the chunk source names
+    except SQLAlchemyError:
         return {}
 
 

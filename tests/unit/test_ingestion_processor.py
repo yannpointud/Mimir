@@ -343,7 +343,7 @@ class TestIngestionProcessor:
         """A BM25 rebuild that raises must NOT fail an ingestion whose
         FAISS upsert/persist already succeeded (non-fatal, continuing anyway)."""
         processor.bm25_store = Mock()
-        processor.bm25_store.rebuild.side_effect = RuntimeError("bm25 boom")
+        processor.bm25_store.rebuild.side_effect = OSError("disk full")
         processor.vector_store.metadata = [
             {"chunk_id": 0, "text": "active", "deleted": False},
         ]

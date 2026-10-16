@@ -7,6 +7,7 @@ import os
 from http import HTTPStatus
 from typing import Any
 
+from mimir.rag_core.interfaces import VectorStoreConnectionError
 from mimir.services.errors import RequestRejectedError
 from mimir.services.index_maintenance import remove_document_from_indexes
 
@@ -49,8 +50,10 @@ async def delete_document_everywhere(
     _remove_stored_file(file_path)
     try:
         await remove_document_from_indexes(vector_store, bm25_store, document_id, filename)
-    except Exception as e:  # noqa: BLE001 - best effort: the database deletion already succeeded
-        logger.error(f"Error removing document from vector store: {e}")
+    except (VectorStoreConnectionError, OSError) as e:
+        # The database record is gone: an index write failure leaves orphan
+        # chunks that the admin rebuild removes, it must not undo the deletion.
+        logger.error(f"Error removing document from the indexes: {e}")
 
     audit_repo.create_log(
         user_type="admin",
@@ -68,5 +71,5 @@ def _remove_stored_file(file_path: str | None) -> None:
         try:
             os.remove(file_path)
             logger.debug(f"Deleted file: {file_path}")
-        except Exception as e:  # noqa: BLE001 - best effort: the database deletion already succeeded
+        except OSError as e:
             logger.warning(f"Failed to delete file {file_path}: {e}")

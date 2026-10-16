@@ -44,7 +44,7 @@ class TestSimilarityFloorRawPool:
         store = FaissVectorStore(
             dimension=2,
             index_path=str(tmp_path / "hybrid.index"),
-            metadata_path=str(tmp_path / "hybrid.pkl"),
+            metadata_path=str(tmp_path / "hybrid.json"),
             similarity_threshold=0.5,
             index_type="FlatL2",
         )

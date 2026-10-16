@@ -5,6 +5,7 @@ These tests cover JWT token management and password hashing.
 """
 
 import pytest
+from pwdlib.exceptions import UnknownHashError
 from datetime import datetime, timedelta
 from unittest.mock import patch
 from freezegun import freeze_time
@@ -217,13 +218,11 @@ class TestVerifyToken:
         assert payload is None
 
     @patch("mimir.auth.jwt_handler.jwt.decode")
-    def test_verify_token_unexpected_error(self, mock_decode, jwt_handler):
-        """Test unexpected error handling during verification."""
-        mock_decode.side_effect = Exception("Unexpected error")
+    def test_verify_token_does_not_mask_a_programming_error(self, mock_decode, jwt_handler):
+        mock_decode.side_effect = TypeError("unexpected")
 
-        payload = jwt_handler.verify_token("some_token")
-
-        assert payload is None
+        with pytest.raises(TypeError):
+            jwt_handler.verify_token("some_token")
 
 
 class TestPasswordOperations:
@@ -299,13 +298,10 @@ class TestPasswordOperations:
         assert jwt_handler.verify_password(None, None) is False
 
     @patch("mimir.auth.jwt_handler.PasswordHash.verify")
-    def test_verify_password_exception(self, mock_verify, jwt_handler):
-        """Test exception handling during verification."""
-        mock_verify.side_effect = Exception("Verification failed")
+    def test_verify_password_with_an_unknown_hash_format(self, mock_verify, jwt_handler):
+        mock_verify.side_effect = UnknownHashError("hash")
 
-        is_valid = jwt_handler.verify_password("password", "hash")
-
-        assert is_valid is False
+        assert jwt_handler.verify_password("password", "hash") is False
 
 
 class TestBackwardCompatibility:
