@@ -47,7 +47,7 @@ pwdlib[argon2,bcrypt]==0.3.0
 python-multipart==0.0.31
 
 # Monitoring
-watchdog==3.0.0
+watchdog==6.0.0
 
 # Email
 aiosmtplib==5.1.2
