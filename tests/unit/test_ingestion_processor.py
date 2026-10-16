@@ -8,11 +8,17 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
+import pypdf
 import pytest
 
 from mimir.cost.budget_guard import BudgetReservation
 from mimir.ingestion.chunking import ChunkingConfig
-from mimir.ingestion.processor import IngestionProcessor, ProcessingError
+from mimir.ingestion.processor import (
+    NO_TEXT_ERROR_MESSAGE,
+    IngestionProcessor,
+    NoExtractableTextError,
+    ProcessingError,
+)
 from mimir.ingestion.queue_manager import IngestionTask
 from mimir.llm_interface.interfaces import EmbeddingResponse, LLMException
 from mimir.rag_core.interfaces import Chunk
@@ -498,10 +504,48 @@ class TestIngestionProcessor:
     async def test_process_document_pipeline_empty_text(self, processor):
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, "_extract_text", return_value="   \n  "):
-            success = await processor._process_document_pipeline(task)
+        with (
+            patch.object(processor, "_extract_text", return_value="   \n  "),
+            pytest.raises(NoExtractableTextError),
+        ):
+            await processor._process_document_pipeline(task)
 
-            assert success is False
+    @pytest.mark.asyncio
+    async def test_empty_text_fails_the_document_without_retry(
+        self, processor, mock_document_repository, mock_llm_service
+    ):
+        task = IngestionTask(file_path="dummy", document_id="123", max_retries=5)
+
+        with patch.object(processor, "_extract_text", return_value=""):
+            success = await processor._process_task(task)
+
+        assert success is False
+        mock_llm_service.embed.assert_not_called()
+        last_call = mock_document_repository.update_status.call_args_list[-1]
+        assert last_call.args == (123, "error")
+        assert last_call.kwargs == {"error_message": NO_TEXT_ERROR_MESSAGE}
+        assert task.can_retry() is False
+
+    @pytest.mark.asyncio
+    async def test_pdf_without_text_layer_fails_without_retry(
+        self, processor, mock_document_repository, temp_dir
+    ):
+        # A scanner output carries its page as an image: pypdf extracts no
+        # text from it, exactly like from a blank page
+        pdf_path = temp_dir / "scan.pdf"
+        writer = pypdf.PdfWriter()
+        writer.add_blank_page(width=595, height=842)
+        with open(pdf_path, "wb") as pdf_file:
+            writer.write(pdf_file)
+        task = IngestionTask(file_path=str(pdf_path), document_id="123", max_retries=5)
+
+        success = await processor._process_task(task)
+
+        assert success is False
+        mock_document_repository.update_status.assert_called_with(
+            123, "error", error_message=NO_TEXT_ERROR_MESSAGE
+        )
+        assert task.can_retry() is False
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_no_chunks(self, processor):

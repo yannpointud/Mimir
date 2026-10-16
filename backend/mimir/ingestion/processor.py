@@ -34,6 +34,19 @@ class ProcessingError(IngestionError):
     pass
 
 
+class NoExtractableTextError(ProcessingError):
+    """The document yields no text: an empty file or a scan without a text layer.
+
+    Every attempt extracts the same empty text, so the task is not retried.
+    """
+
+
+# Stored on the document and shown in the admin documents list
+NO_TEXT_ERROR_MESSAGE = (
+    "No extractable text: empty document or scan without a text layer (OCR is not supported)"
+)
+
+
 class IngestionProcessor:
     """
     Main processor for document ingestion pipeline
@@ -186,14 +199,12 @@ class IngestionProcessor:
                 },
             )
 
-            try:
-                self.document_repository.update_status(
-                    int(task.document_id), "error", error_message="Daily budget exceeded"
-                )
-            except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
-                logger.error(f"Failed to update document status: {db_error!s}")
+            self._fail_without_retry(task, "Daily budget exceeded")
+            return False
 
-            task.retry_count = task.max_retries
+        except NoExtractableTextError as e:
+            logger.warning(f"Ingestion stopped (not retried): {e!s}")
+            self._fail_without_retry(task, NO_TEXT_ERROR_MESSAGE)
             return False
 
         except Exception as e:  # noqa: BLE001 - worker boundary: a failing document must not stop the worker
@@ -224,6 +235,19 @@ class IngestionProcessor:
             except Exception as drain_error:  # noqa: BLE001 - worker boundary: never mask the task result
                 logger.warning(f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}")
 
+    def _fail_without_retry(self, task: IngestionTask, error_message: str) -> None:
+        """Mark the document as failed and exhaust the task's retries.
+
+        The async queue worker loop then does not re-queue the task.
+        """
+        try:
+            self.document_repository.update_status(
+                int(task.document_id), "error", error_message=error_message
+            )
+        except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
+            logger.error(f"Failed to update document status: {db_error!s}")
+        task.retry_count = task.max_retries
+
     async def _process_document_pipeline(self, task: IngestionTask) -> bool:
         """Extract, chunk, embed and index one document; False when it yields nothing."""
         start_time = time.time()
@@ -245,8 +269,8 @@ class IngestionProcessor:
             # Coalesced to the queue drain; also called from _process_task's
             # finally block so a failing last document still triggers it.
             await self._maybe_rebuild_bm25_on_drain()
-        except BudgetExceeded:
-            # Not retried: _process_task stops the document until the daily reset
+        except (BudgetExceeded, NoExtractableTextError):
+            # Not retried: _process_task stops the document
             raise
         except Exception as e:  # noqa: BLE001 - worker boundary: any failure marks the document as failed
             processing_time = time.time() - start_time
@@ -282,10 +306,13 @@ class IngestionProcessor:
         return True
 
     def _chunk(self, text: str, file_path: str) -> list[dict[str, Any]]:
-        """Chunks of the text, capped at max_chunks_per_doc; empty when there is no text."""
+        """Chunks of the text, capped at max_chunks_per_doc.
+
+        Raises:
+            NoExtractableTextError: If the extracted text is empty
+        """
         if not text.strip():
-            logger.warning(f"No text extracted from: {file_path}")
-            return []
+            raise NoExtractableTextError(f"No text extracted from: {file_path}")
         chunks_data = self.chunking_strategy.chunk_text(text, source=file_path)
         if not chunks_data:
             logger.warning(f"No chunks created from: {file_path}")
