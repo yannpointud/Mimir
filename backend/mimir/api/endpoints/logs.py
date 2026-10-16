@@ -7,7 +7,7 @@ frontend application logs for debugging and monitoring.
 
 import logging
 from typing import Any
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from mimir.monitoring.logger import frontend_logger
@@ -50,50 +50,41 @@ async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
     This endpoint accepts log entries from the frontend application
     and writes them to the dedicated frontend.log file.
     """
-    try:
-        # Map frontend log levels to Python logging levels
-        level_mapping = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARN": logging.WARNING,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL,
-        }
+    # Map frontend log levels to Python logging levels
+    level_mapping = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARN": logging.WARNING,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
 
-        # Get Python logging level
-        log_level = level_mapping.get(log_entry.level.upper(), logging.INFO)
+    # Get Python logging level
+    log_level = level_mapping.get(log_entry.level.upper(), logging.INFO)
 
-        # Prepare extra fields for structured logging
-        extra_fields = {
-            "frontend_timestamp": log_entry.timestamp,
-            "frontend_module": log_entry.module,
-            "type": "frontend_log",
-        }
+    # Prepare extra fields for structured logging
+    extra_fields = {
+        "frontend_timestamp": log_entry.timestamp,
+        "frontend_module": log_entry.module,
+        "type": "frontend_log",
+    }
 
-        # Add optional fields if present
-        if log_entry.url:
-            extra_fields["url"] = log_entry.url
-        if log_entry.userAgent:
-            extra_fields["user_agent"] = log_entry.userAgent
-        if log_entry.timeSinceStart:
-            extra_fields["time_since_start"] = log_entry.timeSinceStart
-        if log_entry.extra_data:
-            extra_fields.update(log_entry.extra_data)
+    # Add optional fields if present
+    if log_entry.url:
+        extra_fields["url"] = log_entry.url
+    if log_entry.userAgent:
+        extra_fields["user_agent"] = log_entry.userAgent
+    if log_entry.timeSinceStart:
+        extra_fields["time_since_start"] = log_entry.timeSinceStart
+    if log_entry.extra_data:
+        extra_fields.update(log_entry.extra_data)
 
-        # Log to frontend logger with structured data
-        frontend_logger.log(
-            log_level,
-            f"[{log_entry.module}] {log_entry.message}",
-            extra={"extra_fields": extra_fields},
-        )
+    # Log to frontend logger with structured data
+    frontend_logger.log(
+        log_level,
+        f"[{log_entry.module}] {log_entry.message}",
+        extra={"extra_fields": extra_fields},
+    )
 
-        return LogResponse(status="success", message="Log entry stored successfully")
-
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        # Log the error to backend logger
-        logger.error(f"Failed to process frontend log: {str(e)}")
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process log entry"
-        ) from e
+    return LogResponse(status="success", message="Log entry stored successfully")

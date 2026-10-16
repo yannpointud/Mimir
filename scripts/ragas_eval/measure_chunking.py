@@ -256,7 +256,6 @@ async def _ingest_corpus_isolated() -> int:
             processor.queue_document(
                 file_path=str(dest),
                 document_id=str(document.id),
-                preserve=False,
                 metadata={"source": "measure_chunking.py"},
             )
 

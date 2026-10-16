@@ -227,29 +227,6 @@ class TestEscalationEndpoint:
             # Assertions
             assert result.success is True
 
-    def test_escalate_to_human_exception_handling(self, mock_request, mock_email_service):
-        """Test exception handling in escalation."""
-
-        # Configure mock to raise an exception
-        mock_email_service.send_escalation_email.side_effect = Exception("Email service error")
-
-        escalation_request = EscalationRequest(question="Question complexe")
-
-        # Call the function
-        result = asyncio.run(
-            escalate_to_human(
-                request=mock_request,
-                escalation_request=escalation_request,
-                current_user=None,
-                email_service=mock_email_service,
-            )
-        )
-
-        # Assertions
-        assert result.success is False
-        assert result.escalation_id is None
-        assert "erreur s'est produite" in result.message
-
 
 class TestChatHelperFunctions:
     """Tests for chat utility functions.
@@ -258,50 +235,6 @@ class TestChatHelperFunctions:
     tests/unit/test_rag_service.py; only the HTTP-layer
     helper tests remain here.
     """
-
-    def test_get_client_ip_forwarded(self):
-        """Test IP extraction with X-Forwarded-For header."""
-        from mimir.api.endpoints.chat import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {"X-Forwarded-For": "192.168.1.100, 10.0.0.1"}
-        mock_request.client.host = "127.0.0.1"
-
-        ip = _get_client_ip(mock_request)
-        assert ip == "192.168.1.100"
-
-    def test_get_client_ip_real_ip(self):
-        """Test IP extraction with X-Real-IP header."""
-        from mimir.api.endpoints.chat import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {"X-Real-IP": "192.168.1.200"}
-        mock_request.client.host = "127.0.0.1"
-
-        ip = _get_client_ip(mock_request)
-        assert ip == "192.168.1.200"
-
-    def test_get_client_ip_direct(self):
-        """Test direct IP extraction."""
-        from mimir.api.endpoints.chat import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client.host = "192.168.1.50"
-
-        ip = _get_client_ip(mock_request)
-        assert ip == "192.168.1.50"
-
-    def test_get_client_ip_no_client(self):
-        """Test IP extraction without client."""
-        from mimir.api.endpoints.chat import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client = None
-
-        ip = _get_client_ip(mock_request)
-        assert ip == "unknown"
 
     def test_generate_session_id(self):
         """Test session ID generation."""
@@ -432,4 +365,4 @@ class TestChatIntegration:
         assert call_args[1]["user_question"] == escalation_request.question
         assert call_args[1]["chat_history"] == escalation_request.chat_history
         assert call_args[1]["user_info"]["user_email"] == "user@company.com"
-        assert call_args[1]["user_info"]["ip_address"] == "203.0.113.1"
+        assert call_args[1]["user_info"]["ip_address"] == "192.168.1.100"

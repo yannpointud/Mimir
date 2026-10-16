@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 import numpy as np
 import pypdf
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from mimir.cost.budget_guard import BudgetReservation
 from mimir.ingestion.chunking import ChunkingConfig
@@ -310,7 +311,9 @@ class TestRestoredBestEffortBlocks:
         )
         upload.filename = "a.txt"
         doc_repo = Mock()
-        doc_repo.delete.side_effect = RuntimeError("database is locked")
+        doc_repo.delete.side_effect = OperationalError(
+            "DELETE", {}, Exception("database is locked")
+        )
 
         with pytest.raises(RequestRejectedError) as exc_info:
             upload._reject_queue_full(

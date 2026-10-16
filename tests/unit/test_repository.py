@@ -5,6 +5,8 @@ Vérifie les opérations CRUD et la logique métier
 
 import pytest
 
+from mimir.shared.errors import ConflictError, NotFoundError
+
 
 class TestDocumentRepository:
     """Tests du DocumentRepository"""
@@ -36,7 +38,7 @@ class TestDocumentRepository:
         )
 
         # Tentative de duplication
-        with pytest.raises(ValueError, match="already exists"):
+        with pytest.raises(ConflictError, match="already exists"):
             repo.create(filename="different_name.pdf", file_hash=sample_document_data["file_hash"])
 
     def test_get_by_id(self, test_repositories, sample_document_data):
@@ -149,7 +151,7 @@ class TestDocumentRepository:
         """Test de mise à jour d'un document inexistant"""
         repo = test_repositories["document"]
 
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(NotFoundError, match="not found"):
             repo.update_status(99999, "indexed")
 
     def test_delete_document(self, test_repositories, sample_document_data):
@@ -178,7 +180,7 @@ class TestDocumentRepository:
         )
 
         # Suppression bloquée
-        with pytest.raises(ValueError, match="protected"):
+        with pytest.raises(ConflictError, match="protected"):
             repo.delete(doc.id)
 
         # Suppression forcée

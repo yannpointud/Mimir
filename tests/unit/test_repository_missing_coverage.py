@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 from sqlalchemy.exc import SQLAlchemyError
 
+from mimir.shared.errors import NotFoundError
+
 from mimir.database.repository import (
     DocumentRepository,
     ConfigurationRepository,
@@ -90,7 +92,7 @@ class TestDocumentRepositoryErrorHandling:
         """Test update_status avec document inexistant"""
         repo = test_repositories["document"]
 
-        with pytest.raises(ValueError, match="Document 999 not found"):
+        with pytest.raises(NotFoundError, match="Document 999 not found"):
             repo.update_status(999, "indexed")
 
     def test_update_status_sqlalchemy_error(self, test_repositories, sample_document_data):

@@ -124,35 +124,6 @@ class TestAuthEndpoints:
         with pytest.raises(ValidationError):
             LoginRequest()  # No fields provided
 
-    @patch("mimir.api.endpoints.auth._authenticate_admin")
-    @patch("mimir.api.endpoints.auth._log_auth_event")
-    def test_login_exception_handling(self, mock_log_event, mock_auth):
-        """Test exception handling during login."""
-        from mimir.api.endpoints.auth import login
-
-        # Configure mocks to raise an exception
-        mock_auth.side_effect = Exception("Database error")
-
-        mock_request = Mock()
-        mock_request.client.host = "127.0.0.1"
-        mock_request.headers = {}
-
-        login_data = LoginRequest(username="admin", password="test123")
-        mock_audit_repo = AsyncMock()
-
-        # Test that exception is handled
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                login(
-                    request=mock_request,
-                    response=Mock(),  # required by slowapi header injection
-                    login_data=login_data,
-                    audit_repo=mock_audit_repo,
-                )
-            )
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
 
 class TestAuthHelperFunctions:
     """Tests for authentication utility functions."""
@@ -190,54 +161,6 @@ class TestAuthHelperFunctions:
 
         result = _authenticate_admin("admin", "wrong_password")
         assert result is False
-
-    def test_get_client_ip_forwarded(self):
-        """Test IP extraction with X-Forwarded-For header."""
-        from mimir.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {"X-Forwarded-For": "192.168.1.100, 10.0.0.1"}
-        mock_request.client.host = "127.0.0.1"
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "192.168.1.100"
-
-    def test_get_client_ip_real_ip(self):
-        """Test IP extraction with X-Real-IP header."""
-        from mimir.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {"X-Real-IP": "192.168.1.200"}
-        mock_request.client.host = "127.0.0.1"
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "192.168.1.200"
-
-    def test_get_client_ip_direct(self):
-        """Test direct IP extraction."""
-        from mimir.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client.host = "192.168.1.50"
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "192.168.1.50"
-
-    def test_get_client_ip_no_client(self):
-        """Test IP extraction without client."""
-        from mimir.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client = None
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "unknown"
 
     def test_log_auth_event(self):
         """Test authentication event logging."""
@@ -310,35 +233,6 @@ class TestTokenRefresh:
         # Assertions
         assert result.access_token == "new_token"
         assert result.token_type == "bearer"
-
-    @patch("mimir.api.endpoints.auth.jwt_handler")
-    @patch("mimir.api.endpoints.auth.settings")
-    @patch("mimir.api.endpoints.auth._log_auth_event")
-    def test_refresh_token_invalid_token(self, mock_log_event, mock_settings, mock_jwt):
-        """Test refresh with invalid token."""
-        from mimir.api.endpoints.auth import refresh_token
-
-        # Configure mock to raise an exception
-        mock_jwt.create_access_token.side_effect = Exception("Invalid token")
-        mock_settings.jwt_expiration_hours = 24
-
-        mock_user = {"sub": "admin", "user_type": "admin"}
-
-        mock_request = Mock()
-        mock_request.client.host = "127.0.0.1"
-        mock_request.headers = {}
-
-        mock_audit_repo = AsyncMock()
-
-        # Test that exception is handled
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                refresh_token(
-                    request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo
-                )
-            )
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestLogout:

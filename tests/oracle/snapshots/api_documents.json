@@ -70,7 +70,7 @@
             "end_char": 985,
             "section_title": null,
             "start_char": 0,
-            "uploaded_by": "unknown",
+            "uploaded_by": "admin",
             "word_count": 150
           },
           "text": "Charte d'utilisation des salles de réunion\n\nLes salles de réunion du siège sont réservées via l'agenda partagé. Une réservation ne peut excéder une demi-journée, sauf pour les séminaires validés par la direction. Toute réservation non honorée dans les quinze minutes est automatiquement libérée afin de permettre à d'autres équipes d'utiliser la salle.\n\nÉquipements disponibles. Chaque salle dispose d'un écran de projection, d'un système de visioconférence et d'un tableau blanc. Les salles Orion et Véga disposent en outre d'une caméra grand angle adaptée aux réunions hybrides de plus de dix participants. Les télécommandes et les câbles d'adaptation ne doivent pas quitter la salle.\n\nRègles de vie. Les participants laissent la salle propre et rangée, effacent le tableau blanc et éteignent les équipements à la fin de la réunion. La nourriture est tolérée uniquement dans la salle Polaris, équipée d'un point d'eau. Les incidents techniques sont signalés au support au poste 4400."
@@ -84,7 +84,7 @@
             "end_char": 899,
             "section_title": null,
             "start_char": 0,
-            "uploaded_by": "unknown",
+            "uploaded_by": "admin",
             "word_count": 133
           },
           "text": "Les incidents techniques sont signalés au support au poste 4400. Confidentialité. Les documents imprimés ne doivent jamais être laissés dans une salle après une réunion. Les réunions portant sur des sujets confidentiels se tiennent dans les salles fermées du troisième étage, dont les parois vitrées sont équipées de films occultants.\n\nRéunions hybrides. L'organisateur vérifie la connexion vidéo cinq minutes avant le début de la réunion. Il partage l'ordre du jour dans l'invitation et désigne un animateur pour donner la parole aux participants à distance. Le compte rendu est diffusé dans les quarante-huit heures sur l'espace documentaire de l'équipe.\n\nPriorités de réservation. Les comités de direction et les entretiens de recrutement sont prioritaires sur les autres réunions. En cas de conflit, l'assistante de direction arbitre et propose une salle de remplacement de capacité équivalente."
@@ -303,8 +303,8 @@
       "details": {
         "path": "/api/v1/documents/999/preserve"
       },
-      "error_code": "HTTP_404",
-      "error_message": "Document with ID 999 not found",
+      "error_code": "NOT_FOUND",
+      "error_message": "Document 999 not found",
       "success": false,
       "timestamp": "<timestamp>"
     },

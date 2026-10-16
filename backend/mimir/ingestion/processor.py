@@ -4,7 +4,6 @@ Orchestrates the complete pipeline: extraction → chunking → embedding → in
 """
 
 import asyncio
-import hashlib
 import time
 from pathlib import Path
 from typing import Any
@@ -22,7 +21,7 @@ from mimir.monitoring.logger import setup_logger
 from mimir.config import settings
 from mimir.cost.budget_guard import budget_guard as default_budget_guard
 from mimir.cost.usage_tracker import usage_tracker as default_usage_tracker
-from mimir.shared.errors import BudgetExceeded, IngestionError
+from mimir.shared.errors import BudgetExceeded, IngestionError, NotFoundError
 
 logger = setup_logger(__name__)
 
@@ -105,99 +104,46 @@ class IngestionProcessor:
         return success
 
     def queue_document(
-        self,
-        file_path: str,
-        document_id: str | None = None,
-        preserve: bool = False,
-        metadata: dict[str, Any] | None = None,
+        self, file_path: str, document_id: str, metadata: dict[str, Any] | None = None
     ) -> bool:
-        """Queue a document for processing; return True if queued.
+        """Queue a stored document for ingestion; return False when the queue is full.
 
-        Without ``document_id`` a new document record is created; otherwise the
-        existing document is reprocessed.
+        Raises:
+            NotFoundError: If the file or the document record does not exist
+            IngestionError: If the file exceeds the maximum size
         """
-        try:
-            # Validate file
-            file_path_obj = Path(file_path)
-            if not file_path_obj.exists():
-                logger.error(f"File does not exist: {file_path}")
-                return False
-
-            # Check file size
-            file_size = file_path_obj.stat().st_size
-            if file_size > self.max_file_size_bytes:
-                logger.error(
-                    f"File too large: {file_size / 1024 / 1024:.1f}MB > "
-                    f"{self.max_file_size_bytes / 1024 / 1024}MB"
-                )
-                return False
-
-            # Handle document creation/reprocessing
-            if document_id is None:
-                # New document - generate ID and create database record
-                document_id = self._generate_document_id(file_path)
-                file_hash = self._calculate_file_hash(file_path)
-
-                try:
-                    document = self.document_repository.create(
-                        filename=file_path_obj.name,
-                        file_hash=file_hash,
-                        path=str(file_path_obj.absolute()),
-                        preserve=preserve,
-                    )
-                    document_id = str(document.id)
-                except Exception as e:  # noqa: BLE001 - a duplicate is reported as not queued; anything else re-raised
-                    if "already exists" in str(e).lower():
-                        logger.warning(f"Document already exists with hash: {file_hash}")
-                        return False
-                    raise
-            else:
-                # Reprocessing existing document - validate it exists
-                try:
-                    existing = self.document_repository.get_by_id(int(document_id))
-                    if not existing:
-                        logger.error(f"Document ID {document_id} not found for reprocessing")
-                        return False
-                    logger.info(
-                        f"Reprocessing existing document: {existing.filename} (ID: {document_id})"
-                    )
-                except Exception as e:  # noqa: BLE001 - never raise: any lookup failure means not queued
-                    logger.error(
-                        f"Failed to retrieve document {document_id} for reprocessing: {str(e)}"
-                    )
-                    return False
-
-            # Create ingestion task
-            task = IngestionTask(
-                file_path=file_path,
-                document_id=document_id,
-                metadata=metadata or {},
-                max_retries=settings.ingestion_max_retries,
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            raise NotFoundError(f"File does not exist: {file_path}")
+        file_size = file_path_obj.stat().st_size
+        if file_size > self.max_file_size_bytes:
+            raise IngestionError(
+                f"File too large: {file_size / 1024 / 1024:.1f}MB > "
+                f"{self.max_file_size_bytes / 1024 / 1024}MB"
             )
+        if self.document_repository.get_by_id(int(document_id)) is None:
+            raise NotFoundError(f"Document {document_id} not found")
 
-            # Queue the task
-            success = self.queue_manager.add_task(task)
-
-            if success:
-                logger.info(
-                    f"Queued document for processing: {file_path_obj.name}",
-                    extra={
-                        "extra_fields": {
-                            # str(): callers pass a Path, which the JSON log
-                            # formatter cannot serialize (the record was lost)
-                            "file_path": str(file_path),
-                            "document_id": document_id,
-                            "file_size_mb": file_size / 1024 / 1024,
-                            "type": "document_queued",
-                        }
-                    },
-                )
-
-            return success
-
-        except Exception as e:  # noqa: BLE001 - never raise: any failure means not queued (returns False)
-            logger.error(f"Failed to queue document {file_path}: {str(e)}")
-            return False
+        task = IngestionTask(
+            file_path=file_path,
+            document_id=document_id,
+            metadata=metadata or {},
+            max_retries=settings.ingestion_max_retries,
+        )
+        queued = self.queue_manager.add_task(task)
+        if queued:
+            logger.info(
+                f"Queued document for processing: {file_path_obj.name}",
+                extra={
+                    "extra_fields": {
+                        "file_path": file_path,
+                        "document_id": document_id,
+                        "file_size_mb": file_size / 1024 / 1024,
+                        "type": "document_queued",
+                    }
+                },
+            )
+        return queued
 
     async def _process_task(self, task: IngestionTask) -> bool:
         """Process a single ingestion task"""
@@ -541,20 +487,6 @@ class IngestionProcessor:
             chunks.append(chunk)
 
         return chunks
-
-    def _calculate_file_hash(self, file_path: str) -> str:
-        """Calculate SHA-256 hash of file"""
-        hasher = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hasher.update(chunk)
-        return hasher.hexdigest()
-
-    def _generate_document_id(self, file_path: str) -> str:
-        """Generate document ID from file path and timestamp"""
-        file_path_obj = Path(file_path)
-        timestamp = int(time.time())
-        return f"{file_path_obj.stem}_{timestamp}"
 
     def get_stats(self) -> dict[str, Any]:
         """Get processing statistics"""

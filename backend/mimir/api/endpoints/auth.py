@@ -21,6 +21,7 @@ from mimir.auth.password_utils import validate_password_strength
 from mimir.database.repository import AuditLogRepository
 from mimir.api.dependencies import get_audit_log_repository
 from mimir.api.middleware.rate_limit import limiter
+from mimir.api.client_ip import get_client_ip
 from mimir.config import settings
 
 logger = logging.getLogger(__name__)
@@ -76,70 +77,50 @@ async def login(
     ``response`` is required by slowapi to inject the X-RateLimit-* headers
     on successful (Pydantic) returns.
     """
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
 
-    try:
-        # Validate credentials
-        if not _authenticate_admin(login_data.username, login_data.password):
-            # Log failed attempt
-            await _log_auth_event(
-                audit_repo=audit_repo,
-                action="login_failed",
-                username=login_data.username,
-                ip_address=client_ip,
-                success=False,
-                details="Invalid credentials",
-            )
-
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Create access token
-        token_data = {"sub": login_data.username, "user_type": "admin"}
-
-        expires_delta = timedelta(hours=settings.jwt_expiration_hours)
-        access_token = jwt_handler.create_access_token(data=token_data, expires_delta=expires_delta)
-
-        # Log successful login
+    # Validate credentials
+    if not _authenticate_admin(login_data.username, login_data.password):
+        # Log failed attempt
         await _log_auth_event(
             audit_repo=audit_repo,
-            action="login_success",
-            username=login_data.username,
-            ip_address=client_ip,
-            success=True,
-            details="Admin login successful",
-        )
-
-        logger.info(f"Admin login successful - user: {login_data.username}, IP: {client_ip}")
-
-        return LoginResponse(
-            access_token=access_token,
-            token_type="bearer",
-            expires_in=settings.jwt_expiration_hours * 3600,  # Convert to seconds
-            user_type="admin",
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        logger.error(f"Login error for user {login_data.username}: {e}")
-
-        # Log system error
-        await _log_auth_event(
-            audit_repo=audit_repo,
-            action="login_error",
+            action="login_failed",
             username=login_data.username,
             ip_address=client_ip,
             success=False,
-            details=f"System error: {str(e)}",
+            details="Invalid credentials",
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Authentication system error"
-        ) from e
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Create access token
+    token_data = {"sub": login_data.username, "user_type": "admin"}
+
+    expires_delta = timedelta(hours=settings.jwt_expiration_hours)
+    access_token = jwt_handler.create_access_token(data=token_data, expires_delta=expires_delta)
+
+    # Log successful login
+    await _log_auth_event(
+        audit_repo=audit_repo,
+        action="login_success",
+        username=login_data.username,
+        ip_address=client_ip,
+        success=True,
+        details="Admin login successful",
+    )
+
+    logger.info(f"Admin login successful - user: {login_data.username}, IP: {client_ip}")
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=settings.jwt_expiration_hours * 3600,  # Convert to seconds
+        user_type="admin",
+    )
 
 
 @router.post("/logout")
@@ -153,26 +134,21 @@ async def logout(
     Note: Since JWT is stateless, this endpoint mainly serves to log the logout
     event. Client should discard the token.
     """
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
 
-    try:
-        # Log logout event
-        await _log_auth_event(
-            audit_repo=audit_repo,
-            action="logout",
-            username=current_user.get("sub", "unknown"),
-            ip_address=client_ip,
-            success=True,
-            details="User logout",
-        )
+    # Log logout event
+    await _log_auth_event(
+        audit_repo=audit_repo,
+        action="logout",
+        username=current_user.get("sub", "unknown"),
+        ip_address=client_ip,
+        success=True,
+        details="User logout",
+    )
 
-        logger.info(f"User logout - user: {current_user.get('sub')}, IP: {client_ip}")
+    logger.info(f"User logout - user: {current_user.get('sub')}, IP: {client_ip}")
 
-        return {"message": "Successfully logged out"}
-
-    except Exception as e:  # noqa: BLE001 - API boundary: logout always succeeds for the client
-        logger.error(f"Logout error: {e}")
-        return {"message": "Logged out (with errors)"}
+    return {"message": "Successfully logged out"}
 
 
 @router.post("/refresh", response_model=TokenRefreshResponse)
@@ -182,50 +158,31 @@ async def refresh_token(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> TokenRefreshResponse:
     """Refresh access token for authenticated user."""
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
 
-    try:
-        # Create new token with same claims
-        token_data = {"sub": current_user["sub"], "user_type": current_user["user_type"]}
+    # Create new token with same claims
+    token_data = {"sub": current_user["sub"], "user_type": current_user["user_type"]}
 
-        expires_delta = timedelta(hours=settings.jwt_expiration_hours)
-        new_access_token = jwt_handler.create_access_token(
-            data=token_data, expires_delta=expires_delta
-        )
+    expires_delta = timedelta(hours=settings.jwt_expiration_hours)
+    new_access_token = jwt_handler.create_access_token(data=token_data, expires_delta=expires_delta)
 
-        # Log token refresh
-        await _log_auth_event(
-            audit_repo=audit_repo,
-            action="token_refresh",
-            username=current_user["sub"],
-            ip_address=client_ip,
-            success=True,
-            details="Token refreshed successfully",
-        )
+    # Log token refresh
+    await _log_auth_event(
+        audit_repo=audit_repo,
+        action="token_refresh",
+        username=current_user["sub"],
+        ip_address=client_ip,
+        success=True,
+        details="Token refreshed successfully",
+    )
 
-        logger.debug(f"Token refreshed for user: {current_user['sub']}")
+    logger.debug(f"Token refreshed for user: {current_user['sub']}")
 
-        return TokenRefreshResponse(
-            access_token=new_access_token,
-            token_type="bearer",
-            expires_in=settings.jwt_expiration_hours * 3600,
-        )
-
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        logger.error(f"Token refresh error: {e}")
-
-        await _log_auth_event(
-            audit_repo=audit_repo,
-            action="token_refresh_error",
-            username=current_user.get("sub", "unknown"),
-            ip_address=client_ip,
-            success=False,
-            details=f"Token refresh failed: {str(e)}",
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Token refresh failed"
-        ) from e
+    return TokenRefreshResponse(
+        access_token=new_access_token,
+        token_type="bearer",
+        expires_in=settings.jwt_expiration_hours * 3600,
+    )
 
 
 @router.get("/me")
@@ -249,7 +206,7 @@ async def change_password(
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> dict[str, str]:
     """Change admin password."""
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     username = admin_user.get("sub", "admin")
 
     # Verify current password
@@ -275,14 +232,7 @@ async def change_password(
     # Hash new password and persist
     new_hash = jwt_handler.hash_password(data.new_password)
 
-    try:
-        _update_env_file("ADMIN_PASSWORD_HASH", new_hash)
-    except Exception as e:  # noqa: BLE001 - API boundary: any write failure becomes this 500
-        logger.error(f"Failed to update .env file: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de la mise à jour du fichier de configuration",
-        ) from e
+    _update_env_file("ADMIN_PASSWORD_HASH", new_hash)
 
     await _log_auth_event(
         audit_repo=audit_repo,
@@ -342,20 +292,6 @@ def _authenticate_admin(username: str, password: str) -> bool:
     except Exception as e:  # noqa: BLE001 - fail closed: any error denies authentication
         logger.error(f"Authentication error: {e}")
         return False
-
-
-def _get_client_ip(request: Request) -> str:
-    # Check for forwarded headers (when behind proxy)
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip
-
-    # Fall back to direct client IP
-    return request.client.host if request.client else "unknown"
 
 
 async def _log_auth_event(

@@ -32,3 +32,11 @@ class BudgetExceeded(MimirError):
     answer 429 themselves); callers outside a request, such as the ingestion
     worker, raise it to stop without retrying.
     """
+
+
+class NotFoundError(MimirError):
+    """A requested record does not exist (HTTP 404)."""
+
+
+class ConflictError(MimirError):
+    """The request conflicts with the stored state, such as a duplicate (HTTP 409)."""

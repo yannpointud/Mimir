@@ -5,7 +5,6 @@ Tests pour les endpoints de logs frontend.
 import pytest
 from unittest.mock import patch
 
-from fastapi import HTTPException
 
 from mimir.api.endpoints.logs import (
     FrontendLogEntry,
@@ -181,21 +180,3 @@ class TestReceiveFrontendLog:
         # Vérifier le niveau CRITICAL
         call_args = mock_logger.log.call_args
         assert call_args[0][0] == 50  # logging.CRITICAL
-
-    @pytest.mark.asyncio
-    @patch("mimir.api.endpoints.logs.frontend_logger")
-    @patch("mimir.api.endpoints.logs.logger")
-    async def test_receive_log_exception_handling(self, mock_backend_logger, mock_frontend_logger):
-        """Test gestion d'exception lors du traitement du log."""
-        mock_frontend_logger.log.side_effect = Exception("Logging failed")
-
-        log_entry = FrontendLogEntry(
-            timestamp="2023-12-01T10:00:00Z", level="INFO", module="app", message="Test message"
-        )
-
-        with pytest.raises(HTTPException):
-            await receive_frontend_log(log_entry)
-
-        # Vérifier que l'erreur a été loggée
-        mock_backend_logger.error.assert_called_once()
-        assert "Failed to process frontend log" in mock_backend_logger.error.call_args[0][0]

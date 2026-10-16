@@ -11,6 +11,8 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from datetime import datetime, timedelta
 import logging
 
+from mimir.shared.errors import ConflictError, NotFoundError
+
 from mimir.database.models import Document, Configuration, AuditLog, LlmUsage, LlmBudgetLedger
 
 
@@ -40,7 +42,7 @@ class DocumentRepository(BaseRepository):
         """Create a new document
 
         Raises:
-            IntegrityError: If the hash already exists
+            ConflictError: If a document with this hash already exists
         """
         try:
             document = Document(
@@ -60,7 +62,7 @@ class DocumentRepository(BaseRepository):
 
         except IntegrityError as e:
             self._handle_db_error(e, f"create document {filename}")
-            raise ValueError(f"Document with hash {file_hash} already exists") from e
+            raise ConflictError(f"Document with hash {file_hash} already exists") from e
         except SQLAlchemyError as e:
             self._handle_db_error(e, f"create document {filename}")
             raise
@@ -192,7 +194,7 @@ class DocumentRepository(BaseRepository):
         try:
             document = self.get_by_id(doc_id)
             if not document:
-                raise ValueError(f"Document {doc_id} not found")
+                raise NotFoundError(f"Document {doc_id} not found")
 
             old_status = document.status
             document.status = status
@@ -216,12 +218,12 @@ class DocumentRepository(BaseRepository):
         """Set whether a document is protected from deletion; returns the document.
 
         Raises:
-            ValueError: If the document does not exist
+            NotFoundError: If the document does not exist
         """
         try:
             document = self.get_by_id(doc_id)
             if not document:
-                raise ValueError(f"Document {doc_id} not found")
+                raise NotFoundError(f"Document {doc_id} not found")
             document.preserve = preserve
             self.session.commit()
             logger.info(f"Document {doc_id} preserve flag set to {preserve}")
@@ -234,7 +236,7 @@ class DocumentRepository(BaseRepository):
         """Delete a document; return False if it does not exist.
 
         Raises:
-            ValueError: If the document is protected and ``force`` is False.
+            ConflictError: If the document is protected and ``force`` is False.
         """
         try:
             document = self.get_by_id(doc_id)
@@ -242,7 +244,7 @@ class DocumentRepository(BaseRepository):
                 return False
 
             if document.preserve and not force:
-                raise ValueError(f"Document {doc_id} is protected from deletion")
+                raise ConflictError(f"Document {doc_id} is protected from deletion")
 
             self.session.delete(document)
             self.session.commit()

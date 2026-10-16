@@ -3,6 +3,8 @@ Unit tests for document management endpoints.
 """
 
 import pytest
+
+from mimir.shared.errors import NotFoundError
 import asyncio
 import tempfile
 from unittest.mock import Mock, patch, AsyncMock, mock_open
@@ -202,25 +204,6 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
 
         # Assertions
         assert result == mock_response
-
-    def test_list_documents_exception_handling(self, mock_doc_repo, mock_pagination):
-        """Test exception handling in listing."""
-
-        # Configure mock to raise an exception
-        mock_doc_repo.get_all_paginated.side_effect = Exception("Database error")
-
-        # Test that exception is handled
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                list_documents(
-                    pagination=mock_pagination,
-                    status_filter=None,
-                    search=None,
-                    doc_repo=mock_doc_repo,
-                )
-            )
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestGetDocumentEndpoint(TestDocumentEndpoints):
@@ -735,11 +718,9 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
     ):
         """Test toggle on non-existent document."""
 
-        # Configure mock
-        mock_doc_repo.get_by_id.return_value = None
+        mock_doc_repo.update_preserve_status.side_effect = NotFoundError("Document 999 not found")
 
-        # Test that exception is raised
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(NotFoundError):
             asyncio.run(
                 toggle_document_preservation(
                     document_id=999,
@@ -749,8 +730,7 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
                     audit_repo=mock_audit_repo,
                 )
             )
-
-        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+        mock_audit_repo.create_log.assert_not_called()
 
 
 class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
@@ -854,18 +834,6 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
         assert result.preserved_documents == 5
         assert result.storage_info.upload_directory == "/uploads"
         assert result.storage_info.max_file_size_mb == 10
-
-    def test_get_document_stats_exception_handling(self, mock_doc_repo):
-        """Test exception handling in statistics."""
-
-        # Configure mock to raise an exception
-        mock_doc_repo.get_statistics.side_effect = Exception("Database error")
-
-        # Test that exception is handled
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(get_document_stats(doc_repo=mock_doc_repo))
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestDocumentIntegration(TestDocumentEndpoints):

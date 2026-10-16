@@ -39,4 +39,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 # sequential ingestion queue are process-local and are NOT safe across multiple
 # worker processes, so production MUST run exactly one uvicorn worker.
 # Do not add --workers or --reload here.
-CMD ["uvicorn", "mimir.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers: request.client is the address nginx writes in
+# X-Forwarded-For; the backend is only reachable from nginx (not published).
+CMD ["uvicorn", "mimir.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -31,6 +31,7 @@ from mimir.api.dependencies import (
 from mimir.database.repository import DocumentRepository
 from mimir.monitoring.rag_debug_logger import RagDebugService
 from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
+from mimir.api.client_ip import get_client_ip
 from mimir.config import settings
 
 # RAG pipeline lives in mimir.services.rag_service and the SSE stream in
@@ -142,7 +143,7 @@ async def chat_stream(
         session_id=chat_request.session_id,
         context_limit=chat_request.context_limit,
         include_sources=chat_request.include_sources,
-        client_ip=_get_client_ip(request),
+        client_ip=get_client_ip(request),
         current_user=current_user,
     )
     # The background task releases the reservation if the stream is never
@@ -163,65 +164,44 @@ async def escalate_to_human(
     email_service: EmailService = Depends(get_email_service),
 ) -> EscalationResponse:
     """Escalate conversation to human operator."""
-    try:
-        client_ip = _get_client_ip(request)
-        escalation_id = _generate_escalation_id()
+    client_ip = get_client_ip(request)
+    escalation_id = _generate_escalation_id()
 
-        # Prepare user info
-        user_info = {
-            "ip_address": client_ip,
-            "session_id": escalation_request.session_id,
-            "user_email": escalation_request.user_email,
-            "user_type": current_user.get("user_type") if current_user else "anonymous",
-            "escalation_id": escalation_id,
-            "additional_context": escalation_request.additional_context,
-        }
+    # Prepare user info
+    user_info = {
+        "ip_address": client_ip,
+        "session_id": escalation_request.session_id,
+        "user_email": escalation_request.user_email,
+        "user_type": current_user.get("user_type") if current_user else "anonymous",
+        "escalation_id": escalation_id,
+        "additional_context": escalation_request.additional_context,
+    }
 
-        # Extract sources from chat history if available
-        context_sources = _extract_sources_from_history(escalation_request.chat_history)
+    # Extract sources from chat history if available
+    context_sources = _extract_sources_from_history(escalation_request.chat_history)
 
-        # Send escalation email
-        success = await email_service.send_escalation_email(
-            user_question=escalation_request.question,
-            chat_history=escalation_request.chat_history,
-            user_info=user_info,
-            context_sources=context_sources,
+    # Send escalation email
+    success = await email_service.send_escalation_email(
+        user_question=escalation_request.question,
+        chat_history=escalation_request.chat_history,
+        user_info=user_info,
+        context_sources=context_sources,
+    )
+
+    if success:
+        logger.info(f"Escalation sent successfully - ID: {escalation_id}")
+        return EscalationResponse(
+            success=True,
+            message="Votre demande a été transmise à notre équipe support. Vous recevrez une réponse dans les plus brefs délais.",
+            escalation_id=escalation_id,
         )
-
-        if success:
-            logger.info(f"Escalation sent successfully - ID: {escalation_id}")
-            return EscalationResponse(
-                success=True,
-                message="Votre demande a été transmise à notre équipe support. Vous recevrez une réponse dans les plus brefs délais.",
-                escalation_id=escalation_id,
-            )
-        else:
-            logger.error(f"Escalation failed - ID: {escalation_id}")
-            return EscalationResponse(
-                success=False,
-                message="Impossible d'envoyer votre demande pour le moment. Veuillez réessayer plus tard.",
-                escalation_id=None,
-            )
-
-    except Exception as e:  # noqa: BLE001 - API boundary: any failure becomes a failed escalation
-        logger.error(f"Escalation error: {e}")
+    else:
+        logger.error(f"Escalation failed - ID: {escalation_id}")
         return EscalationResponse(
             success=False,
-            message="Une erreur s'est produite lors de l'envoi de votre demande.",
+            message="Impossible d'envoyer votre demande pour le moment. Veuillez réessayer plus tard.",
             escalation_id=None,
         )
-
-
-def _get_client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip
-
-    return request.client.host if request.client else "unknown"
 
 
 def _generate_cache_key(question: str) -> str:

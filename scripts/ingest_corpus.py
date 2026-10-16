@@ -105,7 +105,6 @@ async def main() -> int:
             if processor.queue_document(
                 file_path=str(dest),
                 document_id=str(document.id),
-                preserve=False,
                 metadata={"source": "ingest_corpus.py"},
             ):
                 queued += 1

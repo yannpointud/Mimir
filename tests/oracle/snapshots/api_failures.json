@@ -4,8 +4,8 @@
       "details": {
         "path": "/api/v1/admin/audit-log"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve audit log",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_logs_paginated",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -16,8 +16,8 @@
       "details": {
         "path": "/api/v1/admin/cache/clear"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to clear cache",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in create_log",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -28,8 +28,8 @@
       "details": {
         "path": "/api/v1/admin/config"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve configuration",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_all",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -40,8 +40,8 @@
       "details": {
         "path": "/api/v1/admin/config"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to update configuration",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in set",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -129,8 +129,8 @@
       "details": {
         "path": "/api/v1/documents/"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve documents",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_all_paginated",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -141,8 +141,8 @@
       "details": {
         "path": "/api/v1/documents/stats/overview"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve document statistics",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_statistics",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -189,8 +189,8 @@
       "details": {
         "path": "/api/v1/admin/vector-store/rebuild"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Vector index rebuild failed",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_stats",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -204,8 +204,8 @@
       "details": {
         "path": "/api/v1/documents/1/reprocess"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to queue document for reprocessing",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in queue_document",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -240,8 +240,8 @@
       "details": {
         "path": "/api/v1/documents/stats/overview"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve document statistics",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_stats",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -283,8 +283,8 @@
       "details": {
         "path": "/api/v1/documents/upload"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to queue document for processing",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in queue_document",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -307,8 +307,8 @@
       "details": {
         "path": "/api/v1/admin/usage"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve usage data",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get_today_by_model",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -319,8 +319,8 @@
       "details": {
         "path": "/api/v1/admin/usage"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to retrieve usage data",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "oracle failure in get",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -331,8 +331,8 @@
       "details": {
         "path": "/api/v1/documents/maintenance/validate-consistency"
       },
-      "error_code": "HTTP_500",
-      "error_message": "Consistency validation failed",
+      "error_code": "INTERNAL_ERROR",
+      "error_message": "Validation failed: oracle failure in get_all",
       "success": false,
       "timestamp": "<timestamp>"
     },

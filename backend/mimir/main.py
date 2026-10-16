@@ -15,7 +15,7 @@ from mimir.config import settings
 from mimir.database.connection import init_database
 from mimir.security.admin_password import resolve_admin_password
 from mimir.security.startup_validation import validate_production_secrets
-from mimir.shared.errors import BudgetExceeded, MimirError
+from mimir.shared.errors import BudgetExceeded, ConflictError, MimirError, NotFoundError
 from mimir.shared.models import ErrorResponse, RootResponse
 
 # Import API endpoints
@@ -215,15 +215,10 @@ def _queue_pending_documents(document_repo, processor) -> None:
 
     logger.info(f"Found {len(pending_documents)} pending documents, queuing for processing")
     for doc in pending_documents:
-        if Path(doc.path).exists():
-            processor.queue_document(
-                file_path=doc.path,
-                document_id=str(doc.id),
-                preserve=doc.preserve,
-                metadata={},
-            )
-        else:
+        if not Path(doc.path).exists():
             logger.warning(f"Document file not found: {doc.path}")
+        elif not processor.queue_document(file_path=doc.path, document_id=str(doc.id)):
+            logger.warning(f"Ingestion queue full, pending document left for next start: {doc.id}")
 
 
 async def _stop_ingestion() -> None:
@@ -332,50 +327,46 @@ async def request_logging_middleware(request: Request, call_next):
     return response
 
 
-# Global exception handler
+def _error_response(
+    request: Request, status_code: int, error_code: str, message: str
+) -> CustomJSONResponse:
+    return CustomJSONResponse(
+        status_code=status_code,
+        content=ErrorResponse(
+            error_code=error_code,
+            error_message=message,
+            details={"path": str(request.url.path)},
+        ).model_dump(),
+    )
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Standardized handler for HTTP errors"""
-    return CustomJSONResponse(
-        status_code=exc.status_code,
-        content=ErrorResponse(
-            error_code=f"HTTP_{exc.status_code}",
-            error_message=exc.detail,
-            details={"path": str(request.url.path)},
-        ).model_dump(),
-    )
+    return _error_response(request, exc.status_code, f"HTTP_{exc.status_code}", exc.detail)
 
 
-@app.exception_handler(ValueError)
-async def value_error_handler(request: Request, exc: ValueError):
-    """Handler for business validation errors"""
-    logger.warning(f"Validation error on {request.url.path}: {exc}")
-    return CustomJSONResponse(
-        status_code=400,
-        content=ErrorResponse(
-            error_code="VALIDATION_ERROR",
-            error_message=str(exc),
-            details={"path": str(request.url.path)},
-        ).model_dump(),
-    )
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request: Request, exc: NotFoundError):
+    return _error_response(request, 404, "NOT_FOUND", str(exc))
+
+
+@app.exception_handler(ConflictError)
+async def conflict_handler(request: Request, exc: ConflictError):
+    return _error_response(request, 409, "CONFLICT", str(exc))
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """Handler for unexpected errors"""
+    """Unexpected error: logged with its traceback; production hides its text."""
     logger.error(f"Unhandled error on {request.url.path}: {exc}", exc_info=True)
-
-    # In production, do not expose internal details
-    error_message = "Internal server error" if settings.is_production else str(exc)
-
-    return CustomJSONResponse(
-        status_code=500,
-        content=ErrorResponse(
-            error_code="INTERNAL_ERROR",
-            error_message=error_message,
-            details={"path": str(request.url.path)} if not settings.is_production else None,
-        ).model_dump(),
-    )
+    if settings.is_production:
+        return CustomJSONResponse(
+            status_code=500,
+            content=ErrorResponse(
+                error_code="INTERNAL_ERROR", error_message="Internal server error"
+            ).model_dump(),
+        )
+    return _error_response(request, 500, "INTERNAL_ERROR", str(exc))
 
 
 @app.exception_handler(BudgetExceeded)

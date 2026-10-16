@@ -1,5 +1,7 @@
 """Tests unitaires pour l'application FastAPI principale."""
 
+import asyncio
+
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
@@ -171,3 +173,45 @@ class TestMiddleware:
         # Le middleware peut bloquer ou permettre selon la configuration
         # On vérifie juste qu'il n'y a pas d'erreur serveur
         assert response.status_code in [200, 400, 403]
+
+
+class TestErrorHandlers:
+    """Domain errors and unexpected errors map to stable JSON error responses."""
+
+    @staticmethod
+    def _request(path: str = "/api/v1/documents/1"):
+        from starlette.requests import Request
+
+        return Request({"type": "http", "method": "GET", "path": path, "headers": []})
+
+    def _body(self, response) -> dict:
+        import json
+
+        return json.loads(response.body)
+
+    def test_not_found_error_is_a_404(self):
+        from mimir.main import not_found_handler
+        from mimir.shared.errors import NotFoundError
+
+        response = asyncio.run(not_found_handler(self._request(), NotFoundError("missing")))
+        assert response.status_code == 404
+        assert self._body(response)["error_code"] == "NOT_FOUND"
+        assert self._body(response)["error_message"] == "missing"
+
+    def test_conflict_error_is_a_409(self):
+        from mimir.main import conflict_handler
+        from mimir.shared.errors import ConflictError
+
+        response = asyncio.run(conflict_handler(self._request(), ConflictError("protected")))
+        assert response.status_code == 409
+        assert self._body(response)["error_code"] == "CONFLICT"
+
+    def test_unexpected_error_hides_its_text_in_production(self, monkeypatch):
+        from mimir import config
+        from mimir.main import general_exception_handler
+
+        monkeypatch.setattr(config.settings, "environment", "production")
+        response = asyncio.run(general_exception_handler(self._request(), KeyError("secret")))
+        assert response.status_code == 500
+        assert self._body(response)["error_message"] == "Internal server error"
+        assert "secret" not in response.body.decode()

@@ -479,7 +479,7 @@ class OracleEnv:
         }
         app.dependency_overrides.update(self._overrides)
 
-        self.client = TestClient(app)
+        self.client = TestClient(app, raise_server_exceptions=False)
         self.admin_token = jwt_handler.create_access_token({"sub": "admin", "user_type": "admin"})
         self.user_token = jwt_handler.create_access_token({"sub": "reader", "user_type": "user"})
         self.admin_headers = {"Authorization": f"Bearer {self.admin_token}"}

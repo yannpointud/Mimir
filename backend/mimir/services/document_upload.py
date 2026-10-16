@@ -12,6 +12,8 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Protocol
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from mimir.database.models import Document
 from mimir.database.repository import AuditLogRepository, DocumentRepository
 from mimir.ingestion.processor import IngestionProcessor
@@ -98,7 +100,7 @@ class DocumentUpload:
             filename=self.filename, path=str(file_path), file_hash=file_hash, preserve=preserve
         )
         self._audit_upload(audit_repo, document, len(content), preserve)
-        self._queue(ingestion_processor, doc_repo, document, file_path, preserve, current_user)
+        self._queue(ingestion_processor, doc_repo, document, file_path, current_user)
         return document
 
     def discard_stored_file(self) -> None:
@@ -148,27 +150,17 @@ class DocumentUpload:
         doc_repo: DocumentRepository,
         document: Document,
         file_path: Path,
-        preserve: bool,
         current_user: Mapping[str, Any],
     ) -> None:
         """Queue the document for ingestion: 503 when the queue is full."""
-        try:
-            queued = ingestion_processor.queue_document(
-                file_path=str(file_path),
-                document_id=str(document.id),
-                preserve=preserve,
-                metadata={"uploaded_by": current_user.get("username", "unknown")},
-            )
-            if not queued:
-                self._reject_queue_full(ingestion_processor, doc_repo, document, file_path)
-            logger.info(f"Document queued for processing: {self.filename} (ID: {document.id})")
-        except RequestRejectedError:
-            raise
-        except Exception as e:  # noqa: BLE001 - API boundary: a queueing failure becomes a 500
-            logger.error(f"Error queuing document for processing: {e}")
-            raise RequestRejectedError(
-                HTTPStatus.INTERNAL_SERVER_ERROR, "Failed to queue document for processing"
-            ) from e
+        queued = ingestion_processor.queue_document(
+            file_path=str(file_path),
+            document_id=str(document.id),
+            metadata={"uploaded_by": current_user["sub"]},
+        )
+        if not queued:
+            self._reject_queue_full(ingestion_processor, doc_repo, document, file_path)
+        logger.info(f"Document queued for processing: {self.filename} (ID: {document.id})")
 
     def _reject_queue_full(
         self,
@@ -194,7 +186,7 @@ class DocumentUpload:
         try:
             doc_repo.delete(document.id, force=True)
             file_path.unlink(missing_ok=True)
-        except Exception as cleanup_error:  # noqa: BLE001 - best-effort cleanup: the client still gets the 503
+        except (SQLAlchemyError, OSError) as cleanup_error:
             logger.warning(
                 f"Failed to clean up after queue-full rejection "
                 f"(document_id={document.id}): {cleanup_error}"

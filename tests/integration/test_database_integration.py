@@ -15,6 +15,7 @@ from mimir.database.repository import (
     ConfigurationRepository,
     DocumentRepository,
 )
+from mimir.shared.errors import ConflictError, NotFoundError
 from mimir.shared.models import DocumentStatus
 
 
@@ -61,13 +62,13 @@ class TestDocumentRepositoryIntegration:
         repo = DocumentRepository(session)
         assert repo.get_by_id(99999) is None
         assert repo.get_by_hash("nonexistent_hash") is None
-        with pytest.raises(ValueError):
+        with pytest.raises(NotFoundError):
             repo.update_status(99999, DocumentStatus.INDEXED)
 
     def test_duplicate_hash_is_rejected(self, session):
         repo = DocumentRepository(session)
         repo.create(filename="first.pdf", file_hash="duplicate_hash", path="/test/first.pdf")
-        with pytest.raises(ValueError, match="already exists"):
+        with pytest.raises(ConflictError, match="already exists"):
             repo.create(filename="other.pdf", file_hash="duplicate_hash", path="/test/other.pdf")
 
     def test_update_preserve_status(self, session):
@@ -76,7 +77,7 @@ class TestDocumentRepositoryIntegration:
         assert repo.update_preserve_status(document.id, True).preserve is True
         assert repo.get_by_id(document.id).preserve is True
         assert repo.update_preserve_status(document.id, False).preserve is False
-        with pytest.raises(ValueError):
+        with pytest.raises(NotFoundError):
             repo.update_preserve_status(99999, True)
 
     def test_create_commits_immediately(self, session):

@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
 
 from mimir.ingestion.processor import IngestionProcessor, ProcessingError
+from mimir.shared.errors import IngestionError, NotFoundError
 from mimir.ingestion.queue_manager import IngestionTask
 from mimir.ingestion.chunking import ChunkingConfig
 from mimir.llm_interface.interfaces import EmbeddingResponse, LLMException
@@ -149,71 +150,31 @@ class TestIngestionProcessor:
         assert not processor.is_running()
 
     def test_queue_document_success(self, processor, sample_text_file):
-        """Test de mise en queue de document réussi"""
-        success = processor.queue_document(str(sample_text_file))
-
-        assert success is True
+        assert processor.queue_document(str(sample_text_file), document_id="1") is True
         assert processor.get_queue_size() == 1
 
-        # Vérifier que le document a été créé en base
-        processor.document_repository.create.assert_called_once()
-
     def test_queue_document_nonexistent_file(self, processor):
-        """Test avec fichier inexistant"""
-        success = processor.queue_document("/nonexistent/file.txt")
-
-        assert success is False
+        with pytest.raises(NotFoundError, match="File does not exist"):
+            processor.queue_document("/nonexistent/file.txt", document_id="1")
         assert processor.get_queue_size() == 0
 
-    def test_queue_document_file_too_large(self, processor, temp_dir):
-        """Test avec fichier trop volumineux"""
-        # Créer un fichier plus grand que la limite (1MB pour ce test)
-        large_file = temp_dir / "large.txt"
-        large_content = "x" * (2 * 1024 * 1024)  # 2MB
-        large_file.write_text(large_content, encoding="utf-8")
-
-        success = processor.queue_document(str(large_file))
-
-        assert success is False
-        assert processor.get_queue_size() == 0
-
-    def test_queue_document_with_metadata(self, processor, sample_text_file):
-        """Test avec métadonnées"""
-        metadata = {"author": "test", "category": "sample"}
-        success = processor.queue_document(str(sample_text_file), metadata=metadata, preserve=True)
-
-        assert success is True
-
-        # Vérifier que la tâche a les bonnes métadonnées
-        # (nous ne pouvons pas facilement vérifier cela sans accéder à la queue interne)
-
-    def test_queue_document_duplicate_hash(
+    def test_queue_document_unknown_document(
         self, processor, sample_text_file, mock_document_repository
     ):
-        """Test avec hash de fichier dupliqué"""
-        # Simuler une exception de duplication
-        mock_document_repository.create.side_effect = Exception("already exists")
+        mock_document_repository.get_by_id.return_value = None
+        with pytest.raises(NotFoundError, match="Document 1 not found"):
+            processor.queue_document(str(sample_text_file), document_id="1")
 
-        success = processor.queue_document(str(sample_text_file))
+    def test_queue_document_file_too_large(self, processor, temp_dir):
+        large_file = temp_dir / "large.txt"
+        large_file.write_text("x" * (2 * 1024 * 1024), encoding="utf-8")
+        with pytest.raises(IngestionError, match="File too large"):
+            processor.queue_document(str(large_file), document_id="1")
+        assert processor.get_queue_size() == 0
 
-        assert success is False
-
-    def test_calculate_file_hash(self, processor, sample_text_file):
-        """Test du calcul de hash de fichier"""
-        hash1 = processor._calculate_file_hash(str(sample_text_file))
-        hash2 = processor._calculate_file_hash(str(sample_text_file))
-
-        assert hash1 == hash2
-        assert len(hash1) == 64  # SHA-256 hex
-        assert isinstance(hash1, str)
-
-    def test_generate_document_id(self, processor):
-        """Test de génération d'ID de document"""
-        doc_id = processor._generate_document_id("/path/to/document.pdf")
-
-        assert "document" in doc_id
-        assert "_" in doc_id
-        assert doc_id.count("_") == 1
+    def test_queue_document_full_queue_returns_false(self, processor, sample_text_file):
+        processor.queue_manager.add_task = Mock(return_value=False)
+        assert processor.queue_document(str(sample_text_file), document_id="1") is False
 
     def test_extract_text_success(self, processor, sample_text_file):
         """Test d'extraction de texte réussie"""
@@ -746,7 +707,7 @@ class TestIngestionProcessor:
     async def test_clear_queue(self, processor, sample_text_file):
         """Test de vidage de queue"""
         # Ajouter quelques documents
-        processor.queue_document(str(sample_text_file))
+        processor.queue_document(str(sample_text_file), document_id="1")
         initial_size = processor.get_queue_size()
         assert initial_size >= 0  # Peut être 0 ou 1 selon le timing
 
@@ -986,15 +947,9 @@ Even more detailed content here.
         # Remplacer le callback de traitement pour traquer les résultats
         processor.queue_manager.processing_callback = tracking_callback
 
-        # Ajouter plusieurs documents (sans spécifier document_id pour laisser la génération automatique)
-        files_to_process = [
-            str(real_files["txt"]),
-            str(real_files["md"]),
-        ]
-
-        for file_path in files_to_process:
-            success = processor.queue_document(file_path)
-            assert success is True
+        files_to_process = [str(real_files["txt"]), str(real_files["md"])]
+        for document_id, file_path in enumerate(files_to_process, start=1):
+            assert processor.queue_document(file_path, document_id=str(document_id)) is True
 
         # Attendre que le traitement se termine
         await asyncio.sleep(1.0)
@@ -1002,6 +957,4 @@ Even more detailed content here.
         await processor.stop()
 
         # Vérifier que les documents ont été traités
-        assert len(processed_docs) == 2
-        # Tous les documents créés auront l'id "123" de la fixture
-        assert all(doc_id == "123" for doc_id in processed_docs)
+        assert sorted(processed_docs) == ["1", "2"]
