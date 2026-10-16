@@ -5,6 +5,8 @@ Validation utilities for detecting inconsistencies between SQLite and FAISS
 from typing import Any
 import logging
 from mimir.shared.clock import utc_now
+from mimir.database.repository import DocumentRepository
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 
 
 logger = logging.getLogger(__name__)
@@ -15,7 +17,9 @@ class VectorStoreValidator:
     Validator for detecting inconsistencies between the SQLite database and FAISS.
     """
 
-    def __init__(self, vector_store, document_repository):
+    def __init__(
+        self, vector_store: FaissVectorStore, document_repository: DocumentRepository
+    ) -> None:
         """
         Initialize the validator.
 
@@ -163,7 +167,7 @@ class VectorStoreValidator:
         return ghost_chunks
 
     def _apply_fixes(self, issues: dict[str, Any]) -> list[dict[str, Any]]:
-        fixes = []
+        fixes: list[dict[str, Any]] = []
 
         if issues["orphaned_chunks"]:
             orphaned_doc_ids = [item["document_id"] for item in issues["orphaned_chunks"]]

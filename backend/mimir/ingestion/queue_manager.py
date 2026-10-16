@@ -24,6 +24,6 @@ class IngestionTask:
         """Check if task can be retried"""
         return self.retry_count < self.max_retries
 
-    def increment_retry(self):
+    def increment_retry(self) -> None:
         """Increment retry count"""
         self.retry_count += 1

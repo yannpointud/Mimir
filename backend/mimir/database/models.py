@@ -74,7 +74,7 @@ class Document(Base):
     def has_error(self) -> bool:
         return self.status == "error"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename='{self.filename}', status='{self.status}')>"
 
 
@@ -96,7 +96,7 @@ class Configuration(Base):
         return {"key": self.key, "value": self.value, "updated_at": self.updated_at.isoformat()}
 
     @staticmethod
-    def get_typed_value(value: str, value_type: str = "string"):
+    def get_typed_value(value: str, value_type: str = "string") -> Any:
         """
         Convert a string value to the appropriate type
         Useful for retrieving typed configs
@@ -110,7 +110,7 @@ class Configuration(Base):
         else:
             return value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Configuration(key='{self.key}', updated_at='{self.updated_at}')>"
 
 
@@ -182,7 +182,7 @@ class AuditLog(Base):
     ) -> Self:
         return cls(user_type="system", action=action, details=details, success=success)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<AuditLog(id={self.id}, user_type='{self.user_type}', "
             f"action='{self.action}', created_at='{self.created_at}')>"
@@ -230,7 +230,7 @@ class LlmUsage(Base):
             "session_id": self.session_id,
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<LlmUsage(id={self.id}, call_type='{self.call_type}', "
             f"model='{self.model}', cost_eur={self.cost_eur})>"
@@ -252,7 +252,7 @@ class LlmBudgetLedger(Base):
     def to_dict(self) -> dict[str, Any]:
         return {"date": self.date, "spent_eur": self.spent_eur}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<LlmBudgetLedger(date='{self.date}', spent_eur={self.spent_eur})>"
 
 

@@ -18,6 +18,7 @@ import logging
 
 from mimir.config import settings
 from mimir.shared.models import ErrorResponse
+from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ limiter = Limiter(
 )
 
 
-def configure_rate_limiting(app):
+def configure_rate_limiting(app: FastAPI) -> None:
     """Configure rate limiting for the FastAPI application.
 
     Registers the limiter on app.state and the 429 exception handler.

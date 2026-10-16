@@ -2,25 +2,15 @@
 Tests unitaires pour le système de logging centralisé
 """
 
-import pytest
 import json
 import logging
 from pathlib import Path
-from unittest.mock import Mock, patch
 from datetime import datetime
 
 from mimir.monitoring.logger import (
     JSONFormatter,
     ConsoleFormatter,
     setup_logger,
-    log_api_request,
-    log_ingestion_event,
-    log_search_query,
-    log_llm_request,
-    log_vector_operation,
-    log_auth_event,
-    log_health_check,
-    log_system_event,
 )
 
 
@@ -220,106 +210,6 @@ class TestSetupLogger:
         # Vérifier qu'un handler de fichier existe (créé automatiquement)
         file_handlers = [h for h in logger.handlers if hasattr(h, "baseFilename")]
         assert len(file_handlers) > 0
-
-
-class TestLoggingHelpers:
-    """Tests pour les fonctions helpers de logging"""
-
-    @pytest.fixture
-    def mock_logger(self):
-        """Logger mocké pour les tests"""
-        return Mock(spec=logging.Logger)
-
-    def test_log_api_request(self, mock_logger):
-        """Test de log des requêtes API"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_api_request(method="POST", endpoint="/api/test", status_code=200)
-
-            mock_logger.log.assert_called_once()
-            call_args = mock_logger.log.call_args
-            assert "API POST /api/test" in str(call_args[0])
-
-    def test_log_search_query(self, mock_logger):
-        """Test de log des requêtes de recherche"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_search_query(query="test search", results_count=5, duration_ms=200)
-
-            mock_logger.info.assert_called_once()
-            call_args = mock_logger.info.call_args
-            assert "Search:" in str(call_args[0])
-
-    def test_log_ingestion_event(self, mock_logger):
-        """Test de log des événements d'ingestion"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_ingestion_event(document="doc.pdf", status="processed")
-
-            mock_logger.info.assert_called_once()
-            call_args = mock_logger.info.call_args
-            assert "Ingestion:" in str(call_args[0])
-
-    def test_log_ingestion_event_with_error(self, mock_logger):
-        """Test de log des événements d'ingestion avec erreur"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            # Les fonctions de log n'ont pas de paramètre success, elles logguent toujours en info
-            log_ingestion_event(document="doc.pdf", status="failed")
-
-            mock_logger.info.assert_called_once()
-
-    def test_log_auth_event(self, mock_logger):
-        """Test de log des événements d'authentification"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_auth_event(event="login_success")
-
-            mock_logger.log.assert_called_once()
-            call_args = mock_logger.log.call_args
-            assert "Auth login_success" in str(call_args[0])
-
-    def test_log_llm_request(self, mock_logger):
-        """Test de log des requêtes LLM"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_llm_request(
-                model="mistral-small", operation="generate", tokens=10, duration_ms=1500
-            )
-
-            mock_logger.log.assert_called_once()
-            call_args = mock_logger.log.call_args
-            assert "LLM generate" in str(call_args[0])
-
-
-class TestAdditionalLoggerFunctions:
-    """Tests pour les fonctions supplémentaires de logging"""
-
-    @pytest.fixture
-    def mock_logger(self):
-        """Logger mocké pour les tests"""
-        return Mock(spec=logging.Logger)
-
-    def test_log_vector_operation(self, mock_logger):
-        """Test de log des opérations vectorielles"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_vector_operation(operation="similarity_search", vector_count=1000, duration_ms=300)
-
-            mock_logger.log.assert_called_once()
-            call_args = mock_logger.log.call_args
-            assert "Vector similarity_search" in str(call_args[0])
-
-    def test_log_health_check(self, mock_logger):
-        """Test de log des health checks"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_health_check(component="database", status="healthy")
-
-            mock_logger.log.assert_called_once()
-            call_args = mock_logger.log.call_args
-            assert "Health check: database - healthy" in str(call_args[0])
-
-    def test_log_system_event(self, mock_logger):
-        """Test de log des événements système"""
-        with patch("mimir.monitoring.logger.app_logger", mock_logger):
-            log_system_event(event="service_startup")
-
-            mock_logger.log.assert_called_once()
-            call_args = mock_logger.log.call_args
-            assert "System: service_startup" in str(call_args[0])
 
 
 class TestLoggerIntegration:

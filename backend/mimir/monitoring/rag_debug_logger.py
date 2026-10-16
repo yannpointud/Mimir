@@ -13,7 +13,7 @@ from pathlib import Path
 from mimir.shared.clock import utc_now
 
 
-def _make_json_serializable(obj):
+def _make_json_serializable(obj: Any) -> Any:
     """Recursively convert all objects to JSON-serializable types."""
     if isinstance(obj, datetime):
         # Convert datetime to ISO 8601 with UTC timezone
@@ -40,7 +40,7 @@ class RagDebugService:
     Logs all pipeline steps with detailed information for debugging and optimization.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Dedicated logger for RAG debug logs
         self.logger = self._setup_rag_debug_logger()
         self.enabled = False  # Will be set from config
@@ -74,7 +74,7 @@ class RagDebugService:
         log_prompts: bool = True,
         log_context: bool = True,
         log_responses: bool = True,
-    ):
+    ) -> None:
         """Configure debug service from settings."""
         self.enabled = enabled
         self.log_prompts = log_prompts
@@ -107,7 +107,7 @@ class RagDebugService:
         question: str,
         user_context: dict[str, Any] | None = None,
         context_limit: int | None = None,
-    ):
+    ) -> None:
         """Log incoming user request."""
         if not self.enabled:
             return
@@ -130,7 +130,7 @@ class RagDebugService:
         search_results: list[Any],
         embedding_tokens: int,
         search_time_ms: float,
-    ):
+    ) -> None:
         """Log vector search results with details."""
         if not self.enabled:
             return
@@ -173,7 +173,7 @@ class RagDebugService:
         context_text: str,
         context_chunks: int,
         filtered_sources: list[dict[str, Any]],
-    ):
+    ) -> None:
         """Log context building with prompt and sources."""
         if not self.enabled:
             return
@@ -207,7 +207,7 @@ class RagDebugService:
         full_prompt: str,
         user_question: str,
         parameters: dict[str, Any],
-    ):
+    ) -> None:
         """Log LLM request with full prompt."""
         if not self.enabled:
             return
@@ -237,7 +237,7 @@ class RagDebugService:
         tokens_used: int,
         duration_ms: float,
         finish_reason: str,
-    ):
+    ) -> None:
         """Log LLM response with metrics."""
         if not self.enabled:
             return
@@ -268,7 +268,7 @@ class RagDebugService:
         final_sources: list[dict[str, Any]],
         total_processing_time_ms: float,
         cached: bool = False,
-    ):
+    ) -> None:
         """Log final response with confidence and sources."""
         if not self.enabled:
             return
@@ -293,7 +293,7 @@ class RagDebugService:
         error_message: str,
         stage: str,
         traceback_info: str | None = None,
-    ):
+    ) -> None:
         """Log errors in RAG pipeline."""
         if not self.enabled:
             return

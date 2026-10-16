@@ -28,7 +28,7 @@ class FingerprintAlertHandler(logging.Handler):
     *where/what*, not by message text).
     """
 
-    def __init__(self, throttle_seconds: int, level=logging.ERROR):
+    def __init__(self, throttle_seconds: int, level: int = logging.ERROR) -> None:
         super().__init__(level=level)
         self._throttle_seconds = throttle_seconds
         # Last time (epoch seconds) an alert was sent per fingerprint.

@@ -28,7 +28,7 @@ class LogEntry:
         module: str,
         message: str,
         details: dict[str, Any] | None = None,
-    ):
+    ) -> None:
         self.timestamp = timestamp
         self.level = level
         self.source = source

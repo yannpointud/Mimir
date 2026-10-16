@@ -43,7 +43,7 @@ class Bm25LexicalStore:
     corpus (JSONL), so a save/load round-trip restores the mapping too.
     """
 
-    def __init__(self, index_path: str):
+    def __init__(self, index_path: str) -> None:
         """``index_path`` is the directory where the bm25s index is persisted."""
         self.index_path = Path(index_path)
         self._retriever: bm25s.BM25 | None = None

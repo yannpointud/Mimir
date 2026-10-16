@@ -14,11 +14,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mimir import config
 from mimir.database.models import Base
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def configure_sqlite_performance(dbapi_connection, connection_record):
+def configure_sqlite_performance(dbapi_connection: Any, connection_record: Any) -> None:
     """Configure SQLite for performance and concurrency (WAL mode and related pragmas)."""
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()

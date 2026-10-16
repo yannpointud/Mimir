@@ -3,12 +3,11 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import uvicorn
 import time
-import json
-from datetime import datetime
 from contextlib import asynccontextmanager
 
 from mimir.config import settings
@@ -41,35 +40,19 @@ from mimir.api.dependencies import (
     get_bm25_store,
 )
 from pathlib import Path
+from mimir.database.repository import DocumentRepository
+from fastapi import Response
 
 
 # Logging configuration with centralized system
 logger = setup_logger("main", level=settings.log_level.upper())
 
 # Global ingestion processor instance
-ingestion_processor = None
-
-
-# Custom JSON encoder to handle datetime objects
-class CustomJSONResponse(JSONResponse):
-    def render(self, content) -> bytes:
-        return json.dumps(
-            content,
-            ensure_ascii=False,
-            allow_nan=False,
-            indent=None,
-            separators=(",", ":"),
-            default=self.json_encoder,
-        ).encode("utf-8")
-
-    def json_encoder(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+ingestion_processor: IngestionProcessor | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager: initialization at startup, cleanup at shutdown."""
     logger.info("Starting Mimir application - API & Services...")
     # The effective admin hash comes from ADMIN_PASSWORD first, so the
@@ -156,7 +139,9 @@ def _ensure_bm25_index() -> None:
     logger.info(f"BM25 lexical index rebuilt at startup from {len(active_chunks)} active chunks")
 
 
-def _queue_pending_documents(document_repo, processor) -> None:
+def _queue_pending_documents(
+    document_repo: DocumentRepository, processor: IngestionProcessor
+) -> None:
     """Queue the documents left pending by a previous run."""
     pending_documents = document_repo.get_by_status("pending")
     if not pending_documents:
@@ -164,7 +149,7 @@ def _queue_pending_documents(document_repo, processor) -> None:
 
     logger.info(f"Found {len(pending_documents)} pending documents, queuing for processing")
     for doc in pending_documents:
-        if not Path(doc.path).exists():
+        if not doc.path or not Path(doc.path).exists():
             logger.warning(f"Document file not found: {doc.path}")
         elif not processor.queue_document(file_path=doc.path, document_id=str(doc.id)):
             logger.warning(f"Ingestion queue full, pending document left for next start: {doc.id}")
@@ -239,7 +224,9 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts or ["*"])
 
 # Custom middleware for request logging
 @app.middleware("http")
-async def request_logging_middleware(request: Request, call_next):
+async def request_logging_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     """Log all HTTP requests with timing and detailed information"""
     start_time = time.time()
 
@@ -278,55 +265,55 @@ async def request_logging_middleware(request: Request, call_next):
 
 def _error_response(
     request: Request, status_code: int, error_code: str, message: str
-) -> CustomJSONResponse:
-    return CustomJSONResponse(
+) -> JSONResponse:
+    return JSONResponse(
         status_code=status_code,
         content=ErrorResponse(
             error_code=error_code,
             error_message=message,
             details={"path": str(request.url.path)},
-        ).model_dump(),
+        ).model_dump(mode="json"),
     )
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     return _error_response(request, exc.status_code, f"HTTP_{exc.status_code}", exc.detail)
 
 
 @app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError):
+async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
     return _error_response(request, 404, "NOT_FOUND", str(exc))
 
 
 @app.exception_handler(ConflictError)
-async def conflict_handler(request: Request, exc: ConflictError):
+async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
     return _error_response(request, 409, "CONFLICT", str(exc))
 
 
 @app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Unexpected error: logged with its traceback; production hides its text."""
     logger.error(f"Unhandled error on {request.url.path}: {exc}", exc_info=True)
     if settings.is_production:
-        return CustomJSONResponse(
+        return JSONResponse(
             status_code=500,
             content=ErrorResponse(
                 error_code="INTERNAL_ERROR", error_message="Internal server error"
-            ).model_dump(),
+            ).model_dump(mode="json"),
         )
     return _error_response(request, 500, "INTERNAL_ERROR", str(exc))
 
 
 @app.exception_handler(BudgetExceeded)
-async def budget_exceeded_handler(request: Request, exc: BudgetExceeded):
+async def budget_exceeded_handler(request: Request, exc: BudgetExceeded) -> JSONResponse:
     """Daily AI budget exhausted: the same 429 as the chat route."""
     logger.warning(f"Daily budget exceeded on {request.url.path}: {exc}")
     return budget_exceeded_response()
 
 
 @app.exception_handler(MimirError)
-async def domain_error_handler(request: Request, exc: MimirError):
+async def domain_error_handler(request: Request, exc: MimirError) -> JSONResponse:
     """Domain error escaping a route: the same 500 payload as an unexpected error."""
     return await general_exception_handler(request, exc)
 

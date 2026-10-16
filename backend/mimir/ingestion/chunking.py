@@ -43,7 +43,7 @@ class ChunkingConfig:
 class ChunkingStrategy:
     """Smart text chunking with sentence and paragraph boundaries"""
 
-    def __init__(self, config: ChunkingConfig | None = None):
+    def __init__(self, config: ChunkingConfig | None = None) -> None:
         self.config = config or ChunkingConfig()
         logger.debug(f"Chunking strategy initialized: {self.config}")
 

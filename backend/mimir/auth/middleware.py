@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class JWTBearer(HTTPBearer):
     """Custom JWT Bearer token extractor with validation."""
 
-    def __init__(self, auto_error: bool = True):
+    def __init__(self, auto_error: bool = True) -> None:
         super().__init__(auto_error=auto_error)
 
     def make_not_authenticated_error(self) -> HTTPException:

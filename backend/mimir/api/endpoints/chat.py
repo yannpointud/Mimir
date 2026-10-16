@@ -6,7 +6,7 @@ and responses based on document context.
 """
 
 from typing import Any
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
@@ -121,7 +121,7 @@ async def chat_stream(
     rag_debug: RagDebugService = Depends(get_rag_debug_service),
     budget_guard: BudgetGuard = Depends(get_budget_guard),
     rag_service: rag_service_module.RagService = Depends(get_rag_service),
-):
+) -> Response:
     """Process user question with streaming response (Server-Sent Events)."""
     # Budget gate BEFORE the StreamingResponse is returned: once it is, the
     # client already has an implicit 200, so a real 429 is only possible here

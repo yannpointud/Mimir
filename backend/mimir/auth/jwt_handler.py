@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class JWTHandler:
     """Handles JWT token creation, validation, and password operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.secret_key = settings.jwt_secret_key
         self.algorithm = settings.jwt_algorithm
         self.expiration_hours = settings.jwt_expiration_hours

@@ -98,8 +98,8 @@ def _clean_filename(filename: str) -> str:
 
 
 def _find_documents_by_fuzzy_match(
-    question: str, document_repository, threshold: int = 70
-) -> list[tuple]:
+    question: str, document_repository: DocumentRepository, threshold: int = 70
+) -> list[tuple[int, str, float]]:
     """Find documents whose filename matches the question via fuzzy matching.
 
     ``threshold`` is the minimum fuzzy score (0-100).
@@ -132,8 +132,8 @@ def _find_documents_by_fuzzy_match(
 async def _pre_include_document_chunks(
     document_ids: list[int],
     question_embedding: np.ndarray,
-    vector_store,
-    document_repository,
+    vector_store: AbstractVectorStore,
+    document_repository: DocumentRepository,
     boost_factor: float,
     filename_similarities: dict[int, float],
 ) -> list[Any]:
@@ -960,7 +960,7 @@ class RagService:
         usage_tracker: UsageTracker | None = None,
         chat_cache: ChatCacheService | None = None,
         bm25_store: LexicalIndex | None = None,
-    ):
+    ) -> None:
         self.llm_service = llm_service
         self.vector_store = vector_store
         self.rag_debug = rag_debug

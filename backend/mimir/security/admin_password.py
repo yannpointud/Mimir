@@ -14,13 +14,14 @@ container) nor persisted, so every start re-derives it from the environment.
 from mimir.auth.jwt_handler import jwt_handler
 from mimir.auth.password_utils import validate_password_strength
 from mimir.monitoring.logger import setup_logger
+from mimir.config import Settings
 
 logger = setup_logger(__name__)
 
 __all__ = ["resolve_admin_password"]
 
 
-def resolve_admin_password(settings) -> None:
+def resolve_admin_password(settings: Settings) -> None:
     """Derive settings.admin_password_hash from ADMIN_PASSWORD when it is set.
 
     Must run before validate_production_secrets so the default-secret checks apply to

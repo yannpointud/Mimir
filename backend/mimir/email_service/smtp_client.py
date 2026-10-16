@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class EmailService:
     """Handles email sending for escalation and notifications."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.smtp_host = settings.smtp_host
         self.smtp_port = settings.smtp_port
         self.smtp_user = settings.smtp_user
@@ -146,7 +146,7 @@ class EmailService:
             logger.error(f"SMTP send error: {e}")
             return False
 
-    def _add_attachment(self, message: MIMEMultipart, attachment: dict[str, Any]):
+    def _add_attachment(self, message: MIMEMultipart, attachment: dict[str, Any]) -> None:
         """Add an attachment (dict with 'filename', 'content', 'mime_type') to the message."""
         part = MIMEBase("application", "octet-stream")
         part.set_payload(attachment["content"])

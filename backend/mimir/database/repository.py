@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class BaseRepository:
     """Base repository with common operations"""
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session) -> None:
         self.session = session
 
     def _handle_db_error(self, e: Exception, operation: str) -> None:

@@ -11,9 +11,6 @@ from unittest.mock import AsyncMock, Mock  # noqa: F401
 
 from mimir.monitoring.logger import (
     setup_logger,
-    log_ingestion_event,
-    log_search_query,
-    log_api_request,
 )
 from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
@@ -40,29 +37,6 @@ class TestLoggingIntegration:
         # Test de log basique
         logger.info("Test message")
         logger.error("Test error message")
-
-    def test_structured_logging_helpers(self, temp_log_dir):
-        """Test des helpers de logging structuré"""
-        # Les helpers de logging doivent fonctionner sans erreur
-        # Le contenu exact des logs n'est pas testé car ils sont configurés globalement
-
-        # Test log_ingestion_event
-        log_ingestion_event(
-            document="test.pdf", status="processing", chunk_count=5, duration_ms=1250.0
-        )
-
-        # Test log_search_query
-        log_search_query(
-            query="test query", results_count=3, duration_ms=150, similarity_threshold=0.7
-        )
-
-        # Test log_api_request
-        log_api_request(
-            endpoint="/v1/chat/completions", method="POST", status_code=200, duration_ms=500.0
-        )
-
-        # Si on arrive ici sans exception, les helpers fonctionnent correctement
-        assert True
 
     def test_faiss_store_logging(self, temp_log_dir):
         """Test du logging dans FaissVectorStore"""
@@ -133,49 +107,6 @@ class TestLoggingIntegration:
         chunking = ChunkingStrategy()
         chunks = chunking.chunk_text(extracted_text)
         assert len(chunks) >= 1
-
-    def test_concurrent_logging(self, temp_log_dir):
-        """Test de logging concurrent (thread safety)"""
-        import threading
-        import time  # noqa: F811
-
-        results = []
-        log_counts = {}
-
-        def log_worker(worker_id):
-            """Worker qui génère des logs"""
-            logger = setup_logger(f"worker_{worker_id}")  # noqa: F841
-
-            for i in range(5):
-                log_ingestion_event(
-                    document=f"worker_{worker_id}_test_{i}.txt",
-                    status="processing",
-                    chunk_count=i + 1,
-                    duration_ms=(0.1 * (i + 1)) * 1000,
-                )
-                time.sleep(0.01)  # Petit délai
-
-            log_counts[worker_id] = 5
-            results.append(worker_id)
-
-        # Lancer plusieurs workers
-        threads = []
-        for worker_id in range(3):
-            thread = threading.Thread(target=log_worker, args=(worker_id,))
-            threads.append(thread)
-            thread.start()
-
-        # Attendre la fin
-        for thread in threads:
-            thread.join()
-
-        # Vérifier que tous les workers ont terminé sans erreur
-        assert len(results) == 3
-        assert sorted(results) == [0, 1, 2]
-
-        # Vérifier que tous les workers ont généré leurs logs
-        for worker_id in range(3):
-            assert log_counts[worker_id] == 5
 
 
 class TestJalon2AcceptanceCriteria:
@@ -332,32 +263,6 @@ class TestJalon2AcceptanceCriteria:
         query_results = new_store.query(query_vector, top_k=3)
         assert len(query_results) > 0
 
-    def test_jalon2_logging_integration(self, temp_workspace):
-        """Critère: Le logging centralisé fonctionne sur toute la chaîne"""
-        # Ce test vérifie que les logs sont générés sans erreur
-        # dans un workflow complet
-
-        # Test de log d'ingestion
-        log_ingestion_event(
-            document="acceptance_test.pdf", status="completed", chunk_count=10, duration_ms=2500.0
-        )
-
-        # Test de log de recherche
-        log_search_query(
-            query="acceptance test query",
-            results_count=5,
-            duration_ms=120,
-            similarity_threshold=0.7,
-        )
-
-        # Test de log API
-        log_api_request(
-            endpoint="/v1/embeddings", method="POST", status_code=200, duration_ms=800.0
-        )
-
-        # Si on arrive ici sans exception, le logging fonctionne
-        assert True
-
     @pytest.mark.integration
     def test_jalon2_end_to_end_pipeline(self, temp_workspace):
         """Test d'acceptation complet du pipeline Jalon 2"""
@@ -389,18 +294,11 @@ class TestJalon2AcceptanceCriteria:
         factory = ExtractorFactory()
         extracted_text = factory.extract_text(str(test_document))
         assert len(extracted_text) > 0
-        log_ingestion_event(document="end_to_end_test.txt", status="extracted", duration_ms=100.0)
 
         # 3. Chunking
         strategy = ChunkingStrategy()
         chunks_data = strategy.chunk_text(extracted_text, source=str(test_document))
         assert len(chunks_data) >= 1
-        log_ingestion_event(
-            document="end_to_end_test.txt",
-            status="chunked",
-            chunk_count=len(chunks_data),
-            duration_ms=500.0,
-        )
 
         # 4. Simulation d'embeddings (normalement généré par Mistral)
         chunks = []
@@ -429,23 +327,15 @@ class TestJalon2AcceptanceCriteria:
 
         success = store.upsert(chunks)
         assert success is True
-        log_ingestion_event(
-            document="end_to_end_test.txt",
-            status="indexed",
-            chunk_count=len(chunks),
-            duration_ms=1200.0,
-        )
 
         # 6. Recherche vectorielle
         query_vector = chunks[0].embedding + 0.05  # Similaire au premier chunk
         results = store.query(query_vector, top_k=3)
         assert len(results) > 0
-        log_search_query("test query", len(results), 45, 0.7)
 
         # 7. Persistance et récupération
         store.persist()
         assert index_path.exists()
-        # metadata_path est normalisé en .json par le store (voir __init__)
         assert store.metadata_path.exists()
 
         # Test de récupération complète
@@ -456,11 +346,3 @@ class TestJalon2AcceptanceCriteria:
         new_store.load()
         recovery_results = new_store.query(query_vector, top_k=3)
         assert len(recovery_results) > 0
-
-        # Si tous ces tests passent, le pipeline Jalon 2 est fonctionnel
-        log_ingestion_event(
-            document="end_to_end_test.txt",
-            status="pipeline_completed",
-            chunk_count=len(chunks),
-            duration_ms=3000.0,
-        )

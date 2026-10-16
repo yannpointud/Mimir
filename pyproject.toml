@@ -60,8 +60,10 @@ max-complexity = 15
 ban-relative-imports = "all"
 
 [tool.mypy]
-# Normal (non-strict) mode, run as `mypy backend/mimir` locally and in CI.
 python_version = "3.13"
+# Every function is annotated, and its body is type checked
+disallow_untyped_defs = true
+check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 show_error_codes = true

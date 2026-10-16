@@ -25,6 +25,9 @@ import os
 import urllib.parse
 from pathlib import Path
 
+from mimir.ingestion.processor import IngestionProcessor
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.auth.middleware import require_admin, get_current_user
 from mimir.api.middleware.rate_limit import limiter, get_client_identifier
 from mimir.database.repository import DocumentRepository, AuditLogRepository
@@ -53,6 +56,7 @@ from mimir.services.document_deletion import delete_document_everywhere
 from mimir.services.document_reader import build_document_view
 from mimir.services.document_upload import DocumentUpload, UploadPolicy
 from mimir.services.errors import RequestRejectedError
+from mimir.shared.errors import NotFoundError
 from mimir.config import settings
 from mimir.shared.clock import utc_now
 
@@ -126,7 +130,7 @@ async def get_document(
 async def get_document_with_chunks(
     document_id: int,
     doc_repo: DocumentRepository = Depends(get_document_repository),
-    vector_store=Depends(get_vector_store),
+    vector_store: FaissVectorStore = Depends(get_vector_store),
 ) -> DocumentWithChunksResponse:
     """Get specific document by ID with all its chunks and content."""
     try:
@@ -138,7 +142,7 @@ async def get_document_with_chunks(
 @reader_router.get("/{document_id}/download")
 async def download_document(
     document_id: int, doc_repo: DocumentRepository = Depends(get_document_repository)
-):
+) -> FileResponse:
     """Download the original document file."""
     document = doc_repo.get_by_id(document_id)
 
@@ -195,7 +199,7 @@ async def upload_document(
     current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-    ingestion_processor=Depends(get_ingestion_processor),
+    ingestion_processor: IngestionProcessor = Depends(get_ingestion_processor),
 ) -> DocumentResponse:
     """
     Upload a new document for processing.
@@ -229,8 +233,8 @@ async def delete_document(
     current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-    vector_store=Depends(get_vector_store),
-    bm25_store=Depends(get_bm25_store),
+    vector_store: FaissVectorStore = Depends(get_vector_store),
+    bm25_store: Bm25LexicalStore = Depends(get_bm25_store),
 ) -> BaseResponse:
     """Delete a document and its associated data.
 
@@ -282,7 +286,7 @@ async def reprocess_document(
     current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-    ingestion_processor=Depends(get_ingestion_processor),
+    ingestion_processor: IngestionProcessor = Depends(get_ingestion_processor),
 ) -> BaseResponse:
     """Queue a document for ingestion again."""
     document = doc_repo.get_by_id(document_id)
@@ -291,6 +295,8 @@ async def reprocess_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document with ID {document_id} not found",
         )
+    if not document.path:
+        raise NotFoundError(f"Document {document_id} has no stored file")
 
     doc_repo.update_status(document_id, "pending", error_message=None)
     queued = ingestion_processor.queue_document(
@@ -333,7 +339,7 @@ async def reprocess_document(
 @router.get("/stats/overview", response_model=DocumentStatsOverview)
 async def get_document_stats(
     doc_repo: DocumentRepository = Depends(get_document_repository),
-    vector_store=Depends(get_vector_store),
+    vector_store: FaissVectorStore = Depends(get_vector_store),
 ) -> DocumentStatsOverview:
     """Document statistics with the vector store health."""
     db_stats = doc_repo.get_statistics()
@@ -373,7 +379,7 @@ async def validate_vector_store_consistency(
     save_report: bool = Query(True, description="Save detailed report to file"),
     current_user: dict[str, Any] = Depends(get_current_user),
     doc_repo: DocumentRepository = Depends(get_document_repository),
-    vector_store=Depends(get_vector_store),
+    vector_store: FaissVectorStore = Depends(get_vector_store),
     audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
 ) -> ConsistencyValidationResponse:
     """Check SQLite against FAISS, optionally fixing the inconsistencies.

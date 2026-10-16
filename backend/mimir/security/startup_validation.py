@@ -9,6 +9,7 @@ only the environment variable names are reported.
 
 from mimir.auth.jwt_handler import jwt_handler
 from mimir.monitoring.logger import setup_logger
+from mimir.config import Settings
 
 logger = setup_logger(__name__)
 
@@ -19,7 +20,7 @@ DEFAULT_ADMIN_PASSWORD = "Abc1234"
 __all__ = ["validate_production_secrets"]
 
 
-def validate_production_secrets(settings) -> None:
+def validate_production_secrets(settings: Settings) -> None:
     """Refuse to start in production when default secrets are detected.
 
     Pure function taking settings as a parameter (testable without the app).

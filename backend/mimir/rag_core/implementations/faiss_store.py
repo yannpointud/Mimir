@@ -71,7 +71,7 @@ class FaissVectorStore(AbstractVectorStore):
         metadata_path: str,
         similarity_threshold: float = 0.5,
         index_type: str = "FlatL2",
-    ):
+    ) -> None:
         """Load the index from disk, or create an empty one when none exists.
 
         Only "FlatL2" is built; ``index_type`` is a label reported in the stats.

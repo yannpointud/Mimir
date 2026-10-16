@@ -21,6 +21,7 @@ from mimir.database.connection import db_manager
 from mimir.database.repository import ConfigurationRepository, UsageRepository
 from mimir.shared.errors import BudgetExceeded
 from mimir.shared.clock import utc_now
+from sqlalchemy.orm import Session
 
 # Historical name of the budget-exhausted error, still imported by callers.
 BudgetExceededError = BudgetExceeded
@@ -44,7 +45,7 @@ class BudgetGuard:
     UsageRepository's atomic ledger primitives.
     """
 
-    def _effective_cap(self, session) -> float:
+    def _effective_cap(self, session: Session) -> float:
         """
         Effective daily cap: the Admin > Configuration hot override for key
         'daily_budget_eur' if present, else the .env default

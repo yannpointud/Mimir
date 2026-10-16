@@ -76,7 +76,7 @@ class AbstractLLMService(ABC):
         system_prompt: str | None = None,
         max_tokens: int | None = None,
         temperature: float = 0.1,
-        **kwargs,
+        **kwargs: Any,
     ) -> GenerationResponse:
         """Generate text response from prompt
 

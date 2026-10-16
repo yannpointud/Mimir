@@ -22,6 +22,9 @@ from mimir.config import settings
 from mimir.cost.budget_guard import budget_guard as default_budget_guard
 from mimir.cost.usage_tracker import usage_tracker as default_usage_tracker
 from mimir.shared.errors import BudgetExceeded, IngestionError, NotFoundError
+from mimir.cost.budget_guard import BudgetGuard
+from mimir.cost.usage_tracker import UsageTracker
+from mimir.rag_core.interfaces import LexicalIndex
 
 logger = setup_logger(__name__)
 
@@ -46,10 +49,10 @@ class IngestionProcessor:
         chunking_config: ChunkingConfig | None = None,
         max_file_size_mb: int = 100,
         max_chunks_per_doc: int = 2000,
-        budget_guard=None,
-        usage_tracker=None,
-        bm25_store=None,
-    ):
+        budget_guard: BudgetGuard | None = None,
+        usage_tracker: UsageTracker | None = None,
+        bm25_store: LexicalIndex | None = None,
+    ) -> None:
         """Initialize ingestion processor.
 
         ``budget_guard`` and ``usage_tracker`` default to the module-level
@@ -92,7 +95,7 @@ class IngestionProcessor:
             f"max_chunks={max_chunks_per_doc})"
         )
 
-    async def start(self):
+    async def start(self) -> None:
         """Start the ingestion processor"""
         await self.queue_manager.start(self._process_task)
         logger.info("Ingestion processor started")

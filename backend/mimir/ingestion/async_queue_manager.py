@@ -31,7 +31,7 @@ class AsyncQueueManager:
         stats_interval: float = 300.0,  # 5 minutes
         retry_base_delay: float = 2.0,
         retry_max_delay: float = 60.0,
-    ):
+    ) -> None:
         """Initialize async queue manager.
 
         ``max_size`` 0 means unlimited. A failed task is re-queued after a capped
@@ -69,7 +69,7 @@ class AsyncQueueManager:
 
         logger.info(f"Async queue manager initialized (max_size={max_size})")
 
-    async def start(self, processing_callback: Callable[[IngestionTask], Awaitable[bool]]):
+    async def start(self, processing_callback: Callable[[IngestionTask], Awaitable[bool]]) -> None:
         """Start the async worker task"""
         if self.worker_task and not self.worker_task.done():
             logger.warning("Worker task already running")
@@ -146,7 +146,7 @@ class AsyncQueueManager:
             )
             return False
 
-    async def _worker_loop(self):
+    async def _worker_loop(self) -> None:
         """Main async worker loop - processes tasks sequentially"""
         logger.info("Async worker task started")
 
@@ -287,14 +287,14 @@ class AsyncQueueManager:
             )
             return False
 
-    def _maybe_log_stats(self):
+    def _maybe_log_stats(self) -> None:
         """Log statistics periodically"""
         current_time = time.time()
         if current_time - self._last_stats_log >= self.stats_interval:
             self._log_stats()
             self._last_stats_log = current_time
 
-    def _log_stats(self):
+    def _log_stats(self) -> None:
         stats = self.get_stats()
 
         # Convert datetime objects to ISO strings for JSON serialization

@@ -15,9 +15,9 @@ from mimir.database.repository import (
     AuditLogRepository,
     UsageRepository,
 )
-from mimir.cache.lru_cache import cache_service, chat_cache_service
-from mimir.email_service.smtp_client import email_service
-from mimir.auth.jwt_handler import jwt_handler
+from mimir.cache.lru_cache import CacheService, ChatCacheService, cache_service, chat_cache_service
+from mimir.email_service.smtp_client import EmailService, email_service
+from mimir.auth.jwt_handler import JWTHandler, jwt_handler
 from mimir.cost.budget_guard import budget_guard, BudgetGuard
 from mimir.cost.usage_tracker import usage_tracker, UsageTracker
 from mimir.config import settings
@@ -25,7 +25,8 @@ from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
 from mimir.rag_core.interfaces import VectorStoreConnectionError
-from mimir.monitoring.rag_debug_logger import rag_debug_service
+from mimir.monitoring.rag_debug_logger import RagDebugService, rag_debug_service
+from mimir.ingestion.processor import IngestionProcessor
 from mimir.services.rag_service import RagService
 from mimir.monitoring.logger import setup_logger
 
@@ -48,19 +49,19 @@ def get_usage_repository(db: Session = Depends(get_db_session)) -> UsageReposito
     return UsageRepository(db)
 
 
-def get_cache_service():
+def get_cache_service() -> CacheService:
     return cache_service
 
 
-def get_chat_cache_service():
+def get_chat_cache_service() -> ChatCacheService:
     return chat_cache_service
 
 
-def get_email_service():
+def get_email_service() -> EmailService:
     return email_service
 
 
-def get_jwt_handler():
+def get_jwt_handler() -> JWTHandler:
     return jwt_handler
 
 
@@ -73,9 +74,9 @@ def get_usage_tracker() -> UsageTracker:
 
 
 # Global service instances (singleton pattern)
-_llm_service = None
-_vector_store = None
-_ingestion_processor = None
+_llm_service: MistralAPIService | None = None
+_vector_store: FaissVectorStore | None = None
+_ingestion_processor: IngestionProcessor | None = None
 
 
 def get_llm_service() -> MistralAPIService:
@@ -106,7 +107,7 @@ def get_vector_store() -> FaissVectorStore:
 
 # BM25 lexical store singleton (mirrors _vector_store above). Only consumed by
 # the hybrid retrieval path, which is gated behind settings.hybrid_search_enabled.
-_bm25_store = None
+_bm25_store: Bm25LexicalStore | None = None
 
 
 def get_bm25_store() -> Bm25LexicalStore:
@@ -127,7 +128,7 @@ def get_bm25_store() -> Bm25LexicalStore:
     return _bm25_store
 
 
-def get_ingestion_processor():
+def get_ingestion_processor() -> IngestionProcessor:
     global _ingestion_processor
     if _ingestion_processor is None:
         raise RuntimeError(
@@ -136,13 +137,13 @@ def get_ingestion_processor():
     return _ingestion_processor
 
 
-def set_ingestion_processor(processor):
+def set_ingestion_processor(processor: IngestionProcessor) -> None:
     """Set the ingestion processor instance (called by main.py at startup)."""
     global _ingestion_processor
     _ingestion_processor = processor
 
 
-def get_rag_debug_service():
+def get_rag_debug_service() -> RagDebugService:
     # Configure the service from settings on first call
     rag_debug_service.configure(
         enabled=settings.rag_debug_enabled,
@@ -154,7 +155,7 @@ def get_rag_debug_service():
 
 
 # Global service instance (singleton pattern, mirrors _llm_service/_vector_store above)
-_rag_service = None
+_rag_service: RagService | None = None
 
 
 def get_rag_service() -> RagService:

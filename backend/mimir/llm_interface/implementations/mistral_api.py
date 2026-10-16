@@ -7,8 +7,10 @@ import asyncio
 import json
 import aiohttp
 import time
-from typing import Any
+from collections.abc import AsyncIterator
+from typing import Any, Self
 
+from mimir.monitoring.rag_debug_logger import RagDebugService
 from mimir.llm_interface.interfaces import (
     AbstractLLMService,
     GenerationResponse,
@@ -79,7 +81,7 @@ class MistralAPIService(AbstractLLMService):
         base_url: str = "https://api.mistral.ai/v1",
         max_retries: int = 3,
         retry_delay: float = 1.0,
-    ):
+    ) -> None:
         """Initialize Mistral API service.
 
         ``retry_delay`` is the initial delay between retries (exponential backoff).
@@ -208,8 +210,8 @@ class MistralAPIService(AbstractLLMService):
         max_tokens: int | None = None,
         temperature: float = 0.1,
         session_id: str | None = None,
-        rag_debug=None,
-        **kwargs,
+        rag_debug: RagDebugService | None = None,
+        **kwargs: Any,
     ) -> GenerationResponse:
         """Generate text using Mistral API"""
         start_time = time.time()
@@ -299,10 +301,10 @@ class MistralAPIService(AbstractLLMService):
         max_tokens: int | None = None,
         temperature: float = 0.1,
         session_id: str | None = None,
-        rag_debug=None,
+        rag_debug: RagDebugService | None = None,
         usage_out: dict[str, Any] | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
         """Generate text using Mistral API with streaming support.
 
         Yields text chunks as they arrive from the API.
@@ -414,7 +416,10 @@ class MistralAPIService(AbstractLLMService):
         return payload
 
     async def embed(
-        self, texts: list[str], session_id: str | None = None, rag_debug=None
+        self,
+        texts: list[str],
+        session_id: str | None = None,
+        rag_debug: RagDebugService | None = None,
     ) -> EmbeddingResponse:
         """Generate embeddings using Mistral API with batching support"""
         if not texts:
@@ -494,7 +499,7 @@ class MistralAPIService(AbstractLLMService):
         texts: list[str],
         start_time: float | None = None,
         session_id: str | None = None,
-        rag_debug=None,
+        rag_debug: RagDebugService | None = None,
     ) -> EmbeddingResponse:
         """Generate embeddings for a single batch of texts (at most batch_size)."""
         if start_time is None:
@@ -569,14 +574,14 @@ class MistralAPIService(AbstractLLMService):
         # Mistral embeddings are 1024-dimensional
         return 1024
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the HTTP session"""
         if self._session and not self._session.closed:
             await self._session.close()
             logger.debug("Mistral API session closed")
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, *exc_info: object) -> None:
         await self.close()

@@ -76,7 +76,7 @@ class TextExtractor(ABC):
 class PDFExtractor(TextExtractor):
     """Extract text from PDF files using pypdf"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if pypdf is None:
             raise ImportError(
                 "pypdf is required for PDF extraction. Install with: pip install pypdf"
@@ -151,7 +151,7 @@ class PDFExtractor(TextExtractor):
 class DOCXExtractor(TextExtractor):
     """Extract text from DOCX files using python-docx"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if DocxDocument is None:
             raise ImportError(
                 "python-docx is required for DOCX extraction. Install with: pip install python-docx"
@@ -263,7 +263,7 @@ class TXTExtractor(TextExtractor):
 class MarkdownExtractor(TextExtractor):
     """Extract text from Markdown files"""
 
-    def __init__(self, convert_to_html: bool = False):
+    def __init__(self, convert_to_html: bool = False) -> None:
         """Optionally convert the Markdown to HTML first (requires the markdown library)."""
         self.convert_to_html = convert_to_html
         if convert_to_html and markdown is None:
@@ -313,11 +313,11 @@ class MarkdownExtractor(TextExtractor):
 class ExtractorFactory:
     """Factory for creating appropriate text extractors"""
 
-    def __init__(self):
-        self._extractors = []
+    def __init__(self) -> None:
+        self._extractors: list[TextExtractor] = []
         self._initialize_extractors()
 
-    def _initialize_extractors(self):
+    def _initialize_extractors(self) -> None:
         # Add extractors in order of preference
 
         # PDF extractor

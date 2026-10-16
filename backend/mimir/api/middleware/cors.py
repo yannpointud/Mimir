@@ -8,11 +8,12 @@ configuration for the Mimir API.
 from fastapi.middleware.cors import CORSMiddleware
 from mimir.config import settings
 import logging
+from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
 
-def configure_cors_middleware(app):
+def configure_cors_middleware(app: FastAPI) -> None:
     """Configure CORS middleware for the FastAPI application."""
     # CORS configuration based on environment
     if settings.is_production:
