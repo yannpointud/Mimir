@@ -25,16 +25,16 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          utils: ['axios', 'clsx', 'tailwind-merge']
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
+            return 'vendor'
+          }
+          if (/[\\/]node_modules[\\/](axios|clsx|tailwind-merge)[\\/]/.test(id)) {
+            return 'utils'
+          }
+          return undefined
         }
       }
     }
-  },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.js'],
   }
 })
