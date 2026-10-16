@@ -540,7 +540,7 @@ class TestSectionTitleThreadingIntoMetadata:
 
 
 # Exact-output tests below pin the current splitter behaviour (they were
-# written against surviving mutants of chunking.py, see docs/cleanup).
+# written against surviving mutmut mutants of chunking.py).
 # Known quirks are pinned as they are, except chunk positions: start_char
 # never advances past the first chunk, so only position invariants are checked.
 

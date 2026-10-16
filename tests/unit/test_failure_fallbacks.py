@@ -1,14 +1,11 @@
-"""Regression tests: failure paths keep their pre-cleanup fallbacks.
+"""Regression tests of the failure paths that degrade instead of failing.
 
-Each test injects an exception type that is NOT in the narrowed lists pass 2
-had introduced (docs/cleanup/REVIEW.md, DECISIONS DF.x) and checks the
-original fallback: the BM25 drain rebuild stays best effort (B1), a truncated
-BM25 index never blocks startup or ingestion (B2), a broken PDF page is
-skipped (B3), the analytics endpoints keep their defaults (M2), and the other
-best-effort, degradation and wrapping contracts restored after the review.
-
-Everything is imported through the ``src.`` namespace, like the modules under
-test import each other, so patches and singletons hit the same module objects.
+Each test injects an unexpected exception type and checks the outcome: the
+BM25 drain rebuild stays best effort, an unreadable BM25 index starts unbuilt
+and gets rebuilt, a broken PDF page is skipped and other parser errors become
+ExtractionError, unreadable log lines are skipped, and the remaining
+best-effort blocks keep answering. An unreadable FAISS index, on the
+contrary, aborts loading.
 """
 
 from http import HTTPStatus

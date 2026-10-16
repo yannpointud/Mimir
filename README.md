@@ -68,7 +68,7 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 
 #### Frontend
 - **Framework** : React 18 avec hooks
-- **Build** : Vite
+- **Build** : Vite 8
 - **UI** : Tailwind CSS
 - **HTTP** : Axios avec intercepteurs, `fetch` pour le streaming SSE
 - **Routing** : React Router v6
@@ -116,7 +116,7 @@ backend/
     ├── services/              # Logique des routes : pipeline RAG, flux SSE, upload, suppression, maintenance des index
     ├── monitoring/            # Logging centralisé JSON, alertes SMTP
     ├── shared/                # Modèles Pydantic, constantes, exceptions métier (errors.py)
-    └── utils/                 # Utilitaires (logs reader, parser)
+    └── utils/                 # Lecture des fichiers de logs
 
 frontend/
 ├── src/
@@ -126,7 +126,7 @@ frontend/
 │   │   └── Common/            # Composants réutilisables
 │   ├── services/
 │   │   └── api.js             # Client API centralisé
-│   ├── hooks/                 # Hooks personnalisés (useAuth)
+│   ├── hooks/                 # Hooks personnalisés (useAuth, useDocumentsList)
 │   ├── utils/                 # Utilitaires (storage, logger, auth)
 │   └── test/                  # Tests vitest
 └── package.json
@@ -156,13 +156,13 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 
 | Périmètre | Fichiers | Lignes de code |
 | --- | ---: | ---: |
-| Backend : `backend/mimir`, `backend/mimir/main.py`, `scripts` (Python) | 77 | 9 484 |
-| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 39 | 5 152 |
-| **Code applicatif** | **116** | **14 636** |
-| Tests backend : `tests/` (Python) | 87 | 14 167 |
-| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 15 | 1 381 |
-| **Tests** | **102** | **15 548** |
-| Outillage : `scripts/` (Python, Bash) | 16 | 2 013 |
+| Backend : `backend/mimir`, `scripts` (Python) | 88 | 9 007 |
+| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 42 | 5 141 |
+| **Code applicatif** | **130** | **14 148** |
+| Tests backend : `tests/` (Python) | 85 | 12 119 |
+| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 16 | 1 475 |
+| **Tests** | **101** | **13 594** |
+| Outillage : `scripts/` (Python, Bash) | 16 | 1 963 |
 
 ```bash
 pygount --format=summary --suffix=py backend/mimir scripts
@@ -178,7 +178,7 @@ pygount --format=summary --suffix=py,sh scripts
 
 ### Prérequis
 - Python 3.13+
-- Node.js 18+
+- Node.js 22 (Vite 8 exige Node.js 20.19+ ou 22.12+)
 - Clé API Mistral
 - Minimum 4GB RAM
 
@@ -306,7 +306,7 @@ Sans `ADMIN_PASSWORD` ni `ADMIN_PASSWORD_HASH`, le backend utilise un hash inté
 
 ```bash
 cd backend
-python -c "from src.auth.jwt_handler import JWTHandler; print(JWTHandler().hash_password('votre_password'))"
+python -c "from mimir.auth.jwt_handler import JWTHandler; print(JWTHandler().hash_password('votre_password'))"
 ```
 
 ## 📚 Utilisation
@@ -360,21 +360,21 @@ cd frontend && npx vitest run
 
 La couverture de `backend/mimir` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
 
-La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
+La suite compte 911 tests pytest (720 unitaires, 147 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 92,17 %, seuil bloquant à 85 % dans `pytest.ini`) et 148 tests vitest (15 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Toute la suite tourne sur des chemins de données temporaires, jamais sur `backend/data/`.
 
 Les tests de caractérisation (`tests/oracle/`) figent le comportement observable dans des instantanés JSON : contrat OpenAPI, réponses JSON, événements SSE, classement de la recherche et découpage en chunks. Ils se régénèrent avec `ORACLE_UPDATE=1 pytest tests/oracle`, uniquement pour un changement de comportement voulu, en relisant le diff.
 
 ## 🔍 Qualité et CI
 
-- **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90 ; complexité cyclomatique maximale 15).
-- **Typage** : mypy en mode normal sur `backend/mimir` (`mypy backend/mimir`), sans erreur.
-- **Tests** : pytest 9 (pytest-asyncio, pytest-cov), vitest côté frontend.
-- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.lock`, sans exclusion.
+- **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90, TID, I, RUF ; imports absolus uniquement ; complexité cyclomatique maximale 15). ESLint côté frontend.
+- **Typage** : mypy sur `backend/mimir` avec `disallow_untyped_defs` et `check_untyped_defs` (`mypy backend/mimir`), sans erreur.
+- **Tests** : pytest 9 (pytest-asyncio, pytest-cov ; une DeprecationWarning levée depuis `mimir` ou `tests` fait échouer la suite), vitest 5 côté frontend.
+- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.lock`, sans exclusion ; `npm audit` sur les dépendances de production du frontend (niveau haut).
 - **Mesures ponctuelles** : radon (complexité), pygount (lignes de code), mutmut (tests de mutation de `rag_core/fusion.py`, `ingestion/chunking.py` et `rag_core/tokenizer_fr.py`, configuré dans `pyproject.toml`).
 
 `bash scripts/local_ci.sh` enchaîne ruff, mypy, pytest et pip-audit (outils installés depuis `requirements-dev.txt`).
 
-La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs ruff, mypy, pytest (sans les deux modules d'oracle dépendants du processeur) et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt`. Les tests vitest et le build du frontend ne sont pas exécutés par la CI.
+La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs Python ruff, mypy, pytest et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt` ; un job frontend (Node 22, `npm ci`) enchaîne ESLint, vitest, le build et `npm audit --omit=dev --audit-level=high`.
 
 **Dépendances**
 - `requirements.txt` (runtime seul, installé dans l'image Docker) et `requirements-dev.txt` (runtime, tests et outils de qualité) restent la source.
@@ -531,7 +531,7 @@ Le rebuild effectue automatiquement :
 # Backend logs (dossier logs/ du répertoire de lancement d'uvicorn)
 tail -f backend/logs/app.log
 
-# Frontend logs (envoyés au backend)
+# Frontend logs (envoyés au backend si VITE_LOG_TO_FILE=true)
 tail -f backend/logs/frontend.log
 
 # Filtrer par niveau
@@ -547,7 +547,7 @@ Ce projet est libre.
 - **Python** : ruff (lint et format), mypy, type hints, docstrings des API publiques
 - **JavaScript** : ESLint
 - **Commits** : Conventional Commits
-- **Tests** : Couverture 88 % (backend) ; la CI (ruff, mypy, pytest, pip-audit) tourne sur chaque pull request
+- **Tests** : Couverture 92 % (backend, seuil 85 %) ; la CI (ruff, mypy, pytest, pip-audit, frontend) tourne sur chaque pull request
 - **Décisions** : un ADR par décision d'architecture dans `docs/adr/`
 
 ## 📝 License MIT

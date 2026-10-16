@@ -15,7 +15,7 @@ stop_servers.sh
 
 ## Stack
 - **Backend**: Python 3.13, FastAPI, SQLite (WAL), FAISS, Mistral API
-- **Frontend**: React 18, Vite, Tailwind CSS, Axios
+- **Frontend**: React 18, Vite 8, Tailwind CSS, Axios
 - **Auth**: JWT (PyJWT) + Argon2 (pwdlib, bcrypt legacy)
 - **Tests**: pytest (backend), vitest (frontend)
 
@@ -58,7 +58,7 @@ backend/
 │   ├── services/                    # Route logic: RAG pipeline, SSE stream, upload, deletion, index maintenance
 │   ├── monitoring/                  # Structured JSON logging, SMTP error alerting
 │   ├── shared/                      # models.py (Pydantic DTOs), errors.py (domain exceptions), constants.py
-│   └── utils/                       # Log parser, logs reader
+│   └── utils/                       # Log file reader (logs_reader.py)
 ├── data/                            # Runtime data (gitignored)
 │   ├── documents/                   # Uploaded files (hashed filenames)
 │   ├── faiss/                       # index.bin + metadata.json
@@ -74,17 +74,17 @@ frontend/
 │   │   ├── Admin/                   # AdminDashboard, DocumentsList, UploadZone, LogViewer
 │   │   └── Common/                  # DocumentModal, Layout, ProtectedRoute
 │   ├── services/api.js              # Axios client (all API calls)
-│   ├── hooks/useAuth.jsx            # Auth context + JWT management
+│   ├── hooks/                       # useAuth (auth context + JWT), useDocumentsList (admin documents list)
 │   ├── utils/                       # storage.js, logger.js, auth.js, helpers.js
-│   └── test/                        # vitest tests (141 tests)
+│   └── test/                        # vitest tests (148 tests)
 └── package.json
 
-tests/                               # pytest test suite (1036 tests, run from the repo root)
-├── conftest.py                      # Shared fixtures
-├── unit/                            # Unit tests (838)
-├── integration/                     # API + workflow tests
-├── oracle/                          # Characterization snapshots
-└── performance/                     # Cleanup performance tests (12)
+tests/                               # pytest test suite (911 tests, run from the repo root)
+├── conftest.py                      # Shared fixtures (temporary data paths for the whole run)
+├── unit/                            # Unit tests (720)
+├── integration/                     # API + workflow tests (147)
+├── oracle/                          # Characterization snapshots (32)
+└── performance/                     # Cleanup, budget and FAISS concurrency tests (12)
 
 scripts/
 ├── local_ci.sh                      # ruff + mypy + pytest + pip-audit
@@ -115,10 +115,11 @@ docs/adr/                            # Architecture decision records
 # Tests
 pytest                      # All tests with coverage
 pytest tests/unit/ -v       # Unit only
-cd frontend && npx vitest   # Frontend tests
+cd frontend && npx vitest run   # Frontend tests
 
-# Quality (CI checks; local pytest also runs the 2 CPU-dependent oracle modules CI skips)
+# Quality (the CI runs the same checks on every pull request)
 bash scripts/local_ci.sh    # ruff check + ruff format --check + mypy backend/mimir + pytest + pip-audit
+cd frontend && npm run lint && npx vitest run && npm run build
 
 # API docs
 http://localhost:8000/docs   # Swagger UI
@@ -128,4 +129,12 @@ http://localhost:8000/docs   # Swagger UI
 - `backend/.env.example` — copy to `backend/.env` and configure
 - Required: `MISTRAL_API_KEY`, `JWT_SECRET_KEY`
 - Admin account `admin`: password set with `ADMIN_PASSWORD` (clear text, hashed at startup, takes precedence) or `ADMIN_PASSWORD_HASH` (Argon2 hash); see README "Mot de passe admin". With `ENVIRONMENT=production`, startup refuses an unchanged `JWT_SECRET_KEY` or admin password
+- The backend reads the `.env` of its working directory (`backend/` with `start-servers.sh`); an unknown key stops startup (`extra="forbid"`)
+- Frontend logging: warnings and errors always reach the console; `VITE_ENABLE_LOGS`, `VITE_DEBUG_MODE` and `VITE_LOG_TO_FILE` add info, debug and backend forwarding (`frontend/.env.example`)
 - Lockfiles: `requirements.lock` / `requirements-dev.lock` are generated from `requirements*.txt` (regeneration command in their header)
+
+## Quality Gates
+- ruff rules F, E9, B, SIM, UP, BLE, C90, TID (absolute imports only), I, RUF; ruff format
+- mypy with `disallow_untyped_defs` and `check_untyped_defs` on `backend/mimir`
+- pytest (`pytest.ini`) fails under 85 % coverage of `backend/mimir`, and a DeprecationWarning raised from `mimir` or `tests` is an error
+- CI jobs (`.github/workflows/ci.yml`): ruff, mypy, pytest, pip-audit, frontend (ESLint, vitest, build, `npm audit --omit=dev --audit-level=high`)
