@@ -29,7 +29,6 @@ from mimir.api.dependencies import (
     get_rag_service,
 )
 from mimir.database.repository import DocumentRepository
-from mimir.shared.models import BaseResponse
 from mimir.monitoring.rag_debug_logger import RagDebugService
 from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
 from mimir.config import settings
@@ -211,24 +210,6 @@ async def escalate_to_human(
             message="Une erreur s'est produite lors de l'envoi de votre demande.",
             escalation_id=None,
         )
-
-
-@router.get("/sessions/{session_id}/history")
-async def get_session_history(
-    session_id: str, current_user: dict[str, Any] | None = Depends(get_optional_user)
-) -> dict[str, Any]:
-    """Get chat history for a session."""
-    return {"session_id": session_id, "messages": [], "created_at": datetime.utcnow()}
-
-
-@router.delete("/sessions/{session_id}")
-async def clear_session_history(
-    session_id: str, current_user: dict[str, Any] | None = Depends(get_optional_user)
-) -> BaseResponse:
-    """Clear chat history for a session."""
-    return BaseResponse(
-        success=True, message=f"Session {session_id} history cleared", timestamp=datetime.utcnow()
-    )
 
 
 def _get_client_ip(request: Request) -> str:

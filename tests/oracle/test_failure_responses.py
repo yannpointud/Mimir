@@ -116,9 +116,6 @@ def test_failure_responses(oracle_env):
                 "/api/v1/auth/login", json={"username": "admin", "password": "wrong"}
             ).status_code
         }
-        results["maintenance"] = _record(
-            env, client.post("/api/v1/admin/maintenance?enabled=true", headers=admin)
-        )
         results["logout with failing audit"] = _record(
             env, client.post("/api/v1/auth/logout", headers=admin)
         )
@@ -136,13 +133,11 @@ def test_failure_responses(oracle_env):
     )
     with _override(env, dep, factory):
         results["configuration get"] = _record(
-            env, client.get("/api/v1/admin/configuration", headers=admin)
+            env, client.get("/api/v1/admin/config", headers=admin)
         )
         results["configuration put"] = _record(
             env,
-            client.put(
-                "/api/v1/admin/configuration", headers=admin, json={"maintenance_mode": "true"}
-            ),
+            client.put("/api/v1/admin/config", headers=admin, json={"daily_budget_eur": "9"}),
         )
         results["usage with failing config"] = _record(
             env, client.get("/api/v1/admin/usage", headers=admin)
@@ -182,9 +177,6 @@ def test_failure_responses(oracle_env):
     )
     with _override(env, dependencies.get_ingestion_processor, lambda: full_queue):
         results["upload queue full"] = _record(env, env.upload(FIXTURES_DIR / "sample.md"))
-        results["admin upload queue full"] = _record(
-            env, env.upload(FIXTURES_DIR / "sample.md", route="/api/v1/admin/documents/upload")
-        )
     uploaded = env.upload(FIXTURES_DIR / "sample.md")
     results["upload after queue full"] = _record(env, uploaded)
     reprocess_route = f"/api/v1/documents/{uploaded.json()['id']}/reprocess"
@@ -197,9 +189,6 @@ def test_failure_responses(oracle_env):
     broken_queue = _Failing(env.processor, ["queue_document"])
     with _override(env, dependencies.get_ingestion_processor, lambda: broken_queue):
         results["upload queue error"] = _record(env, env.upload(FIXTURES_DIR / "sample.pdf"))
-        results["admin upload queue error"] = _record(
-            env, env.upload(FIXTURES_DIR / "sample.docx", route="/api/v1/admin/documents/upload")
-        )
         results["reprocess queue error"] = _record(env, client.post(reprocess_route, headers=admin))
     results["documents final"] = _record(env, client.get("/api/v1/documents/", headers=admin))
 

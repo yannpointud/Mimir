@@ -9,8 +9,6 @@ from pydantic import ValidationError
 
 from mimir.api.endpoints.chat import (
     escalate_to_human,
-    get_session_history,
-    clear_session_history,
     ChatRequest,
     ChatResponse,
     SourceReference,
@@ -251,40 +249,6 @@ class TestEscalationEndpoint:
         assert result.success is False
         assert result.escalation_id is None
         assert "erreur s'est produite" in result.message
-
-
-class TestSessionHistoryEndpoints:
-    """Tests for session history management endpoints."""
-
-    def test_get_session_history_placeholder(self):
-        """Test session history retrieval."""
-
-        session_id = "test_session_123"
-        current_user = None
-
-        # Call the function
-        result = asyncio.run(get_session_history(session_id=session_id, current_user=current_user))
-
-        # Assertions
-        assert result["session_id"] == session_id
-        assert result["messages"] == []
-        assert "created_at" in result
-
-    def test_clear_session_history_placeholder(self):
-        """Test session history clearing (placeholder)."""
-
-        session_id = "test_session_123"
-        current_user = None
-
-        # Call the function
-        result = asyncio.run(
-            clear_session_history(session_id=session_id, current_user=current_user)
-        )
-
-        # Assertions
-        assert result.success is True
-        assert session_id in result.message
-        assert "cleared" in result.message
 
 
 class TestChatHelperFunctions:

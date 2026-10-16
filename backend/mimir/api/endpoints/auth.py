@@ -241,14 +241,6 @@ async def get_current_user_info(
     }
 
 
-@router.post("/verify-admin")
-async def verify_admin_access(
-    admin_user: dict[str, Any] = Depends(require_admin),
-) -> dict[str, str]:
-    """Verify admin access (protected endpoint for testing admin auth)."""
-    return {"message": "Admin access confirmed", "user": admin_user["sub"]}
-
-
 @router.post("/change-password")
 async def change_password(
     request: Request,

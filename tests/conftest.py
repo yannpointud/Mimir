@@ -1,17 +1,59 @@
 """
-Pytest configuration for Mimir tests
-Common fixtures and test configuration
+Shared pytest fixtures.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from mimir import config
 from mimir.config import Settings
+from mimir.database.connection import db_manager
 from mimir.database.models import Base
 from mimir.database.repository import create_repositories
+
+
+@pytest.fixture(scope="session", autouse=True)
+def hermetic_data_paths(tmp_path_factory):
+    """Run the whole suite against temporary data paths, never the real ones."""
+    data = tmp_path_factory.mktemp("mimir") / "data"
+    overrides = {
+        "data_dir": str(data),
+        "upload_dir": str(data / "documents"),
+        "database_url": f"sqlite:///{data / 'sqlite' / 'mimir.db'}",
+        "faiss_index_path": str(data / "faiss" / "index.bin"),
+        "faiss_metadata_path": str(data / "faiss" / "metadata.json"),
+        "bm25_index_path": str(data / "bm25" / "index"),
+        "sqlite_backup_dir": str(data / "backups"),
+    }
+    saved = {name: getattr(config.settings, name) for name in overrides}
+    for name, value in overrides.items():
+        setattr(config.settings, name, value)
+    config.settings.ensure_directories()
+    db_manager.configure(config.settings.database_url)
+    yield
+    for name, value in saved.items():
+        setattr(config.settings, name, value)
+    db_manager.configure(config.settings.database_url)
+
+
+@pytest.fixture
+def isolated_db_manager(tmp_path, monkeypatch):
+    """Point the global db_manager at a fresh SQLite file for one test.
+
+    Code under test that opens its own sessions (BudgetGuard, UsageTracker...)
+    then writes to this file instead of the developer's database.
+    """
+    original_url = config.settings.database_url
+    database_url = f"sqlite:///{tmp_path / 'test.db'}"
+    monkeypatch.setattr(config.settings, "database_url", database_url)
+    db_manager.configure(database_url)
+    db_manager.create_tables()
+    yield db_manager
+    db_manager.configure(original_url)
 
 
 @pytest.fixture(scope="session")
@@ -29,8 +71,6 @@ def test_settings():
             "admin_password_hash": "$2b$12$test_hash",
             "data_dir": str(Path(temp_dir) / "data"),
             "upload_dir": str(Path(temp_dir) / "uploads"),
-            "watch_folder": str(Path(temp_dir) / "watch"),
-            "cache_enabled": False,  # Disabled for tests
             "log_level": "DEBUG",
         }
 
@@ -41,7 +81,7 @@ def test_settings():
 def test_engine(test_settings):
     """Test database engine"""
     engine = create_engine(
-        test_settings.database_url_sync, echo=False, connect_args={"check_same_thread": False}
+        test_settings.database_url, echo=False, connect_args={"check_same_thread": False}
     )
 
     # Create tables
@@ -133,25 +173,10 @@ def disable_rate_limiter():
 # Fixtures for API tests (future)
 @pytest.fixture
 def test_app():
-    """Test FastAPI application"""
-    from mimir.config import settings
-
-    # Override settings for tests
-    original_values = {}
-    test_values = {"cache_enabled": False, "log_level": "DEBUG"}
-
-    # Save and override
-    for key, value in test_values.items():
-        original_values[key] = getattr(settings, key)
-        setattr(settings, key, value)
-
+    """The FastAPI application."""
     from mimir.main import app
 
-    yield app
-
-    # Restore
-    for key, value in original_values.items():
-        setattr(settings, key, value)
+    return app
 
 
 # Test utilities

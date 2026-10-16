@@ -225,15 +225,13 @@ async def upload_document(
         UploadPolicy(
             upload_dir=settings.upload_dir,
             max_file_size_mb=settings.max_file_size_mb,
-            invalid_filename_detail="Invalid filename",
             supported_extensions=settings.supported_file_extensions,
-            warn_on_duplicate=True,
         ),
     )
     try:
         upload.check_name_and_size()
         document = await upload.run(
-            doc_repo, ingestion_processor, preserve, current_user, audit_repo=audit_repo
+            doc_repo, audit_repo, ingestion_processor, preserve, current_user
         )
         logger.info(f"Document uploaded successfully: {upload.filename} (ID: {document.id})")
         return DocumentResponse.from_orm(document)
@@ -462,7 +460,7 @@ async def get_document_stats(
             ),
             storage_info=StorageInfo(
                 upload_directory=settings.upload_dir,
-                supported_extensions=list(settings.supported_file_extensions),
+                supported_extensions=sorted(settings.supported_file_extensions),
                 max_file_size_mb=settings.max_file_size_mb,
             ),
             timestamp=datetime.utcnow(),

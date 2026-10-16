@@ -61,7 +61,7 @@ async def test_health_responds_during_heavy_faiss_operation(test_app):
 
         async with httpx.AsyncClient(app=test_app, base_url="http://test") as client:
             start = time.monotonic()
-            response = await client.get("/health")
+            response = await client.get("/api/v1/health/")
             elapsed = time.monotonic() - start
 
         await heavy_task

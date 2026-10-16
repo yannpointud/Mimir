@@ -119,7 +119,7 @@ class TestAdminRouterDefaultDeny:
         "route",
         [
             "/api/v1/admin/system-info",
-            "/api/v1/admin/configuration",
+            "/api/v1/admin/config",
             "/api/v1/admin/audit-log",
             "/api/v1/admin/cache/stats",
         ],

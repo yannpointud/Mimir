@@ -264,7 +264,7 @@ class TestErrorRecoveryWorkflow:
         client = TestClient(test_app)
 
         # Simulate normal then degraded conditions
-        response = client.get("/health")
+        response = client.get("/api/v1/health/")
 
         # The system must handle DB errors gracefully
         assert response.status_code in [200, 503]

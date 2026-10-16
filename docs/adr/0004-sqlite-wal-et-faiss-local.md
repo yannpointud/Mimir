@@ -43,7 +43,6 @@ Négatives
 - SQLite et FAISS ne partagent pas de transaction. Leur cohérence repose sur les routes de validation et de reconstruction.
 - Une suppression n'est écrite sur disque qu'au prochain `persist()` : prochaine ingestion, reconstruction admin, nettoyage d'orphelins qui en trouve, validation avec corrections, ou `optimize()` automatique au-delà de 25 % de chunks supprimés. Un redémarrage entre-temps recharge les chunks du document supprimé comme actifs : ils redeviennent des résultats denses orphelins (la ligne SQLite a disparu, et l'index BM25, reconstruit et persisté après la suppression, ne les contient plus) jusqu'au prochain nettoyage.
 - La sauvegarde planifiée ne couvre que SQLite. Les copies FAISS ne sont faites qu'avant le nettoyage d'orphelins de la reconstruction admin.
-- Les pragmas ne sont attachés qu'au moteur synchrone. Le moteur asynchrone (aiosqlite) déclaré dans `connection.py` n'est utilisé nulle part ailleurs.
 
 ## Où dans le code
 

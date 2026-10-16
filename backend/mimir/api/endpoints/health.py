@@ -223,7 +223,7 @@ async def _check_llm_health() -> dict[str, Any]:
         return {
             "healthy": llm_configured,
             "api_configured": llm_configured,
-            "provider": settings.llm_provider,
+            "provider": "mistral",
             "model": settings.mistral_model if llm_configured else None,
             "note": "API key configured" if llm_configured else "API key not configured",
         }

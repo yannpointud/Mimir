@@ -1,6 +1,6 @@
 """Main FastAPI application for Mimir: entry point with the full configuration."""
 
-from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from typing import Any
@@ -12,11 +12,11 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 
 from mimir.config import settings
-from mimir.database.connection import init_database, db_manager
+from mimir.database.connection import init_database
 from mimir.security.admin_password import resolve_admin_password
 from mimir.security.startup_validation import validate_production_secrets
 from mimir.shared.errors import BudgetExceeded, MimirError
-from mimir.shared.models import ErrorResponse, HealthCheckResponse, RootResponse
+from mimir.shared.models import ErrorResponse, RootResponse
 
 # Import API endpoints
 from mimir.api.endpoints import health, auth, chat, documents, admin, logs
@@ -414,32 +414,6 @@ app.include_router(documents.router, prefix="/api/v1")
 app.include_router(documents.reader_router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(logs.router, prefix="/api/v1")
-
-
-# Compatibility route for root health check
-@app.get("/health", response_model=HealthCheckResponse)
-async def root_health_check(response: Response):
-    """Root health check kept for compatibility; delegates to the full health check."""
-    try:
-        # Delegate to the full health check
-        from mimir.api.endpoints.health import health_check
-
-        # Create a session for the health check; pass this route's Response
-        # through so an unhealthy state is reported as HTTP 503 here too.
-        with db_manager.get_session_context() as session:
-            return await health_check(response=response, db=session)
-
-    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as a 503
-        logger.error(f"Root health check failed: {e}")
-        return CustomJSONResponse(
-            status_code=503,
-            content={
-                "success": False,
-                "status": "unhealthy",
-                "message": f"Health check failed: {e}",
-                "timestamp": time.time(),
-            },
-        )
 
 
 # Development entry point

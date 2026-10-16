@@ -165,24 +165,5 @@
       "token_type": "bearer"
     },
     "status": 200
-  },
-  "verify-admin admin": {
-    "body": {
-      "message": "Admin access confirmed",
-      "user": "admin"
-    },
-    "status": 200
-  },
-  "verify-admin reader": {
-    "body": {
-      "details": {
-        "path": "/api/v1/auth/verify-admin"
-      },
-      "error_code": "HTTP_403",
-      "error_message": "Admin privileges required",
-      "success": false,
-      "timestamp": "<timestamp>"
-    },
-    "status": 403
   }
 }

@@ -40,7 +40,7 @@ def resolve_admin_password(settings) -> None:
         RuntimeError: In production, when ADMIN_PASSWORD fails the strength
             rules. The message lists the failed rules only, never the password.
     """
-    password = getattr(settings, "admin_password", "")
+    password = settings.admin_password
     if not password:
         return
 

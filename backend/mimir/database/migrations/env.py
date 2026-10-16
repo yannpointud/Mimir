@@ -11,7 +11,7 @@ from mimir.database.models import Base
 config = context.config
 
 # Set the SQLAlchemy URL from settings
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

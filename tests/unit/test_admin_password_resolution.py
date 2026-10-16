@@ -34,10 +34,8 @@ def make_settings(tmp_path):
             "mistral_api_key": "test_key",
             "data_dir": str(tmp_path / "data"),
             "upload_dir": str(tmp_path / "uploads"),
-            "watch_folder": str(tmp_path / "watch"),
             "faiss_index_path": str(tmp_path / "faiss" / "index.bin"),
             "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.pkl"),
-            "cache_enabled": False,
         }
         base.update(overrides)
         return Settings(**base)

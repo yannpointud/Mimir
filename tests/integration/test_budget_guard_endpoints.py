@@ -16,60 +16,18 @@ the real db_manager singleton, not the test_session fixture) never touch
 the developer's real database. Zero real Mistral API calls.
 """
 
-import shutil
-import tempfile
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, AsyncMock
 
-from mimir import config as config_module
 from mimir.config import settings
 from mimir.cost.budget_guard import BudgetGuard
 from mimir.database.connection import db_manager
-from mimir.database.models import Base, LlmUsage
+from mimir.database.models import LlmUsage
 from mimir.llm_interface.interfaces import EmbeddingResponse, GenerationResponse
 
 
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime. BudgetGuard/UsageTracker open their own
-    sessions via the real db_manager singleton (own-session-per-operation
-    pattern), so the standard test_session fixture (single
-    rollback-only transaction) would never see their commits -- mirrors the
-    isolated_db_manager fixture in tests/unit/test_budget_guard.py /
-    test_usage_tracker.py."""
-    temp_dir = tempfile.mkdtemp(prefix="chat_budget_endpoints_test_")
-    temp_db_path = Path(temp_dir) / "chat_budget_endpoints_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture

@@ -24,18 +24,14 @@ service is visible to the route's read.
 """
 
 import json
-import shutil
-import tempfile
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock
 
-from mimir import config as config_module
 from mimir.config import settings
 from mimir.database.connection import db_manager
-from mimir.database.models import Base, LlmUsage
+from mimir.database.models import LlmUsage
 from mimir.llm_interface.interfaces import EmbeddingResponse
 
 
@@ -118,39 +114,6 @@ def _normalise_sequence(events):
             if etype == "done":
                 done = {k: v for k, v in ev.items() if k != "cached"}
     return types, answer, done
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file (BudgetGuard/UsageTracker open their own sessions via this singleton;
-    mirrors test_budget_guard_endpoints.py)."""
-    temp_dir = tempfile.mkdtemp(prefix="chat_stream_cache_test_")
-    temp_db_path = Path(temp_dir) / "chat_stream_cache_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)

@@ -25,7 +25,7 @@ Les paramètres sont définis dans `backend/mimir/config.py` :
 - estimations forfaitaires `budget_reservation_chat_eur = 0.01` et `budget_reservation_embedding_eur = 0.001` ;
 - `llm_price_table`, la grille de prix en euros par million de tokens.
 
-Le plafond effectif est la clé `daily_budget_eur` de la table `configuration` si elle existe, modifiable à chaud par `PUT /api/v1/admin/configuration` (l'écran Admin > Configuration ne permet pas de la modifier). À défaut, c'est la valeur des settings (`.env`) qui s'applique.
+Le plafond effectif est la clé `daily_budget_eur` de la table `configuration` si elle existe, modifiable à chaud par `PUT /api/v1/admin/config` (l'écran Admin > Configuration ne permet pas de la modifier). À défaut, c'est la valeur des settings (`.env`) qui s'applique.
 
 L'application diffère selon le flux :
 - **Chat.** La route prend une réservation `"chat"` par question, avant de renvoyer le flux. En cas de refus, `budget_exceeded_response()` renvoie un HTTP 429 avec `{"error_code": "budget_exceeded", "error_message": "Plafond quotidien de dépense IA atteint."}`. Cette réponse est renvoyée (et non levée), sinon le gestionnaire global de `HTTPException` réécrirait le corps. La réservation est réglée une seule fois :

@@ -334,12 +334,9 @@ class ApplicationConfig(BaseModel):
     max_chunk_size: int
     chunk_overlap: int
     embedding_dimension: int
-    cache_max_size: int
-    cache_ttl_seconds: int
     supported_file_extensions: list[str]
     max_file_size_mb: int
     jwt_expiration_hours: int
-    llm_provider: str
     mistral_api_key: str
     mistral_model: str
     mistral_embedding_model: str
@@ -415,55 +412,6 @@ class UsageResponse(BaseModel):
     history: list[DailyModelUsage]
     spent_today_eur: float
     daily_budget_eur: float
-    timestamp: datetime
-
-
-class AdminDocumentSummary(BaseModel):
-    """Document row of the admin document list"""
-
-    id: int
-    filename: str
-    status: str
-    created_at: str | None
-    file_size: int
-    preserve: bool
-
-
-class AdminDocumentList(BaseModel):
-    """A page of the admin document list"""
-
-    documents: list[AdminDocumentSummary]
-    total: int
-    page: int
-    limit: int
-    total_pages: int
-
-
-class AdminDocumentStats(BaseModel):
-    """Document statistics of the admin dashboard"""
-
-    total_documents: int
-    by_status: DocumentStatusCounts
-    by_type: dict[str, Any]
-    total_size_mb: int | float
-    timestamp: datetime
-
-
-class UploadedDocument(BaseModel):
-    """Document created by an admin upload"""
-
-    id: int
-    filename: str
-    status: str
-    created_at: str | None
-
-
-class AdminUploadResponse(BaseModel):
-    """Result of an admin upload"""
-
-    success: bool
-    message: str
-    document: UploadedDocument
     timestamp: datetime
 
 

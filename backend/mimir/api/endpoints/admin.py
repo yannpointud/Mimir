@@ -12,11 +12,6 @@ from fastapi import (
     HTTPException,
     status,
     Query,
-    UploadFile,
-    File,
-    Form,
-    Request,
-    Response,
 )
 from datetime import datetime, timedelta
 import logging
@@ -34,11 +29,9 @@ from mimir.api.dependencies import (
     get_audit_log_repository,
     get_usage_repository,
     get_vector_store,
-    get_ingestion_processor,
     get_bm25_store,
     get_document_repository,
 )
-from mimir.api.middleware.rate_limit import limiter, get_client_identifier
 from mimir.cache.lru_cache import cache_service, chat_cache_service
 from mimir.email_service.smtp_client import email_service
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
@@ -46,10 +39,6 @@ from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
 from mimir.shared.models import (
     AdminCacheStats,
     AdminConfigurationResponse,
-    AdminDocumentList,
-    AdminDocumentStats,
-    AdminDocumentSummary,
-    AdminUploadResponse,
     ApplicationConfig,
     AuditLogEntry,
     AuditLogFilters,
@@ -58,17 +47,12 @@ from mimir.shared.models import (
     CacheGlobalStats,
     CacheStatsResponse,
     DailyModelUsage,
-    DocumentStatusCounts,
     ModelUsageToday,
     PaginationModel,
-    UploadedDocument,
     UsageResponse,
 )
 from mimir.shared.constants import MASKED_VALUE, mask_secrets
-from mimir.api.responses import rejection_to_http
 from mimir.services import index_maintenance
-from mimir.services.document_upload import DocumentUpload, UploadPolicy
-from mimir.services.errors import RequestRejectedError
 from mimir.config import settings
 
 logger = logging.getLogger(__name__)
@@ -128,16 +112,10 @@ async def get_system_info(current_user: dict[str, Any] = Depends(require_admin))
                 "upload_directory": settings.upload_dir,
                 "database_url": settings.database_url.replace(
                     settings.database_url.split("/")[-1], "***"
-                )
-                if hasattr(settings, "database_url")
-                else "not configured",
+                ),
             },
             "services": {
-                "llm_provider": settings.llm_provider,
-                "vector_store": settings.vector_store_type,
-                "cache_enabled": True,  # Always enabled in this implementation
                 "email_configured": email_service.get_configuration_status()["configured"],
-                "watch_folder": getattr(settings, "watch_folder", "not configured"),
             },
             "timestamp": datetime.utcnow(),
         }
@@ -244,7 +222,7 @@ async def clear_cache(
         ) from e
 
 
-@router.get("/configuration", response_model=AdminConfigurationResponse)
+@router.get("/config", response_model=AdminConfigurationResponse)
 async def get_configuration(
     current_user: dict[str, Any] = Depends(require_admin),
     config_repo: ConfigurationRepository = Depends(get_configuration_repository),
@@ -260,13 +238,9 @@ async def get_configuration(
             "max_chunk_size": settings.max_chunk_size,
             "chunk_overlap": settings.chunk_overlap,
             "embedding_dimension": settings.embedding_dimension,
-            "cache_max_size": getattr(settings, "cache_max_size", 100),
-            "cache_ttl_seconds": getattr(settings, "cache_ttl_seconds", 3600),
-            "supported_file_extensions": list(getattr(settings, "supported_file_extensions", [])),
-            "max_file_size_mb": getattr(settings, "max_file_size_mb", 100),
+            "supported_file_extensions": sorted(settings.supported_file_extensions),
+            "max_file_size_mb": settings.max_file_size_mb,
             "jwt_expiration_hours": settings.jwt_expiration_hours,
-            # LLM Configuration (with sensitive data)
-            "llm_provider": settings.llm_provider,
             "mistral_api_key": settings.mistral_api_key,
             "mistral_model": settings.mistral_model,
             "mistral_embedding_model": settings.mistral_embedding_model,
@@ -287,7 +261,7 @@ async def get_configuration(
         ) from e
 
 
-@router.put("/configuration", response_model=BaseResponse)
+@router.put("/config", response_model=BaseResponse)
 async def update_configuration(
     config_updates: dict[str, str],
     current_user: dict[str, Any] = Depends(require_admin),
@@ -300,20 +274,10 @@ async def update_configuration(
         # overwrite the real secret nor trigger the allow-list validation
         config_updates = {k: v for k, v in config_updates.items() if v != MASKED_VALUE}
 
-        # Validate configuration keys (only allow certain keys to be updated)
-        allowed_keys = {
-            "maintenance_mode",
-            "max_concurrent_ingestions",
-            "ingestion_retry_limit",
-            "email_escalation_enabled",
-            "chat_rate_limit_per_minute",
-            "auto_delete_failed_documents",
-            "vector_search_threshold",
-            # Hot-reloadable daily spend cap: BudgetGuard._effective_cap
-            # reads this key from the configuration table before falling back
-            # to settings.daily_budget_eur.
-            "daily_budget_eur",
-        }
+        # Only keys the application reads at runtime may be updated: the daily
+        # spend cap, which BudgetGuard reads before falling back to
+        # settings.daily_budget_eur.
+        allowed_keys = {"daily_budget_eur"}
 
         invalid_keys = set(config_updates.keys()) - allowed_keys
         if invalid_keys:
@@ -476,55 +440,6 @@ async def get_usage(
         ) from e
 
 
-@router.post("/maintenance", response_model=BaseResponse)
-async def toggle_maintenance_mode(
-    enabled: bool = Query(..., description="Enable or disable maintenance mode"),
-    message: str | None = Query(None, description="Optional maintenance message"),
-    current_user: dict[str, Any] = Depends(require_admin),
-    config_repo: ConfigurationRepository = Depends(get_configuration_repository),
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-) -> BaseResponse:
-    """Toggle system maintenance mode."""
-    try:
-        # Update maintenance mode configuration
-        config_repo.set("maintenance_mode", "true" if enabled else "false")
-
-        if message:
-            config_repo.set("maintenance_message", message)
-
-        # Log maintenance mode change
-        audit_repo.create_log(
-            user_type="admin",
-            action="maintenance_mode_toggle",
-            details=f"Maintenance mode {'enabled' if enabled else 'disabled'}"
-            + (f": {message}" if message else ""),
-            ip_address="system",
-            success=True,
-            additional_data={
-                "enabled": enabled,
-                "message": message,
-                "admin_user": current_user["sub"],
-            },
-        )
-
-        status_word = "enabled" if enabled else "disabled"
-        logger.info(f"Maintenance mode {status_word} by admin {current_user['sub']}")
-
-        return BaseResponse(
-            success=True,
-            message=f"Maintenance mode {status_word} successfully"
-            + (f": {message}" if message else ""),
-            timestamp=datetime.utcnow(),
-        )
-
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        logger.error(f"Error toggling maintenance mode: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to toggle maintenance mode",
-        ) from e
-
-
 @router.post("/test-email", response_model=BaseResponse)
 async def test_email_service(
     test_email: str = Query(..., description="Email address to send test message to"),
@@ -568,248 +483,6 @@ async def test_email_service(
         logger.error(f"Email service test error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Email service test failed"
-        ) from e
-
-
-# ============= DOCUMENT MANAGEMENT ENDPOINTS =============
-# Document endpoints added for frontend consistency
-
-
-@router.get("/documents", response_model=AdminDocumentList)
-async def admin_list_documents(
-    page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
-    status_filter: str | None = Query(None, description="Filter by document status"),
-    search: str | None = Query(None, description="Search in filenames"),
-    current_user: dict[str, Any] = Depends(require_admin),
-) -> AdminDocumentList:
-    """List documents via admin interface."""
-    # Import here to avoid circular imports
-    from mimir.database.repository import DocumentRepository
-
-    # Use a new repository instance
-    from mimir.database.connection import get_db_session
-
-    db = next(get_db_session())
-    doc_repo = DocumentRepository(db)
-
-    try:
-        # Compute offset
-        offset = (page - 1) * limit
-
-        # Retrieve documents with filters
-        documents = doc_repo.get_all(offset=offset, limit=limit, order_by="created_at")
-
-        # Count total (simple approximation)
-        total = len(doc_repo.get_all())
-
-        return AdminDocumentList(
-            documents=[
-                AdminDocumentSummary(
-                    id=doc.id,
-                    filename=doc.filename,
-                    status=doc.status,
-                    created_at=doc.created_at.isoformat() if doc.created_at else None,
-                    file_size=getattr(doc, "file_size", 0),
-                    preserve=getattr(doc, "preserve", False),
-                )
-                for doc in documents
-            ],
-            total=total,
-            page=page,
-            limit=limit,
-            total_pages=(total + limit - 1) // limit if total > 0 else 0,
-        )
-    finally:
-        db.close()
-
-
-@router.get("/documents/stats", response_model=AdminDocumentStats)
-async def admin_document_stats(
-    current_user: dict[str, Any] = Depends(require_admin),
-) -> AdminDocumentStats:
-    """Get document statistics via admin interface."""
-    from mimir.database.repository import DocumentRepository
-    from mimir.database.connection import get_db_session
-
-    db = next(get_db_session())
-    doc_repo = DocumentRepository(db)
-
-    try:
-        stats = doc_repo.get_statistics()
-        return AdminDocumentStats(
-            total_documents=stats.get("total_documents", 0),
-            by_status=DocumentStatusCounts(
-                pending=stats.get("count_pending", 0),
-                indexing=stats.get("count_indexing", 0),
-                indexed=stats.get("count_indexed", 0),
-                error=stats.get("count_error", 0),
-            ),
-            by_type=stats.get("by_type", {}),
-            total_size_mb=stats.get("total_size_mb", 0),
-            timestamp=datetime.utcnow(),
-        )
-    finally:
-        db.close()
-
-
-@router.post("/documents/upload", response_model=AdminUploadResponse)
-# Same upload limit as /documents/upload: this duplicated admin
-# route would otherwise be a trivial bypass of the upload rate limit.
-# `request` is required by slowapi (import-time error without it) and
-# `response` lets slowapi inject the X-RateLimit-* headers on the returned
-# model (it only adds them itself to a Response object).
-@limiter.limit(
-    lambda: f"{settings.rate_limit_upload_per_minute}/minute", key_func=get_client_identifier
-)
-async def admin_upload_document(
-    request: Request,
-    response: Response,
-    file: UploadFile = File(...),
-    preserve: bool = Form(False),
-    current_user: dict[str, Any] = Depends(require_admin),
-    ingestion_processor=Depends(get_ingestion_processor),
-) -> AdminUploadResponse:
-    """Upload document via admin interface.
-
-    Shares the /documents/upload pipeline, but accepts any extension, writes
-    no audit event, uses its own database session and removes the stored
-    file on an unexpected error.
-    """
-    from mimir.database.repository import DocumentRepository
-    from mimir.database.connection import get_db_session
-
-    upload = DocumentUpload(file, _admin_upload_policy())
-    try:
-        upload.check_name_and_size()
-    except RequestRejectedError as e:
-        raise rejection_to_http(e) from e
-
-    db = next(get_db_session())
-    doc_repo = DocumentRepository(db)
-    try:
-        document = await upload.run(doc_repo, ingestion_processor, preserve, current_user)
-        return AdminUploadResponse(
-            success=True,
-            message="Document uploaded successfully",
-            document=UploadedDocument(
-                id=document.id,
-                filename=document.filename,
-                status=document.status,
-                created_at=document.created_at.isoformat() if document.created_at else None,
-            ),
-            timestamp=datetime.utcnow(),
-        )
-    except RequestRejectedError as e:
-        # Intentional client errors (e.g. 409 duplicate) keep their status
-        raise rejection_to_http(e) from e
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        logger.error(f"Upload error: {e}")
-        upload.discard_stored_file()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload failed"
-        ) from e
-    finally:
-        db.close()
-
-
-def _admin_upload_policy() -> UploadPolicy:
-    return UploadPolicy(
-        upload_dir=settings.upload_dir,
-        max_file_size_mb=settings.max_file_size_mb,
-        invalid_filename_detail="Invalid file type or filename",
-        prepare_dir_first=True,
-    )
-
-
-# ============= CONFIG ALIAS ENDPOINTS =============
-# Aliases for frontend consistency
-
-
-@router.get("/config", response_model=AdminConfigurationResponse)
-async def get_config_alias(
-    current_user: dict[str, Any] = Depends(require_admin),
-    config_repo: ConfigurationRepository = Depends(get_configuration_repository),
-) -> AdminConfigurationResponse:
-    """Alias for /configuration - for frontend consistency."""
-    return await get_configuration(current_user, config_repo)
-
-
-@router.put("/config", response_model=BaseResponse)
-async def update_config_alias(
-    config_updates: dict[str, str],
-    current_user: dict[str, Any] = Depends(require_admin),
-    config_repo: ConfigurationRepository = Depends(get_configuration_repository),
-    audit_repo: AuditLogRepository = Depends(get_audit_log_repository),
-) -> BaseResponse:
-    """Alias for /configuration - for frontend consistency."""
-    return await update_configuration(config_updates, current_user, config_repo, audit_repo)
-
-
-@router.get("/metrics/chat", response_model=dict[str, Any])
-async def get_chat_metrics(current_user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
-    """Get chat system metrics for monitoring dashboard.
-
-    Returns real-time metrics including:
-    - Request volume in last hour
-    - Average response time
-    - Success rate
-    - Error count
-    - Active sessions estimate
-    - Token usage statistics
-    """
-    try:
-        # Import log_parser module to extract real metrics
-        from mimir.utils.log_parser import get_chat_metrics
-
-        # Get all metrics from logs
-        metrics = get_chat_metrics()
-
-        # Add timestamp
-        metrics["timestamp"] = datetime.utcnow().isoformat() + "Z"
-
-        logger.info("Chat metrics retrieved successfully from logs")
-        return metrics
-
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        logger.error(f"Failed to get chat metrics: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve chat metrics",
-        ) from e
-
-
-@router.get("/analytics/usage", response_model=dict[str, Any])
-async def get_usage_analytics(
-    current_user: dict[str, Any] = Depends(require_admin),
-) -> dict[str, Any]:
-    """Get comprehensive usage analytics for dashboard.
-
-    Returns analytics data including:
-    - Usage trends over multiple time periods
-    - Document processing statistics
-    - System resource utilization
-    - User activity patterns
-    - Growth metrics and comparisons
-    """
-    try:
-        # Import log_parser module to extract analytics
-        from mimir.utils.log_parser import get_usage_analytics
-
-        # Get all analytics from logs and database
-        analytics = get_usage_analytics()
-
-        # Add timestamp
-        analytics["timestamp"] = datetime.utcnow().isoformat() + "Z"
-
-        logger.info("Usage analytics retrieved successfully from logs and database")
-        return analytics
-
-    except Exception as e:  # noqa: BLE001 - API boundary: unexpected errors become a generic 500
-        logger.error(f"Failed to get usage analytics: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve usage analytics",
         ) from e
 
 

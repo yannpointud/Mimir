@@ -1,28 +1,4 @@
 {
-  "admin upload queue error": {
-    "body": {
-      "details": {
-        "path": "/api/v1/admin/documents/upload"
-      },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to queue document for processing",
-      "success": false,
-      "timestamp": "<timestamp>"
-    },
-    "status": 500
-  },
-  "admin upload queue full": {
-    "body": {
-      "details": {
-        "path": "/api/v1/admin/documents/upload"
-      },
-      "error_code": "HTTP_503",
-      "error_message": "Ingestion queue is full. The system is currently processing many documents. Please try again later.",
-      "success": false,
-      "timestamp": "<timestamp>"
-    },
-    "status": 503
-  },
   "audit log": {
     "body": {
       "details": {
@@ -50,7 +26,7 @@
   "configuration get": {
     "body": {
       "details": {
-        "path": "/api/v1/admin/configuration"
+        "path": "/api/v1/admin/config"
       },
       "error_code": "HTTP_500",
       "error_message": "Failed to retrieve configuration",
@@ -62,7 +38,7 @@
   "configuration put": {
     "body": {
       "details": {
-        "path": "/api/v1/admin/configuration"
+        "path": "/api/v1/admin/config"
       },
       "error_code": "HTTP_500",
       "error_message": "Failed to update configuration",
@@ -114,18 +90,6 @@
           "chunk_count": 0,
           "created_at": "<created_at>",
           "error_message": null,
-          "file_hash": "0ebe94c0289405ee234e64c28bd8573b98bca1f767af808fae1610fe0b404a41",
-          "filename": "sample.docx",
-          "id": 3,
-          "indexed_at": null,
-          "path": "<TMP>/data/documents/0ebe94c0289405ee234e64c28bd8573b98bca1f767af808fae1610fe0b404a41_sample.docx",
-          "preserve": false,
-          "status": "pending"
-        },
-        {
-          "chunk_count": 0,
-          "created_at": "<created_at>",
-          "error_message": null,
           "file_hash": "6e188b3076daa4dacd4cb3badf10b44e142c706b339b69a988daf2ef6a39baf7",
           "filename": "sample.pdf",
           "id": 2,
@@ -152,11 +116,11 @@
         "has_more": false,
         "limit": 50,
         "offset": 0,
-        "total": 3
+        "total": 2
       },
       "success": true,
       "timestamp": "<timestamp>",
-      "total_count": 3
+      "total_count": 2
     },
     "status": 200
   },
@@ -211,18 +175,6 @@
       "message": "Successfully logged out"
     },
     "status": 200
-  },
-  "maintenance": {
-    "body": {
-      "details": {
-        "path": "/api/v1/admin/maintenance"
-      },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to toggle maintenance mode",
-      "success": false,
-      "timestamp": "<timestamp>"
-    },
-    "status": 500
   },
   "rebuild with failing document listing": {
     "body": {

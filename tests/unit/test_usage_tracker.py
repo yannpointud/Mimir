@@ -10,50 +10,13 @@ for the test's lifetime, so no synthetic usage rows leak into the
 developer's real database.
 """
 
-import shutil
-import tempfile
-from pathlib import Path
-
 import pytest
 
-from mimir import config as config_module
 from mimir.config import settings
 from mimir.cost.pricing import compute_cost_eur
 from mimir.cost.usage_tracker import UsageTracker
 from mimir.database.connection import db_manager
-from mimir.database.models import Base, LlmUsage
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime, then restore the original engine."""
-    temp_dir = tempfile.mkdtemp(prefix="usage_tracker_test_")
-    temp_db_path = Path(temp_dir) / "usage_tracker_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
+from mimir.database.models import LlmUsage
 
 
 def _get_latest_usage_row():

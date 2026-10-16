@@ -16,7 +16,6 @@ slowapi==0.1.9
 # Database
 sqlalchemy==2.0.43
 alembic==1.16.5
-aiosqlite==0.21.0
 
 # LLM & RAG
 # HTTP client of the Mistral API service (chat and embeddings)
@@ -42,8 +41,6 @@ cachetools==5.3.2
 PyJWT==2.15.0
 pwdlib[argon2,bcrypt]==0.3.0
 
-# Monitoring
-watchdog==3.0.0
 # System metrics of the admin system-info endpoint
 psutil==7.0.0
 

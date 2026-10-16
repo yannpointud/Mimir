@@ -76,13 +76,9 @@ def test_health_and_root_responses(oracle_env):
         "GET /api/v1/health/ready": _record(env, client.get("/api/v1/health/ready")),
         "GET /api/v1/health/database": _record(env, client.get("/api/v1/health/database")),
         "GET /api/v1/health/": _record(env, client.get("/api/v1/health/"), keep=_full_health),
-        "GET /health": _record(env, client.get("/health"), keep=_full_health),
         "GET /api/v1/health/cache": _record(env, client.get("/api/v1/health/cache"), mode="shape"),
         "GET /api/v1/health/disk-usage": _record(
             env, client.get("/api/v1/health/disk-usage"), mode="shape"
-        ),
-        "GET /api/v1/logs/frontend/health": _record(
-            env, client.get("/api/v1/logs/frontend/health"), mode="shape"
         ),
         "POST /api/v1/logs/frontend": _record(
             env,
@@ -140,12 +136,6 @@ def test_auth_responses(oracle_env):
     )
     results["me basic scheme"] = _record(
         env, client.get("/api/v1/auth/me", headers={"Authorization": "Basic YWRtaW46eA=="})
-    )
-    results["verify-admin admin"] = _record(
-        env, client.post("/api/v1/auth/verify-admin", headers=env.admin_headers)
-    )
-    results["verify-admin reader"] = _record(
-        env, client.post("/api/v1/auth/verify-admin", headers=env.user_headers)
     )
     results["refresh"] = _record(
         env, client.post("/api/v1/auth/refresh", headers=env.admin_headers)
@@ -318,48 +308,32 @@ def test_admin_responses(oracle_env):
         env, client.post("/api/v1/admin/cache/clear?cache_type=chat", headers=admin)
     )
     results["configuration"] = _record(
-        env, client.get("/api/v1/admin/configuration", headers=admin), keep=_configuration
+        env, client.get("/api/v1/admin/config", headers=admin), keep=_configuration
     )
     results["configuration update"] = _record(
         env,
         client.put(
-            "/api/v1/admin/configuration",
+            "/api/v1/admin/config",
             headers=admin,
-            json={"maintenance_mode": "false", "daily_budget_eur": "12.5"},
+            json={"daily_budget_eur": "12.5"},
         ),
     )
     results["configuration update masked"] = _record(
         env,
-        client.put(
-            "/api/v1/admin/configuration", headers=admin, json={"mistral_api_key": "********"}
-        ),
+        client.put("/api/v1/admin/config", headers=admin, json={"mistral_api_key": "********"}),
     )
     results["configuration update invalid key"] = _record(
-        env, client.put("/api/v1/admin/configuration", headers=admin, json={"secret": "x"})
+        env, client.put("/api/v1/admin/config", headers=admin, json={"secret": "x"})
     )
     results["configuration update bad body"] = _record(
-        env, client.put("/api/v1/admin/configuration", headers=admin, json={"maintenance_mode": 1})
-    )
-    results["config alias"] = _record(
-        env, client.get("/api/v1/admin/config", headers=admin), keep=_configuration
-    )
-    results["config alias update"] = _record(
-        env,
-        client.put("/api/v1/admin/config", headers=admin, json={"vector_search_threshold": "0.4"}),
+        env, client.put("/api/v1/admin/config", headers=admin, json={"daily_budget_eur": 1})
     )
     results["configuration after update"] = _record(
-        env, client.get("/api/v1/admin/configuration", headers=admin), keep=_configuration
+        env, client.get("/api/v1/admin/config", headers=admin), keep=_configuration
     )
     results["usage"] = _record(env, client.get("/api/v1/admin/usage", headers=admin))
     results["usage bad days"] = _record(
         env, client.get("/api/v1/admin/usage?days_back=0", headers=admin)
-    )
-    results["maintenance on"] = _record(
-        env,
-        client.post("/api/v1/admin/maintenance?enabled=true&message=Oracle", headers=admin),
-    )
-    results["maintenance off"] = _record(
-        env, client.post("/api/v1/admin/maintenance?enabled=false", headers=admin)
     )
     results["test-email"] = _record(
         env, client.post("/api/v1/admin/test-email?test_email=oracle@example.com", headers=admin)
@@ -367,43 +341,7 @@ def test_admin_responses(oracle_env):
     results["audit-log config_update"] = _record(
         env, client.get("/api/v1/admin/audit-log?action_filter=config_update", headers=admin)
     )
-    results["audit-log maintenance"] = _record(
-        env,
-        client.get(
-            "/api/v1/admin/audit-log?action_filter=maintenance_mode_toggle&limit=1", headers=admin
-        ),
-    )
 
-    txt = FIXTURES_DIR / "sample.txt"
-    results["admin upload"] = _record(env, env.upload(txt, route="/api/v1/admin/documents/upload"))
-    results["admin upload duplicate"] = _record(
-        env, env.upload(txt, route="/api/v1/admin/documents/upload")
-    )
-    results["admin upload empty"] = _record(
-        env,
-        env.upload(FIXTURES_DIR / "empty.txt", route="/api/v1/admin/documents/upload", content=b""),
-    )
-    results["admin upload invalid name"] = _record(
-        env,
-        env.upload(
-            FIXTURES_DIR / "script.exe", route="/api/v1/admin/documents/upload", content=b"x"
-        ),
-    )
-    results["admin upload via documents route duplicate"] = _record(env, env.upload(txt))
-    env.drain_ingestion()
-    results["admin documents"] = _record(env, client.get("/api/v1/admin/documents", headers=admin))
-    results["admin documents page 2"] = _record(
-        env, client.get("/api/v1/admin/documents?page=2&limit=1", headers=admin)
-    )
-    results["admin documents stats"] = _record(
-        env, client.get("/api/v1/admin/documents/stats", headers=admin)
-    )
-    results["metrics chat"] = _record(
-        env, client.get("/api/v1/admin/metrics/chat", headers=admin), mode="keys"
-    )
-    results["analytics usage"] = _record(
-        env, client.get("/api/v1/admin/analytics/usage", headers=admin), mode="keys"
-    )
     results["logs"] = _record(
         env, client.get("/api/v1/admin/logs?limit=5", headers=admin), mode="keys"
     )
@@ -428,8 +366,6 @@ def test_chat_side_responses(oracle_env):
     env = oracle_env
     client = env.client
     results = {
-        "history": _record(env, client.get("/api/v1/chat/sessions/oracle-session/history")),
-        "clear": _record(env, client.delete("/api/v1/chat/sessions/oracle-session")),
         "escalate": _record(
             env,
             client.post(

@@ -12,8 +12,6 @@ test import each other, so patches and singletons hit the same module objects.
 """
 
 import asyncio
-import json
-from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
@@ -238,65 +236,8 @@ class TestParserFailures:
 # ---------------------------------------------------------------- M2
 
 
-class TestAnalyticsFallbacks:
-    """M2: a JSON line that is not an object never turns analytics into a 500."""
-
-    @pytest.fixture
-    def app_log(self, tmp_path, monkeypatch):
-        import mimir.utils.log_parser as log_parser
-
-        recent = (datetime.utcnow() - timedelta(minutes=10)).isoformat() + "Z"
-        entry = {
-            "timestamp": recent,
-            "module": "mistral_api",
-            "message": "Text generation successful: 10 tokens",
-            "type": "text_generation",
-            "tokens": 10,
-            "duration_ms": 120,
-        }
-        app_log = tmp_path / "app.log"
-        app_log.write_text(json.dumps(entry) + "\n123\n", encoding="utf-8")
-        monkeypatch.setattr(log_parser, "APP_LOG", app_log)
-        monkeypatch.setattr(log_parser, "UVICORN_LOG", tmp_path / "missing_uvicorn.log")
-        monkeypatch.setattr(log_parser, "ERROR_LOG", tmp_path / "missing_error.log")
-        return app_log
-
-    def test_chat_metrics_skip_the_bad_line(self, app_log):
-        import mimir.utils.log_parser as log_parser
-
-        metrics = log_parser.get_chat_metrics()
-
-        assert metrics["requests_last_hour"] == 1
-        assert metrics["avg_tokens_per_request"] == 10 + 150 // 4
-
-    def test_period_metrics_fall_back_to_their_default(self, app_log):
-        import mimir.utils.log_parser as log_parser
-
-        assert log_parser._count_requests_in_period(timedelta(hours=24)) == 0
-        assert log_parser._estimate_system_uptime() == "N/A"
-
-    def test_usage_analytics_endpoint_answers(self, app_log):
-        from mimir.api.endpoints import admin
-
-        analytics = asyncio.run(admin.get_usage_analytics(current_user={"sub": "admin"}))
-
-        assert analytics["overview"]["total_requests_24h"] == 0
-        assert analytics["system"]["health_score"] == 100
-        assert "timestamp" in analytics
-
-    def test_usage_analytics_default_payload(self, monkeypatch):
-        import mimir.utils.log_parser as log_parser
-
-        monkeypatch.setattr(log_parser, "_get_log_file_sizes", Mock(side_effect=RuntimeError()))
-
-        analytics = log_parser.get_usage_analytics()
-
-        assert analytics["system"] == {
-            "log_file_sizes": {},
-            "uptime_estimate": "N/A",
-            "error_rate_24h": 0,
-            "health_score": 85,
-        }
+class TestLogsSummaryFallback:
+    """M2: an unreadable log file never turns the logs summary into a 500."""
 
     def test_logs_summary_default_payload(self, monkeypatch):
         import mimir.utils.logs_reader as logs_reader
@@ -363,7 +304,9 @@ class TestRestoredBestEffortBlocks:
         """I3: a cleanup failure never turns the queue-full 503 into a 500."""
         upload = DocumentUpload(
             Mock(filename="a.txt", size=10),
-            UploadPolicy(upload_dir=str(tmp_path), max_file_size_mb=1, invalid_filename_detail="x"),
+            UploadPolicy(
+                upload_dir=str(tmp_path), max_file_size_mb=1, supported_extensions={".txt"}
+            ),
         )
         upload.filename = "a.txt"
         doc_repo = Mock()

@@ -3,7 +3,7 @@ Tests pour les endpoints de logs frontend.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from fastapi import HTTPException
 
@@ -11,7 +11,6 @@ from mimir.api.endpoints.logs import (
     FrontendLogEntry,
     LogResponse,
     receive_frontend_log,
-    frontend_logging_health,
 )
 
 
@@ -200,52 +199,3 @@ class TestReceiveFrontendLog:
         # Vérifier que l'erreur a été loggée
         mock_backend_logger.error.assert_called_once()
         assert "Failed to process frontend log" in mock_backend_logger.error.call_args[0][0]
-
-
-class TestFrontendLoggingHealth:
-    """Tests pour l'endpoint frontend_logging_health."""
-
-    @pytest.mark.asyncio
-    @patch("mimir.api.endpoints.logs.frontend_logger")
-    async def test_health_check_success(self, mock_logger):
-        """Test health check avec succès."""
-        # Simuler un logger avec handlers
-        mock_handler1 = MagicMock()
-        mock_handler2 = MagicMock()
-        mock_logger.handlers = [mock_handler1, mock_handler2]
-        mock_logger.level = 20  # logging.INFO
-
-        result = await frontend_logging_health()
-
-        assert result["status"] == "healthy"
-        assert result["frontend_logger_configured"] is True
-        assert result["handlers_count"] == 2
-        assert result["log_level"] == "INFO"
-        assert "timestamp" in result
-
-    @pytest.mark.asyncio
-    @patch("mimir.api.endpoints.logs.frontend_logger")
-    async def test_health_check_no_handlers(self, mock_logger):
-        """Test health check sans handlers configurés."""
-        mock_logger.handlers = []
-        mock_logger.level = 30  # logging.WARNING
-
-        result = await frontend_logging_health()
-
-        assert result["status"] == "healthy"  # Status reste healthy
-        assert result["frontend_logger_configured"] is False
-        assert result["handlers_count"] == 0
-        assert result["log_level"] == "WARNING"
-
-    @pytest.mark.asyncio
-    @patch("mimir.api.endpoints.logs.frontend_logger")
-    async def test_health_check_exception(self, mock_logger):
-        """Test health check avec exception."""
-        # Simuler une exception lors de l'accès aux handlers
-        type(mock_logger).handlers = property(lambda x: exec('raise Exception("Test error")'))
-
-        result = await frontend_logging_health()
-
-        assert result["status"] == "unhealthy"
-        assert "error" in result
-        assert "timestamp" in result

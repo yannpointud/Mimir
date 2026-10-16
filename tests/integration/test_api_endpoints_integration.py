@@ -43,7 +43,7 @@ class TestHealthEndpointsIntegration:
         client = TestClient(test_app)
 
         start_time = time.time()
-        response = client.get("/health")
+        response = client.get("/api/v1/health/")
         duration = time.time() - start_time
 
         # 200 (healthy) or 503 (unhealthy: unconfigured services in the
@@ -299,7 +299,7 @@ class TestErrorHandlingIntegration:
         client = TestClient(test_app)
 
         # POST sur un endpoint GET only
-        response = client.post("/health")
+        response = client.post("/api/v1/health/")
         assert response.status_code == 405
 
     def test_validation_error_consistency(self, test_app):
@@ -333,7 +333,7 @@ class TestPerformanceIntegration:
 
         def health_check_worker():
             start = time.time()
-            response = client.get("/health")
+            response = client.get("/api/v1/health/")
             duration = time.time() - start
             results.append((response.status_code, duration))
 
@@ -360,7 +360,7 @@ class TestPerformanceIntegration:
 
         endpoints_timing = [
             ("GET", "/", 1.0),  # Root endpoint
-            ("GET", "/health", 0.5),  # Health check
+            ("GET", "/api/v1/health/", 0.5),  # Health check
             ("POST", "/api/v1/chat/stream", 5.0),  # Chat endpoint
         ]
 
@@ -414,7 +414,7 @@ class TestSecurityIntegration:
         # Faire plusieurs requêtes rapides
         responses = []
         for _ in range(10):
-            response = client.get("/health")
+            response = client.get("/api/v1/health/")
             responses.append(response.status_code)
 
         # Au moins quelques requêtes doivent passer (200 healthy ou 503

@@ -42,12 +42,10 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from mimir import config as config_module
 from mimir.config import settings
 from mimir.cost.budget_guard import BudgetReservation
 from mimir.cost.usage_tracker import UsageTracker
 from mimir.database.connection import db_manager
-from mimir.database.models import Base
 from mimir.database.repository import DocumentRepository
 from mimir.ingestion.chunking import ChunkingConfig
 from mimir.ingestion.processor import IngestionProcessor
@@ -420,7 +418,6 @@ _PATCHED_SETTINGS = (
     "database_url",
     "data_dir",
     "upload_dir",
-    "watch_folder",
     "faiss_index_path",
     "faiss_metadata_path",
     "bm25_index_path",
@@ -583,33 +580,6 @@ class OracleEnv:
         self._processor_session.close()
 
 
-def _redirect_db_manager(database_url: str):
-    saved = (
-        db_manager._engine,
-        db_manager._session_factory,
-        db_manager._async_engine,
-        db_manager._async_session_factory,
-    )
-    config_module.settings.database_url = database_url
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-    return saved
-
-
-def _restore_db_manager(saved) -> None:
-    db_manager.engine.dispose()
-    (
-        db_manager._engine,
-        db_manager._session_factory,
-        db_manager._async_engine,
-        db_manager._async_session_factory,
-    ) = saved
-
-
 def _make_env() -> OracleEnv:
     from mimir.auth.jwt_handler import jwt_handler
 
@@ -617,7 +587,6 @@ def _make_env() -> OracleEnv:
     saved_settings = {name: getattr(settings, name) for name in _PATCHED_SETTINGS}
     settings.data_dir = str(tmp / "data")
     settings.upload_dir = str(tmp / "data" / "documents")
-    settings.watch_folder = str(tmp / "data" / "watch")
     settings.faiss_index_path = str(tmp / "data" / "faiss" / "index.bin")
     settings.faiss_metadata_path = str(tmp / "data" / "faiss" / "metadata.json")
     settings.bm25_index_path = str(tmp / "data" / "bm25" / "index")
@@ -629,9 +598,10 @@ def _make_env() -> OracleEnv:
     settings.environment = "test"
     settings.hybrid_search_enabled = True
     settings.filename_pre_inclusion = True
-    for directory in (settings.upload_dir, settings.watch_folder, tmp / "data" / "sqlite"):
-        Path(directory).mkdir(parents=True, exist_ok=True)
-    saved_db = _redirect_db_manager(f"sqlite:///{tmp / 'data' / 'sqlite' / 'oracle.db'}")
+    settings.database_url = f"sqlite:///{tmp / 'data' / 'sqlite' / 'oracle.db'}"
+    settings.ensure_directories()
+    db_manager.configure(settings.database_url)
+    db_manager.create_tables()
 
     from mimir.cache.lru_cache import cache_service, chat_cache_service
 
@@ -640,7 +610,6 @@ def _make_env() -> OracleEnv:
 
     env = OracleEnv(tmp)
     env._saved_settings = saved_settings
-    env._saved_db = saved_db
     return env
 
 
@@ -650,9 +619,9 @@ def _teardown_env(env: OracleEnv) -> None:
     env.close()
     cache_service.invalidate_all()
     chat_cache_service.invalidate_all()
-    _restore_db_manager(env._saved_db)
     for name, value in env._saved_settings.items():
         setattr(settings, name, value)
+    db_manager.configure(settings.database_url)
     shutil.rmtree(env.tmp, ignore_errors=True)
 
 

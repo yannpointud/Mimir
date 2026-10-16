@@ -4,14 +4,6 @@
       "reserve:chat"
     ]
   },
-  "clear": {
-    "body": {
-      "message": "Session oracle-session history cleared",
-      "success": true,
-      "timestamp": "<timestamp>"
-    },
-    "status": 200
-  },
   "escalate": {
     "body": {
       "escalation_id": null,
@@ -35,14 +27,6 @@
       ]
     },
     "status": 422
-  },
-  "history": {
-    "body": {
-      "created_at": "<created_at>",
-      "messages": [],
-      "session_id": "<session_id>"
-    },
-    "status": 200
   },
   "stream bad context_limit": {
     "body": {

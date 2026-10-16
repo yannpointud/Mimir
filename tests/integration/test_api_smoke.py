@@ -14,7 +14,7 @@ def _sse_events(body):
 
 class TestApiSmoke:
     def test_health(self, test_app):
-        response = TestClient(test_app).get("/health")
+        response = TestClient(test_app).get("/api/v1/health/")
 
         # 503 when the services are not configured, as in the test environment
         assert response.status_code in (200, 503)

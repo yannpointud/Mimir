@@ -6,7 +6,6 @@ frontend application logs for debugging and monitoring.
 """
 
 import logging
-from datetime import datetime
 from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -98,27 +97,3 @@ async def receive_frontend_log(log_entry: FrontendLogEntry) -> LogResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process log entry"
         ) from e
-
-
-@router.get("/frontend/health")
-async def frontend_logging_health() -> dict[str, Any]:
-    """Health check for frontend logging system."""
-    try:
-        # Check if frontend logger is properly configured
-        handlers_count = len(frontend_logger.handlers)
-
-        return {
-            "status": "healthy",
-            "frontend_logger_configured": handlers_count > 0,
-            "handlers_count": handlers_count,
-            "log_level": logging.getLevelName(frontend_logger.level),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-        }
-
-    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unhealthy
-        logger.error(f"Frontend logging health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-        }

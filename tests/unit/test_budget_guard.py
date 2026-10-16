@@ -12,50 +12,13 @@ singleton to a fresh temporary SQLite file for the test's lifetime, so no
 synthetic ledger/config rows leak into the developer's real database.
 """
 
-import shutil
-import tempfile
-from pathlib import Path
-
 import pytest
 
-from mimir import config as config_module
 from mimir.config import settings
 from mimir.cost.budget_guard import BudgetGuard, BudgetExceededError, BudgetReservation
 from mimir.database.connection import db_manager
-from mimir.database.models import Base, LlmBudgetLedger
+from mimir.database.models import LlmBudgetLedger
 from mimir.database.repository import ConfigurationRepository
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime, then restore the original engine."""
-    temp_dir = tempfile.mkdtemp(prefix="budget_guard_test_")
-    temp_db_path = Path(temp_dir) / "budget_guard_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def _get_today_ledger(today: str):

@@ -15,7 +15,7 @@ from mimir.shared.constants import MASKED_VALUE
 
 
 CONFIG_ROUTES = [
-    "/api/v1/admin/configuration",
+    "/api/v1/admin/config",
     "/api/v1/admin/config",
 ]
 
@@ -139,20 +139,12 @@ class TestAdminConfigPutGuard:
         client = TestClient(test_app)
         headers = {"Authorization": f"Bearer {admin_token}"}
 
-        # Read current state to resubmit an allowed key without changing it
-        before = client.get("/api/v1/admin/configuration", headers=headers)
-        assert before.status_code == 200
-        db_config_before = before.json()["database_config"]
-        maintenance_value = db_config_before.get("maintenance_mode", "false")
         api_key_before = settings.mistral_api_key
 
         response = client.put(
-            "/api/v1/admin/configuration",
+            "/api/v1/admin/config",
             headers=headers,
-            json={
-                "maintenance_mode": str(maintenance_value),
-                "mistral_api_key": MASKED_VALUE,
-            },
+            json={"daily_budget_eur": "12.5", "mistral_api_key": MASKED_VALUE},
         )
         # 200 proves the masked key was filtered before the allow-list
         # (mistral_api_key is not an allowed key: unfiltered it would be a 400)
@@ -163,15 +155,13 @@ class TestAdminConfigPutGuard:
         assert settings.mistral_api_key == api_key_before
 
         # Effective configuration unchanged, still masked in the response
-        after = client.get("/api/v1/admin/configuration", headers=headers)
+        after = client.get("/api/v1/admin/config", headers=headers)
         assert after.status_code == 200
         if settings.mistral_api_key:
             assert after.json()["application_config"]["mistral_api_key"] == MASKED_VALUE
             assert settings.mistral_api_key not in after.text
 
-    def test_put_config_alias_returns_valid_base_response(self, test_app, admin_token):
-        """PUT /config alias now delegates and returns a valid BaseResponse
-        (its body used to be empty, returning None)."""
+    def test_put_config_returns_a_base_response(self, test_app, admin_token):
         client = TestClient(test_app)
         headers = {"Authorization": f"Bearer {admin_token}"}
 

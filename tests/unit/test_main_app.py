@@ -44,7 +44,7 @@ class TestMainApp:
         mock_cache.return_value = {"healthy": True, "cache_size": 100}
         mock_email.return_value = {"healthy": True, "configured": True}
 
-        response = client.get("/health")
+        response = client.get("/api/v1/health/")
 
         assert response.status_code == 200
         data = response.json()
@@ -75,7 +75,7 @@ class TestMainApp:
         mock_cache.return_value = {"healthy": True, "cache_size": 100}
         mock_email.return_value = {"healthy": True, "configured": True}
 
-        response = client.get("/health")
+        response = client.get("/api/v1/health/")
 
         # Unhealthy state must be visible in the HTTP status code so
         # Docker healthchecks / load balancers can detect the failure.

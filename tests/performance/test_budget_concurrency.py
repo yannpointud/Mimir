@@ -18,63 +18,17 @@ database (data/sqlite/mimir.db).
 """
 
 import asyncio
-import shutil
-import tempfile
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
-from mimir import config as config_module
 from mimir.database.connection import db_manager
-from mimir.database.models import Base, LlmBudgetLedger
+from mimir.database.models import LlmBudgetLedger
 from mimir.database.repository import UsageRepository
 
 ESTIMATE_EUR = 1.0
 CAP_EUR = 5.0  # affords exactly 5 reservations of ESTIMATE_EUR
 N_WORKERS = 10
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """
-    Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime, then restore the original engine.
-
-    Rationale: db_manager.get_session() is the sanctioned way to get an
-    independent DB session/connection per worker (real WAL writer
-    serialization via SQLite's busy_timeout, already configured in
-    connection.py), but pointing it at the project's actual database file
-    would leak synthetic ledger rows into the developer's real DB. Swapping
-    the singleton's engine to an isolated temp file for the test's lifetime
-    gives identical connection semantics safely.
-    """
-    temp_dir = tempfile.mkdtemp(prefix="budget_concurrency_")
-    temp_db_path = Path(temp_dir) / "budget_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def _reserve_worker(today: str) -> bool:

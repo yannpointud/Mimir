@@ -84,7 +84,7 @@ class TestConfigurationRepositoryIntegration:
     def test_set_and_update_values(self, session):
         repo = ConfigurationRepository(session)
         configs = {
-            "maintenance_mode": "false",
+            "feature_flag": "false",
             "max_concurrent_ingestions": "3",
             "email_notifications": "true",
             "debug_mode": "false",
@@ -92,9 +92,9 @@ class TestConfigurationRepositoryIntegration:
         for key, value in configs.items():
             repo.set(key, value)
 
-        assert repo.get_value("maintenance_mode") == "false"
-        repo.set("maintenance_mode", "true")
-        assert repo.get_value("maintenance_mode") == "true"
+        assert repo.get_value("feature_flag") == "false"
+        repo.set("feature_flag", "true")
+        assert repo.get_value("feature_flag") == "true"
         assert {config.key for config in repo.get_all()} == set(configs)
 
     def test_defaults_and_string_storage(self, session):

@@ -41,7 +41,6 @@ backend/
 │   │   ├── repository.py            # Repository pattern (CRUD)
 │   │   └── migrations/              # Alembic migrations
 │   ├── email_service/               # SMTP client for escalations
-│   ├── file_watcher/                # FileWatcher class, not wired into the app (WATCH_ENABLED has no effect)
 │   ├── ingestion/
 │   │   ├── processor.py             # Ingestion pipeline orchestrator
 │   │   ├── extractors.py            # Text extraction (PDF, DOCX, TXT, MD)
@@ -100,7 +99,7 @@ docs/adr/                            # Architecture decision records
 
 ## Key Patterns
 - **Repository pattern** for all DB access (`database/repository.py`)
-- **Abstract interfaces** `AbstractLLMService`, `AbstractVectorStore` and the `LexicalIndex` Protocol, with a single implementation each (Mistral, FAISS, BM25). `RagService` and `IngestionProcessor` are typed on them, but `api/dependencies.py` instantiates the concrete classes directly (`LLM_PROVIDER` and `VECTOR_STORE_TYPE` are only displayed), and the maintenance paths (rebuild, orphan cleanup, consistency check, document chunks) call FAISS-specific methods: another provider would need code changes, not just configuration
+- **Abstract interfaces** `AbstractLLMService`, `AbstractVectorStore` and the `LexicalIndex` Protocol, with a single implementation each (Mistral, FAISS, BM25). `RagService` and `IngestionProcessor` are typed on them, but `api/dependencies.py` instantiates the concrete classes directly, and the maintenance paths (rebuild, orphan cleanup, consistency check, document chunks) call FAISS-specific methods: another provider would need code changes, not just configuration
 - **Services layer** (`services/`): routes stay thin and delegate to services; domain errors (`shared/errors.py`) and `RequestRejectedError` are translated to HTTP at the API layer
 - **Daily AI budget** reserved atomically before every paid Mistral call (`cost/budget_guard.py`, see `docs/adr/0001`)
 - **Streaming SSE** for chat responses (`POST /api/v1/chat/stream`)

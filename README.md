@@ -99,7 +99,6 @@ backend/
     │   ├── connection.py      # Gestion connexions DB
     │   └── migrations/        # Migrations Alembic
     ├── email_service/         # Service SMTP pour escalades
-    ├── file_watcher/          # Observateur de dossier, non branché dans l'application (WATCH_ENABLED sans effet)
     ├── ingestion/
     │   ├── processor.py       # Pipeline d'ingestion
     │   ├── extractors.py      # Extraction multi-format
@@ -234,7 +233,7 @@ L'application sera accessible sur :
 docker compose up -d --build
 ```
 
-Le fichier `.env` est lu à la racine du dépôt ou dans `backend/`. Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin (`ADMIN_PASSWORD`) avant le premier démarrage, avec `ENVIRONMENT=production` : le backend refuse alors de démarrer si `JWT_SECRET_KEY` ou le mot de passe admin n'ont pas été changés.
+Le backend lit le fichier `.env` de son répertoire de travail (`backend/` avec `start-servers.sh`) ; toute clé inconnue bloque le démarrage. Modèle complet : `backend/.env.example`. Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin (`ADMIN_PASSWORD`) avant le premier démarrage, avec `ENVIRONMENT=production` : le backend refuse alors de démarrer si `JWT_SECRET_KEY` ou le mot de passe admin n'ont pas été changés.
 
 ## ⚙️ Configuration
 
@@ -250,29 +249,22 @@ API_PORT=8000
 DATABASE_URL=sqlite:///./data/sqlite/mimir.db
 SQLITE_WAL_MODE=true
 
-# LLM Configuration (LLM_PROVIDER est seulement affiché : Mistral est la seule implémentation)
-LLM_PROVIDER=mistral
+# LLM (Mistral)
 MISTRAL_API_KEY=your_mistral_api_key_here
 MISTRAL_MODEL=mistral-small-latest
 MISTRAL_EMBEDDING_MODEL=mistral-embed
 
-# Vector Store (VECTOR_STORE_TYPE est seulement affiché : FAISS est la seule implémentation)
-VECTOR_STORE_TYPE=faiss
+# Vector Store (FAISS)
 FAISS_INDEX_PATH=./data/faiss/index.bin
 FAISS_METADATA_PATH=./data/faiss/metadata.json
 EMBEDDING_DIMENSION=1024
 SIMILARITY_THRESHOLD=0.5
-MAX_SOURCES=8
+MAX_SOURCES=5
 
 # Ingestion
 MAX_CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 MAX_FILE_SIZE_MB=100
-
-# Cache (déclarées mais non lues : les caches en mémoire ont une taille fixe)
-CACHE_ENABLED=true
-CACHE_MAX_SIZE=100
-CACHE_TTL=3600
 
 # Email (pour escalades)
 SMTP_HOST=smtp.example.com

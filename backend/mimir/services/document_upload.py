@@ -1,11 +1,7 @@
 """
-Upload pipeline shared by ``POST /documents/upload`` and
-``POST /admin/documents/upload``.
-
-Both routes validate the file, read it, reject duplicates, store it under a
-hash-prefixed name, create the database record and queue it for ingestion.
-The few client-visible differences between them are kept on purpose and
-expressed by ``UploadPolicy`` (see docs/cleanup/DECISIONS.md, D0.4 and D3.x).
+Upload pipeline of ``POST /documents/upload``: validate the file, read it,
+reject duplicates, store it under a hash-prefixed name, create the database
+record, audit the upload and queue it for ingestion.
 """
 
 import hashlib
@@ -16,8 +12,11 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Protocol
 
-from mimir.shared.models import sanitize_filename, validate_filename
+from mimir.database.models import Document
+from mimir.database.repository import AuditLogRepository, DocumentRepository
+from mimir.ingestion.processor import IngestionProcessor
 from mimir.services.errors import RequestRejectedError
+from mimir.shared.models import sanitize_filename, validate_filename
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +37,11 @@ class UploadSource(Protocol):
 
 @dataclass(frozen=True)
 class UploadPolicy:
-    """Route-specific behaviour of the upload pipeline."""
+    """Limits applied to an uploaded file."""
 
     upload_dir: str
     max_file_size_mb: int
-    # 400 detail when validate_filename() rejects the name.
-    invalid_filename_detail: str
-    # Accepted extensions; None skips the check (the admin route accepts any).
-    supported_extensions: Collection[str] | None = None
-    # Log a warning before rejecting a duplicate (documents route only).
-    warn_on_duplicate: bool = False
-    # Create the upload directory before reading the file (admin route order).
-    prepare_dir_first: bool = False
+    supported_extensions: Collection[str]
 
 
 class DocumentUpload:
@@ -72,7 +64,7 @@ class DocumentUpload:
         if not self.file.filename:
             raise RequestRejectedError(HTTPStatus.BAD_REQUEST, "No filename provided")
         if not validate_filename(self.file.filename):
-            raise RequestRejectedError(HTTPStatus.BAD_REQUEST, self.policy.invalid_filename_detail)
+            raise RequestRejectedError(HTTPStatus.BAD_REQUEST, "Invalid filename")
         self.filename = sanitize_filename(self.file.filename)
 
         # Checked before reading the content: a single unbounded read() of an
@@ -85,21 +77,14 @@ class DocumentUpload:
 
     async def run(
         self,
-        doc_repo: Any,
-        ingestion_processor: Any,
+        doc_repo: DocumentRepository,
+        audit_repo: AuditLogRepository,
+        ingestion_processor: IngestionProcessor,
         preserve: bool,
         current_user: Mapping[str, Any],
-        audit_repo: Any | None = None,
-    ) -> Any:
-        """Store the checked file, record it and queue it; returns the document.
-
-        ``audit_repo`` is given by the documents route only, which records a
-        ``document_upload`` audit event before queueing.
-        """
-        if self.policy.prepare_dir_first:
-            self._upload_dir()
-        if self.policy.supported_extensions is not None:
-            self._check_extension(self.policy.supported_extensions)
+    ) -> Document:
+        """Store the checked file, record, audit and queue it; returns the document."""
+        self._check_extension(self.policy.supported_extensions)
 
         content, file_hash = await self._read_new_content(doc_repo)
         # Hash-prefixed name: two uploads sharing a sanitized name never
@@ -112,8 +97,7 @@ class DocumentUpload:
         document = doc_repo.create(
             filename=self.filename, path=str(file_path), file_hash=file_hash, preserve=preserve
         )
-        if audit_repo is not None:
-            self._audit_upload(audit_repo, document, len(content), preserve)
+        self._audit_upload(audit_repo, document, len(content), preserve)
         self._queue(ingestion_processor, doc_repo, document, file_path, preserve, current_user)
         return document
 
@@ -132,24 +116,24 @@ class DocumentUpload:
         if file_ext not in supported_extensions:
             raise RequestRejectedError(HTTPStatus.BAD_REQUEST, f"Unsupported file type: {file_ext}")
 
-    async def _read_new_content(self, doc_repo: Any) -> tuple[bytes, str]:
+    async def _read_new_content(self, doc_repo: DocumentRepository) -> tuple[bytes, str]:
         """Read the content and reject empty files and duplicates."""
         content = await self.file.read()
         if len(content) == 0:
             raise RequestRejectedError(HTTPStatus.BAD_REQUEST, "Empty file")
 
-        # SHA-256 on both routes, so deduplication works across them.
         file_hash = hashlib.sha256(content).hexdigest()
         existing_doc = doc_repo.get_by_hash(file_hash)
         if existing_doc:
-            if self.policy.warn_on_duplicate:
-                logger.warning(f"Duplicate file upload attempted: {self.filename}")
+            logger.warning(f"Duplicate file upload attempted: {self.filename}")
             raise RequestRejectedError(
                 HTTPStatus.CONFLICT, f"File already exists: {existing_doc.filename}"
             )
         return content, file_hash
 
-    def _audit_upload(self, audit_repo: Any, document: Any, size: int, preserve: bool) -> None:
+    def _audit_upload(
+        self, audit_repo: AuditLogRepository, document: Document, size: int, preserve: bool
+    ) -> None:
         audit_repo.create_log(
             user_type="admin",
             action="document_upload",
@@ -166,9 +150,9 @@ class DocumentUpload:
 
     def _queue(
         self,
-        ingestion_processor: Any,
-        doc_repo: Any,
-        document: Any,
+        ingestion_processor: IngestionProcessor,
+        doc_repo: DocumentRepository,
+        document: Document,
         file_path: Path,
         preserve: bool,
         current_user: Mapping[str, Any],
@@ -176,7 +160,7 @@ class DocumentUpload:
         """Queue the document for ingestion: 503 when the queue is full."""
         try:
             queued = ingestion_processor.queue_document(
-                file_path=file_path,
+                file_path=str(file_path),
                 document_id=str(document.id),
                 preserve=preserve,
                 metadata={"uploaded_by": current_user.get("username", "unknown")},
@@ -193,7 +177,11 @@ class DocumentUpload:
             ) from e
 
     def _reject_queue_full(
-        self, ingestion_processor: Any, doc_repo: Any, document: Any, file_path: Path
+        self,
+        ingestion_processor: IngestionProcessor,
+        doc_repo: DocumentRepository,
+        document: Document,
+        file_path: Path,
     ) -> None:
         logger.warning(
             f"Ingestion queue is full, cannot queue document: {self.filename}",
