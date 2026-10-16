@@ -57,7 +57,7 @@ describe('DocumentsList', () => {
     expect(await screen.findByText('guide.pdf')).toBeInTheDocument();
     expect(screen.getByText('charte.md')).toBeInTheDocument();
     expect(screen.getByText(/Affichage de 1 à 2 sur/)).toHaveTextContent('2 documents');
-    expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, null);
+    expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, null, 'created_at', 'desc');
   });
 
   it('shows the load error returned by the API', async () => {
@@ -75,7 +75,7 @@ describe('DocumentsList', () => {
     fireEvent.change(screen.getByLabelText('Rechercher un document'), { target: { value: 'guide' } });
 
     await waitFor(() => {
-      expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, 'guide');
+      expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, 'guide', 'created_at', 'desc');
     });
   });
 
@@ -135,6 +135,42 @@ describe('DocumentsList', () => {
     fireEvent.click(within(openActionsOf('guide.pdf')).getByRole('menuitem', { name: /Réindexer le document/ }));
     await waitFor(() => {
       expect(documentsAPI.reprocessDocument).toHaveBeenCalledWith('doc-1');
+    });
+  });
+
+  it('sorts on a column header, then flips the direction on a second click', async () => {
+    serveDocuments([INDEXED, PRESERVED]);
+    renderList();
+    await screen.findByText('guide.pdf');
+
+    expect(screen.getByRole('columnheader', { name: /Date d'ajout/ })).toHaveAttribute('aria-sort', 'descending');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Document' }));
+    await waitFor(() => {
+      expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, null, 'filename', 'asc');
+    });
+    expect(screen.getByRole('columnheader', { name: /Document/ })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: /Date d'ajout/ })).toHaveAttribute('aria-sort', 'none');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Document' }));
+    await waitFor(() => {
+      expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, null, 'filename', 'desc');
+    });
+  });
+
+  it('starts the sections and status columns in their natural direction', async () => {
+    serveDocuments([INDEXED]);
+    renderList();
+    await screen.findByText('guide.pdf');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sections' }));
+    await waitFor(() => {
+      expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, null, 'chunk_count', 'desc');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Statut' }));
+    await waitFor(() => {
+      expect(documentsAPI.getDocuments).toHaveBeenCalledWith(1, 10, null, null, 'status', 'asc');
     });
   });
 });

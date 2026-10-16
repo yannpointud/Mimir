@@ -7,7 +7,7 @@ import re
 import unicodedata
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,8 +30,11 @@ class BaseResponse(BaseModel):
 class PaginationModel(BaseModel):
     limit: int = Field(default=50, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
-    order_by: str = Field(default="created_at")
-    desc_order: bool = Field(default=True)
+
+
+# Columns the admin documents list can be sorted on
+DocumentSortField = Literal["filename", "status", "created_at", "chunk_count"]
+SortOrder = Literal["asc", "desc"]
 
 
 class DocumentBase(BaseModel):

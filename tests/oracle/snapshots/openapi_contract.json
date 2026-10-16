@@ -75,15 +75,6 @@
       },
       {
         "in": "query",
-        "name": "desc_order",
-        "required": false,
-        "schema": {
-          "default": true,
-          "type": "boolean"
-        }
-      },
-      {
-        "in": "query",
         "name": "limit",
         "required": false,
         "schema": {
@@ -101,15 +92,6 @@
           "default": 0,
           "minimum": 0,
           "type": "integer"
-        }
-      },
-      {
-        "in": "query",
-        "name": "order_by",
-        "required": false,
-        "schema": {
-          "default": "created_at",
-          "type": "string"
         }
       },
       {
@@ -366,15 +348,6 @@
     "parameters": [
       {
         "in": "query",
-        "name": "desc_order",
-        "required": false,
-        "schema": {
-          "default": true,
-          "type": "boolean"
-        }
-      },
-      {
-        "in": "query",
         "name": "limit",
         "required": false,
         "schema": {
@@ -396,15 +369,6 @@
       },
       {
         "in": "query",
-        "name": "order_by",
-        "required": false,
-        "schema": {
-          "default": "created_at",
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
         "name": "search",
         "required": false,
         "schema": {
@@ -416,6 +380,34 @@
               "type": "null"
             }
           ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "sort_by",
+        "required": false,
+        "schema": {
+          "default": "created_at",
+          "enum": [
+            "filename",
+            "status",
+            "created_at",
+            "chunk_count"
+          ],
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "sort_order",
+        "required": false,
+        "schema": {
+          "default": "desc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "type": "string"
         }
       },
       {

@@ -3,6 +3,8 @@ Unit tests of the repositories
 Checks the CRUD operations and the business logic
 """
 
+from datetime import datetime
+
 import pytest
 
 from mimir.shared.errors import ConflictError, NotFoundError
@@ -225,6 +227,61 @@ class TestDocumentRepository:
         assert stats["count_error"] == 1
         assert stats["total_chunks"] == 10
         assert stats["protected_documents"] == 1
+
+
+class TestDocumentSorting:
+    """get_all_paginated sorting, as used by the admin documents list."""
+
+    @pytest.fixture
+    def repo(self, test_repositories):
+        repo = test_repositories["document"]
+        rows = [
+            ("gamma.pdf", "indexed", 5, datetime(2026, 1, 3)),
+            ("alpha.pdf", "pending", 0, datetime(2026, 1, 1)),
+            ("Beta.pdf", "error", 5, datetime(2026, 1, 2)),
+        ]
+        for index, (filename, status, chunk_count, created_at) in enumerate(rows):
+            document = repo.create(filename, f"hash{index}")
+            repo.update_status(document.id, status, chunk_count=chunk_count)
+            document.created_at = created_at
+        repo.session.commit()
+        return repo
+
+    @staticmethod
+    def _filenames(repo, **sort):
+        documents, _ = repo.get_all_paginated(**sort)
+        return [document.filename for document in documents]
+
+    def test_defaults_to_newest_first(self, repo):
+        assert self._filenames(repo) == ["gamma.pdf", "Beta.pdf", "alpha.pdf"]
+
+    def test_filenames_sort_case_insensitively(self, repo):
+        ascending = self._filenames(repo, sort_by="filename", descending=False)
+
+        assert ascending == ["alpha.pdf", "Beta.pdf", "gamma.pdf"]
+
+    def test_status_sorts_on_the_stored_value(self, repo):
+        ascending = self._filenames(repo, sort_by="status", descending=False)
+
+        assert ascending == ["Beta.pdf", "gamma.pdf", "alpha.pdf"]
+
+    def test_ties_are_broken_by_id_in_the_sort_direction(self, repo):
+        descending = self._filenames(repo, sort_by="chunk_count", descending=True)
+        ascending = self._filenames(repo, sort_by="chunk_count", descending=False)
+
+        # gamma.pdf and Beta.pdf both have 5 chunks; gamma.pdf was created first
+        assert descending == ["Beta.pdf", "gamma.pdf", "alpha.pdf"]
+        assert ascending == ["alpha.pdf", "gamma.pdf", "Beta.pdf"]
+
+    def test_pages_neither_repeat_nor_skip_tied_documents(self, repo):
+        sort = {"sort_by": "chunk_count", "descending": True, "limit": 1}
+        pages = [repo.get_all_paginated(offset=offset, **sort)[0] for offset in range(3)]
+
+        assert sorted(page[0].filename for page in pages) == [
+            "Beta.pdf",
+            "alpha.pdf",
+            "gamma.pdf",
+        ]
 
 
 class TestConfigurationRepository:

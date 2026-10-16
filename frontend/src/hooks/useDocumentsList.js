@@ -7,6 +7,17 @@ const logger = createLogger('DocumentsList');
 
 export const ITEMS_PER_PAGE = 10;
 
+const DEFAULT_SORT = { by: 'created_at', order: 'desc' };
+
+// Direction of the first click on a column: A to Z for text, newest or
+// largest first for dates and counts
+const FIRST_SORT_ORDER = {
+  filename: 'asc',
+  status: 'asc',
+  created_at: 'desc',
+  chunk_count: 'desc',
+};
+
 /**
  * State and actions of the admin documents list: paginated and filtered
  * loading, the count of documents in error, the per-document actions and
@@ -26,6 +37,7 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalDocuments, setTotalDocuments] = useState(0);
+  const [sort, setSort] = useState(DEFAULT_SORT);
 
   // Monotonic request id: guards against out-of-order responses overwriting
   // the latest query result (e.g. page 3 request resolving after page 1).
@@ -41,8 +53,8 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
   const [retryingAll, setRetryingAll] = useState(false);
 
   // Load documents. Stable identity (no reactive deps) so effects that call it
-  // don't re-run when page/search/filter change; those are passed explicitly.
-  const loadDocuments = useCallback(async (page, search, status) => {
+  // don't re-run when page/search/filter/sort change; those are passed explicitly.
+  const loadDocuments = useCallback(async (page, search, status, order) => {
     const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
@@ -52,7 +64,9 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
         page,
         ITEMS_PER_PAGE,
         status || null,
-        search || null
+        search || null,
+        order.by,
+        order.order
       );
 
       // Ignore stale responses from a superseded request
@@ -95,23 +109,32 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
     return () => clearTimeout(timeout);
   }, [searchTerm]);
 
-  // Reset to the first page whenever the effective query changes (new search
-  // or status filter) — but NOT when only the page changes.
+  // Reset to the first page whenever the effective query changes (new search,
+  // status filter or sort) — but NOT when only the page changes.
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, sort]);
 
   // Single source of loading: reacts to page, effective query, and global refresh
   useEffect(() => {
-    loadDocuments(currentPage, debouncedSearch, statusFilter);
+    loadDocuments(currentPage, debouncedSearch, statusFilter, sort);
     refreshErrorCount();
-  }, [currentPage, debouncedSearch, statusFilter, refreshTrigger, loadDocuments, refreshErrorCount]);
+  }, [currentPage, debouncedSearch, statusFilter, sort, refreshTrigger, loadDocuments, refreshErrorCount]);
 
   // Clamp the page if it falls out of range (e.g. deleting the last item of
   // the last page); the load effect then refetches the corrected page.
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [totalPages, currentPage]);
+
+  // A second click on the sorted column flips the direction
+  const handleSort = (column) => {
+    setSort((current) => (
+      current.by === column
+        ? { by: column, order: current.order === 'asc' ? 'desc' : 'asc' }
+        : { by: column, order: FIRST_SORT_ORDER[column] }
+    ));
+  };
 
   // Pagination handling
   const handlePageChange = (newPage) => {
@@ -142,7 +165,7 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
         await documentsAPI.reprocessDocument(doc.id);
       }
 
-      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await loadDocuments(currentPage, debouncedSearch, statusFilter, sort);
       await refreshErrorCount();
       onRefresh?.();
 
@@ -161,7 +184,7 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
       await documentsAPI.deleteDocument(document.id, force);
 
       // Refresh the list
-      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await loadDocuments(currentPage, debouncedSearch, statusFilter, sort);
       await refreshErrorCount();
       onRefresh?.();
 
@@ -181,7 +204,7 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
       await documentsAPI.togglePreservation(document.id, !document.preserve);
 
       // Refresh the list
-      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await loadDocuments(currentPage, debouncedSearch, statusFilter, sort);
       onRefresh?.();
 
     } catch (error) {
@@ -198,7 +221,7 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
       await documentsAPI.reprocessDocument(document.id);
 
       // Refresh the list
-      await loadDocuments(currentPage, debouncedSearch, statusFilter);
+      await loadDocuments(currentPage, debouncedSearch, statusFilter, sort);
       await refreshErrorCount();
       onRefresh?.();
 
@@ -219,6 +242,8 @@ export const useDocumentsList = ({ onRefresh, refreshTrigger }) => {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    sort,
+    handleSort,
     currentPage,
     totalPages,
     totalDocuments,

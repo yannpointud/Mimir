@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from mimir.database.models import AuditLog, Configuration, Document, LlmBudgetLedger, LlmUsage
 from mimir.shared.clock import utc_now
 from mimir.shared.errors import ConflictError, NotFoundError
+from mimir.shared.models import DocumentSortField
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,15 @@ class BaseRepository:
     def _handle_db_error(self, e: Exception, operation: str) -> None:
         logger.error(f"Database error during {operation}: {e}")
         self.session.rollback()
+
+
+# Sort expressions of the admin documents list
+DOCUMENT_SORT_COLUMNS = {
+    "filename": func.lower(Document.filename),
+    "status": Document.status,
+    "created_at": Document.created_at,
+    "chunk_count": Document.chunk_count,
+}
 
 
 class DocumentRepository(BaseRepository):
@@ -148,11 +158,15 @@ class DocumentRepository(BaseRepository):
         limit: int = 50,
         filters: dict[str, Any] | None = None,
         search: str | None = None,
+        sort_by: DocumentSortField = "created_at",
+        descending: bool = True,
     ) -> tuple[list["Document"], int]:
-        """Retrieve documents (newest first) with pagination and the total count.
+        """Retrieve sorted documents (newest first by default) with the total count.
 
         Only the ``status`` key of ``filters`` is applied; ``search`` is a
-        case-insensitive filename match. Returns (documents, total_count).
+        case-insensitive filename match. Filenames sort case-insensitively, and
+        the id breaks ties so that pages never repeat or skip a document.
+        Returns (documents, total_count).
         """
         try:
             query = self.session.query(Document)
@@ -168,8 +182,11 @@ class DocumentRepository(BaseRepository):
             # Count total before pagination
             total_count = query.count()
 
-            # Apply pagination and sorting
-            query = query.order_by(desc(Document.created_at))
+            # Apply sorting and pagination
+            direction = desc if descending else asc
+            query = query.order_by(
+                direction(DOCUMENT_SORT_COLUMNS[sort_by]), direction(Document.id)
+            )
             if offset > 0:
                 query = query.offset(offset)
             if limit:

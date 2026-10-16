@@ -10,7 +10,7 @@ import logging
 import os
 import urllib.parse
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -53,10 +53,12 @@ from mimir.shared.models import (
     ConsistencyValidationResponse,
     DocumentListResponse,
     DocumentResponse,
+    DocumentSortField,
     DocumentStatsOverview,
     DocumentStatusCounts,
     DocumentWithChunksResponse,
     PaginationModel,
+    SortOrder,
     StorageInfo,
     VectorStoreOverview,
 )
@@ -91,12 +93,19 @@ def list_documents(
     pagination: PaginationModel = Depends(),
     status_filter: str | None = Query(None, description="Filter by document status"),
     search: str | None = Query(None, description="Search in filenames"),
+    sort_by: Annotated[DocumentSortField, Query(description="Column to sort on")] = "created_at",
+    sort_order: Annotated[SortOrder, Query(description="Sort direction")] = "desc",
     doc_repo: DocumentRepository = Depends(get_document_repository),
 ) -> DocumentListResponse:
-    """List documents, filtered and paginated."""
+    """List documents, filtered, sorted and paginated."""
     filters = {"status": status_filter} if status_filter else {}
     documents, total_count = doc_repo.get_all_paginated(
-        offset=pagination.offset, limit=pagination.limit, filters=filters, search=search
+        offset=pagination.offset,
+        limit=pagination.limit,
+        filters=filters,
+        search=search,
+        sort_by=sort_by,
+        descending=sort_order == "desc",
     )
     document_responses = [DocumentResponse.model_validate(doc) for doc in documents]
     return DocumentListResponse(

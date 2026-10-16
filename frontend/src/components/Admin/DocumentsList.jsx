@@ -4,6 +4,9 @@ import {
   Search,
   Filter,
   RefreshCw,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
   FileText,
   AlertTriangle,
   ChevronLeft,
@@ -26,6 +29,8 @@ const DocumentsList = () => {
     setSearchTerm,
     statusFilter,
     setStatusFilter,
+    sort,
+    handleSort,
     currentPage,
     totalPages,
     totalDocuments,
@@ -160,10 +165,10 @@ const DocumentsList = () => {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-line bg-sunken/70">
                 <tr>
-                  <th scope="col" className="eyebrow py-2.5 pl-3 pr-2 sm:pl-5">Document</th>
-                  <th scope="col" className="eyebrow px-2 py-2.5 sm:px-5">Statut</th>
-                  <th scope="col" className="eyebrow hidden px-5 py-2.5 md:table-cell">Date d&apos;ajout</th>
-                  <th scope="col" className="eyebrow hidden px-5 py-2.5 text-right md:table-cell">Sections</th>
+                  <SortableHeader column="filename" sort={sort} onSort={handleSort} className="py-2.5 pl-3 pr-2 sm:pl-5">Document</SortableHeader>
+                  <SortableHeader column="status" sort={sort} onSort={handleSort} className="px-2 py-2.5 sm:px-5">Statut</SortableHeader>
+                  <SortableHeader column="created_at" sort={sort} onSort={handleSort} className="hidden px-5 py-2.5 md:table-cell">Date d&apos;ajout</SortableHeader>
+                  <SortableHeader column="chunk_count" sort={sort} onSort={handleSort} className="hidden px-5 py-2.5 text-right md:table-cell">Sections</SortableHeader>
                   <th scope="col" className="py-2.5 pl-1 pr-2 sm:px-3"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -223,6 +228,28 @@ const DocumentsList = () => {
         loading={actionLoading}
       />
     </div>
+  );
+};
+
+// Column header that sorts the list on click and shows the current direction
+const SortableHeader = ({ column, sort, onSort, className, children }) => {
+  const active = sort.by === column;
+  const Icon = !active ? ArrowUpDown : sort.order === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <th
+      scope="col"
+      className={cn('eyebrow', className)}
+      aria-sort={active ? (sort.order === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn('inline-flex items-center gap-1 hover:text-ink', active && 'text-ink')}
+      >
+        {children}
+        <Icon className={cn('h-3.5 w-3.5', !active && 'opacity-40')} aria-hidden="true" />
+      </button>
+    </th>
   );
 };
 

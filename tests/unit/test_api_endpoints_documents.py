@@ -152,7 +152,12 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         # Assertions
         assert result == mock_response
         mock_doc_repo.get_all_paginated.assert_called_once_with(
-            offset=0, limit=20, filters={"status": "indexed"}, search="doc1"
+            offset=0,
+            limit=20,
+            filters={"status": "indexed"},
+            search="doc1",
+            sort_by="created_at",
+            descending=True,
         )
 
     @patch("mimir.api.endpoints.documents.DocumentListResponse")
