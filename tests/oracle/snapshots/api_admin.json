@@ -1,0 +1,584 @@
+{
+  "admin documents": {
+    "body": {
+      "documents": [
+        {
+          "created_at": "<created_at>",
+          "file_size": 0,
+          "filename": "script.exe",
+          "id": 2,
+          "preserve": false,
+          "status": "error"
+        },
+        {
+          "created_at": "<created_at>",
+          "file_size": 0,
+          "filename": "sample.txt",
+          "id": 1,
+          "preserve": false,
+          "status": "indexed"
+        }
+      ],
+      "limit": 10,
+      "page": 1,
+      "total": 2,
+      "total_pages": 1
+    },
+    "status": 200
+  },
+  "admin documents page 2": {
+    "body": {
+      "documents": [
+        {
+          "created_at": "<created_at>",
+          "file_size": 0,
+          "filename": "sample.txt",
+          "id": 1,
+          "preserve": false,
+          "status": "indexed"
+        }
+      ],
+      "limit": 1,
+      "page": 2,
+      "total": 2,
+      "total_pages": 2
+    },
+    "status": 200
+  },
+  "admin documents stats": {
+    "body": {
+      "by_status": {
+        "error": 1,
+        "indexed": 1,
+        "indexing": 0,
+        "pending": 0
+      },
+      "by_type": {},
+      "timestamp": "<timestamp>",
+      "total_documents": 2,
+      "total_size_mb": 0
+    },
+    "status": 200
+  },
+  "admin upload": {
+    "body": {
+      "document": {
+        "created_at": "<created_at>",
+        "filename": "sample.txt",
+        "id": 1,
+        "status": "pending"
+      },
+      "message": "Document uploaded successfully",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "admin upload duplicate": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/documents/upload"
+      },
+      "error_code": "HTTP_409",
+      "error_message": "File already exists: sample.txt",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 409
+  },
+  "admin upload empty": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/documents/upload"
+      },
+      "error_code": "HTTP_400",
+      "error_message": "Empty file",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 400
+  },
+  "admin upload invalid name": {
+    "body": {
+      "document": {
+        "created_at": "<created_at>",
+        "filename": "script.exe",
+        "id": 2,
+        "status": "pending"
+      },
+      "message": "Document uploaded successfully",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "admin upload via documents route duplicate": {
+    "body": {
+      "details": {
+        "path": "/api/v1/documents/upload"
+      },
+      "error_code": "HTTP_409",
+      "error_message": "File already exists: sample.txt",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 409
+  },
+  "analytics usage": {
+    "keys": {
+      "overview": "dict",
+      "performance": "dict",
+      "resources": "dict",
+      "system": "dict",
+      "timestamp": "str",
+      "trends": "dict"
+    },
+    "status": 200
+  },
+  "audit-log config_update": {
+    "body": {
+      "entries": [
+        {
+          "action": "config_update",
+          "additional_data": null,
+          "details": "Configuration updated: vector_search_threshold=0.4",
+          "id": 4,
+          "ip_address": "system",
+          "success": true,
+          "timestamp": "<timestamp>",
+          "user_type": "admin"
+        },
+        {
+          "action": "config_update",
+          "additional_data": null,
+          "details": "Configuration updated: maintenance_mode=false, daily_budget_eur=12.5",
+          "id": 3,
+          "ip_address": "system",
+          "success": true,
+          "timestamp": "<timestamp>",
+          "user_type": "admin"
+        }
+      ],
+      "filters": {
+        "action": "config_update",
+        "days_back": 7,
+        "success": null,
+        "user_type": null
+      },
+      "has_more": false,
+      "limit": 50,
+      "offset": 0,
+      "timestamp": "<timestamp>",
+      "total": 2
+    },
+    "status": 200
+  },
+  "audit-log maintenance": {
+    "body": {
+      "entries": [
+        {
+          "action": "maintenance_mode_toggle",
+          "additional_data": null,
+          "details": "Maintenance mode disabled",
+          "id": 6,
+          "ip_address": "system",
+          "success": true,
+          "timestamp": "<timestamp>",
+          "user_type": "admin"
+        }
+      ],
+      "filters": {
+        "action": "maintenance_mode_toggle",
+        "days_back": 7,
+        "success": null,
+        "user_type": null
+      },
+      "has_more": true,
+      "limit": 1,
+      "offset": 0,
+      "timestamp": "<timestamp>",
+      "total": 2
+    },
+    "status": 200
+  },
+  "cache clear all": {
+    "body": {
+      "message": "Cache cleared successfully. Removed 0 entries from all cache(s).",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "cache clear chat": {
+    "body": {
+      "message": "Cache cleared successfully. Removed 0 entries from chat cache(s).",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "cache stats": {
+    "shape": {
+      "chat_cache": {
+        "evictions": "int",
+        "expired_entries": "int",
+        "hit_rate_percent": "float",
+        "hits": "int",
+        "max_size": "int",
+        "misses": "int",
+        "size": "int",
+        "total_requests": "int",
+        "utilization": "float",
+        "utilization_percent": "float"
+      },
+      "global_stats": {
+        "hit_ratio": "float",
+        "total_hits": "int",
+        "total_misses": "int",
+        "total_requests": "int"
+      },
+      "main_cache": {
+        "evictions": "int",
+        "expired_entries": "int",
+        "hit_rate_percent": "float",
+        "hits": "int",
+        "max_size": "int",
+        "misses": "int",
+        "size": "int",
+        "total_requests": "int",
+        "utilization": "float",
+        "utilization_percent": "float"
+      },
+      "timestamp": "str"
+    },
+    "status": 200
+  },
+  "config alias": {
+    "body": {
+      "application_config": {
+        "api_version": "v1",
+        "cache_max_size": 100,
+        "cache_ttl_seconds": 3600,
+        "chunk_overlap": 200,
+        "embedding_dimension": 1024,
+        "jwt_expiration_hours": 2,
+        "llm_provider": "mistral",
+        "max_chunk_size": 1000,
+        "max_file_size_mb": 100,
+        "mistral_api_key": "***MASKED***",
+        "mistral_embedding_model": "mistral-embed",
+        "mistral_model": "mistral-small-latest",
+        "supported_file_extensions": [
+          ".docx",
+          ".md",
+          ".pdf",
+          ".txt"
+        ]
+      },
+      "database_config": {
+        "daily_budget_eur": "12.5",
+        "maintenance_mode": "false"
+      },
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "config alias update": {
+    "body": {
+      "message": "Configuration updated successfully. 1 items changed.",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "configuration": {
+    "body": {
+      "application_config": {
+        "api_version": "v1",
+        "cache_max_size": 100,
+        "cache_ttl_seconds": 3600,
+        "chunk_overlap": 200,
+        "embedding_dimension": 1024,
+        "jwt_expiration_hours": 2,
+        "llm_provider": "mistral",
+        "max_chunk_size": 1000,
+        "max_file_size_mb": 100,
+        "mistral_api_key": "***MASKED***",
+        "mistral_embedding_model": "mistral-embed",
+        "mistral_model": "mistral-small-latest",
+        "supported_file_extensions": [
+          ".docx",
+          ".md",
+          ".pdf",
+          ".txt"
+        ]
+      },
+      "database_config": {},
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "configuration after update": {
+    "body": {
+      "application_config": {
+        "api_version": "v1",
+        "cache_max_size": 100,
+        "cache_ttl_seconds": 3600,
+        "chunk_overlap": 200,
+        "embedding_dimension": 1024,
+        "jwt_expiration_hours": 2,
+        "llm_provider": "mistral",
+        "max_chunk_size": 1000,
+        "max_file_size_mb": 100,
+        "mistral_api_key": "***MASKED***",
+        "mistral_embedding_model": "mistral-embed",
+        "mistral_model": "mistral-small-latest",
+        "supported_file_extensions": [
+          ".docx",
+          ".md",
+          ".pdf",
+          ".txt"
+        ]
+      },
+      "database_config": {
+        "daily_budget_eur": "12.5",
+        "maintenance_mode": "false",
+        "vector_search_threshold": "0.4"
+      },
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "configuration update": {
+    "body": {
+      "message": "Configuration updated successfully. 2 items changed.",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "configuration update bad body": {
+    "body": {
+      "detail": [
+        {
+          "input": 1,
+          "loc": [
+            "body",
+            "maintenance_mode"
+          ],
+          "msg": "Input should be a valid string",
+          "type": "string_type"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "configuration update invalid key": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/configuration"
+      },
+      "error_code": "HTTP_400",
+      "error_message": "Invalid configuration keys: ['secret']",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 400
+  },
+  "configuration update masked": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/configuration"
+      },
+      "error_code": "HTTP_400",
+      "error_message": "Invalid configuration keys: ['mistral_api_key']",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 400
+  },
+  "logs": {
+    "keys": {
+      "filters_applied": "dict",
+      "has_more": "bool",
+      "logs": "list",
+      "returned_count": "int",
+      "summary": "dict",
+      "timestamp": "str",
+      "total_count": "int"
+    },
+    "status": 200
+  },
+  "logs bad limit": {
+    "body": {
+      "detail": [
+        {
+          "ctx": {
+            "ge": 1
+          },
+          "input": "0",
+          "loc": [
+            "query",
+            "limit"
+          ],
+          "msg": "Input should be greater than or equal to 1",
+          "type": "greater_than_equal"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "maintenance off": {
+    "body": {
+      "message": "Maintenance mode disabled successfully",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "maintenance on": {
+    "body": {
+      "message": "Maintenance mode enabled successfully: Oracle",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "metrics chat": {
+    "keys": {
+      "active_sessions": "int",
+      "avg_response_time_ms": "float",
+      "avg_tokens_per_request": "int",
+      "errors_last_hour": "int",
+      "requests_last_hour": "int",
+      "success_rate": "float",
+      "timestamp": "str"
+    },
+    "status": 200
+  },
+  "system-info": {
+    "shape": {
+      "application": {
+        "data_directory": "str",
+        "database_url": "str",
+        "environment": "str",
+        "upload_directory": "str",
+        "version": "str"
+      },
+      "hardware": {
+        "cpu_count": "int",
+        "cpu_percent": "float",
+        "disk": {
+          "free": "int",
+          "percent": "float",
+          "total": "int",
+          "used": "int"
+        },
+        "memory": {
+          "available": "int",
+          "percent": "float",
+          "total": "int",
+          "used": "int"
+        }
+      },
+      "platform": {
+        "machine": "str",
+        "processor": "str",
+        "python_version": "str",
+        "release": "str",
+        "system": "str",
+        "version": "str"
+      },
+      "services": {
+        "cache_enabled": "bool",
+        "email_configured": "bool",
+        "llm_provider": "str",
+        "vector_store": "str",
+        "watch_folder": "str"
+      },
+      "timestamp": "str"
+    },
+    "status": 200
+  },
+  "system-info no token": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/system-info"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Not authenticated",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  },
+  "system-info reader": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/system-info"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Admin privileges required",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  },
+  "test-email": {
+    "body": {
+      "message": "Failed to send test email. Check email service configuration.",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "usage": {
+    "body": {
+      "daily_budget_eur": 12.5,
+      "history": [],
+      "spent_today_eur": 0.0,
+      "timestamp": "<timestamp>",
+      "today_by_model": []
+    },
+    "status": 200
+  },
+  "usage bad days": {
+    "body": {
+      "detail": [
+        {
+          "ctx": {
+            "ge": 1
+          },
+          "input": "0",
+          "loc": [
+            "query",
+            "days_back"
+          ],
+          "msg": "Input should be greater than or equal to 1",
+          "type": "greater_than_equal"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "vector-store rebuild": {
+    "body": {
+      "message": "Vector index rebuilt successfully. Optimized from 2 to 2 vectors. Completed in <N>ms.",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "vector-store rebuild reader": {
+    "body": {
+      "details": {
+        "path": "/api/v1/admin/vector-store/rebuild"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Admin privileges required",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  }
+}

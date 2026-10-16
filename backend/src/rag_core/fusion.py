@@ -8,7 +8,7 @@ map. It never touches the dense-only retrieval path, which keeps its cosine
 """
 
 from dataclasses import dataclass
-from typing import Dict, Sequence
+from collections.abc import Sequence
 
 __all__ = ["RankedResult", "reciprocal_rank_fusion"]
 
@@ -30,7 +30,7 @@ class RankedResult:
 def reciprocal_rank_fusion(
     rank_lists: Sequence[Sequence[int]],
     k: int = 60,
-) -> Dict[int, float]:
+) -> dict[int, float]:
     """Fuse several ranked chunk-id lists with Reciprocal Rank Fusion.
 
     Standard RRF (Cormack, Clarke & Buttcher, "Reciprocal Rank Fusion
@@ -53,7 +53,7 @@ def reciprocal_rank_fusion(
         Mapping ``chunk_id -> fused RRF score``. Empty if no chunk appears in
         any list.
     """
-    fused: Dict[int, float] = {}
+    fused: dict[int, float] = {}
     for rank_list in rank_lists:
         for rank, chunk_id in enumerate(rank_list, start=1):
             fused[chunk_id] = fused.get(chunk_id, 0.0) + 1.0 / (k + rank)

@@ -2,7 +2,6 @@
 Tests for the rate limiting module.
 """
 
-import pytest  # noqa: F401
 from unittest.mock import Mock, patch
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
@@ -21,10 +20,7 @@ class TestGetClientIdentifier:
         """Test identifier for authenticated user."""
         request = Mock(spec=Request)
         request.state = Mock()
-        request.state.jwt_payload = {
-            'sub': 'user123',
-            'user_type': 'user'
-        }
+        request.state.jwt_payload = {"sub": "user123", "user_type": "user"}
 
         result = get_client_identifier(request)
 
@@ -34,10 +30,7 @@ class TestGetClientIdentifier:
         """Test identifier for authenticated admin."""
         request = Mock(spec=Request)
         request.state = Mock()
-        request.state.jwt_payload = {
-            'sub': 'admin456',
-            'user_type': 'admin'
-        }
+        request.state.jwt_payload = {"sub": "admin456", "user_type": "admin"}
 
         result = get_client_identifier(request)
 
@@ -48,11 +41,11 @@ class TestGetClientIdentifier:
         request = Mock(spec=Request)
         request.state = Mock()
         request.state.jwt_payload = {
-            'user_type': 'user'
+            "user_type": "user"
             # No 'sub'
         }
 
-        with patch('src.api.middleware.rate_limit.get_remote_address') as mock_get_ip:
+        with patch("src.api.middleware.rate_limit.get_remote_address") as mock_get_ip:
             mock_get_ip.return_value = "192.168.1.1"
             result = get_client_identifier(request)
 
@@ -64,24 +57,11 @@ class TestGetClientIdentifier:
         request.state = Mock()
         request.state.jwt_payload = None
 
-        with patch('src.api.middleware.rate_limit.get_remote_address') as mock_get_ip:
+        with patch("src.api.middleware.rate_limit.get_remote_address") as mock_get_ip:
             mock_get_ip.return_value = "10.0.0.1"
             result = get_client_identifier(request)
 
         assert result == "10.0.0.1"
-
-    def test_no_jwt_payload_in_state(self):
-        """Test identifier when state exists but no jwt_payload."""
-        # Create a mock with empty state (more realistic for FastAPI)
-        request = Mock()
-        request.state = Mock()
-        request.state.jwt_payload = None
-
-        with patch('src.api.middleware.rate_limit.get_remote_address') as mock_get_ip:
-            mock_get_ip.return_value = "172.16.0.1"
-            result = get_client_identifier(request)
-
-        assert result == "172.16.0.1"
 
 
 class TestConfigureRateLimiting:

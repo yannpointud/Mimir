@@ -109,3 +109,6 @@ scripts/ragas_eval/eval_input_chunk_*.jsonl
 
 # Planning artifacts, kept local only
 .planning/
+
+# mutmut working copy (mutation testing, see [tool.mutmut] in pyproject.toml)
+mutants/

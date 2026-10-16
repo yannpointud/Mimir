@@ -12,31 +12,23 @@ __all__ = ["MASKED_VALUE", "SENSITIVE_CONFIG_KEYS", "mask_secrets"]
 MASKED_VALUE = "***MASKED***"
 
 # Configuration keys whose values must never leave the backend in clear text.
-SENSITIVE_CONFIG_KEYS = frozenset({
-    "mistral_api_key",
-    "smtp_password",
-    "jwt_secret_key",
-    "admin_password_hash",
-    # Clear-text admin password accepted at startup (ADMIN_PASSWORD): the only
-    # unhashed credential in settings, so it must never reach a response.
-    "admin_password",
-})
+SENSITIVE_CONFIG_KEYS = frozenset(
+    {
+        "mistral_api_key",
+        "smtp_password",
+        "jwt_secret_key",
+        "admin_password_hash",
+        # Clear-text admin password accepted at startup (ADMIN_PASSWORD): the only
+        # unhashed credential in settings, so it must never reach a response.
+        "admin_password",
+    }
+)
 
 
 def mask_secrets(config: dict) -> dict:
-    """
-    Return a copy of the config dict with all sensitive values fully masked.
+    """Return a copy of the config dict with all sensitive values fully masked.
 
     Falsy sensitive values (empty string, None) are left untouched so that
     a missing configuration remains visible to the administrator.
-
-    Args:
-        config: Configuration dictionary possibly containing secret values
-
-    Returns:
-        dict: New dictionary with sensitive truthy values replaced by MASKED_VALUE
     """
-    return {
-        k: (MASKED_VALUE if k in SENSITIVE_CONFIG_KEYS and v else v)
-        for k, v in config.items()
-    }
+    return {k: (MASKED_VALUE if k in SENSITIVE_CONFIG_KEYS and v else v) for k, v in config.items()}

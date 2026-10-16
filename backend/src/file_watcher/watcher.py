@@ -8,7 +8,8 @@ queues new or modified documents for ingestion processing.
 import os
 import time
 from pathlib import Path
-from typing import Set, Optional, Callable, Dict, Any, List
+from typing import Any
+from collections.abc import Callable
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 import threading
@@ -22,22 +23,12 @@ class DocumentFileHandler(FileSystemEventHandler):
 
     def __init__(
         self,
-        supported_extensions: Set[str],
+        supported_extensions: set[str],
         on_file_added: Callable[[str], None],
-        on_file_modified: Optional[Callable[[str], None]] = None,
+        on_file_modified: Callable[[str], None] | None = None,
         ignore_hidden: bool = True,
-        ignore_temp: bool = True
+        ignore_temp: bool = True,
     ):
-        """
-        Initialize file handler.
-
-        Args:
-            supported_extensions: Set of file extensions to monitor (e.g. {'.pdf', '.docx'})
-            on_file_added: Callback for new files
-            on_file_modified: Optional callback for modified files
-            ignore_hidden: Whether to ignore hidden files (starting with .)
-            ignore_temp: Whether to ignore temporary files
-        """
         super().__init__()
         self.supported_extensions = {ext.lower() for ext in supported_extensions}
         self.on_file_added = on_file_added
@@ -46,63 +37,46 @@ class DocumentFileHandler(FileSystemEventHandler):
         self.ignore_temp = ignore_temp
 
         # Tracking for avoiding duplicate events
-        self._recently_processed = {}
+        self._recently_processed: dict[str, float] = {}
         self._lock = threading.Lock()
 
         logger.info(f"DocumentFileHandler initialized - extensions: {self.supported_extensions}")
 
     def _should_ignore_file(self, file_path: str) -> bool:
-        """
-        Check if file should be ignored.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            bool: True if file should be ignored
-        """
         file_name = os.path.basename(file_path)
 
         # Ignore hidden files
-        if self.ignore_hidden and file_name.startswith('.'):
+        if self.ignore_hidden and file_name.startswith("."):
             return True
 
         # Ignore temporary files
         if self.ignore_temp:
             temp_patterns = [
-                '~$',  # Microsoft Office temp files
-                '.tmp', '.temp',
-                '.part',  # Partial downloads
-                '.crdownload',  # Chrome downloads
+                "~$",  # Microsoft Office temp files
+                ".tmp",
+                ".temp",
+                ".part",  # Partial downloads
+                ".crdownload",  # Chrome downloads
             ]
-            if any(file_name.endswith(pattern) or pattern in file_name for pattern in temp_patterns):
+            if any(
+                file_name.endswith(pattern) or pattern in file_name for pattern in temp_patterns
+            ):
                 return True
 
         # Check file extension
         file_ext = os.path.splitext(file_path)[1].lower()
-        if file_ext not in self.supported_extensions:
-            return True
-
-        return False
+        return file_ext not in self.supported_extensions
 
     def _is_recently_processed(self, file_path: str, event_type: str) -> bool:
-        """
-        Check if file was recently processed to avoid duplicates.
-
-        Args:
-            file_path: Path to the file
-            event_type: Type of event (created, modified)
-
-        Returns:
-            bool: True if recently processed
-        """
+        """Check if file was recently processed to avoid duplicates."""
         with self._lock:
             key = f"{file_path}:{event_type}"
             current_time = time.time()
 
             # Clean old entries (older than 5 seconds)
             to_remove = [
-                k for k, timestamp in self._recently_processed.items()
+                k
+                for k, timestamp in self._recently_processed.items()
                 if current_time - timestamp > 5
             ]
             for k in to_remove:
@@ -136,7 +110,7 @@ class DocumentFileHandler(FileSystemEventHandler):
             logger.info(f"New file detected: {file_path}")
             try:
                 self.on_file_added(file_path)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - observer thread boundary: a failing callback must not stop the watcher
                 logger.error(f"Error processing new file {file_path}: {e}")
 
     def on_modified(self, event: FileSystemEvent):
@@ -162,23 +136,17 @@ class DocumentFileHandler(FileSystemEventHandler):
             logger.info(f"File modified: {file_path}")
             try:
                 self.on_file_modified(file_path)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - observer thread boundary: a failing callback must not stop the watcher
                 logger.error(f"Error processing modified file {file_path}: {e}")
 
     def _wait_for_file_stability(self, file_path: str, max_wait: int = 5):
-        """
-        Wait for file to be stable (no size changes).
-
-        Args:
-            file_path: Path to the file
-            max_wait: Maximum time to wait in seconds
-        """
+        """Wait for file to be stable (no size changes)."""
         try:
             if not os.path.exists(file_path):
                 return
 
             previous_size = -1
-            waited = 0
+            waited: float = 0
 
             while waited < max_wait:
                 try:
@@ -188,11 +156,11 @@ class DocumentFileHandler(FileSystemEventHandler):
                     previous_size = current_size
                     time.sleep(0.5)
                     waited += 0.5
-                except (OSError, FileNotFoundError):
+                except OSError:
                     # File might be locked or deleted
                     break
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best effort: the event is handled even if the wait fails
             logger.debug(f"Error waiting for file stability: {e}")
 
 
@@ -201,22 +169,12 @@ class FileWatcher:
 
     def __init__(
         self,
-        watch_directories: List[str],
-        supported_extensions: Set[str],
+        watch_directories: list[str],
+        supported_extensions: set[str],
         on_file_added: Callable[[str], None],
-        on_file_modified: Optional[Callable[[str], None]] = None,
-        recursive: bool = True
+        on_file_modified: Callable[[str], None] | None = None,
+        recursive: bool = True,
     ):
-        """
-        Initialize file watcher.
-
-        Args:
-            watch_directories: List of directories to monitor
-            supported_extensions: Set of file extensions to monitor
-            on_file_added: Callback for new files
-            on_file_modified: Optional callback for modified files
-            recursive: Whether to monitor subdirectories
-        """
         self.watch_directories = [Path(d).resolve() for d in watch_directories]
         self.supported_extensions = supported_extensions
         self.recursive = recursive
@@ -227,27 +185,22 @@ class FileWatcher:
         self.handler = DocumentFileHandler(
             supported_extensions=supported_extensions,
             on_file_added=on_file_added,
-            on_file_modified=on_file_modified
+            on_file_modified=on_file_modified,
         )
 
         # Statistics
-        self.stats = {
+        self.stats: dict[str, Any] = {
             "files_processed": 0,
             "files_added": 0,
             "files_modified": 0,
             "errors": 0,
-            "start_time": None
+            "start_time": None,
         }
 
         logger.info(f"FileWatcher initialized - directories: {self.watch_directories}")
 
     def start(self) -> bool:
-        """
-        Start the file watcher.
-
-        Returns:
-            bool: True if started successfully
-        """
+        """Start the file watcher."""
         try:
             if self.is_running:
                 logger.warning("FileWatcher is already running")
@@ -268,11 +221,7 @@ class FileWatcher:
 
             # Set up watchers
             for directory in valid_directories:
-                self.observer.schedule(
-                    self.handler,
-                    str(directory),
-                    recursive=self.recursive
-                )
+                self.observer.schedule(self.handler, str(directory), recursive=self.recursive)
 
             # Start observer
             self.observer.start()
@@ -282,20 +231,12 @@ class FileWatcher:
             logger.info("FileWatcher started successfully")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not started
             logger.error(f"Failed to start FileWatcher: {e}")
             return False
 
     def stop(self, timeout: int = 5) -> bool:
-        """
-        Stop the file watcher.
-
-        Args:
-            timeout: Timeout in seconds to wait for stop
-
-        Returns:
-            bool: True if stopped successfully
-        """
+        """Stop the file watcher."""
         try:
             if not self.is_running:
                 return True
@@ -308,17 +249,12 @@ class FileWatcher:
             logger.info("FileWatcher stopped")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not stopped
             logger.error(f"Error stopping FileWatcher: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Get file watcher statistics.
-
-        Returns:
-            dict: Statistics about file watching activity
-        """
+    def get_stats(self) -> dict[str, Any]:
+        """Get file watcher statistics."""
         stats = self.stats.copy()
         stats["is_running"] = self.is_running
         stats["watched_directories"] = [str(d) for d in self.watch_directories]
@@ -330,15 +266,7 @@ class FileWatcher:
         return stats
 
     def add_directory(self, directory: str) -> bool:
-        """
-        Add a new directory to watch.
-
-        Args:
-            directory: Path to directory to add
-
-        Returns:
-            bool: True if added successfully
-        """
+        """Add a new directory to watch."""
         try:
             dir_path = Path(directory).resolve()
 
@@ -352,30 +280,18 @@ class FileWatcher:
 
             # Add to observer if running
             if self.is_running:
-                self.observer.schedule(
-                    self.handler,
-                    str(dir_path),
-                    recursive=self.recursive
-                )
+                self.observer.schedule(self.handler, str(dir_path), recursive=self.recursive)
 
             self.watch_directories.append(dir_path)
             logger.info(f"Added directory to watch list: {directory}")
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not added
             logger.error(f"Failed to add directory {directory}: {e}")
             return False
 
     def remove_directory(self, directory: str) -> bool:
-        """
-        Remove a directory from watching.
-
-        Args:
-            directory: Path to directory to remove
-
-        Returns:
-            bool: True if removed successfully
-        """
+        """Remove a directory from watching."""
         try:
             dir_path = Path(directory).resolve()
 
@@ -392,17 +308,12 @@ class FileWatcher:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not removed
             logger.error(f"Failed to remove directory {directory}: {e}")
             return False
 
-    def scan_existing_files(self) -> List[str]:
-        """
-        Scan existing files in watched directories.
-
-        Returns:
-            list: List of existing files that match criteria
-        """
+    def scan_existing_files(self) -> list[str]:
+        """Scan existing files in watched directories."""
         existing_files = []
 
         try:
@@ -414,12 +325,14 @@ class FileWatcher:
                 for ext in self.supported_extensions:
                     pattern = f"**/*{ext}" if self.recursive else f"*{ext}"
                     for file_path in directory.glob(pattern):
-                        if file_path.is_file() and not self.handler._should_ignore_file(str(file_path)):
+                        if file_path.is_file() and not self.handler._should_ignore_file(
+                            str(file_path)
+                        ):
                             existing_files.append(str(file_path))
 
             logger.info(f"Found {len(existing_files)} existing files")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best effort: return the files found so far
             logger.error(f"Error scanning existing files: {e}")
 
         return existing_files

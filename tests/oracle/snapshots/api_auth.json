@@ -1,0 +1,188 @@
+{
+  "change-password reader": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/change-password"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Admin privileges required",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  },
+  "change-password weak new": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/change-password"
+      },
+      "error_code": "HTTP_400",
+      "error_message": "Password must be at least 8 characters long. Password must contain at least one uppercase letter. Password must contain at least one digit. Password must contain at least one special character. Password should not contain sequential characters (abc, 123)",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 400
+  },
+  "change-password wrong current": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/change-password"
+      },
+      "error_code": "HTTP_400",
+      "error_message": "Mot de passe actuel incorrect",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 400
+  },
+  "login missing field": {
+    "body": {
+      "detail": [
+        {
+          "input": {
+            "username": "admin"
+          },
+          "loc": [
+            "body",
+            "password"
+          ],
+          "msg": "Field required",
+          "type": "missing"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "login ok": {
+    "body": {
+      "access_token": "<access_token>",
+      "expires_in": 7200,
+      "token_type": "bearer",
+      "user_type": "admin"
+    },
+    "status": 200
+  },
+  "login unknown user": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/login"
+      },
+      "error_code": "HTTP_401",
+      "error_message": "Invalid credentials",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 401
+  },
+  "login wrong password": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/login"
+      },
+      "error_code": "HTTP_401",
+      "error_message": "Invalid credentials",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 401
+  },
+  "logout": {
+    "body": {
+      "message": "Successfully logged out"
+    },
+    "status": 200
+  },
+  "logout no token": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/logout"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Not authenticated",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  },
+  "me admin": {
+    "body": {
+      "token_expires_at": "<token_expires_at>",
+      "token_issued_at": "<token_issued_at>",
+      "user_type": "admin",
+      "username": "admin"
+    },
+    "status": 200
+  },
+  "me basic scheme": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/me"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Not authenticated",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  },
+  "me invalid token": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/me"
+      },
+      "error_code": "HTTP_401",
+      "error_message": "Invalid or expired token",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 401
+  },
+  "me no token": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/me"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Not authenticated",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  },
+  "me reader": {
+    "body": {
+      "token_expires_at": "<token_expires_at>",
+      "token_issued_at": "<token_issued_at>",
+      "user_type": "user",
+      "username": "reader"
+    },
+    "status": 200
+  },
+  "refresh": {
+    "body": {
+      "access_token": "<access_token>",
+      "expires_in": 7200,
+      "token_type": "bearer"
+    },
+    "status": 200
+  },
+  "verify-admin admin": {
+    "body": {
+      "message": "Admin access confirmed",
+      "user": "admin"
+    },
+    "status": 200
+  },
+  "verify-admin reader": {
+    "body": {
+      "details": {
+        "path": "/api/v1/auth/verify-admin"
+      },
+      "error_code": "HTTP_403",
+      "error_message": "Admin privileges required",
+      "success": false,
+      "timestamp": "<timestamp>"
+    },
+    "status": 403
+  }
+}

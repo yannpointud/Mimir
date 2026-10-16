@@ -5,8 +5,6 @@ Verifies that mask_secrets fully masks all sensitive configuration keys
 with the shared MASKED_VALUE constant, without mutating the input dict.
 """
 
-import pytest  # noqa: F401
-
 from src.shared.constants import MASKED_VALUE, SENSITIVE_CONFIG_KEYS, mask_secrets
 
 
@@ -80,10 +78,15 @@ class TestMaskSecrets:
 
     def test_sensitive_config_keys_contains_exactly_the_known_secrets(self):
         """SENSITIVE_CONFIG_KEYS covers exactly the known secret keys."""
-        assert SENSITIVE_CONFIG_KEYS == frozenset({
-            "mistral_api_key",
-            "smtp_password",
-            "jwt_secret_key",
-            "admin_password_hash",
-            "admin_password",
-        })
+        assert (
+            frozenset(
+                {
+                    "mistral_api_key",
+                    "smtp_password",
+                    "jwt_secret_key",
+                    "admin_password_hash",
+                    "admin_password",
+                }
+            )
+            == SENSITIVE_CONFIG_KEYS
+        )

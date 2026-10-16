@@ -1,0 +1,28 @@
+# Weekly version updates. Dependabot edits requirements.txt and
+# requirements-dev.txt only: regenerate requirements.lock and
+# requirements-dev.lock on its branch with the uv command written in their
+# header, otherwise the CI lockfile check fails.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # mistralai 1.x is a new SDK with a different API: moving to it is a
+      # migration of the LLM client, not a version bump.
+      - dependency-name: mistralai
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

@@ -21,13 +21,20 @@ from src.services.rag_service import _process_question_with_rag_stream
 
 def _sr(chunk_id, document_id, text, source, score):
     return SearchResult(
-        chunk_id=chunk_id, document_id=document_id, text=text, source=source,
-        similarity_score=score, chunk_index=0, total_chunks=1, metadata={},
+        chunk_id=chunk_id,
+        document_id=document_id,
+        text=text,
+        source=source,
+        similarity_score=score,
+        chunk_index=0,
+        total_chunks=1,
+        metadata={},
     )
 
 
 def _fake_generate_stream(*chunks):
     """Return an async-generator function standing in for llm.generate_stream."""
+
     async def _gen(*args, **kwargs):
         for c in chunks:
             yield c
@@ -42,17 +49,27 @@ def _base_mocks():
     mock_document_repository = Mock()
     mock_rag_debug = Mock()
 
-    for name in ("log_user_request", "log_vector_search", "log_context_building",
-                 "log_llm_generation", "log_error"):
+    for name in (
+        "log_user_request",
+        "log_vector_search",
+        "log_context_building",
+        "log_llm_generation",
+        "log_error",
+    ):
         setattr(mock_rag_debug, name, Mock())
 
     # No fuzzy filename pre-inclusion matches (keeps the dense path pure).
     mock_document_repository.get_all.return_value = []
-    mock_document_repository.get_by_ids.side_effect = lambda ids: {i: Mock(filename="doc.pdf") for i in ids}
+    mock_document_repository.get_by_ids.side_effect = lambda ids: {
+        i: Mock(filename="doc.pdf") for i in ids
+    }
 
     mock_llm_service.embed.return_value = AsyncMock(
-        embeddings=[[0.1] * 1024], usage_tokens=10,
-        model="mistral-embed", prompt_tokens=10, completion_tokens=0,
+        embeddings=[[0.1] * 1024],
+        usage_tokens=10,
+        model="mistral-embed",
+        prompt_tokens=10,
+        completion_tokens=0,
     )
     mock_llm_service.generate_stream = _fake_generate_stream("L'IA ", "est une technologie.")
     return mock_llm_service, mock_vector_store, mock_document_repository, mock_rag_debug
@@ -89,16 +106,18 @@ class TestStreamPipelineContract:
 
         with patch("src.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
-            events = asyncio.run(_drain(
-                question="Qu'est-ce que l'IA ?",
-                context_limit=5,
-                include_sources=True,
-                session_id="session_123",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-            ))
+            events = asyncio.run(
+                _drain(
+                    question="Qu'est-ce que l'IA ?",
+                    context_limit=5,
+                    include_sources=True,
+                    session_id="session_123",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                )
+            )
 
         types = [e["type"] for e in events]
         assert "done" in types
@@ -117,16 +136,18 @@ class TestStreamPipelineContract:
 
         with patch("src.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
-            events = asyncio.run(_drain(
-                question="Test question",
-                context_limit=3,
-                include_sources=False,
-                session_id="session_123",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-            ))
+            events = asyncio.run(
+                _drain(
+                    question="Test question",
+                    context_limit=3,
+                    include_sources=False,
+                    session_id="session_123",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                )
+            )
 
         done = next(e for e in events if e["type"] == "done")
         assert done["sources"] == []

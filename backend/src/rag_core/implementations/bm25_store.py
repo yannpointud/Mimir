@@ -1,5 +1,4 @@
-"""
-BM25 lexical store implementation.
+"""BM25 lexical store implementation.
 
 Second retrieval index living beside FaissVectorStore: a lexical BM25 index that
 recovers exact terms (identifiers, acronyms) the dense embedding path tends to
@@ -7,7 +6,7 @@ miss. It is a *derived* artifact -- reconstructed in full from the source of
 truth (FaissVectorStore's active chunks) at every mutation, exactly like
 FaissVectorStore.optimize() rebuilds from non-deleted metadata.
 
-Design constraints (locked):
+Design constraints:
 - Persistence uses the native bm25s save/load API (JSON + .npy, allow_pickle=False):
   NO arbitrary-object deserialization, consistent with the removal of pickle
   from FaissVectorStore's metadata persistence.
@@ -24,12 +23,11 @@ import shutil
 import tempfile
 import threading
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 
 import bm25s
 
 from ..interfaces import (
-    VectorStoreException,  # noqa: F401
     VectorStoreConnectionError,
     VectorStoreOperationError,
 )
@@ -49,15 +47,11 @@ class Bm25LexicalStore:
     """
 
     def __init__(self, index_path: str):
-        """Initialize the lexical store.
-
-        Args:
-            index_path: Directory path where the bm25s index is persisted.
-        """
+        """``index_path`` is the directory where the bm25s index is persisted."""
         self.index_path = Path(index_path)
-        self._retriever: Optional[bm25s.BM25] = None
+        self._retriever: bm25s.BM25 | None = None
         # Corpus index position i -> real chunk_id (from FaissVectorStore metadata).
-        self._chunk_ids: List[int] = []
+        self._chunk_ids: list[int] = []
         # True once rebuilt or loaded (distinguishes "never built" from
         # "built empty" so query() can raise only in the former case).
         self._built: bool = False
@@ -65,7 +59,7 @@ class Bm25LexicalStore:
         # Thread safety (reentrant, like FaissVectorStore._lock).
         self._lock = threading.RLock()
 
-    def rebuild(self, active_chunks: List[Dict[str, Any]]) -> None:
+    def rebuild(self, active_chunks: list[dict[str, Any]]) -> None:
         """Rebuild the whole index from the currently active chunks.
 
         The corpus is expected to be modest in size (out of scope for HNSW /
@@ -106,12 +100,12 @@ class Bm25LexicalStore:
                     "BM25 lexical index rebuilt",
                     extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - any failure becomes VectorStoreOperationError
                 error_msg = f"Failed to rebuild BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
-    def query(self, question: str, top_k: int = 50) -> List[Tuple[int, float]]:
+    def query(self, question: str, top_k: int = 50) -> list[tuple[int, float]]:
         """Query the lexical index for the most relevant chunks.
 
         Args:
@@ -143,21 +137,19 @@ class Bm25LexicalStore:
                 if k <= 0:
                     return []
 
-                results, scores = self._retriever.retrieve(
-                    query_tokens, k=k, show_progress=False
-                )
+                results, scores = self._retriever.retrieve(query_tokens, k=k, show_progress=False)
                 # bm25s.retrieve returns integer corpus positions when no corpus
                 # is attached (fresh rebuild) but the corpus objects themselves
                 # when one was loaded (load_corpus=True). Resolve both shapes to
                 # the real chunk_id.
                 return [
                     (self._resolve_chunk_id(doc), float(score))
-                    for doc, score in zip(results[0], scores[0])
+                    for doc, score in zip(results[0], scores[0], strict=False)
                 ]
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - any failure becomes VectorStoreOperationError
                 error_msg = f"Failed to query BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreOperationError(error_msg)
+                raise VectorStoreOperationError(error_msg) from e
 
     def load(self) -> bool:
         """Load the persisted index (and chunk_id mapping) from disk.
@@ -190,19 +182,17 @@ class Bm25LexicalStore:
                     str(self.index_path), load_corpus=True, allow_pickle=False
                 )
                 self._retriever = retriever
-                self._chunk_ids = [
-                    int(item["chunk_id"]) for item in (retriever.corpus or [])
-                ]
+                self._chunk_ids = [int(item["chunk_id"]) for item in (retriever.corpus or [])]
                 self._built = True
                 logger.info(
                     "BM25 lexical index loaded",
                     extra={"extra_fields": {"chunks": len(self._chunk_ids)}},
                 )
                 return True
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - any failure (e.g. EOFError on a truncated .npy) becomes VectorStoreConnectionError
                 error_msg = f"Failed to load BM25 lexical index: {str(e)}"
                 logger.error(error_msg)
-                raise VectorStoreConnectionError(error_msg)
+                raise VectorStoreConnectionError(error_msg) from e
 
     def _resolve_chunk_id(self, doc: Any) -> int:
         """Map a bm25s retrieval result to a real chunk_id.
@@ -236,7 +226,7 @@ class Bm25LexicalStore:
             os.replace(target, backup)  # atomic: target aside
         try:
             os.replace(tmp_dir, target)  # atomic: new in place
-        except Exception:
+        except Exception:  # noqa: BLE001 - roll back on any failure, then re-raise
             if had_old:
                 os.replace(backup, target)  # roll back
             raise
@@ -253,9 +243,7 @@ class Bm25LexicalStore:
         deserialization).
         """
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_dir = tempfile.mkdtemp(
-            dir=str(self.index_path.parent), suffix=".bm25.tmp"
-        )
+        tmp_dir = tempfile.mkdtemp(dir=str(self.index_path.parent), suffix=".bm25.tmp")
         try:
             corpus = [{"chunk_id": cid} for cid in self._chunk_ids]
             retriever.save(
@@ -265,19 +253,17 @@ class Bm25LexicalStore:
                 show_progress=False,
             )
             self._swap_dir_into_place(tmp_dir)
-        except Exception:
+        except Exception:  # noqa: BLE001 - remove the temp directory on any failure, then re-raise
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
 
     def _persist_empty(self) -> None:
         """Persist an empty-corpus marker directory (no bm25s index)."""
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_dir = tempfile.mkdtemp(
-            dir=str(self.index_path.parent), suffix=".bm25.tmp"
-        )
+        tmp_dir = tempfile.mkdtemp(dir=str(self.index_path.parent), suffix=".bm25.tmp")
         try:
             (Path(tmp_dir) / "empty.marker").write_text("empty\n", encoding="utf-8")
             self._swap_dir_into_place(tmp_dir)
-        except Exception:
+        except Exception:  # noqa: BLE001 - remove the temp directory on any failure, then re-raise
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise

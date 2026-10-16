@@ -27,14 +27,13 @@ from backend.src.rag_core.interfaces import VectorStoreOperationError
 # Light French tokenizer                                                      #
 # --------------------------------------------------------------------------- #
 
+
 class TestLightFrenchTokenizer:
     """Tokenizer: accent fold + exact-term preservation, no stemming/stopwords."""
 
     def test_accent_fold_produces_matching_tokens(self):
         """Café == cafe == CAFÉ collapse to the same token."""
-        assert light_french_tokenizer(["Café", "cafe", "CAFÉ"]) == [
-            ["cafe"], ["cafe"], ["cafe"]
-        ]
+        assert light_french_tokenizer(["Café", "cafe", "CAFÉ"]) == [["cafe"], ["cafe"], ["cafe"]]
 
     def test_exact_identifier_preserved_no_stemming(self):
         """Identifiers/acronyms are preserved verbatim, split on non-alnum."""
@@ -62,6 +61,7 @@ class TestLightFrenchTokenizer:
 # --------------------------------------------------------------------------- #
 # Bm25LexicalStore                                                            #
 # --------------------------------------------------------------------------- #
+
 
 def _make_chunks():
     """A small corpus where each doc has a distinctive exact term."""

@@ -6,16 +6,15 @@ Couvre la gestion d'erreurs, cas limites et fonctionnalités non testées
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError  # noqa: F401
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.src.database.repository import (
     DocumentRepository,
     ConfigurationRepository,
     AuditLogRepository,
     BaseRepository,
-    create_repositories
+    create_repositories,
 )
-from backend.src.database.models import Document, Configuration, AuditLog  # noqa: F401
 
 
 class TestBaseRepository:
@@ -39,86 +38,100 @@ class TestDocumentRepositoryErrorHandling:
 
     def test_create_sqlalchemy_error(self, test_repositories):
         """Test création avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
-        with patch.object(repo.session, 'commit', side_effect=SQLAlchemyError("DB Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.create("test.pdf", "hash123")
+        with (
+            patch.object(repo.session, "commit", side_effect=SQLAlchemyError("DB Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.create("test.pdf", "hash123")
 
     def test_get_by_id_sqlalchemy_error(self, test_repositories):
         """Test get_by_id avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_by_id(1)
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_by_id(1)
 
     def test_get_by_hash_sqlalchemy_error(self, test_repositories):
         """Test get_by_hash avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_by_hash("hash123")
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_by_hash("hash123")
 
     def test_get_by_status_sqlalchemy_error(self, test_repositories):
         """Test get_by_status avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_by_status("pending")
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_by_status("pending")
 
     def test_get_all_sqlalchemy_error(self, test_repositories):
         """Test get_all avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_all()
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_all()
 
     def test_update_status_document_not_found(self, test_repositories):
         """Test update_status avec document inexistant"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         with pytest.raises(ValueError, match="Document 999 not found"):
             repo.update_status(999, "indexed")
 
     def test_update_status_sqlalchemy_error(self, test_repositories, sample_document_data):
         """Test update_status avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         # Créer un document
         doc = repo.create(
-            filename=sample_document_data["filename"],
-            file_hash=sample_document_data["file_hash"]
+            filename=sample_document_data["filename"], file_hash=sample_document_data["file_hash"]
         )
 
-        with patch.object(repo.session, 'commit', side_effect=SQLAlchemyError("Update Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.update_status(doc.id, "indexed")
+        with (
+            patch.object(repo.session, "commit", side_effect=SQLAlchemyError("Update Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.update_status(doc.id, "indexed")
 
     def test_delete_sqlalchemy_error(self, test_repositories, sample_document_data):
         """Test delete avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         # Créer un document
         doc = repo.create(
-            filename=sample_document_data["filename"],
-            file_hash=sample_document_data["file_hash"]
+            filename=sample_document_data["filename"], file_hash=sample_document_data["file_hash"]
         )
 
-        with patch.object(repo.session, 'commit', side_effect=SQLAlchemyError("Delete Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.delete(doc.id)
+        with (
+            patch.object(repo.session, "commit", side_effect=SQLAlchemyError("Delete Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.delete(doc.id)
 
     def test_get_statistics_sqlalchemy_error(self, test_repositories):
         """Test get_statistics avec erreur SQLAlchemy"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Stats Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_statistics()
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Stats Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_statistics()
 
 
 class TestDocumentRepositoryMissingCoverage:
@@ -126,12 +139,11 @@ class TestDocumentRepositoryMissingCoverage:
 
     def test_update_status_with_indexed_timestamp(self, test_repositories, sample_document_data):
         """Test update_status avec timestamp indexed_at"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         # Créer un document
         doc = repo.create(
-            filename=sample_document_data["filename"],
-            file_hash=sample_document_data["file_hash"]
+            filename=sample_document_data["filename"], file_hash=sample_document_data["file_hash"]
         )
 
         # Mettre à jour vers indexed avec chunk_count
@@ -145,12 +157,11 @@ class TestDocumentRepositoryMissingCoverage:
 
     def test_update_status_with_error_message(self, test_repositories, sample_document_data):
         """Test update_status avec message d'erreur"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         # Créer un document
         doc = repo.create(
-            filename=sample_document_data["filename"],
-            file_hash=sample_document_data["file_hash"]
+            filename=sample_document_data["filename"], file_hash=sample_document_data["file_hash"]
         )
 
         # Mettre à jour vers error avec message
@@ -164,14 +175,14 @@ class TestDocumentRepositoryMissingCoverage:
 
     def test_delete_document_not_found(self, test_repositories):
         """Test delete avec document inexistant"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         result = repo.delete(999)
         assert result is False
 
     def test_get_statistics_with_chunks(self, test_repositories, sample_document_data):
         """Test get_statistics avec calcul des chunks"""
-        repo = test_repositories['document']
+        repo = test_repositories["document"]
 
         # Créer des documents avec différents statuts
         doc1 = repo.create(
@@ -188,20 +199,16 @@ class TestDocumentRepositoryMissingCoverage:
         repo.update_status(doc2.id, "indexed", chunk_count=10)
 
         # Créer un document protégé
-        repo.create(
-            filename="protected.pdf",
-            file_hash="hash3",
-            preserve=True
-        )
+        repo.create(filename="protected.pdf", file_hash="hash3", preserve=True)
 
         stats = repo.get_statistics()
 
         # Vérifier les statistiques
-        assert stats['total_documents'] == 3
-        assert stats['count_pending'] == 1  # protected doc
-        assert stats['count_indexed'] == 2
-        assert stats['total_chunks'] == 15  # 5 + 10
-        assert stats['protected_documents'] == 1
+        assert stats["total_documents"] == 3
+        assert stats["count_pending"] == 1  # protected doc
+        assert stats["count_indexed"] == 2
+        assert stats["total_chunks"] == 15  # 5 + 10
+        assert stats["protected_documents"] == 1
 
 
 class TestConfigurationRepositoryErrorHandling:
@@ -209,42 +216,50 @@ class TestConfigurationRepositoryErrorHandling:
 
     def test_get_sqlalchemy_error(self, test_repositories):
         """Test get avec erreur SQLAlchemy"""
-        repo = test_repositories['config']
+        repo = test_repositories["config"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get("test_key")
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get("test_key")
 
     def test_set_sqlalchemy_error(self, test_repositories):
         """Test set avec erreur SQLAlchemy"""
-        repo = test_repositories['config']
+        repo = test_repositories["config"]
 
-        with patch.object(repo.session, 'commit', side_effect=SQLAlchemyError("Commit Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.set("test_key", "test_value")
+        with (
+            patch.object(repo.session, "commit", side_effect=SQLAlchemyError("Commit Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.set("test_key", "test_value")
 
     def test_delete_sqlalchemy_error(self, test_repositories):
         """Test delete avec erreur SQLAlchemy"""
-        repo = test_repositories['config']
+        repo = test_repositories["config"]
 
         # Créer une config d'abord
         repo.set("test_key", "test_value")
 
-        with patch.object(repo.session, 'commit', side_effect=SQLAlchemyError("Delete Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.delete("test_key")
+        with (
+            patch.object(repo.session, "commit", side_effect=SQLAlchemyError("Delete Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.delete("test_key")
 
     def test_get_all_sqlalchemy_error(self, test_repositories):
         """Test get_all avec erreur SQLAlchemy"""
-        repo = test_repositories['config']
+        repo = test_repositories["config"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_all()
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_all()
 
     def test_get_value_with_default(self, test_repositories):
         """Test get_value avec valeur par défaut"""
-        repo = test_repositories['config']
+        repo = test_repositories["config"]
 
         # Test avec clé inexistante
         value = repo.get_value("nonexistent", "default_value")
@@ -261,26 +276,32 @@ class TestAuditLogRepositoryErrorHandling:
 
     def test_create_log_sqlalchemy_error(self, test_repositories):
         """Test create_log avec erreur SQLAlchemy"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
-        with patch.object(repo.session, 'commit', side_effect=SQLAlchemyError("Commit Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.create_log("admin", "test_action")
+        with (
+            patch.object(repo.session, "commit", side_effect=SQLAlchemyError("Commit Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.create_log("admin", "test_action")
 
     def test_get_logs_sqlalchemy_error(self, test_repositories):
         """Test get_logs avec erreur SQLAlchemy"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
-        with patch.object(repo.session, 'query', side_effect=SQLAlchemyError("Query Error")):
-            with pytest.raises(SQLAlchemyError):
-                repo.get_logs()
+        with (
+            patch.object(repo.session, "query", side_effect=SQLAlchemyError("Query Error")),
+            pytest.raises(SQLAlchemyError),
+        ):
+            repo.get_logs()
 
     def test_cleanup_old_logs_sqlalchemy_error(self, test_repositories):
         """Test cleanup_old_logs avec erreur SQLAlchemy"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
-        with patch.object(repo.session, 'query') as mock_query:
-            mock_query.return_value.filter.return_value.delete.side_effect = SQLAlchemyError("Delete Error")
+        with patch.object(repo.session, "query") as mock_query:
+            mock_query.return_value.filter.return_value.delete.side_effect = SQLAlchemyError(
+                "Delete Error"
+            )
 
             with pytest.raises(SQLAlchemyError):
                 repo.cleanup_old_logs(30)
@@ -291,11 +312,10 @@ class TestAuditLogRepositoryMissingCoverage:
 
     def test_cleanup_old_logs_success(self, test_repositories):
         """Test cleanup_old_logs avec succès"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
         # Créer des logs anciens et récents
         old_date = datetime.utcnow() - timedelta(days=100)
-        recent_date = datetime.utcnow() - timedelta(days=10)  # noqa: F841
 
         # Créer un log récent
         repo.create_log("admin", "recent_action")
@@ -318,7 +338,7 @@ class TestAuditLogRepositoryMissingCoverage:
 
     def test_cleanup_old_logs_no_deletion(self, test_repositories):
         """Test cleanup_old_logs sans suppression"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
         # Créer un log récent seulement
         repo.create_log("admin", "recent_action")
@@ -331,7 +351,7 @@ class TestAuditLogRepositoryMissingCoverage:
 
     def test_create_log_with_all_parameters(self, test_repositories):
         """Test create_log avec tous les paramètres"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
         log = repo.create_log(
             user_type="admin",
@@ -339,7 +359,7 @@ class TestAuditLogRepositoryMissingCoverage:
             details="Detailed description",
             ip_address="192.168.1.100",
             user_agent="Mozilla/5.0 Test",
-            success=False
+            success=False,
         )
 
         assert log.user_type == "admin"
@@ -351,7 +371,7 @@ class TestAuditLogRepositoryMissingCoverage:
 
     def test_get_logs_with_partial_action_match(self, test_repositories):
         """Test get_logs avec correspondance partielle d'action"""
-        repo = test_repositories['audit']
+        repo = test_repositories["audit"]
 
         # Créer des logs avec différentes actions
         repo.create_log("admin", "login_success")
@@ -373,15 +393,15 @@ class TestCreateRepositoriesFactory:
         """Test création réussie de tous les repositories"""
         repositories = create_repositories(test_session)
 
-        assert 'document' in repositories
-        assert 'config' in repositories
-        assert 'audit' in repositories
+        assert "document" in repositories
+        assert "config" in repositories
+        assert "audit" in repositories
 
-        assert isinstance(repositories['document'], DocumentRepository)
-        assert isinstance(repositories['config'], ConfigurationRepository)
-        assert isinstance(repositories['audit'], AuditLogRepository)
+        assert isinstance(repositories["document"], DocumentRepository)
+        assert isinstance(repositories["config"], ConfigurationRepository)
+        assert isinstance(repositories["audit"], AuditLogRepository)
 
         # Vérifier que tous utilisent la même session
-        assert repositories['document'].session is test_session
-        assert repositories['config'].session is test_session
-        assert repositories['audit'].session is test_session
+        assert repositories["document"].session is test_session
+        assert repositories["config"].session is test_session
+        assert repositories["audit"].session is test_session

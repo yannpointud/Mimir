@@ -28,6 +28,7 @@ Exit code 1: at least one iteration reloaded an incoherent pair or raised.
 
 Usage: python3 scripts/faiss_kill9_persist.py
 """
+
 import multiprocessing
 import os
 import random
@@ -122,7 +123,7 @@ def _run_iteration(iteration: int, index_path: str, metadata_path: str) -> tuple
             index_path=index_path,
             metadata_path=metadata_path,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - crash harness: any reload error is a failed iteration
         return False, f"iteration {iteration}: reload raised {e!r}"
 
     metadata_len = len(reloaded.metadata)
@@ -138,8 +139,7 @@ def _run_iteration(iteration: int, index_path: str, metadata_path: str) -> tuple
         )
 
     return True, (
-        f"iteration {iteration}: OK "
-        f"(metadata_len={metadata_len}, index.ntotal={index_total})"
+        f"iteration {iteration}: OK (metadata_len={metadata_len}, index.ntotal={index_total})"
     )
 
 

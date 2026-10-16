@@ -23,22 +23,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_client_identifier(request: Request) -> str:
-    """
-    Get client identifier for rate limiting.
+    """Get client identifier for rate limiting.
 
     Uses IP address by default, but can be enhanced to use
     authenticated user ID for more sophisticated limiting.
-
-    Args:
-        request: FastAPI request object
-
-    Returns:
-        str: Client identifier
     """
     # Check if user is authenticated
-    if hasattr(request.state, 'jwt_payload') and request.state.jwt_payload:
-        user_id = request.state.jwt_payload.get('sub')
-        user_type = request.state.jwt_payload.get('user_type')
+    if hasattr(request.state, "jwt_payload") and request.state.jwt_payload:
+        user_id = request.state.jwt_payload.get("sub")
+        user_type = request.state.jwt_payload.get("user_type")
         if user_id:
             return f"user:{user_type}:{user_id}"
 
@@ -57,14 +50,10 @@ limiter = Limiter(
 
 
 def configure_rate_limiting(app):
-    """
-    Configure rate limiting for the FastAPI application.
+    """Configure rate limiting for the FastAPI application.
 
     Registers the limiter on app.state and the 429 exception handler.
     Deliberately registers NO ASGI middleware (see module docstring).
-
-    Args:
-        app: FastAPI application instance
     """
     app.state.limiter = limiter
 
@@ -92,8 +81,6 @@ def configure_rate_limiting(app):
         )
         # Inject Retry-After and X-RateLimit-* headers from the window state
         # recorded by the limit check (request.state.view_rate_limit)
-        return request.app.state.limiter._inject_headers(
-            response, request.state.view_rate_limit
-        )
+        return request.app.state.limiter._inject_headers(response, request.state.view_rate_limit)
 
     logger.info("Rate limiting configured successfully")

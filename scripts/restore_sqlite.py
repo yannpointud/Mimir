@@ -10,6 +10,7 @@ script restores a backup file via the Online Backup API and asserts two things:
 It exits ``0`` only when both hold, ``1`` otherwise, so it can gate a scheduled
 backup run or a disaster-recovery drill.
 """
+
 import sqlite3
 import sys
 from pathlib import Path
@@ -22,9 +23,7 @@ def _assert_within_data_tree(path: Path) -> None:
     obviously out-of-tree arguments; it does not replace filesystem perms.
     """
     if "data" not in path.parts:
-        raise ValueError(
-            f"Refusing to operate on path outside a data/ tree: {path}"
-        )
+        raise ValueError(f"Refusing to operate on path outside a data/ tree: {path}")
 
 
 def restore_and_verify(backup_path, source_path, restore_target) -> bool:
@@ -80,21 +79,19 @@ def restore_and_verify(backup_path, source_path, restore_target) -> bool:
         return False
 
     # Enumerate user tables only (exclude SQLite internal sqlite_% tables).
-    tables = [r[0] for r in restore_conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' "
-        "AND name NOT LIKE 'sqlite_%'"
-    ).fetchall()]
+    tables = [
+        r[0]
+        for r in restore_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    ]
 
     source_conn = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True)
     mismatches = []
     try:
         for table in tables:
-            restored_count = restore_conn.execute(
-                f"SELECT COUNT(*) FROM {table}"
-            ).fetchone()[0]
-            source_count = source_conn.execute(
-                f"SELECT COUNT(*) FROM {table}"
-            ).fetchone()[0]
+            restored_count = restore_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            source_count = source_conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             if restored_count != source_count:
                 mismatches.append((table, source_count, restored_count))
     finally:

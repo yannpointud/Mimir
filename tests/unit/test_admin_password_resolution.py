@@ -96,9 +96,7 @@ class TestResolveAdminPassword:
 
         assert settings.admin_password_hash == configured_hash
 
-    def test_development_weak_password_warns_and_applies(
-        self, make_settings, resolver_caplog
-    ):
+    def test_development_weak_password_warns_and_applies(self, make_settings, resolver_caplog):
         """Test 4: development + weak ADMIN_PASSWORD -> warning, still applied."""
         settings = make_settings(
             environment="development",
@@ -115,9 +113,7 @@ class TestResolveAdminPassword:
         assert len(warning_records) == 1
         assert jwt_handler.verify_password(WEAK_PASSWORD, settings.admin_password_hash)
 
-    def test_clear_text_password_never_reaches_the_logs(
-        self, make_settings, resolver_caplog
-    ):
+    def test_clear_text_password_never_reaches_the_logs(self, make_settings, resolver_caplog):
         """Test 5: neither the password nor the derived hash is ever logged."""
         settings = make_settings(admin_password=STRONG_PASSWORD)
 

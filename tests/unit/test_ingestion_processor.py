@@ -8,12 +8,11 @@ import shutil
 import asyncio
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
-import numpy as np  # noqa: F401
 
 from src.ingestion.processor import IngestionProcessor, ProcessingError
 from src.ingestion.queue_manager import IngestionTask
 from src.ingestion.chunking import ChunkingConfig
-from src.llm_interface.interfaces import GenerationResponse, EmbeddingResponse, LLMException  # noqa: F401
+from src.llm_interface.interfaces import EmbeddingResponse, LLMException
 from src.rag_core.interfaces import Chunk
 from src.cost.budget_guard import BudgetReservation
 
@@ -33,9 +32,7 @@ class TestIngestionProcessor:
         """Service LLM mocké"""
         mock_service = AsyncMock()
         mock_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
-            model="test-embed",
-            usage_tokens=10
+            embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], model="test-embed", usage_tokens=10
         )
         return mock_service
 
@@ -76,8 +73,14 @@ class TestIngestionProcessor:
         return mock_tracker
 
     @pytest.fixture
-    def processor(self, mock_llm_service, mock_vector_store, mock_document_repository,
-                  mock_budget_guard, mock_usage_tracker):
+    def processor(
+        self,
+        mock_llm_service,
+        mock_vector_store,
+        mock_document_repository,
+        mock_budget_guard,
+        mock_usage_tracker,
+    ):
         """Processeur d'ingestion pour les tests"""
         config = ChunkingConfig(chunk_size=100, overlap=20)
         return IngestionProcessor(
@@ -88,7 +91,7 @@ class TestIngestionProcessor:
             max_file_size_mb=1,
             max_chunks_per_doc=100,
             budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
+            usage_tracker=mock_usage_tracker,
         )
 
     @pytest.fixture
@@ -96,15 +99,17 @@ class TestIngestionProcessor:
         """Fichier texte d'exemple"""
         file_path = temp_dir / "sample.txt"
         content = "This is a sample text file for testing the ingestion processor. " * 10
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
         return file_path
 
-    def test_processor_initialization(self, mock_llm_service, mock_vector_store, mock_document_repository):
+    def test_processor_initialization(
+        self, mock_llm_service, mock_vector_store, mock_document_repository
+    ):
         """Test d'initialisation du processeur"""
         processor = IngestionProcessor(
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
-            document_repository=mock_document_repository
+            document_repository=mock_document_repository,
         )
 
         assert processor.llm_service == mock_llm_service
@@ -113,7 +118,9 @@ class TestIngestionProcessor:
         assert processor.max_file_size_bytes == 100 * 1024 * 1024  # 100MB par défaut
         assert processor.max_chunks_per_doc == 2000
 
-    def test_processor_custom_config(self, mock_llm_service, mock_vector_store, mock_document_repository):
+    def test_processor_custom_config(
+        self, mock_llm_service, mock_vector_store, mock_document_repository
+    ):
         """Test avec configuration personnalisée"""
         config = ChunkingConfig(chunk_size=500, overlap=100)
         processor = IngestionProcessor(
@@ -122,7 +129,7 @@ class TestIngestionProcessor:
             document_repository=mock_document_repository,
             chunking_config=config,
             max_file_size_mb=50,
-            max_chunks_per_doc=1000
+            max_chunks_per_doc=1000,
         )
 
         assert processor.max_file_size_bytes == 50 * 1024 * 1024
@@ -163,7 +170,7 @@ class TestIngestionProcessor:
         # Créer un fichier plus grand que la limite (1MB pour ce test)
         large_file = temp_dir / "large.txt"
         large_content = "x" * (2 * 1024 * 1024)  # 2MB
-        large_file.write_text(large_content, encoding='utf-8')
+        large_file.write_text(large_content, encoding="utf-8")
 
         success = processor.queue_document(str(large_file))
 
@@ -173,18 +180,16 @@ class TestIngestionProcessor:
     def test_queue_document_with_metadata(self, processor, sample_text_file):
         """Test avec métadonnées"""
         metadata = {"author": "test", "category": "sample"}
-        success = processor.queue_document(
-            str(sample_text_file),
-            metadata=metadata,
-            preserve=True
-        )
+        success = processor.queue_document(str(sample_text_file), metadata=metadata, preserve=True)
 
         assert success is True
 
         # Vérifier que la tâche a les bonnes métadonnées
         # (nous ne pouvons pas facilement vérifier cela sans accéder à la queue interne)
 
-    def test_queue_document_duplicate_hash(self, processor, sample_text_file, mock_document_repository):
+    def test_queue_document_duplicate_hash(
+        self, processor, sample_text_file, mock_document_repository
+    ):
         """Test avec hash de fichier dupliqué"""
         # Simuler une exception de duplication
         mock_document_repository.create.side_effect = Exception("already exists")
@@ -225,10 +230,7 @@ class TestIngestionProcessor:
     @pytest.mark.asyncio
     async def test_generate_embeddings_success(self, processor):
         """Test de génération d'embeddings réussi"""
-        chunks_data = [
-            {"text": "First chunk"},
-            {"text": "Second chunk"}
-        ]
+        chunks_data = [{"text": "First chunk"}, {"text": "Second chunk"}]
 
         response = await processor._generate_embeddings(chunks_data)
 
@@ -257,7 +259,7 @@ class TestIngestionProcessor:
                 "start_char": 0,
                 "end_char": 11,
                 "word_count": 2,
-                "char_count": 11
+                "char_count": 11,
             },
             {
                 "text": "Second chunk",
@@ -266,21 +268,14 @@ class TestIngestionProcessor:
                 "start_char": 11,
                 "end_char": 23,
                 "word_count": 2,
-                "char_count": 12
-            }
+                "char_count": 12,
+            },
         ]
 
-        embeddings = [
-            [0.1, 0.2, 0.3],
-            [0.4, 0.5, 0.6]
-        ]
+        embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
 
         chunks = processor._create_chunks(
-            chunks_data,
-            embeddings,
-            "doc123",
-            "/test/source.txt",
-            {"category": "test"}
+            chunks_data, embeddings, "doc123", "/test/source.txt", {"category": "test"}
         )
 
         assert len(chunks) == 2
@@ -300,39 +295,43 @@ class TestIngestionProcessor:
         task = IngestionTask(
             file_path="dummy_path",  # sera mocké
             document_id="123",
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         # Ajuster le mock LLM pour retourner un seul embedding correspondant à un chunk
         processor.llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding pour un chunk
             model="test-embed",
-            usage_tokens=10
+            usage_tokens=10,
         )
 
         # Mock des étapes du pipeline
-        with patch.object(processor, '_extract_text', return_value="Sample text for chunking test") as mock_extract:
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [
-                    {
-                        "text": "Sample text",
-                        "chunk_index": 0,
-                        "total_chunks": 1,
-                        "start_char": 0,
-                        "end_char": 11,
-                        "word_count": 2,
-                        "char_count": 11
-                    }
-                ]
+        with (
+            patch.object(
+                processor, "_extract_text", return_value="Sample text for chunking test"
+            ) as mock_extract,
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
+                    "text": "Sample text",
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": 11,
+                    "word_count": 2,
+                    "char_count": 11,
+                }
+            ]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
-                assert success is True
-                mock_extract.assert_called_once_with(task.file_path)
-                mock_chunk.assert_called_once()
-                processor.llm_service.embed.assert_called_once()
-                processor.vector_store.upsert.assert_called_once()
-                processor.vector_store.persist.assert_called_once()
+            assert success is True
+            mock_extract.assert_called_once_with(task.file_path)
+            mock_chunk.assert_called_once()
+            processor.llm_service.embed.assert_called_once()
+            processor.vector_store.upsert.assert_called_once()
+            processor.vector_store.persist.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_pipeline_rebuilds_bm25_from_active_chunks(self, processor):
@@ -342,24 +341,35 @@ class TestIngestionProcessor:
         # store under its own lock (snapshot_active_chunks), so the worker just
         # forwards whatever that lock-safe snapshot returns to rebuild().
         processor.bm25_store = Mock()
-        processor.vector_store.snapshot_active_chunks = Mock(return_value=[
-            {"chunk_id": 0, "text": "active one"},
-            {"chunk_id": 2, "text": "active two"},
-        ])
+        processor.vector_store.snapshot_active_chunks = Mock(
+            return_value=[
+                {"chunk_id": 0, "text": "active one"},
+                {"chunk_id": 2, "text": "active two"},
+            ]
+        )
 
         task = IngestionTask(file_path="dummy_path", document_id="123", metadata={})
         processor.llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, "_extract_text", return_value="Sample text"),
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
+                    "text": "Sample text",
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": 11,
+                    "word_count": 2,
+                    "char_count": 11,
+                }
+            ]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
         assert success is True
         processor.vector_store.snapshot_active_chunks.assert_called_once()
@@ -382,14 +392,23 @@ class TestIngestionProcessor:
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, "_extract_text", return_value="Sample text"),
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
+                    "text": "Sample text",
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": 11,
+                    "word_count": 2,
+                    "char_count": 11,
+                }
+            ]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
         # FAISS upsert succeeded, so the pipeline reports success despite BM25.
         assert success is True
@@ -404,35 +423,44 @@ class TestIngestionProcessor:
         quadratic bulk-load cost, while the FAISS upsert still runs once per
         document (dense index stays authoritative throughout)."""
         processor.bm25_store = Mock()
-        processor.vector_store.snapshot_active_chunks = Mock(return_value=[
-            {"chunk_id": 0, "text": "active"},
-        ])
+        processor.vector_store.snapshot_active_chunks = Mock(
+            return_value=[
+                {"chunk_id": 0, "text": "active"},
+            ]
+        )
 
         n_docs = 5
         processor.llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, "_extract_text", return_value="Sample text"),
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
+                    "text": "Sample text",
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": 11,
+                    "word_count": 2,
+                    "char_count": 11,
+                }
+            ]
 
-                # Pre-enqueue N documents BEFORE the worker starts: this is the
-                # realistic bulk-upload scenario where the queue is already full
-                # when the single-writer worker begins draining it.
-                for i in range(n_docs):
-                    task = IngestionTask(
-                        file_path=f"dummy_{i}", document_id=str(100 + i), metadata={}
-                    )
-                    assert processor.queue_manager.add_task(task) is True
+            # Pre-enqueue N documents BEFORE the worker starts: this is the
+            # realistic bulk-upload scenario where the queue is already full
+            # when the single-writer worker begins draining it.
+            for i in range(n_docs):
+                task = IngestionTask(file_path=f"dummy_{i}", document_id=str(100 + i), metadata={})
+                assert processor.queue_manager.add_task(task) is True
 
-                await processor.start()
-                # Wait for the whole batch to drain (task_done for every item).
-                await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
-                await processor.stop()
+            await processor.start()
+            # Wait for the whole batch to drain (task_done for every item).
+            await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
+            await processor.stop()
 
         # FAISS upsert ran once per document (dense index authoritative)...
         assert processor.vector_store.upsert.call_count == n_docs
@@ -456,9 +484,11 @@ class TestIngestionProcessor:
         Only the coalescing test's all-success path was covered before; this proves
         the failure-path drain rebuild, fired from _process_task's finally block."""
         processor.bm25_store = Mock()
-        processor.vector_store.snapshot_active_chunks = Mock(return_value=[
-            {"chunk_id": 0, "text": "active"},
-        ])
+        processor.vector_store.snapshot_active_chunks = Mock(
+            return_value=[
+                {"chunk_id": 0, "text": "active"},
+            ]
+        )
         processor.llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]], model="test-embed", usage_tokens=10
         )
@@ -471,27 +501,36 @@ class TestIngestionProcessor:
                 raise ProcessingError("simulated extraction failure on last doc")
             return "Sample text"
 
-        with patch.object(processor, '_extract_text', side_effect=_extract_side_effect):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
-                    "text": "Sample text", "chunk_index": 0, "total_chunks": 1,
-                    "start_char": 0, "end_char": 11, "word_count": 2, "char_count": 11
-                }]
+        with (
+            patch.object(processor, "_extract_text", side_effect=_extract_side_effect),
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
+                    "text": "Sample text",
+                    "chunk_index": 0,
+                    "total_chunks": 1,
+                    "start_char": 0,
+                    "end_char": 11,
+                    "word_count": 2,
+                    "char_count": 11,
+                }
+            ]
 
-                ok_task = IngestionTask(
-                    file_path="dummy_ok", document_id="100", metadata={}
-                )
-                fail_task = IngestionTask(
-                    file_path="dummy_fail", document_id="101", metadata={},
-                )
-                # No retries for the failing task so the batch drains promptly.
-                fail_task.max_retries = 0
-                assert processor.queue_manager.add_task(ok_task) is True
-                assert processor.queue_manager.add_task(fail_task) is True
+            ok_task = IngestionTask(file_path="dummy_ok", document_id="100", metadata={})
+            fail_task = IngestionTask(
+                file_path="dummy_fail",
+                document_id="101",
+                metadata={},
+            )
+            # No retries for the failing task so the batch drains promptly.
+            fail_task.max_retries = 0
+            assert processor.queue_manager.add_task(ok_task) is True
+            assert processor.queue_manager.add_task(fail_task) is True
 
-                await processor.start()
-                await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
-                await processor.stop()
+            await processor.start()
+            await asyncio.wait_for(processor.queue_manager.queue.join(), timeout=10.0)
+            await processor.stop()
 
         # The first document was upserted into FAISS...
         assert processor.vector_store.upsert.call_count == 1
@@ -499,7 +538,7 @@ class TestIngestionProcessor:
         # the earlier document is present in the lexical index.
         assert processor.bm25_store.rebuild.call_count >= 1, (
             "BM25 was never rebuilt after the last doc of the batch failed; "
-            "the earlier successful document would be stale vs FAISS (WR-01)"
+            "the earlier successful document would be stale vs FAISS"
         )
 
     @pytest.mark.asyncio
@@ -507,7 +546,7 @@ class TestIngestionProcessor:
         """Test avec texte vide extrait"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, '_extract_text', return_value="   \n  "):
+        with patch.object(processor, "_extract_text", return_value="   \n  "):
             success = await processor._process_document_pipeline(task)
 
             assert success is False
@@ -517,11 +556,13 @@ class TestIngestionProcessor:
         """Test sans chunks créés"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text', return_value=[]):
-                success = await processor._process_document_pipeline(task)
+        with (
+            patch.object(processor, "_extract_text", return_value="Sample text"),
+            patch.object(processor.chunking_strategy, "chunk_text", return_value=[]),
+        ):
+            success = await processor._process_document_pipeline(task)
 
-                assert success is False
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_too_many_chunks(self, processor):
@@ -531,32 +572,36 @@ class TestIngestionProcessor:
         # Créer plus de chunks que la limite
         many_chunks = []
         for i in range(150):  # Plus que max_chunks_per_doc (100 dans ce test)
-            many_chunks.append({
-                "text": f"Chunk {i}",
-                "chunk_index": i,
-                "total_chunks": 150,
-                "start_char": i * 10,
-                "end_char": (i + 1) * 10,
-                "word_count": 2,
-                "char_count": 10
-            })
+            many_chunks.append(
+                {
+                    "text": f"Chunk {i}",
+                    "chunk_index": i,
+                    "total_chunks": 150,
+                    "start_char": i * 10,
+                    "end_char": (i + 1) * 10,
+                    "word_count": 2,
+                    "char_count": 10,
+                }
+            )
 
         # Ajuster le mock pour retourner 100 embeddings (le nombre après troncature)
         processor.llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]] * 100,  # 100 embeddings pour 100 chunks tronqués
             model="test-embed",
-            usage_tokens=100
+            usage_tokens=100,
         )
 
-        with patch.object(processor, '_extract_text', return_value="Long text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text', return_value=many_chunks):
-                success = await processor._process_document_pipeline(task)
+        with (
+            patch.object(processor, "_extract_text", return_value="Long text"),
+            patch.object(processor.chunking_strategy, "chunk_text", return_value=many_chunks),
+        ):
+            success = await processor._process_document_pipeline(task)
 
-                # Doit réussir mais tronquer les chunks
-                assert success is True
-                # Vérifier que seulement max_chunks_per_doc chunks ont été traités
-                call_args = processor.llm_service.embed.call_args[0][0]
-                assert len(call_args) == processor.max_chunks_per_doc
+            # Doit réussir mais tronquer les chunks
+            assert success is True
+            # Vérifier que seulement max_chunks_per_doc chunks ont été traités
+            call_args = processor.llm_service.embed.call_args[0][0]
+            assert len(call_args) == processor.max_chunks_per_doc
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_embedding_mismatch(self, processor, mock_llm_service):
@@ -567,48 +612,58 @@ class TestIngestionProcessor:
         mock_llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding
             model="test",
-            usage_tokens=5
+            usage_tokens=5,
         )
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [
-                    {"text": "Chunk 1", "chunk_index": 0, "total_chunks": 2},
-                    {"text": "Chunk 2", "chunk_index": 1, "total_chunks": 2}
-                ]  # Deux chunks mais un seul embedding
+        with (
+            patch.object(processor, "_extract_text", return_value="Sample text"),
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {"text": "Chunk 1", "chunk_index": 0, "total_chunks": 2},
+                {"text": "Chunk 2", "chunk_index": 1, "total_chunks": 2},
+            ]  # Deux chunks mais un seul embedding
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
-                assert success is False
+            assert success is False
 
     @pytest.mark.asyncio
-    async def test_process_document_pipeline_vector_store_failure(self, processor, mock_vector_store):
+    async def test_process_document_pipeline_vector_store_failure(
+        self, processor, mock_vector_store
+    ):
         """Test d'échec du vector store"""
         task = IngestionTask(file_path="dummy", document_id="123")
         mock_vector_store.upsert.return_value = False
 
-        with patch.object(processor, '_extract_text', return_value="Sample text"):
-            with patch.object(processor.chunking_strategy, 'chunk_text') as mock_chunk:
-                mock_chunk.return_value = [{
+        with (
+            patch.object(processor, "_extract_text", return_value="Sample text"),
+            patch.object(processor.chunking_strategy, "chunk_text") as mock_chunk,
+        ):
+            mock_chunk.return_value = [
+                {
                     "text": "Sample text",
                     "chunk_index": 0,
                     "total_chunks": 1,
                     "start_char": 0,
                     "end_char": 11,
                     "word_count": 2,
-                    "char_count": 11
-                }]
+                    "char_count": 11,
+                }
+            ]
 
-                success = await processor._process_document_pipeline(task)
+            success = await processor._process_document_pipeline(task)
 
-                assert success is False
+            assert success is False
 
     @pytest.mark.asyncio
     async def test_process_task_success(self, processor, mock_document_repository):
         """Test de traitement de tâche réussi"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, '_process_document_pipeline', new_callable=AsyncMock) as mock_pipeline:
+        with patch.object(
+            processor, "_process_document_pipeline", new_callable=AsyncMock
+        ) as mock_pipeline:
             mock_pipeline.return_value = True
 
             success = await processor._process_task(task)
@@ -622,7 +677,9 @@ class TestIngestionProcessor:
         """Test d'échec de traitement de tâche"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, '_process_document_pipeline', new_callable=AsyncMock) as mock_pipeline:
+        with patch.object(
+            processor, "_process_document_pipeline", new_callable=AsyncMock
+        ) as mock_pipeline:
             mock_pipeline.return_value = False
 
             success = await processor._process_task(task)
@@ -631,14 +688,16 @@ class TestIngestionProcessor:
             # Vérifier que le statut d'erreur a été mis à jour
             mock_document_repository.update_status.assert_called()
             last_call = mock_document_repository.update_status.call_args_list[-1]
-            assert last_call[0][1] == 'error'  # statut d'erreur
+            assert last_call[0][1] == "error"  # statut d'erreur
 
     @pytest.mark.asyncio
     async def test_process_task_exception(self, processor, mock_document_repository):
         """Test d'exception lors du traitement"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        with patch.object(processor, '_process_document_pipeline', new_callable=AsyncMock) as mock_pipeline:
+        with patch.object(
+            processor, "_process_document_pipeline", new_callable=AsyncMock
+        ) as mock_pipeline:
             mock_pipeline.side_effect = Exception("Processing error")
 
             success = await processor._process_task(task)
@@ -652,19 +711,19 @@ class TestIngestionProcessor:
         stats = processor.get_stats()
 
         expected_keys = [
-            'processor_running',
-            'supported_extensions',
-            'max_file_size_mb',
-            'max_chunks_per_doc',
-            'queue_stats'
+            "processor_running",
+            "supported_extensions",
+            "max_file_size_mb",
+            "max_chunks_per_doc",
+            "queue_stats",
         ]
 
         for key in expected_keys:
             assert key in stats
 
-        assert isinstance(stats['supported_extensions'], list)
-        assert stats['max_file_size_mb'] == 1  # Configuration de test
-        assert stats['max_chunks_per_doc'] == 100
+        assert isinstance(stats["supported_extensions"], list)
+        assert stats["max_file_size_mb"] == 1  # Configuration de test
+        assert stats["max_chunks_per_doc"] == 100
 
     def test_get_queue_size(self, processor):
         """Test de taille de queue"""
@@ -711,9 +770,7 @@ class TestIngestionProcessorIntegration:
         """Service LLM mocké pour les tests d'intégration"""
         mock_service = AsyncMock()
         mock_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
-            model="test-embed",
-            usage_tokens=10
+            embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], model="test-embed", usage_tokens=10
         )
         return mock_service
 
@@ -762,8 +819,11 @@ class TestIngestionProcessorIntegration:
 
         # Fichier texte simple
         txt_file = temp_dir / "simple.txt"
-        txt_file.write_text("This is a simple text file for testing. It contains multiple sentences. Each sentence should be processed correctly.", encoding='utf-8')
-        files['txt'] = txt_file
+        txt_file.write_text(
+            "This is a simple text file for testing. It contains multiple sentences. Each sentence should be processed correctly.",
+            encoding="utf-8",
+        )
+        files["txt"] = txt_file
 
         # Fichier markdown
         md_file = temp_dir / "document.md"
@@ -783,20 +843,27 @@ Content of section 2 with more text.
 
 Even more detailed content here.
 """
-        md_file.write_text(md_content, encoding='utf-8')
-        files['md'] = md_file
+        md_file.write_text(md_content, encoding="utf-8")
+        files["md"] = md_file
 
         return files
 
     @pytest.mark.asyncio
-    async def test_end_to_end_processing(self, real_files, mock_llm_service, mock_vector_store,
-                                          mock_document_repository, mock_budget_guard, mock_usage_tracker):
+    async def test_end_to_end_processing(
+        self,
+        real_files,
+        mock_llm_service,
+        mock_vector_store,
+        mock_document_repository,
+        mock_budget_guard,
+        mock_usage_tracker,
+    ):
         """Test de traitement bout en bout"""
         # Configurer les mocks pour un comportement réaliste - adapter selon le nombre de chunks réel
         mock_llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3, 0.4]],  # Un seul chunk pour le fichier texte simple
             model="test-embed",
-            usage_tokens=50
+            usage_tokens=50,
         )
 
         processor = IngestionProcessor(
@@ -806,14 +873,12 @@ Even more detailed content here.
             max_file_size_mb=10,
             max_chunks_per_doc=50,
             budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
+            usage_tracker=mock_usage_tracker,
         )
 
         # Traitement d'un fichier texte
         task = IngestionTask(
-            file_path=str(real_files['txt']),
-            document_id="123",
-            metadata={"type": "test"}
+            file_path=str(real_files["txt"]), document_id="123", metadata={"type": "test"}
         )
 
         success = await processor._process_document_pipeline(task)
@@ -835,14 +900,21 @@ Even more detailed content here.
         assert all(len(chunk.text.strip()) > 0 for chunk in chunks)
 
     @pytest.mark.asyncio
-    async def test_markdown_processing(self, real_files, mock_llm_service, mock_vector_store,
-                                        mock_document_repository, mock_budget_guard, mock_usage_tracker):
+    async def test_markdown_processing(
+        self,
+        real_files,
+        mock_llm_service,
+        mock_vector_store,
+        mock_document_repository,
+        mock_budget_guard,
+        mock_usage_tracker,
+    ):
         """Test de traitement de fichier Markdown"""
         # Configurer le mock pour le fichier markdown (probablement 1 chunk)
         mock_llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding pour le fichier markdown
             model="test-embed",
-            usage_tokens=25
+            usage_tokens=25,
         )
 
         processor = IngestionProcessor(
@@ -850,13 +922,13 @@ Even more detailed content here.
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
             budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
+            usage_tracker=mock_usage_tracker,
         )
 
         task = IngestionTask(
-            file_path=str(real_files['md']),
+            file_path=str(real_files["md"]),
             document_id="123",  # Utiliser un entier sous forme de chaîne
-            metadata={"format": "markdown"}
+            metadata={"format": "markdown"},
         )
 
         success = await processor._process_document_pipeline(task)
@@ -873,14 +945,21 @@ Even more detailed content here.
         assert "Section 2" in all_text
 
     @pytest.mark.asyncio
-    async def test_concurrent_processing_simulation(self, real_files, mock_llm_service, mock_vector_store,
-                                                     mock_document_repository, mock_budget_guard, mock_usage_tracker):
+    async def test_concurrent_processing_simulation(
+        self,
+        real_files,
+        mock_llm_service,
+        mock_vector_store,
+        mock_document_repository,
+        mock_budget_guard,
+        mock_usage_tracker,
+    ):
         """Test de simulation de traitement concurrent"""
         # Configurer le mock pour les multiples fichiers (probablement 1 chunk chacun)
         mock_llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding par fichier
             model="test-embed",
-            usage_tokens=20
+            usage_tokens=20,
         )
 
         # La fixture mock_document_repository est configurée correctement
@@ -890,7 +969,7 @@ Even more detailed content here.
             vector_store=mock_vector_store,
             document_repository=mock_document_repository,
             budget_guard=mock_budget_guard,
-            usage_tracker=mock_usage_tracker
+            usage_tracker=mock_usage_tracker,
         )
 
         processed_docs = []
@@ -909,8 +988,8 @@ Even more detailed content here.
 
         # Ajouter plusieurs documents (sans spécifier document_id pour laisser la génération automatique)
         files_to_process = [
-            str(real_files['txt']),
-            str(real_files['md']),
+            str(real_files["txt"]),
+            str(real_files["md"]),
         ]
 
         for file_path in files_to_process:

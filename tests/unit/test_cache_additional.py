@@ -4,8 +4,6 @@ Tests unitaires supplémentaires pour le module cache/lru_cache.py
 Ces tests couvrent les cas d'edge et fonctionnalités avancées du cache.
 """
 
-import pytest  # noqa: F401
-from unittest.mock import Mock, patch  # noqa: F401
 import threading
 import time
 from datetime import datetime, timedelta
@@ -95,7 +93,7 @@ class TestCacheServiceAdvanced:
             thread.join()
 
         # Vérifier que toutes les opérations ont réussi
-        for key, original_value, retrieved_value in results:
+        for _key, original_value, retrieved_value in results:
             assert original_value == retrieved_value
 
     def test_cache_service_update_existing_key(self):
@@ -255,7 +253,7 @@ class TestCacheServiceAdvanced:
                         contains(cache, key)
                     if i % 20 == 0:
                         cache.get_stats()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - thread harness: collect any error for the assertion
                 errors.append(f"Worker {worker_id}: {e}")
 
         # Lancer plusieurs workers
@@ -308,11 +306,11 @@ class TestCacheServiceIntegration:
             "How does neural network work?",
             "What is deep learning?",
             "Explain reinforcement learning",
-            "What is machine learning?"  # Répétée
+            "What is machine learning?",  # Répétée
         ]
 
         # Première passe - cache misses
-        for i, question in enumerate(questions):
+        for _i, question in enumerate(questions):
             key = cache._generate_key(question)
             result = cache.get(key)
             if result is None:
@@ -369,7 +367,7 @@ class TestCacheServiceIntegration:
             ("list_key", [1, 2, 3]),
             ("dict_key", {"nested": "value"}),
             ("bool_key", True),
-            ("none_key", None)
+            ("none_key", None),
         ]
 
         for key, value in test_data:

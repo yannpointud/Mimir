@@ -79,9 +79,7 @@ async def test_same_fingerprint_within_window_sends_once(mock_send, monkeypatch)
     handler = FingerprintAlertHandler(throttle_seconds=900)
 
     for _ in range(3):
-        handler.emit(
-            _make_record(module="chat", func="answer", line=42, message="boom")
-        )
+        handler.emit(_make_record(module="chat", func="answer", line=42, message="boom"))
     await _drain_tasks()
 
     assert mock_send.call_count == 1

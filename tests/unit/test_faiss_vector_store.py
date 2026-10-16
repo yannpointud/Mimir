@@ -14,9 +14,12 @@ from unittest.mock import Mock, patch
 from pydantic import ValidationError
 
 from backend.src.rag_core.interfaces import (
-    AbstractVectorStore, Chunk, SearchResult,
-    VectorStoreException, VectorStoreConnectionError,
-    VectorStoreOperationError
+    AbstractVectorStore,
+    Chunk,
+    SearchResult,
+    VectorStoreException,
+    VectorStoreConnectionError,
+    VectorStoreOperationError,
 )
 from backend.src.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
 
@@ -43,7 +46,7 @@ class TestChunk:
             chunk_index=0,
             total_chunks=5,
             source="test.txt",
-            metadata={"author": "test"}
+            metadata={"author": "test"},
         )
 
         assert chunk.text == "Hello world"
@@ -65,7 +68,7 @@ class TestChunk:
             total_chunks=1,
             source="important.txt",
             metadata={},
-            preserve=True
+            preserve=True,
         )
 
         assert chunk.preserve is True
@@ -84,7 +87,7 @@ class TestSearchResult:
             similarity_score=0.85,
             chunk_index=0,
             total_chunks=2,
-            metadata={"type": "test"}
+            metadata={"type": "test"},
         )
 
         assert result.chunk_id == 1
@@ -137,7 +140,7 @@ class TestFaissVectorStore:
                 chunk_index=0,
                 total_chunks=1,
                 source=f"test_{i}.txt",
-                metadata={"type": "test", "number": i}
+                metadata={"type": "test", "number": i},
             )
             chunks.append(chunk)
         return chunks
@@ -152,7 +155,7 @@ class TestFaissVectorStore:
             index_path=str(index_path),
             metadata_path=str(metadata_path),
             similarity_threshold=0.7,
-            index_type="FlatL2"
+            index_type="FlatL2",
         )
 
         assert store.dimension == 128
@@ -160,8 +163,8 @@ class TestFaissVectorStore:
         # metadata_path is normalized to .json regardless of the extension
         # passed in (write target); legacy_metadata_path keeps the .pkl form
         # for transparent migration fallback (see faiss_store.py __init__).
-        assert store.metadata_path == metadata_path.with_suffix('.json')
-        assert store.legacy_metadata_path == metadata_path.with_suffix('.pkl')
+        assert store.metadata_path == metadata_path.with_suffix(".json")
+        assert store.legacy_metadata_path == metadata_path.with_suffix(".pkl")
         assert store.similarity_threshold == 0.7
         assert store.index_type == "FlatL2"
 
@@ -171,9 +174,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "test.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         # Test d'ajout
@@ -188,22 +189,24 @@ class TestFaissVectorStore:
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "opt.index"),
-            metadata_path=str(temp_dir / "opt.pkl")
+            metadata_path=str(temp_dir / "opt.pkl"),
         )
 
         # 3 documents x 2 chunks -> chunk ids 0..5
         chunks = []
         for doc in ("doc_A", "doc_B", "doc_C"):
             for idx in range(2):
-                chunks.append(Chunk(
-                    text=f"{doc} chunk {idx}",
-                    embedding=np.random.rand(128).astype(np.float32),
-                    document_id=doc,
-                    chunk_index=idx,
-                    total_chunks=2,
-                    source=f"{doc}.txt",
-                    metadata={"document_id": doc}
-                ))
+                chunks.append(
+                    Chunk(
+                        text=f"{doc} chunk {idx}",
+                        embedding=np.random.rand(128).astype(np.float32),
+                        document_id=doc,
+                        chunk_index=idx,
+                        total_chunks=2,
+                        source=f"{doc}.txt",
+                        metadata={"document_id": doc},
+                    )
+                )
         assert store.upsert(chunks) is True
 
         # Delete the FIRST document so surviving chunks shift positions on rebuild
@@ -231,7 +234,7 @@ class TestFaissVectorStore:
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "snap.index"),
-            metadata_path=str(temp_dir / "snap.pkl")
+            metadata_path=str(temp_dir / "snap.pkl"),
         )
         store.metadata = [
             {"chunk_id": 0, "text": "active one", "deleted": False},
@@ -250,9 +253,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "empty.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         query_vector = np.random.rand(128).astype(np.float32)
@@ -266,9 +267,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "health.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         # Le health check doit réussir après initialisation
@@ -281,9 +280,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "stats.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         stats = store.get_stats()
@@ -297,9 +294,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "persist.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         # Test de persistance
@@ -316,9 +311,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "atomic.metadata"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
         store.upsert(sample_chunks)
 
@@ -327,16 +320,16 @@ class TestFaissVectorStore:
 
         # metadata.json exists, parses as JSON, and carries schema_version
         assert store.metadata_path.exists()
-        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+        with open(store.metadata_path, encoding="utf-8") as f:
             raw = json.load(f)
-        assert raw['schema_version'] == 1
-        assert 'metadata' in raw
-        assert 'document_to_chunks' in raw
-        assert 'stats' in raw
-        assert 'saved_at' in raw
+        assert raw["schema_version"] == 1
+        assert "metadata" in raw
+        assert "document_to_chunks" in raw
+        assert "stats" in raw
+        assert "saved_at" in raw
 
         # No residual .tmp files left in the faiss directory
-        assert list(temp_dir.glob('*.tmp')) == []
+        assert list(temp_dir.glob("*.tmp")) == []
 
     def test_atomic_persist_crash_order(self, temp_dir, sample_chunks):
         """A crash between index replace and metadata replace leaves the index
@@ -345,9 +338,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "crash.metadata"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         # v1: successful persist with the first chunk only
@@ -355,7 +346,7 @@ class TestFaissVectorStore:
         assert store.persist() is True
 
         v1_ntotal = store.index.ntotal
-        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+        with open(store.metadata_path, encoding="utf-8") as f:
             v1_metadata_raw = json.load(f)
 
         # v2: add more chunks, then simulate a crash on the SECOND os.replace
@@ -363,20 +354,22 @@ class TestFaissVectorStore:
         store.upsert(sample_chunks[1:])
 
         real_replace = os.replace
-        call_count = {'n': 0}
+        call_count = {"n": 0}
 
         def flaky_replace(src, dst):
-            call_count['n'] += 1
-            if call_count['n'] == 2:
+            call_count["n"] += 1
+            if call_count["n"] == 2:
                 raise OSError("Simulated crash during metadata replace")
             return real_replace(src, dst)
 
-        with patch(
-            'backend.src.rag_core.implementations.faiss_store.os.replace',
-            side_effect=flaky_replace
+        with (
+            patch(
+                "backend.src.rag_core.implementations.faiss_store.os.replace",
+                side_effect=flaky_replace,
+            ),
+            pytest.raises(VectorStoreConnectionError),
         ):
-            with pytest.raises(VectorStoreConnectionError):
-                store.persist()
+            store.persist()
 
         # Index on disk reflects v2 (already replaced); metadata.json on
         # disk still reflects v1 (never replaced) -- read directly, not via
@@ -385,17 +378,17 @@ class TestFaissVectorStore:
         assert reread_index.ntotal == store.index.ntotal
         assert reread_index.ntotal > v1_ntotal
 
-        with open(store.metadata_path, 'r', encoding='utf-8') as f:
+        with open(store.metadata_path, encoding="utf-8") as f:
             reread_metadata_raw = json.load(f)
         assert reread_metadata_raw == v1_metadata_raw
 
     def test_schema_validation(self):
         """MetadataPayload rejects a payload missing schema_version"""
         payload_without_version = {
-            'metadata': [],
-            'document_to_chunks': {},
-            'stats': {},
-            'saved_at': '2026-07-12T00:00:00'
+            "metadata": [],
+            "document_to_chunks": {},
+            "stats": {},
+            "saved_at": "2026-07-12T00:00:00",
         }
 
         with pytest.raises(ValidationError):
@@ -407,9 +400,7 @@ class TestFaissVectorStore:
         metadata_path = temp_dir / "delete.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         # Ajouter des chunks d'abord
@@ -419,7 +410,7 @@ class TestFaissVectorStore:
         success = store.delete("doc_0")
         assert isinstance(success, bool)
 
-    @patch('faiss.IndexFlatL2')
+    @patch("faiss.IndexFlatL2")
     def test_faiss_store_with_mock_index(self, mock_index_class, temp_dir):
         """Test avec index FAISS mocké"""
         mock_index = Mock()
@@ -429,29 +420,12 @@ class TestFaissVectorStore:
         index_path = temp_dir / "mock.index"
         metadata_path = temp_dir / "mock.pkl"
 
-        store = FaissVectorStore(  # noqa: F841
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+        FaissVectorStore(
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         # Vérifier que l'index a été créé
         mock_index_class.assert_called_with(128)
-
-    def test_faiss_store_different_index_types(self, temp_dir):
-        """Test avec différents types d'index"""
-        for index_type in ["FlatL2"]:
-            index_path = temp_dir / f"{index_type}.index"
-            metadata_path = temp_dir / f"{index_type}.pkl"
-
-            store = FaissVectorStore(
-                dimension=128,
-                index_path=str(index_path),
-                metadata_path=str(metadata_path),
-                index_type=index_type
-            )
-
-            assert store.index_type == index_type
 
     def test_faiss_store_invalid_dimension(self, temp_dir):
         """Test avec dimension invalide"""
@@ -461,9 +435,7 @@ class TestFaissVectorStore:
         # Test avec dimension négative - le code actuel n'empêche pas cela
         # donc on teste que l'initialisation se fait sans erreur
         store = FaissVectorStore(
-            dimension=-1,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=-1, index_path=str(index_path), metadata_path=str(metadata_path)
         )
         assert store.dimension == -1
 
@@ -488,7 +460,7 @@ class TestFaissIntegration:
             dimension=128,
             index_path=str(index_path),
             metadata_path=str(metadata_path),
-            similarity_threshold=0.5
+            similarity_threshold=0.5,
         )
 
         # Créer quelques chunks
@@ -501,7 +473,7 @@ class TestFaissIntegration:
                 chunk_index=0,
                 total_chunks=1,
                 source=f"doc_{i}.txt",
-                metadata={"category": "test"}
+                metadata={"category": "test"},
             )
             chunks.append(chunk)
 
@@ -524,9 +496,7 @@ class TestFaissIntegration:
 
         # 5. Créer un nouveau store et charger
         new_store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         success = new_store.load()
@@ -535,15 +505,12 @@ class TestFaissIntegration:
     def test_thread_safety_basic(self, temp_dir):
         """Test basique de thread safety"""
         import threading
-        import time  # noqa: F401
 
         index_path = temp_dir / "thread.index"
         metadata_path = temp_dir / "thread.pkl"
 
         store = FaissVectorStore(
-            dimension=128,
-            index_path=str(index_path),
-            metadata_path=str(metadata_path)
+            dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
         results = []
@@ -555,7 +522,7 @@ class TestFaissIntegration:
                 stats = store.get_stats()
                 health = store.health_check()
                 results.append((stats, health))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - thread harness: collect any error for the assertion
                 results.append(e)
 
         # Lancer plusieurs threads

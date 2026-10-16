@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""RAGAS pipeline stage 2/2 (venv SÉPARÉ): scores the baseline.
+"""RAGAS pipeline stage 2/2 (SEPARATE venv): scores the baseline.
 
 Why this exists: this is the SEPARATE-venv half of the two-stage RAGAS harness.
 It reads ONLY ``eval_input.jsonl`` (produced by ``run_pipeline.py`` in the main
@@ -31,11 +31,11 @@ import json
 import math
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-# The four legacy metrics required by the success criteria. context_recall and
+# The four legacy ragas metrics of the baseline. context_recall and
 # context_precision are the mandatory pair; faithfulness and answer_relevancy
 # are included as they come cheaply from the same evaluate() batch.
 _ALL_METRICS = ["context_recall", "context_precision", "faithfulness", "answer_relevancy"]
@@ -49,10 +49,10 @@ _DEFAULT_IN = Path(__file__).resolve().parent / "eval_input.jsonl"
 _DEFAULT_RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
-def _read_eval_rows(path: Path) -> List[Dict[str, Any]]:
+def _read_eval_rows(path: Path) -> list[dict[str, Any]]:
     """Read the newline-delimited JSON boundary file (blank lines tolerated)."""
-    rows: List[Dict[str, Any]] = []
-    with open(path, "r", encoding="utf-8") as handle:
+    rows: list[dict[str, Any]] = []
+    with open(path, encoding="utf-8") as handle:
         for line_number, raw in enumerate(handle, start=1):
             stripped = raw.strip()
             if not stripped:
@@ -64,7 +64,7 @@ def _read_eval_rows(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
-def _resolve_metrics(names: List[str]):
+def _resolve_metrics(names: list[str]):
     """Map metric names to ragas metric objects (imported lazily).
 
     Import is deferred so ``--help`` works without ragas installed. Raises a
@@ -86,14 +86,12 @@ def _resolve_metrics(names: List[str]):
     resolved = []
     for name in names:
         if name not in registry:
-            raise ValueError(
-                f"Unknown metric '{name}'. Choose from: {', '.join(registry)}"
-            )
+            raise ValueError(f"Unknown metric '{name}'. Choose from: {', '.join(registry)}")
         resolved.append(registry[name])
     return resolved
 
 
-def _mean_ignoring_nan(values: List[float]) -> Optional[float]:
+def _mean_ignoring_nan(values: list[float]) -> float | None:
     """Mean of the non-NaN values, or None when every value is NaN."""
     clean = [v for v in values if v is not None and not (isinstance(v, float) and math.isnan(v))]
     if not clean:
@@ -101,7 +99,7 @@ def _mean_ignoring_nan(values: List[float]) -> Optional[float]:
     return sum(clean) / len(clean)
 
 
-def _nan_rate(values: List[float]) -> float:
+def _nan_rate(values: list[float]) -> float:
     """Fraction of NaN (or missing) entries in a column."""
     if not values:
         return 0.0
@@ -109,9 +107,7 @@ def _nan_rate(values: List[float]) -> float:
     return nan_count / len(values)
 
 
-def _summarize(
-    df, metric_names: List[str], is_adversarial: List[bool]
-) -> Dict[str, Any]:
+def _summarize(df, metric_names: list[str], is_adversarial: list[bool]) -> dict[str, Any]:
     """Compute per-metric mean + NaN rate (overall / corpus / adversarial).
 
     Splitting the NaN rate on adversarial vs corpus questions is what lets a
@@ -130,7 +126,7 @@ def _summarize(
     corpus_idx = [i for i, adv in enumerate(is_adversarial) if not adv]
     adv_idx = [i for i, adv in enumerate(is_adversarial) if adv]
 
-    per_metric: Dict[str, Any] = {}
+    per_metric: dict[str, Any] = {}
     for name in metric_names:
         col = [float(v) for v in df[name].tolist()]
         corpus_col = [col[i] for i in corpus_idx]
@@ -154,22 +150,44 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "métrique. MISTRAL_API_KEY via environnement, jamais loggée."
         )
     )
-    parser.add_argument("--in", dest="in_path", type=Path, default=_DEFAULT_IN,
-                        help="Chemin de eval_input.jsonl (entrée).")
-    parser.add_argument("--out", type=Path, default=None,
-                        help="Chemin du JSON de résultats (défaut: results/baseline_run_{N}.json).")
-    parser.add_argument("--run", type=int, default=1,
-                        help="Numéro de run (utilisé pour le nom de fichier par défaut).")
-    parser.add_argument("--metrics", type=str, default=",".join(_ALL_METRICS),
-                        help="Liste de métriques séparées par des virgules.")
-    parser.add_argument("--model", type=str, default="mistral-small-latest",
-                        help="Modèle juge Mistral (chat).")
-    parser.add_argument("--embedding-model", type=str, default="mistral-embed",
-                        help="Modèle d'embeddings Mistral pour answer_relevancy.")
+    parser.add_argument(
+        "--in",
+        dest="in_path",
+        type=Path,
+        default=_DEFAULT_IN,
+        help="Chemin de eval_input.jsonl (entrée).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Chemin du JSON de résultats (défaut: results/baseline_run_{N}.json).",
+    )
+    parser.add_argument(
+        "--run",
+        type=int,
+        default=1,
+        help="Numéro de run (utilisé pour le nom de fichier par défaut).",
+    )
+    parser.add_argument(
+        "--metrics",
+        type=str,
+        default=",".join(_ALL_METRICS),
+        help="Liste de métriques séparées par des virgules.",
+    )
+    parser.add_argument(
+        "--model", type=str, default="mistral-small-latest", help="Modèle juge Mistral (chat)."
+    )
+    parser.add_argument(
+        "--embedding-model",
+        type=str,
+        default="mistral-embed",
+        help="Modèle d'embeddings Mistral pour answer_relevancy.",
+    )
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point (separate venv). Heavy ragas/langchain imports deferred
     past argument parsing so ``--help`` works without the ragas venv."""
     args = _build_arg_parser().parse_args(argv)
@@ -181,6 +199,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     # is down here). Default behavior is unchanged when the flag is unset.
     if os.environ.get("RAGAS_FORCE_IPV4") == "1":
         import socket as _socket
+
         _orig_getaddrinfo = _socket.getaddrinfo
 
         def _getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
@@ -195,14 +214,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not os.environ.get("MISTRAL_API_KEY"):
         try:
             from dotenv import load_dotenv
+
             load_dotenv(Path(__file__).resolve().parents[2] / "backend" / ".env")
         except ImportError:
             pass
 
     if not os.environ.get("MISTRAL_API_KEY"):
         # Fail fast with an actionable message; never echo the key itself.
-        print("MISTRAL_API_KEY absente de l'environnement -- exportez-la avant de scorer.",
-              file=sys.stderr)
+        print(
+            "MISTRAL_API_KEY absente de l'environnement -- exportez-la avant de scorer.",
+            file=sys.stderr,
+        )
         return 2
 
     metric_names = [m.strip() for m in args.metrics.split(",") if m.strip()]
@@ -254,7 +276,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     payload = {
         "run": args.run,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "judge_model": args.model,
         "embedding_model": args.embedding_model,
         "run_config": {"max_workers": 1, "cache": False, "temperature": 0},
@@ -269,8 +291,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     for name, stats in per_metric.items():
         mean = stats["mean"]
         mean_str = f"{mean:.3f}" if mean is not None else "NaN"
-        print(f"  {name}: mean={mean_str} nan_rate={stats['nan_rate']:.1%} "
-              f"(corpus={stats['nan_rate_corpus']:.1%}, adv={stats['nan_rate_adversarial']:.1%})")
+        print(
+            f"  {name}: mean={mean_str} nan_rate={stats['nan_rate']:.1%} "
+            f"(corpus={stats['nan_rate_corpus']:.1%}, adv={stats['nan_rate_adversarial']:.1%})"
+        )
     return 0
 
 

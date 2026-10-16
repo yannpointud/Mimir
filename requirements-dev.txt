@@ -3,6 +3,11 @@
 #
 # These are dev/CI-only tools, NOT runtime dependencies (do not add to requirements.txt).
 # Used by scripts/local_ci.sh: ruff (lint) + pip-audit (dependency vulnerability scan).
+# Quality measurement tools: radon (cyclomatic complexity), mypy (static typing),
+# pygount (line counts), mutmut (mutation testing).
+# Type stubs for runtime libraries without inline types: each stub release
+# matches the runtime version pinned in requirements.txt (cachetools 5.3,
+# Markdown 3.8, psutil 7.0).
 #
 # Legitimacy note: a package legitimacy audit flagged ruff (astral-sh) and pip-audit (pypa)
 # as suspicious purely because of an `unknown-downloads` metadata gap (and, for ruff, a
@@ -13,3 +18,10 @@
 
 ruff==0.15.21
 pip-audit==2.10.1
+radon==6.0.1
+mypy==2.4.0
+pygount==3.2.0
+mutmut==3.8.0
+types-cachetools==5.3.0.7
+types-Markdown==3.8.0.20250809
+types-psutil==7.0.0.20251116

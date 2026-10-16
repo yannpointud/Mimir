@@ -5,15 +5,13 @@ Ces tests couvrent toutes les fonctions de validation et génération de mots de
 """
 
 import pytest
-import string  # noqa: F401
-from unittest.mock import patch  # noqa: F401
 from backend.src.auth.password_utils import (
     validate_password_strength,
     has_sequential_chars,
     calculate_password_strength,
     generate_secure_password,
     is_password_compromised,
-    sanitize_password_error_message
+    sanitize_password_error_message,
 )
 
 
@@ -224,7 +222,9 @@ class TestGenerateSecurePassword:
         for _ in range(5):  # Tester plusieurs générations
             password = generate_secure_password()
             result = validate_password_strength(password)
-            assert result["valid"] is True, f"Generated password should be valid: {password}, errors: {result['errors']}"
+            assert result["valid"] is True, (
+                f"Generated password should be valid: {password}, errors: {result['errors']}"
+            )
 
     def test_uniqueness(self):
         """Test que les mots de passe générés sont uniques."""
@@ -239,13 +239,7 @@ class TestIsPasswordCompromised:
     def test_compromised_passwords(self):
         """Test avec des mots de passe connus comme compromis."""
         # Mots de passe couramment compromis
-        compromised_passwords = [
-            "password",
-            "123456",
-            "password123",
-            "admin",
-            "qwerty"
-        ]
+        compromised_passwords = ["password", "123456", "password123", "admin", "qwerty"]
 
         for password in compromised_passwords:
             assert is_password_compromised(password) is True
@@ -287,7 +281,7 @@ class TestSanitizePasswordErrorMessage:
         """Test avec plusieurs erreurs."""
         errors = [
             "Password must be at least 8 characters long",
-            "Password must contain at least one uppercase letter"
+            "Password must contain at least one uppercase letter",
         ]
         result = sanitize_password_error_message(errors)
 

@@ -29,7 +29,7 @@ class TestChunkingConfig:
             min_chunk_size=50,
             max_chunk_size=1000,
             preserve_sentences=False,
-            preserve_paragraphs=False
+            preserve_paragraphs=False,
         )
 
         assert config.chunk_size == 500
@@ -51,12 +51,7 @@ class TestChunkingStrategy:
     @pytest.fixture
     def small_chunks_strategy(self):
         """Stratégie pour petits chunks"""
-        config = ChunkingConfig(
-            chunk_size=200,
-            overlap=50,
-            min_chunk_size=30,
-            max_chunk_size=400
-        )
+        config = ChunkingConfig(chunk_size=200, overlap=50, min_chunk_size=30, max_chunk_size=400)
         return ChunkingStrategy(config)
 
     def test_strategy_initialization(self):
@@ -91,13 +86,13 @@ class TestChunkingStrategy:
         chunks = default_strategy.chunk_text(text)
 
         assert len(chunks) == 1
-        assert chunks[0]['text'] == text
-        assert chunks[0]['chunk_index'] == 0
-        assert chunks[0]['total_chunks'] == 1
-        assert chunks[0]['start_char'] == 0
-        assert chunks[0]['end_char'] == len(text)
-        assert chunks[0]['word_count'] == len(text.split())
-        assert chunks[0]['char_count'] == len(text)
+        assert chunks[0]["text"] == text
+        assert chunks[0]["chunk_index"] == 0
+        assert chunks[0]["total_chunks"] == 1
+        assert chunks[0]["start_char"] == 0
+        assert chunks[0]["end_char"] == len(text)
+        assert chunks[0]["word_count"] == len(text.split())
+        assert chunks[0]["char_count"] == len(text)
 
     def test_chunk_large_text_by_paragraphs(self, default_strategy):
         """Test de découpage par paragraphes"""
@@ -110,8 +105,8 @@ Third paragraph with additional content to test the chunking strategy."""
         chunks = default_strategy.chunk_text(text)
 
         assert len(chunks) >= 1
-        assert all(chunk['chunk_index'] < chunk['total_chunks'] for chunk in chunks)
-        assert all(chunk['char_count'] > 0 for chunk in chunks)
+        assert all(chunk["chunk_index"] < chunk["total_chunks"] for chunk in chunks)
+        assert all(chunk["char_count"] > 0 for chunk in chunks)
 
     def test_chunk_text_without_paragraphs(self, small_chunks_strategy):
         """Test avec texte sans paragraphes (une seule ligne)"""
@@ -123,7 +118,7 @@ Third paragraph with additional content to test the chunking strategy."""
             "The fourth sentence continues the text with additional meaningful content and words.",
             "Fifth sentence adds even more comprehensive content to make it much longer than before.",
             "Sixth sentence ensures we definitely exceed the maximum chunk size limit without any doubt.",
-            "Seventh sentence for good measure with extra content to guarantee chunking occurs as expected."
+            "Seventh sentence for good measure with extra content to guarantee chunking occurs as expected.",
         ]
         text = " ".join(sentences)
 
@@ -132,7 +127,9 @@ Third paragraph with additional content to test the chunking strategy."""
         # Si le texte est assez long, il devrait être chunké
         if len(text) > small_chunks_strategy.config.max_chunk_size:
             assert len(chunks) > 1  # Devrait être divisé en plusieurs chunks
-        assert all(chunk['char_count'] <= small_chunks_strategy.config.max_chunk_size for chunk in chunks)
+        assert all(
+            chunk["char_count"] <= small_chunks_strategy.config.max_chunk_size for chunk in chunks
+        )
 
     def test_chunk_with_overlap(self, default_strategy):
         """Test du système d'overlap"""
@@ -143,8 +140,8 @@ Third paragraph with additional content to test the chunking strategy."""
 
         if len(chunks) > 1:
             # Vérifier qu'il y a un overlap entre chunks consécutifs
-            first_chunk = chunks[0]['text']
-            second_chunk = chunks[1]['text']
+            first_chunk = chunks[0]["text"]
+            second_chunk = chunks[1]["text"]
 
             # Chercher du contenu commun (overlap)
             first_words = first_chunk.split()
@@ -161,10 +158,10 @@ Third paragraph with additional content to test the chunking strategy."""
         cleaned = default_strategy._clean_text(dirty_text)
 
         # Vérifier que le texte est nettoyé
-        assert not cleaned.startswith(' ')
-        assert not cleaned.endswith(' ')
-        assert '   ' not in cleaned  # Pas plus de 2 espaces consécutifs
-        assert '\n\n\n' not in cleaned  # Pas plus de 2 newlines consécutifs
+        assert not cleaned.startswith(" ")
+        assert not cleaned.endswith(" ")
+        assert "   " not in cleaned  # Pas plus de 2 espaces consécutifs
+        assert "\n\n\n" not in cleaned  # Pas plus de 2 newlines consécutifs
 
     def test_split_sentences(self, default_strategy):
         """Test du découpage en phrases"""
@@ -208,24 +205,24 @@ Third paragraph with additional content to test the chunking strategy."""
 
         stats = default_strategy.get_chunk_statistics(chunks)
 
-        assert stats['total_chunks'] == len(chunks)
-        assert stats['total_characters'] > 0
-        assert stats['total_words'] > 0
-        assert stats['avg_chunk_size'] > 0
-        assert stats['min_chunk_size'] > 0
-        assert stats['max_chunk_size'] > 0
-        assert stats['config']['chunk_size'] == default_strategy.config.chunk_size
+        assert stats["total_chunks"] == len(chunks)
+        assert stats["total_characters"] > 0
+        assert stats["total_words"] > 0
+        assert stats["avg_chunk_size"] > 0
+        assert stats["min_chunk_size"] > 0
+        assert stats["max_chunk_size"] > 0
+        assert stats["config"]["chunk_size"] == default_strategy.config.chunk_size
 
     def test_chunk_statistics_empty(self, default_strategy):
         """Test des statistiques avec liste vide"""
         stats = default_strategy.get_chunk_statistics([])
 
-        assert stats['total_chunks'] == 0
-        assert stats['total_characters'] == 0
-        assert stats['total_words'] == 0
-        assert stats['avg_chunk_size'] == 0
-        assert stats['min_chunk_size'] == 0
-        assert stats['max_chunk_size'] == 0
+        assert stats["total_chunks"] == 0
+        assert stats["total_characters"] == 0
+        assert stats["total_words"] == 0
+        assert stats["avg_chunk_size"] == 0
+        assert stats["min_chunk_size"] == 0
+        assert stats["max_chunk_size"] == 0
 
     def test_preserve_sentences_disabled(self):
         """Test avec préservation des phrases désactivée"""
@@ -233,12 +230,15 @@ Third paragraph with additional content to test the chunking strategy."""
             chunk_size=50,  # Taille plus petite pour forcer le découpage
             max_chunk_size=80,  # Limite plus stricte
             preserve_sentences=False,
-            preserve_paragraphs=False
+            preserve_paragraphs=False,
         )
         strategy = ChunkingStrategy(config)
 
         # Créer un texte très long qui dépasse clairement la limite
-        text = "This is a very long sentence that definitely exceeds the chunk size limit and should be split even in the middle of words or sentences when preserve_sentences is disabled. " * 3  # Tripler pour garantir le dépassement
+        text = (
+            "This is a very long sentence that definitely exceeds the chunk size limit and should be split even in the middle of words or sentences when preserve_sentences is disabled. "
+            * 3
+        )  # Tripler pour garantir le dépassement
 
         chunks = strategy.chunk_text(text)
 
@@ -276,21 +276,8 @@ Third paragraph with additional content to test the chunking strategy."""
 
         # Vérifier que les indices sont cohérents
         for i, chunk in enumerate(chunks):
-            assert chunk['chunk_index'] == i
-            assert chunk['total_chunks'] == len(chunks)
-
-    def test_chunk_character_positions(self, small_chunks_strategy):
-        """Test des positions de caractères dans les chunks"""
-        text = "First part of text. Second part of text. Third part of text."
-
-        chunks = small_chunks_strategy.chunk_text(text)
-
-        if len(chunks) > 1:
-            # Vérifier que les positions sont logiques
-            for chunk in chunks:
-                assert chunk['start_char'] >= 0
-                assert chunk['end_char'] > chunk['start_char']
-                assert chunk['end_char'] <= len(text) + 100  # Permettre un peu de marge pour l'overlap
+            assert chunk["chunk_index"] == i
+            assert chunk["total_chunks"] == len(chunks)
 
     def test_word_count_accuracy(self, default_strategy):
         """Test de précision du comptage de mots"""
@@ -298,22 +285,11 @@ Third paragraph with additional content to test the chunking strategy."""
 
         chunks = default_strategy.chunk_text(text)
 
-        total_words_counted = sum(chunk['word_count'] for chunk in chunks)
+        total_words_counted = sum(chunk["word_count"] for chunk in chunks)
         actual_words = len(text.split())
 
         # Le compte peut être légèrement différent à cause de l'overlap
         assert total_words_counted >= actual_words
-
-    def test_chunk_minimum_size_enforcement(self, default_strategy):
-        """Test du respect de la taille minimum de chunk"""
-        # Texte avec phrases courtes
-        text = "Short. Very short. Another. Brief."
-
-        chunks = default_strategy.chunk_text(text)
-
-        # Vérifier qu'aucun chunk n'est trop petit (sauf le dernier éventuellement)
-        for chunk in chunks[:-1]:  # Tous sauf le dernier
-            assert len(chunk['text']) >= default_strategy.config.min_chunk_size or len(chunks) == 1
 
     def test_empty_paragraphs_handling(self, default_strategy):
         """Test de gestion des paragraphes vides"""
@@ -329,8 +305,8 @@ Third paragraph."""
         chunks = default_strategy.chunk_text(text)
 
         # Les paragraphes vides ne doivent pas créer de chunks vides
-        assert all(chunk['text'].strip() for chunk in chunks)
-        assert all(chunk['char_count'] > 0 for chunk in chunks)
+        assert all(chunk["text"].strip() for chunk in chunks)
+        assert all(chunk["char_count"] > 0 for chunk in chunks)
 
 
 class TestChunkingIntegration:
@@ -372,13 +348,13 @@ This chunking implementation provides a robust solution for document processing 
 
         # Vérifier que les métadonnées sont correctes
         for chunk in chunks:
-            assert chunk['chunk_index'] < chunk['total_chunks']
-            assert chunk['char_count'] > 0
-            assert chunk['word_count'] > 0
-            assert len(chunk['text'].strip()) > 0
+            assert chunk["chunk_index"] < chunk["total_chunks"]
+            assert chunk["char_count"] > 0
+            assert chunk["word_count"] > 0
+            assert len(chunk["text"].strip()) > 0
 
         # Vérifier que le contenu important est préservé
-        all_text = " ".join(chunk['text'] for chunk in chunks)
+        all_text = " ".join(chunk["text"] for chunk in chunks)
         assert "Introduction" in all_text
         assert "Implementation Details" in all_text
         assert "Conclusion" in all_text
@@ -387,7 +363,9 @@ This chunking implementation provides a robust solution for document processing 
         """Test avec différents types de texte"""
         configs_and_texts = [
             # Code source
-            (ChunkingConfig(chunk_size=300), """
+            (
+                ChunkingConfig(chunk_size=300),
+                """
 def process_text(text):
     if not text:
         return []
@@ -395,10 +373,12 @@ def process_text(text):
     chunks = []
     # Process the text
     return chunks
-            """),
-
+            """,
+            ),
             # Liste à puces
-            (ChunkingConfig(chunk_size=200), """
+            (
+                ChunkingConfig(chunk_size=200),
+                """
 Shopping list:
 - Apples
 - Bananas
@@ -406,12 +386,15 @@ Shopping list:
 - Milk
 - Bread
 - Cheese
-            """),
-
+            """,
+            ),
             # Texte narratif
-            (ChunkingConfig(chunk_size=400), """
+            (
+                ChunkingConfig(chunk_size=400),
+                """
 Once upon a time, in a land far away, there lived a princess who loved to read books. She spent her days in the castle library, discovering new worlds through literature. One day, she found a mysterious book that would change her life forever.
-            """)
+            """,
+            ),
         ]
 
         for config, text in configs_and_texts:
@@ -420,7 +403,7 @@ Once upon a time, in a land far away, there lived a princess who loved to read b
 
             # Chaque type de texte doit être traité correctement
             assert len(chunks) >= 1
-            assert all(len(chunk['text'].strip()) > 0 for chunk in chunks)
+            assert all(len(chunk["text"].strip()) > 0 for chunk in chunks)
 
 
 class TestStructureAwareChunking:
@@ -462,9 +445,7 @@ class TestStructureAwareChunking:
             + "\n\n## Section B\n\n"
             + ("Beta explains the second topic with thorough coverage now. " * 12)
         )
-        html = MarkdownExtractor(convert_to_html=True).extract(
-            self._write_md(tmp_path, md)
-        )
+        html = MarkdownExtractor(convert_to_html=True).extract(self._write_md(tmp_path, md))
         # Sanity: the extractor really produced HTML heading tags, not `#`.
         assert "<h2>Section A</h2>" in html
         assert "<h2>Section B</h2>" in html
@@ -500,9 +481,7 @@ class TestStructureAwareChunking:
             + "\n\n## Section B\n\n"
             + ("Beta explains the second topic with thorough coverage now. " * 12)
         )
-        html = MarkdownExtractor(convert_to_html=True).extract(
-            self._write_md(tmp_path, md)
-        )
+        html = MarkdownExtractor(convert_to_html=True).extract(self._write_md(tmp_path, md))
 
         off = ChunkingStrategy(self._structure_config(False)).chunk_text(html)
         # Default config (no new field set) must match the explicit flag-off path.
@@ -517,7 +496,7 @@ class TestStructureAwareChunking:
         # On-vs-off: identical text and character boundaries, only an extra key.
         on = ChunkingStrategy(self._structure_config(True)).chunk_text(html)
         assert len(on) == len(off)
-        for chunk_on, chunk_off in zip(on, off):
+        for chunk_on, chunk_off in zip(on, off, strict=False):
             assert chunk_on["text"] == chunk_off["text"]
             assert chunk_on["start_char"] == chunk_off["start_char"]
             assert chunk_on["end_char"] == chunk_off["end_char"]
@@ -525,9 +504,7 @@ class TestStructureAwareChunking:
     def test_small_single_chunk_gets_section_title_when_enabled(self, tmp_path):
         """A short document that fits in one chunk still gets its section_title."""
         md = "## Only Section\n\nA short body that fits within a single chunk."
-        html = MarkdownExtractor(convert_to_html=True).extract(
-            self._write_md(tmp_path, md)
-        )
+        html = MarkdownExtractor(convert_to_html=True).extract(self._write_md(tmp_path, md))
         chunks = ChunkingStrategy(self._structure_config(True)).chunk_text(html)
 
         assert len(chunks) == 1
@@ -545,16 +522,18 @@ class TestSectionTitleThreadingIntoMetadata:
 
     def test_section_title_reaches_chunk_metadata(self):
         proc = self._new_processor()
-        chunks_data = [{
-            "text": "Alpha body.",
-            "chunk_index": 0,
-            "total_chunks": 1,
-            "start_char": 0,
-            "end_char": 11,
-            "word_count": 2,
-            "char_count": 11,
-            "section_title": "Section A",
-        }]
+        chunks_data = [
+            {
+                "text": "Alpha body.",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "start_char": 0,
+                "end_char": 11,
+                "word_count": 2,
+                "char_count": 11,
+                "section_title": "Section A",
+            }
+        ]
         result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "src.md", {})
 
         assert len(result) == 1
@@ -563,15 +542,17 @@ class TestSectionTitleThreadingIntoMetadata:
     def test_flag_off_chunk_has_no_section_title_value(self):
         """Flag-off chunk dict (no key) yields metadata section_title None, no error."""
         proc = self._new_processor()
-        chunks_data = [{
-            "text": "Alpha body.",
-            "chunk_index": 0,
-            "total_chunks": 1,
-            "start_char": 0,
-            "end_char": 11,
-            "word_count": 2,
-            "char_count": 11,
-        }]
+        chunks_data = [
+            {
+                "text": "Alpha body.",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "start_char": 0,
+                "end_char": 11,
+                "word_count": 2,
+                "char_count": 11,
+            }
+        ]
         result = proc._create_chunks(chunks_data, [[0.1, 0.2, 0.3]], "doc1", "src.md", {})
 
         assert len(result) == 1
@@ -579,3 +560,250 @@ class TestSectionTitleThreadingIntoMetadata:
         # Existing metadata keys remain intact.
         assert result[0].metadata["start_char"] == 0
         assert result[0].metadata["char_count"] == 11
+
+
+# Exact-output tests below pin the current splitter behaviour (they were
+# written against surviving mutants of chunking.py, see docs/cleanup).
+# Known quirks are pinned as they are, except chunk positions: start_char
+# never advances past the first chunk, so only position invariants are checked.
+
+
+def _texts(chunks):
+    return [chunk["text"] for chunk in chunks]
+
+
+def _assert_positions(chunks):
+    """First chunk starts at 0 and every span is as long as its text."""
+    assert chunks[0]["start_char"] == 0
+    for chunk in chunks:
+        assert chunk["start_char"] >= 0
+        assert chunk["end_char"] - chunk["start_char"] == len(chunk["text"])
+
+
+class TestCleanTextExact:
+    def test_clean_text_exact_output(self):
+        dirty = "  Hello   world  \n\n\n\n  Multiple   spaces   \n\n  End  "
+
+        assert ChunkingStrategy()._clean_text(dirty) == "Hello world\n\nMultiple spaces\n\nEnd"
+
+
+class TestParagraphChunkingExact:
+    PARAGRAPHS = ["Alpha one. Alpha two.", "Beta one. Beta two.", "Gamma one. Gamma two."]
+
+    def _strategy(self, chunk_size, max_chunk_size=200):
+        return ChunkingStrategy(
+            ChunkingConfig(
+                chunk_size=chunk_size,
+                overlap=12,
+                min_chunk_size=5,
+                max_chunk_size=max_chunk_size,
+            )
+        )
+
+    def test_paragraphs_fill_a_chunk_up_to_chunk_size_inclusive(self):
+        # len("Alpha one. Alpha two.\n\nBeta one. Beta two.") == 42 == chunk_size
+        chunks = self._strategy(42).chunk_text("\n\n".join(self.PARAGRAPHS))
+
+        assert _texts(chunks) == [
+            "Alpha one. Alpha two.\n\nBeta one. Beta two.",
+            "Beta two. Gamma one. Gamma two.",
+        ]
+        assert [c["chunk_index"] for c in chunks] == [0, 1]
+        assert all(c["total_chunks"] == 2 for c in chunks)
+        _assert_positions(chunks)
+
+    def test_paragraph_one_char_over_chunk_size_starts_a_new_chunk(self):
+        chunks = self._strategy(41).chunk_text("\n\n".join(self.PARAGRAPHS))
+
+        # Each new chunk starts with the last sentence of the previous one.
+        assert _texts(chunks) == [
+            "Alpha one. Alpha two.",
+            "Alpha two. Beta one. Beta two.",
+            "Beta two. Gamma one. Gamma two.",
+        ]
+        _assert_positions(chunks)
+
+    def test_paragraph_of_exactly_max_chunk_size_is_not_resplit(self):
+        text = "Short one is here. Another short one ok."  # 40 characters
+
+        chunks = self._strategy(20, max_chunk_size=40).chunk_text(text)
+
+        assert _texts(chunks) == [text]
+        _assert_positions(chunks)
+
+
+class TestSentenceChunkingExact:
+    """preserve_paragraphs=False: sentence path (terminators are dropped by the split)."""
+
+    TEXT = "First one here. Second one here. Third one here."
+
+    def _strategy(self, chunk_size, min_chunk_size=5, overlap=12):
+        return ChunkingStrategy(
+            ChunkingConfig(
+                chunk_size=chunk_size,
+                overlap=overlap,
+                min_chunk_size=min_chunk_size,
+                max_chunk_size=2000,
+                preserve_paragraphs=False,
+            )
+        )
+
+    def test_sentences_fill_a_chunk_up_to_chunk_size_inclusive(self):
+        # 14 + 1 + 15 == 30 == chunk_size: the first two sentences share a chunk.
+        chunks = self._strategy(30).chunk_text(self.TEXT)
+
+        assert _texts(chunks) == ["First one here Second one here", "ond one here Third one here."]
+        _assert_positions(chunks)
+
+    def test_chunk_of_exactly_min_size_is_closed_when_next_sentence_overflows(self):
+        chunks = self._strategy(29, min_chunk_size=14).chunk_text(self.TEXT)
+
+        assert _texts(chunks) == [
+            "First one here",
+            "rst one here Second one here",
+            "ond one here Third one here.",
+        ]
+        _assert_positions(chunks)
+
+    def test_chunk_below_min_size_absorbs_the_next_sentence(self):
+        text = "One two three. Four five six. Seven eight nine."
+
+        chunks = self._strategy(20, min_chunk_size=24, overlap=6).chunk_text(text)
+
+        # The 24-character tail equals min_chunk_size, so it is kept.
+        assert _texts(chunks) == ["One two three Four five six", "ve six Seven eight nine."]
+        _assert_positions(chunks)
+
+    def test_zero_min_chunk_size_never_emits_an_empty_chunk(self):
+        chunks = self._strategy(10, min_chunk_size=0, overlap=3).chunk_text(
+            "First one here. Second one here."
+        )
+
+        assert _texts(chunks) == ["First one here", "ere Second one here."]
+        _assert_positions(chunks)
+
+    def test_text_never_reaching_min_size_becomes_a_single_chunk(self):
+        chunks = self._strategy(20, min_chunk_size=1000, overlap=6).chunk_text(self.TEXT)
+
+        assert len(chunks) == 1
+        assert chunks[0]["text"] == self.TEXT
+        assert chunks[0]["start_char"] == 0
+        assert chunks[0]["end_char"] == len(self.TEXT)
+
+    def test_text_of_exactly_chunk_size_is_kept_verbatim(self):
+        text = "First one here. Second one here."  # 32 characters
+
+        chunks = self._strategy(32).chunk_text(text)
+
+        assert _texts(chunks) == [text]
+
+
+class TestSplitSentencesExact:
+    def test_regex_split_is_kept_when_it_finds_several_sentences(self):
+        # Only ". G" is a regex boundary; the fallback would also split at ". e".
+        strategy = ChunkingStrategy(ChunkingConfig(chunk_size=20))
+
+        sentences = strategy._split_sentences("alpha beta. Gamma delta. epsilon zeta.")
+
+        assert sentences == ["alpha beta", "Gamma delta. epsilon zeta."]
+
+    def test_fallback_split_when_a_long_text_has_a_single_regex_sentence(self):
+        strategy = ChunkingStrategy(ChunkingConfig(chunk_size=20))
+
+        sentences = strategy._split_sentences("alpha beta. gamma delta. epsilon zeta.")
+
+        assert sentences == ["alpha beta", "gamma delta", "epsilon zeta."]
+
+    def test_no_fallback_for_a_text_of_exactly_chunk_size(self):
+        strategy = ChunkingStrategy(ChunkingConfig(chunk_size=24))
+
+        sentences = strategy._split_sentences("alpha beta. gamma delta.")  # 24 characters
+
+        assert sentences == ["alpha beta. gamma delta."]
+
+
+class TestOverlapTextExact:
+    def test_no_overlap_for_empty_text(self):
+        assert ChunkingStrategy()._get_overlap_text("", 10) == ""
+
+    def test_no_overlap_for_zero_size(self):
+        assert ChunkingStrategy()._get_overlap_text("One. Two.", 0) == ""
+
+    def test_overlap_starts_after_the_last_sentence_boundary(self):
+        assert ChunkingStrategy()._get_overlap_text("One. Two", 1) == "Two "
+
+    def test_boundary_is_searched_up_to_100_chars_before_the_overlap(self):
+        text = "a" * 198 + ". " + "b" * 100
+
+        assert ChunkingStrategy()._get_overlap_text(text, 20) == "b" * 100 + " "
+
+    def test_boundary_before_the_lookback_window_is_ignored(self):
+        # The window starts at len - size - 100 == 180, one char after the ".".
+        text = "a" * 179 + ". " + "b" * 119
+
+        assert ChunkingStrategy()._get_overlap_text(text, 20) == "b" * 20 + " "
+
+    def test_boundary_at_the_start_of_the_window_is_found(self):
+        assert ChunkingStrategy()._get_overlap_text("! abc", 4) == "abc "
+
+    def test_boundary_at_the_very_end_falls_back_to_characters(self):
+        assert ChunkingStrategy()._get_overlap_text("Hello world. ", 5) == "rld.  "
+
+    def test_overlap_as_long_as_the_text_returns_the_whole_text(self):
+        assert ChunkingStrategy()._get_overlap_text("One. Two", 8) == "One. Two "
+
+    def test_character_overlap_when_sentences_are_not_preserved(self):
+        strategy = ChunkingStrategy(ChunkingConfig(preserve_sentences=False))
+
+        assert strategy._get_overlap_text("One. Two three", 5) == "three "
+
+    def test_overlap_longer_than_the_text_returns_the_whole_text(self):
+        strategy = ChunkingStrategy(ChunkingConfig(preserve_sentences=False))
+
+        assert strategy._get_overlap_text("abc", 10) == "abc "
+
+
+class TestChunkStatisticsExact:
+    def test_statistics_prefer_the_stored_word_count(self):
+        chunks = [{"text": "a b c", "word_count": 10}, {"text": "d e"}]
+
+        stats = ChunkingStrategy().get_chunk_statistics(chunks)
+
+        assert stats["total_chunks"] == 2
+        assert stats["total_characters"] == 8
+        assert stats["total_words"] == 12
+        assert stats["avg_chunk_size"] == 4.0
+        assert stats["min_chunk_size"] == 3
+        assert stats["max_chunk_size"] == 5
+        assert stats["avg_words_per_chunk"] == 6.0
+
+
+class TestSectionTitlesExact:
+    def test_preamble_has_no_section_and_each_heading_tags_its_chunk(self):
+        text = (
+            "An introduction without a heading.\n\n# Alpha\n\nAlpha body.\n\n"
+            "# Beta\n\nBeta body.\n\n# Gamma\n\nGamma body."
+        )
+        config = ChunkingConfig(
+            chunk_size=22,
+            overlap=0,
+            min_chunk_size=5,
+            max_chunk_size=200,
+            section_title_tracking=True,
+        )
+
+        chunks = ChunkingStrategy(config).chunk_text(text)
+
+        assert [(c["text"], c["section_title"]) for c in chunks] == [
+            ("An introduction without a heading.", None),
+            ("# Alpha\n\nAlpha body.", "Alpha"),
+            ("# Beta\n\nBeta body.", "Beta"),
+            ("# Gamma\n\nGamma body.", "Gamma"),
+        ]
+
+    def test_inline_markup_is_stripped_from_heading_titles(self):
+        headings = ChunkingStrategy()._detect_headings(
+            "<h2><em>Intro</em> part</h2>\n\n<h3>Next</h3>"
+        )
+
+        assert [title for _, title in headings] == ["Intro part", "Next"]

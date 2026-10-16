@@ -29,7 +29,7 @@ const renderModalWithChunk = (text, extraProps = {}) => {
   );
 };
 
-describe('DocumentModal — SEC-04 escape-then-highlight', () => {
+describe('DocumentModal — escape-then-highlight', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

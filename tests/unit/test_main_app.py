@@ -1,10 +1,8 @@
 """Tests unitaires pour l'application FastAPI principale."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
+from unittest.mock import patch
 from fastapi.testclient import TestClient
-import logging
-from unittest.mock import AsyncMock  # noqa: F401
 
 from backend.main import app
 
@@ -30,12 +28,14 @@ class TestMainApp:
         assert "version" in data
         assert data["status"] == "running"
 
-    @patch('src.api.endpoints.health._check_database_health')
-    @patch('src.api.endpoints.health._check_vector_store_health')
-    @patch('src.api.endpoints.health._check_llm_health')
-    @patch('src.api.endpoints.health._check_cache_health')
-    @patch('src.api.endpoints.health._check_email_health')
-    def test_health_check_success(self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client):
+    @patch("src.api.endpoints.health._check_database_health")
+    @patch("src.api.endpoints.health._check_vector_store_health")
+    @patch("src.api.endpoints.health._check_llm_health")
+    @patch("src.api.endpoints.health._check_cache_health")
+    @patch("src.api.endpoints.health._check_email_health")
+    def test_health_check_success(
+        self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
+    ):
         """Test du health check réussi"""
         # Simuler tous les checks comme sains
         mock_db.return_value = {"healthy": True, "connection": "ok"}
@@ -55,15 +55,21 @@ class TestMainApp:
         assert data["checks"]["database"]["healthy"] is True
         assert data["checks"]["vector_store"]["healthy"] is True
 
-    @patch('src.api.endpoints.health._check_database_health')
-    @patch('src.api.endpoints.health._check_vector_store_health')
-    @patch('src.api.endpoints.health._check_llm_health')
-    @patch('src.api.endpoints.health._check_cache_health')
-    @patch('src.api.endpoints.health._check_email_health')
-    def test_health_check_failure(self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client):
+    @patch("src.api.endpoints.health._check_database_health")
+    @patch("src.api.endpoints.health._check_vector_store_health")
+    @patch("src.api.endpoints.health._check_llm_health")
+    @patch("src.api.endpoints.health._check_cache_health")
+    @patch("src.api.endpoints.health._check_email_health")
+    def test_health_check_failure(
+        self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
+    ):
         """Test du health check en échec"""
         # Simuler une base de données défaillante
-        mock_db.return_value = {"healthy": False, "connection": "failed", "error": "Connection timeout"}
+        mock_db.return_value = {
+            "healthy": False,
+            "connection": "failed",
+            "error": "Connection timeout",
+        }
         mock_vector.return_value = {"healthy": True, "index_file": "exists"}
         mock_llm.return_value = {"healthy": True, "api_accessible": True}
         mock_cache.return_value = {"healthy": True, "cache_size": 100}
@@ -89,20 +95,15 @@ class TestMainApp:
 
     def test_cors_headers(self, client):
         """Test des headers CORS"""
-        response = client.options("/", headers={
-            "Origin": "http://localhost:3000",
-            "Access-Control-Request-Method": "GET"
-        })
+        response = client.options(
+            "/", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"}
+        )
 
         # Test de la présence des headers CORS
-        assert "access-control-allow-origin" in response.headers or response.status_code in [200, 404]
-
-    def test_request_timing_header(self, client):
-        """Test de l'ajout du header de timing"""
-        response = client.get("/")
-
-        # Le middleware de timing devrait ajouter un header
-        assert "x-process-time" in response.headers or response.status_code == 200
+        assert "access-control-allow-origin" in response.headers or response.status_code in [
+            200,
+            404,
+        ]
 
     def test_openapi_schema(self, client):
         """Test de la disponibilité du schéma OpenAPI"""
@@ -115,18 +116,6 @@ class TestMainApp:
         assert "openapi" in schema
         assert "info" in schema
         assert schema["info"]["title"] == "Mimir"
-
-    def test_production_mode_docs_disabled(self):
-        """Test que les docs sont désactivées en mode production"""
-        with patch('src.config.settings') as mock_settings:
-            mock_settings.is_production = True
-
-            # Créer un client avec les paramètres modifiés
-            test_client = TestClient(app)
-            response = test_client.get("/docs")
-
-            # En production, les docs peuvent être désactivées (404) ou redirigées
-            assert response.status_code in [404, 307, 200]  # 307 = redirect
 
 
 class TestErrorHandling:
@@ -147,22 +136,6 @@ class TestErrorHandling:
 
         assert "detail" in data or "error_message" in data
 
-    @patch('backend.main.logger')
-    def test_general_exception_handler(self, mock_logger, client):
-        """Test du gestionnaire d'exceptions générales"""
-        # Il est difficile de simuler une exception générale sans casser l'app
-        # On va simplement tester qu'une requête normale ne cause pas d'exception
-
-        response = client.get("/")
-
-        # Une requête normale ne devrait pas déclencher d'exception générale
-        assert response.status_code == 200
-
-        # Vérifier les champs du modèle racine
-        data = response.json()
-        assert data["name"] == "Mimir"
-        assert data["status"] == "running"
-
 
 class TestMiddleware:
     """Tests pour les middlewares."""
@@ -171,20 +144,6 @@ class TestMiddleware:
     def client(self):
         """Client de test FastAPI."""
         return TestClient(app)
-
-    def test_request_logging_middleware(self, caplog, client):
-        """Test du middleware de logging des requêtes"""
-        # Configurer le niveau de log pour capturer les logs de middleware
-        logging.getLogger().setLevel(logging.INFO)
-
-        with caplog.at_level(logging.INFO):
-            response = client.get("/")
-
-        assert response.status_code == 200
-
-        # Vérifier qu'il y a eu des logs (même si pas exactement comme attendu)
-        # Le middleware peut ne pas logger exactement comme prévu
-        assert len(caplog.records) >= 0  # Au moins pas d'erreur de logging
 
     def test_timing_header_added(self, client):
         """Test de l'ajout du header de timing"""

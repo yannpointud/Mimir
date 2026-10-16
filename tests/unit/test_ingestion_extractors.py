@@ -9,8 +9,12 @@ from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
 
 from src.ingestion.extractors import (
-    ExtractorFactory, TextExtractor, PDFExtractor, DOCXExtractor, TXTExtractor,
-    ExtractionError, UnsupportedFormatError  # noqa: F401
+    ExtractorFactory,
+    TextExtractor,
+    PDFExtractor,
+    DOCXExtractor,
+    TXTExtractor,
+    ExtractionError,
 )
 
 
@@ -29,7 +33,7 @@ class TestExtractorFactory:
         factory = ExtractorFactory()
 
         supported_extensions = factory.get_supported_extensions()
-        expected_extensions = ['.txt', '.pdf', '.docx', '.md']
+        expected_extensions = [".txt", ".pdf", ".docx", ".md"]
 
         for ext in expected_extensions:
             assert ext in supported_extensions
@@ -38,28 +42,28 @@ class TestExtractorFactory:
         """Test de récupération d'extracteur pour fichier texte"""
         factory = ExtractorFactory()
 
-        extractor = factory.get_extractor('test.txt')
+        extractor = factory.get_extractor("test.txt")
         assert isinstance(extractor, TextExtractor)
 
     def test_get_extractor_pdf(self):
         """Test de récupération d'extracteur pour PDF"""
         factory = ExtractorFactory()
 
-        extractor = factory.get_extractor('test.pdf')
+        extractor = factory.get_extractor("test.pdf")
         assert isinstance(extractor, PDFExtractor)
 
     def test_get_extractor_docx(self):
         """Test de récupération d'extracteur pour DOCX"""
         factory = ExtractorFactory()
 
-        extractor = factory.get_extractor('test.docx')
+        extractor = factory.get_extractor("test.docx")
         assert isinstance(extractor, DOCXExtractor)
 
     def test_unsupported_extension(self):
         """Test d'extension non supportée"""
         factory = ExtractorFactory()
 
-        extractor = factory.get_extractor('test.xyz')
+        extractor = factory.get_extractor("test.xyz")
         assert extractor is None
 
     def test_extract_text_success(self, temp_dir):
@@ -69,7 +73,7 @@ class TestExtractorFactory:
         # Créer un fichier texte temporaire
         test_file = temp_dir / "test.txt"
         test_content = "Hello world\nThis is a test file."
-        test_file.write_text(test_content, encoding='utf-8')
+        test_file.write_text(test_content, encoding="utf-8")
 
         extracted_text = factory.extract_text(str(test_file))
 
@@ -82,7 +86,9 @@ class TestExtractorFactory:
         with pytest.raises(ExtractionError) as exc_info:
             factory.extract_text("/nonexistent/file.txt")
 
-        assert "Failed to extract text" in str(exc_info.value) or "No such file" in str(exc_info.value)
+        assert "Failed to extract text" in str(exc_info.value) or "No such file" in str(
+            exc_info.value
+        )
 
     def test_extract_text_with_metadata(self, temp_dir):
         """Test d'extraction avec métadonnées"""
@@ -90,7 +96,7 @@ class TestExtractorFactory:
 
         test_file = temp_dir / "test.txt"
         test_content = "Test content"
-        test_file.write_text(test_content, encoding='utf-8')
+        test_file.write_text(test_content, encoding="utf-8")
 
         # Utiliser get_extractor pour obtenir l'extracteur et ses métadonnées
         extractor = factory.get_extractor(str(test_file))
@@ -98,9 +104,9 @@ class TestExtractorFactory:
         metadata = extractor.get_metadata(str(test_file))
 
         assert extracted_text.strip() == test_content
-        assert metadata['file_size'] > 0
-        assert metadata['file_extension'] == '.txt'
-        assert metadata['file_name'] == 'test.txt'
+        assert metadata["file_size"] > 0
+        assert metadata["file_extension"] == ".txt"
+        assert metadata["file_name"] == "test.txt"
 
 
 class TestTextExtractor:
@@ -119,7 +125,7 @@ class TestTextExtractor:
 
         test_file = temp_dir / "utf8.txt"
         test_content = "Hello world! Café, naïve, résumé 🌟"
-        test_file.write_text(test_content, encoding='utf-8')
+        test_file.write_text(test_content, encoding="utf-8")
 
         extracted_text = extractor.extract(str(test_file))
 
@@ -131,11 +137,13 @@ class TestTextExtractor:
 
         test_file = temp_dir / "latin1.txt"
         test_content = "Café, résumé"
-        test_file.write_text(test_content, encoding='latin-1')
+        test_file.write_text(test_content, encoding="latin-1")
 
         extracted_text = extractor.extract(str(test_file))
 
-        assert "Café" in extracted_text or "Caf" in extracted_text  # Peut y avoir des problèmes d'encoding
+        assert (
+            "Café" in extracted_text or "Caf" in extracted_text
+        )  # Peut y avoir des problèmes d'encoding
 
     def test_text_extraction_with_bom(self, temp_dir):
         """Test d'extraction avec BOM UTF-8"""
@@ -145,7 +153,7 @@ class TestTextExtractor:
         test_content = "Test with BOM"
 
         # Écrire avec BOM UTF-8
-        with open(test_file, 'w', encoding='utf-8-sig') as f:
+        with open(test_file, "w", encoding="utf-8-sig") as f:
             f.write(test_content)
 
         extracted_text = extractor.extract(str(test_file))
@@ -159,7 +167,7 @@ class TestTextExtractor:
 
         # UTF-8
         test_file_utf8 = temp_dir / "utf8.txt"
-        test_file_utf8.write_text("Hello world", encoding='utf-8')
+        test_file_utf8.write_text("Hello world", encoding="utf-8")
 
         # Le TXTExtractor n'a pas de méthode _detect_encoding publique
         # On teste simplement que l'extraction fonctionne avec différents encodages
@@ -183,7 +191,7 @@ class TestTextExtractor:
 
         # Créer un fichier binaire
         test_file = temp_dir / "binary.bin"
-        test_file.write_bytes(b'\x00\x01\x02\x03\x04\x05')
+        test_file.write_bytes(b"\x00\x01\x02\x03\x04\x05")
 
         with pytest.raises(ExtractionError):
             extractor.extract(str(test_file))
@@ -197,7 +205,7 @@ class TestPDFExtractor:
         extractor = PDFExtractor()
         assert extractor is not None
 
-    @patch('pypdf.PdfReader')
+    @patch("pypdf.PdfReader")
     def test_pdf_extraction_success(self, mock_pdf_reader):
         """Test d'extraction PDF réussie"""
         # Mock du lecteur PDF
@@ -210,13 +218,13 @@ class TestPDFExtractor:
 
         extractor = PDFExtractor()
 
-        with patch('builtins.open', mock_open(read_data=b'fake pdf data')):
+        with patch("builtins.open", mock_open(read_data=b"fake pdf data")):
             extracted_text = extractor.extract("fake.pdf")
 
         assert "PDF content page 1" in extracted_text
         assert mock_pdf_reader.called
 
-    @patch('pypdf.PdfReader')
+    @patch("pypdf.PdfReader")
     def test_pdf_extraction_encrypted(self, mock_pdf_reader):
         """Test d'extraction PDF chiffré"""
         mock_reader = Mock()
@@ -227,26 +235,32 @@ class TestPDFExtractor:
 
         extractor = PDFExtractor()
 
-        with patch('builtins.open', mock_open(read_data=b'encrypted pdf data')):
-            with pytest.raises(ExtractionError) as exc_info:
-                extractor.extract("encrypted.pdf")
+        with (
+            patch("builtins.open", mock_open(read_data=b"encrypted pdf data")),
+            pytest.raises(ExtractionError) as exc_info,
+        ):
+            extractor.extract("encrypted.pdf")
 
-        assert "encrypted" in str(exc_info.value).lower() or "decrypt" in str(exc_info.value).lower()
+        assert (
+            "encrypted" in str(exc_info.value).lower() or "decrypt" in str(exc_info.value).lower()
+        )
 
-    @patch('pypdf.PdfReader')
+    @patch("pypdf.PdfReader")
     def test_pdf_extraction_error(self, mock_pdf_reader):
         """Test d'erreur lors de l'extraction PDF"""
         mock_pdf_reader.side_effect = Exception("PDF parsing error")
 
         extractor = PDFExtractor()
 
-        with patch('builtins.open', mock_open(read_data=b'bad pdf data')):
-            with pytest.raises(ExtractionError) as exc_info:
-                extractor.extract("bad.pdf")
+        with (
+            patch("builtins.open", mock_open(read_data=b"bad pdf data")),
+            pytest.raises(ExtractionError) as exc_info,
+        ):
+            extractor.extract("bad.pdf")
 
         assert "PDF parsing error" in str(exc_info.value)
 
-    @patch('pypdf.PdfReader')
+    @patch("pypdf.PdfReader")
     def test_pdf_empty_pages(self, mock_pdf_reader):
         """Test PDF avec pages vides"""
         mock_reader = Mock()
@@ -261,7 +275,7 @@ class TestPDFExtractor:
 
         extractor = PDFExtractor()
 
-        with patch('builtins.open', mock_open(read_data=b'empty pdf')):
+        with patch("builtins.open", mock_open(read_data=b"empty pdf")):
             extracted_text = extractor.extract("empty.pdf")
 
         assert extracted_text.strip() == ""
@@ -275,7 +289,7 @@ class TestDOCXExtractor:
         extractor = DOCXExtractor()
         assert extractor is not None
 
-    @patch('src.ingestion.extractors.DocxDocument')
+    @patch("src.ingestion.extractors.DocxDocument")
     def test_docx_extraction_success(self, mock_document):
         """Test d'extraction DOCX réussie"""
         # Mock du document
@@ -296,7 +310,7 @@ class TestDOCXExtractor:
         assert "Second paragraph" in extracted_text
         assert mock_document.called
 
-    @patch('src.ingestion.extractors.DocxDocument')
+    @patch("src.ingestion.extractors.DocxDocument")
     def test_docx_extraction_error(self, mock_document):
         """Test d'erreur lors de l'extraction DOCX"""
         mock_document.side_effect = Exception("DOCX parsing error")
@@ -308,7 +322,7 @@ class TestDOCXExtractor:
 
         assert "DOCX parsing error" in str(exc_info.value)
 
-    @patch('src.ingestion.extractors.DocxDocument')
+    @patch("src.ingestion.extractors.DocxDocument")
     def test_docx_empty_document(self, mock_document):
         """Test DOCX vide"""
         mock_doc = Mock()
@@ -321,7 +335,7 @@ class TestDOCXExtractor:
 
         assert extracted_text.strip() == ""
 
-    @patch('src.ingestion.extractors.DocxDocument')
+    @patch("src.ingestion.extractors.DocxDocument")
     def test_docx_with_empty_paragraphs(self, mock_document):
         """Test DOCX avec paragraphes vides"""
         mock_doc = Mock()
@@ -341,7 +355,7 @@ class TestDOCXExtractor:
 
         assert "Real content" in extracted_text
         # Les paragraphes vides ne doivent pas ajouter de lignes supplémentaires
-        lines = [line for line in extracted_text.split('\n') if line.strip()]
+        lines = [line for line in extracted_text.split("\n") if line.strip()]
         assert len(lines) == 1
 
 
@@ -367,14 +381,14 @@ class TestExtractorIntegration:
 
         for filename, content in files_and_contents:
             test_file = temp_dir / filename
-            test_file.write_text(content, encoding='utf-8')
+            test_file.write_text(content, encoding="utf-8")
 
             extracted_text = factory.extract_text(str(test_file))
             # Pour les fichiers markdown, le contenu peut être converti en HTML
-            if filename.endswith('.md'):
+            if filename.endswith(".md"):
                 # Le contenu markdown peut être transformé en HTML
-                assert 'Markdown content' in extracted_text
-                assert 'markdown' in extracted_text.lower()
+                assert "Markdown content" in extracted_text
+                assert "markdown" in extracted_text.lower()
             else:
                 assert content in extracted_text
 
@@ -384,7 +398,7 @@ class TestExtractorIntegration:
 
         test_file = temp_dir / "test.TXT"
         test_content = "Uppercase extension"
-        test_file.write_text(test_content, encoding='utf-8')
+        test_file.write_text(test_content, encoding="utf-8")
 
         extracted_text = factory.extract_text(str(test_file))
         assert test_content in extracted_text
@@ -395,7 +409,7 @@ class TestExtractorIntegration:
 
         test_file = temp_dir / "metadata_test.txt"
         test_content = "Content for metadata testing"
-        test_file.write_text(test_content, encoding='utf-8')
+        test_file.write_text(test_content, encoding="utf-8")
 
         # Utiliser get_extractor pour obtenir l'extracteur et ses métadonnées
         extractor = factory.get_extractor(str(test_file))
@@ -406,10 +420,10 @@ class TestExtractorIntegration:
         assert extracted_text.strip() == test_content
 
         # Vérifier les métadonnées
-        assert metadata['file_extension'] == '.txt'
-        assert metadata['file_size'] > 0
-        assert isinstance(metadata['file_size'], int)
-        assert metadata['file_name'] == 'metadata_test.txt'
+        assert metadata["file_extension"] == ".txt"
+        assert metadata["file_size"] > 0
+        assert isinstance(metadata["file_size"], int)
+        assert metadata["file_name"] == "metadata_test.txt"
 
     def test_large_file_handling(self, temp_dir):
         """Test de gestion de gros fichiers"""
@@ -419,7 +433,7 @@ class TestExtractorIntegration:
         test_file = temp_dir / "large.txt"
         large_content = "This is a large file. " * 10000  # ~240KB
 
-        test_file.write_text(large_content, encoding='utf-8')
+        test_file.write_text(large_content, encoding="utf-8")
 
         extracted_text = factory.extract_text(str(test_file))
 
@@ -432,7 +446,7 @@ class TestExtractorIntegration:
 
         test_file = temp_dir / "special.txt"
         special_content = "Special chars: é, ñ, 中文, 🚀, \n\t\r"
-        test_file.write_text(special_content, encoding='utf-8')
+        test_file.write_text(special_content, encoding="utf-8")
 
         extracted_text = factory.extract_text(str(test_file))
 

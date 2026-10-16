@@ -6,8 +6,7 @@ et notifications du système Mimir.
 """
 
 import pytest
-from unittest.mock import Mock, patch, AsyncMock  # noqa: F401
-from datetime import datetime  # noqa: F401
+from unittest.mock import patch, AsyncMock
 
 from backend.src.email_service.smtp_client import EmailService
 
@@ -15,7 +14,7 @@ from backend.src.email_service.smtp_client import EmailService
 class TestEmailServiceInit:
     """Tests pour l'initialisation du service email."""
 
-    @patch('backend.src.email_service.smtp_client.settings')
+    @patch("backend.src.email_service.smtp_client.settings")
     def test_init_with_full_config(self, mock_settings):
         """Test d'initialisation avec configuration complète."""
         mock_settings.smtp_host = "smtp.example.com"
@@ -35,7 +34,7 @@ class TestEmailServiceInit:
         assert service.escalation_email == "support@example.com"
         assert service.from_email == "user@example.com"
 
-    @patch('backend.src.email_service.smtp_client.settings')
+    @patch("backend.src.email_service.smtp_client.settings")
     def test_init_with_incomplete_config(self, mock_settings):
         """Test d'initialisation avec configuration incomplète."""
         mock_settings.smtp_host = None
@@ -45,8 +44,8 @@ class TestEmailServiceInit:
         mock_settings.smtp_use_tls = True
         mock_settings.escalation_email = "support@example.com"
 
-        with patch('backend.src.email_service.smtp_client.logger') as mock_logger:
-            service = EmailService()  # noqa: F841
+        with patch("backend.src.email_service.smtp_client.logger") as mock_logger:
+            EmailService()
             mock_logger.warning.assert_called_once()
 
 
@@ -56,7 +55,7 @@ class TestEmailServiceConfiguration:
     @pytest.fixture
     def configured_email_service(self):
         """Service email configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -68,7 +67,7 @@ class TestEmailServiceConfiguration:
     @pytest.fixture
     def unconfigured_email_service(self):
         """Service email non configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = None
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -87,7 +86,7 @@ class TestEmailServiceConfiguration:
 
     def test_is_configured_false_missing_user(self):
         """Test avec utilisateur manquant."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = None
@@ -99,7 +98,7 @@ class TestEmailServiceConfiguration:
 
     def test_is_configured_false_missing_escalation_email(self):
         """Test avec email d'escalation manquant."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -116,7 +115,7 @@ class TestSendEscalationEmail:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -128,15 +127,15 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_success(self, email_service):
         """Test d'envoi d'escalation réussi."""
-        with patch.object(email_service, '_send_email', return_value=True) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=True) as mock_send:
             result = await email_service.send_escalation_email(
                 user_question="How do I reset my password?",
                 chat_history=[
                     {"type": "user", "content": "I forgot my password"},
-                    {"type": "assistant", "content": "I can help you with that..."}
+                    {"type": "assistant", "content": "I can help you with that..."},
                 ],
                 user_info={"ip": "192.168.1.1", "session": "abc123"},
-                context_sources=["user_manual.pdf", "faq.md"]
+                context_sources=["user_manual.pdf", "faq.md"],
             )
 
             assert result is True
@@ -145,7 +144,7 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_not_configured(self):
         """Test d'envoi avec service non configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = None
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = None
@@ -155,8 +154,7 @@ class TestSendEscalationEmail:
 
             service = EmailService()
             result = await service.send_escalation_email(
-                user_question="How do I reset my password?",
-                chat_history=[]
+                user_question="How do I reset my password?", chat_history=[]
             )
 
             assert result is False
@@ -164,10 +162,9 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_send_failure(self, email_service):
         """Test d'échec d'envoi."""
-        with patch.object(email_service, '_send_email', return_value=False) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=False) as mock_send:
             result = await email_service.send_escalation_email(
-                user_question="How do I reset my password?",
-                chat_history=[]
+                user_question="How do I reset my password?", chat_history=[]
             )
 
             assert result is False
@@ -176,10 +173,9 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_exception(self, email_service):
         """Test de gestion d'exception."""
-        with patch.object(email_service, '_send_email', side_effect=Exception("SMTP Error")):
+        with patch.object(email_service, "_send_email", side_effect=Exception("SMTP Error")):
             result = await email_service.send_escalation_email(
-                user_question="How do I reset my password?",
-                chat_history=[]
+                user_question="How do I reset my password?", chat_history=[]
             )
 
             assert result is False
@@ -187,10 +183,9 @@ class TestSendEscalationEmail:
     @pytest.mark.asyncio
     async def test_send_escalation_email_minimal_args(self, email_service):
         """Test avec arguments minimaux."""
-        with patch.object(email_service, '_send_email', return_value=True) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=True) as mock_send:
             result = await email_service.send_escalation_email(
-                user_question="Help me",
-                chat_history=[]
+                user_question="Help me", chat_history=[]
             )
 
             assert result is True
@@ -203,7 +198,7 @@ class TestSendEmail:
     @pytest.fixture
     def email_service(self):
         """Fixture pour EmailService configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -215,7 +210,7 @@ class TestSendEmail:
     @pytest.mark.asyncio
     async def test_send_email_success(self, email_service):
         """Test d'envoi d'email réussi."""
-        with patch('backend.src.email_service.smtp_client.aiosmtplib.SMTP') as mock_smtp_class:
+        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp = AsyncMock()
             mock_smtp_class.return_value = mock_smtp
 
@@ -223,7 +218,7 @@ class TestSendEmail:
                 to_emails=["recipient@example.com"],
                 subject="Test Subject",
                 html_content="<html>Test</html>",
-                text_content="Test text"
+                text_content="Test text",
             )
 
             assert result is True
@@ -235,7 +230,7 @@ class TestSendEmail:
     @pytest.mark.asyncio
     async def test_send_email_multiple_recipients(self, email_service):
         """Test d'envoi à plusieurs destinataires."""
-        with patch('backend.src.email_service.smtp_client.aiosmtplib.SMTP') as mock_smtp_class:
+        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp = AsyncMock()
             mock_smtp_class.return_value = mock_smtp
 
@@ -243,7 +238,7 @@ class TestSendEmail:
                 to_emails=["recipient1@example.com", "recipient2@example.com"],
                 subject="Test Subject",
                 html_content="<html>Test</html>",
-                text_content="Test text"
+                text_content="Test text",
             )
 
             assert result is True
@@ -252,13 +247,13 @@ class TestSendEmail:
     @pytest.mark.asyncio
     async def test_send_email_exception(self, email_service):
         """Test de gestion d'exception."""
-        with patch('backend.src.email_service.smtp_client.aiosmtplib.SMTP') as mock_smtp_class:
+        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp_class.side_effect = Exception("Connection failed")
 
             result = await email_service._send_email(
                 to_emails=["recipient@example.com"],
                 subject="Test Subject",
-                text_content="Test text"
+                text_content="Test text",
             )
 
             assert result is False
@@ -267,14 +262,10 @@ class TestSendEmail:
     async def test_send_email_with_attachments(self, email_service):
         """Test d'envoi avec pièces jointes."""
         attachments = [
-            {
-                "filename": "document.pdf",
-                "content": b"PDF content",
-                "mime_type": "application/pdf"
-            }
+            {"filename": "document.pdf", "content": b"PDF content", "mime_type": "application/pdf"}
         ]
 
-        with patch('backend.src.email_service.smtp_client.aiosmtplib.SMTP') as mock_smtp_class:
+        with patch("backend.src.email_service.smtp_client.aiosmtplib.SMTP") as mock_smtp_class:
             mock_smtp = AsyncMock()
             mock_smtp_class.return_value = mock_smtp
 
@@ -282,7 +273,7 @@ class TestSendEmail:
                 to_emails=["recipient@example.com"],
                 subject="Test Subject with Attachment",
                 text_content="Test text",
-                attachments=attachments
+                attachments=attachments,
             )
 
             assert result is True
@@ -295,7 +286,7 @@ class TestContentGeneration:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -310,10 +301,10 @@ class TestContentGeneration:
             user_question="How do I reset my password?",
             chat_history=[
                 {"type": "user", "content": "I forgot my password"},
-                {"type": "assistant", "content": "I can help you with that..."}
+                {"type": "assistant", "content": "I can help you with that..."},
             ],
             user_info={"ip": "192.168.1.1"},
-            context_sources=["user_manual.pdf"]
+            context_sources=["user_manual.pdf"],
         )
 
         assert "How do I reset my password?" in html
@@ -328,10 +319,10 @@ class TestContentGeneration:
             user_question="How do I reset my password?",
             chat_history=[
                 {"type": "user", "content": "I forgot my password"},
-                {"type": "assistant", "content": "I can help you with that..."}
+                {"type": "assistant", "content": "I can help you with that..."},
             ],
             user_info={"ip": "192.168.1.1"},
-            context_sources=["user_manual.pdf"]
+            context_sources=["user_manual.pdf"],
         )
 
         assert "How do I reset my password?" in text
@@ -343,10 +334,7 @@ class TestContentGeneration:
     def test_generate_escalation_html_minimal(self, email_service):
         """Test de génération HTML avec données minimales."""
         html = email_service._generate_escalation_html(
-            user_question="Help me",
-            chat_history=[],
-            user_info=None,
-            context_sources=None
+            user_question="Help me", chat_history=[], user_info=None, context_sources=None
         )
 
         assert "Help me" in html
@@ -355,10 +343,7 @@ class TestContentGeneration:
     def test_generate_escalation_text_minimal(self, email_service):
         """Test de génération texte avec données minimales."""
         text = email_service._generate_escalation_text(
-            user_question="Help me",
-            chat_history=[],
-            user_info=None,
-            context_sources=None
+            user_question="Help me", chat_history=[], user_info=None, context_sources=None
         )
 
         assert "Help me" in text
@@ -369,14 +354,14 @@ class TestContentGeneration:
         chat_history = [
             {"type": "user", "content": "First message"},
             {"type": "assistant", "content": "Response message"},
-            {"type": "user", "content": "Follow-up question"}
+            {"type": "user", "content": "Follow-up question"},
         ]
 
         html = email_service._generate_escalation_html(
             user_question="Question",
             chat_history=chat_history,
             user_info=None,
-            context_sources=None
+            context_sources=None,
         )
 
         assert "First message" in html
@@ -388,14 +373,14 @@ class TestContentGeneration:
         chat_history = [
             {"type": "user", "content": "First message"},
             {"type": "assistant", "content": "Response message"},
-            {"type": "user", "content": "Follow-up question"}
+            {"type": "user", "content": "Follow-up question"},
         ]
 
         text = email_service._generate_escalation_text(
             user_question="Question",
             chat_history=chat_history,
             user_info=None,
-            context_sources=None
+            context_sources=None,
         )
 
         assert "First message" in text
@@ -405,17 +390,11 @@ class TestContentGeneration:
     def test_format_chat_history_empty(self, email_service):
         """Test avec historique vide."""
         html = email_service._generate_escalation_html(
-            user_question="Question",
-            chat_history=[],
-            user_info=None,
-            context_sources=None
+            user_question="Question", chat_history=[], user_info=None, context_sources=None
         )
 
         text = email_service._generate_escalation_text(
-            user_question="Question",
-            chat_history=[],
-            user_info=None,
-            context_sources=None
+            user_question="Question", chat_history=[], user_info=None, context_sources=None
         )
 
         assert "Question" in html
@@ -428,7 +407,7 @@ class TestNotificationEmail:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -440,25 +419,25 @@ class TestNotificationEmail:
     @pytest.mark.asyncio
     async def test_send_notification_email(self, email_service):
         """Test d'envoi de notification."""
-        with patch.object(email_service, '_send_email', return_value=True) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=True) as mock_send:
             result = await email_service.send_notification_email(
                 to_email="admin@example.com",
                 subject="System Alert",
                 message="System is running normally",
-                is_html=False
+                is_html=False,
             )
 
             assert result is True
             mock_send.assert_called_once_with(
                 to_emails=["admin@example.com"],
                 subject="System Alert",
-                text_content="System is running normally"
+                text_content="System is running normally",
             )
 
     @pytest.mark.asyncio
     async def test_send_notification_email_not_configured(self):
         """Test avec service non configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = None
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = None
@@ -470,7 +449,7 @@ class TestNotificationEmail:
             result = await service.send_notification_email(
                 to_email="admin@example.com",
                 subject="System Alert",
-                message="System is running normally"
+                message="System is running normally",
             )
 
             assert result is False
@@ -478,86 +457,36 @@ class TestNotificationEmail:
     @pytest.mark.asyncio
     async def test_send_system_health_alert(self, email_service):
         """Test d'alerte de santé système."""
-        with patch.object(email_service, '_send_email', return_value=True) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=True) as mock_send:
             result = await email_service.send_notification_email(
                 to_email="admin@example.com",
                 subject="System Health Alert",
                 message="<h1>System Status: Critical</h1>",
-                is_html=True
+                is_html=True,
             )
 
             assert result is True
             mock_send.assert_called_once_with(
                 to_emails=["admin@example.com"],
                 subject="System Health Alert",
-                html_content="<h1>System Status: Critical</h1>"
+                html_content="<h1>System Status: Critical</h1>",
             )
 
     @pytest.mark.asyncio
     async def test_send_ingestion_report(self, email_service):
         """Test de rapport d'ingestion."""
-        with patch.object(email_service, '_send_email', return_value=True) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=True) as mock_send:
             report_content = "Documents processed: 150\nErrors: 0\nTime: 2 minutes"
 
             result = await email_service.send_notification_email(
                 to_email="admin@example.com",
                 subject="Daily Ingestion Report",
                 message=report_content,
-                is_html=False
+                is_html=False,
             )
 
             assert result is True
             mock_send.assert_called_once()
-
-
-class TestEmailValidation:
-    """Tests pour la validation des emails."""
-
-    @pytest.fixture
-    def email_service(self):
-        """Service email configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
-            mock_settings.smtp_host = "smtp.example.com"
-            mock_settings.smtp_port = 587
-            mock_settings.smtp_user = "user@example.com"
-            mock_settings.smtp_password = "password"
-            mock_settings.smtp_use_tls = True
-            mock_settings.escalation_email = "support@example.com"
-            return EmailService()
-
-    def test_validate_email_address_valid(self, email_service):
-        """Test de validation d'adresse email valide."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste la configuration
-        assert email_service._is_configured() is True
-
-    def test_validate_email_address_invalid(self, email_service):
-        """Test de validation d'adresse email invalide."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste la configuration
-        assert email_service._is_configured() is True
-
-    def test_sanitize_email_content(self, email_service):
-        """Test de nettoyage du contenu email."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste que le contenu
-        # est utilisé tel quel dans les templates
-        html = email_service._generate_escalation_html(
-            user_question="Test question",
-            chat_history=[],
-            user_info=None,
-            context_sources=None
-        )
-        assert "Test question" in html
-
-    def test_sanitize_email_content_text(self, email_service):
-        """Test de nettoyage de contenu texte."""
-        # Ces méthodes n'existent pas dans EmailService, donc on teste que le contenu
-        # est utilisé tel quel dans les templates
-        text = email_service._generate_escalation_text(
-            user_question="Test question",
-            chat_history=[],
-            user_info=None,
-            context_sources=None
-        )
-        assert "Test question" in text
 
 
 class TestIntegration:
@@ -566,7 +495,7 @@ class TestIntegration:
     @pytest.fixture
     def email_service(self):
         """Service email configuré."""
-        with patch('backend.src.email_service.smtp_client.settings') as mock_settings:
+        with patch("backend.src.email_service.smtp_client.settings") as mock_settings:
             mock_settings.smtp_host = "smtp.example.com"
             mock_settings.smtp_port = 587
             mock_settings.smtp_user = "user@example.com"
@@ -578,24 +507,27 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_full_escalation_workflow(self, email_service):
         """Test du workflow complet d'escalation."""
-        with patch.object(email_service, '_send_email', return_value=True) as mock_send:
+        with patch.object(email_service, "_send_email", return_value=True) as mock_send:
             # Données de test complètes
             user_question = "I can't access my account after password reset"
             chat_history = [
                 {"type": "user", "content": "My password reset isn't working"},
-                {"type": "assistant", "content": "Let me help you with that. Can you check your email?"},
+                {
+                    "type": "assistant",
+                    "content": "Let me help you with that. Can you check your email?",
+                },
                 {"type": "user", "content": "I checked, no email received"},
-                {"type": "assistant", "content": "Let me escalate this to our support team"}
+                {"type": "assistant", "content": "Let me escalate this to our support team"},
             ]
             user_info = {
                 "ip": "192.168.1.100",
                 "session_id": "sess_12345",
-                "user_agent": "Mozilla/5.0..."
+                "user_agent": "Mozilla/5.0...",
             }
             context_sources = [
                 "password_reset_guide.pdf",
                 "troubleshooting_faq.md",
-                "account_recovery.html"
+                "account_recovery.html",
             ]
 
             # Exécuter l'escalation
@@ -603,7 +535,7 @@ class TestIntegration:
                 user_question=user_question,
                 chat_history=chat_history,
                 user_info=user_info,
-                context_sources=context_sources
+                context_sources=context_sources,
             )
 
             # Vérifications

@@ -1,16 +1,10 @@
-"""
-Main FastAPI application for Mimir
-Application entry point with full configuration - Milestone 3: API & Services
-"""
+"""Main FastAPI application for Mimir: entry point with the full configuration."""
 
 from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.middleware.cors import CORSMiddleware  # noqa: F401
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.openapi.docs import get_swagger_ui_html  # noqa: F401
 from fastapi.openapi.utils import get_openapi
 import uvicorn
-import logging  # noqa: F401
 import time
 import json
 from datetime import datetime
@@ -20,7 +14,8 @@ from src.config import settings
 from src.database.connection import init_database, db_manager
 from src.security.admin_password import resolve_admin_password
 from src.security.startup_validation import validate_production_secrets
-from src.shared.models import ErrorResponse, HealthCheckResponse
+from src.shared.errors import BudgetExceeded, MimirError
+from src.shared.models import ErrorResponse, HealthCheckResponse, RootResponse
 
 # Import API endpoints
 from src.api.endpoints import health, auth, chat, documents, admin, logs
@@ -28,6 +23,7 @@ from src.api.endpoints import health, auth, chat, documents, admin, logs
 # Import middleware
 from src.api.middleware.cors import configure_cors_middleware
 from src.api.middleware.rate_limit import configure_rate_limiting
+from src.api.responses import budget_exceeded_response
 
 # Import services
 from src.cache.lru_cache import cache_service, chat_cache_service
@@ -35,7 +31,13 @@ from src.email_service.smtp_client import email_service
 from src.monitoring.logger import setup_logger
 from src.ingestion.processor import IngestionProcessor
 from src.ingestion.chunking import ChunkingConfig
-from src.api.dependencies import get_llm_service, get_vector_store, get_document_repository, set_ingestion_processor, get_bm25_store
+from src.api.dependencies import (
+    get_llm_service,
+    get_vector_store,
+    get_document_repository,
+    set_ingestion_processor,
+    get_bm25_store,
+)
 from pathlib import Path
 
 
@@ -55,7 +57,7 @@ class CustomJSONResponse(JSONResponse):
             allow_nan=False,
             indent=None,
             separators=(",", ":"),
-            default=self.json_encoder
+            default=self.json_encoder,
         ).encode("utf-8")
 
     def json_encoder(self, obj):
@@ -66,12 +68,9 @@ class CustomJSONResponse(JSONResponse):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifespan manager - Milestone 3
-    Initialization at startup, cleanup at shutdown
-    """
+    """Application lifespan manager: initialization at startup, cleanup at shutdown."""
     # Startup
-    logger.info("Starting Mimir application - Jalon 3: API & Services...")
+    logger.info("Starting Mimir application - API & Services...")
 
     try:
         # Derive the effective admin hash from ADMIN_PASSWORD first, so the
@@ -85,106 +84,19 @@ async def lifespan(app: FastAPI):
         init_database()
         logger.info("Database initialized successfully")
 
-        # Cache services initialization
-        cache_stats = cache_service.get_stats()
-        chat_cache_stats = chat_cache_service.get_stats()
-        logger.info(f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries")
-
-        # Email service verification
-        email_config = email_service.get_configuration_status()
-        if email_config["configured"]:
-            logger.info("Email service configured and ready")
-        else:
-            logger.warning("Email service not fully configured - escalation features will be limited")
+        _log_services_status()
 
         # Attach the fingerprinted SMTP error alerter to app_logger.
         # Idempotent and guarded internally; a failure here must not abort startup.
         from src.monitoring.alerting import setup_alerting
+
         setup_alerting()
 
-        # Ingestion services initialization
-        global ingestion_processor
-        try:
-            # Create chunking configuration. section_title_tracking is defaulted
-            # from the settings flag here (single caller-side default):
-            # when structure_aware_chunking_enabled is False (current default),
-            # chunking output stays byte-identical to today.
-            chunking_config = ChunkingConfig(
-                chunk_size=settings.max_chunk_size,
-                overlap=settings.chunk_overlap,
-                section_title_tracking=settings.structure_aware_chunking_enabled
-            )
-
-            # Get database session
-            from src.database.connection import db_manager
-            with db_manager.get_session_context() as session:
-                document_repo = get_document_repository(session)
-
-                # Initialize ingestion processor
-                ingestion_processor = IngestionProcessor(
-                    llm_service=get_llm_service(),
-                    vector_store=get_vector_store(),
-                    document_repository=document_repo,
-                    chunking_config=chunking_config,
-                    max_file_size_mb=settings.max_file_size_mb,
-                    max_chunks_per_doc=settings.max_chunks_per_doc,
-                    bm25_store=get_bm25_store()
-                )
-
-                # Start the processor
-                await ingestion_processor.start()
-                logger.info("Ingestion processor started successfully")
-
-                # Ensure the BM25 lexical index exists at startup. It is
-                # a derived artifact rebuilt from the FAISS source of truth only
-                # at ingestion/deletion; on a cold start or an upgrade of an
-                # existing FAISS install it may be missing on disk. With hybrid
-                # search enabled by default, a missing BM25 index would otherwise
-                # force every query to degrade to dense-only until the next
-                # ingestion. Rebuild it here (non-fatal) so hybrid works
-                # immediately. The per-query dense-only fallback in RagService
-                # remains the safety net if this rebuild fails.
-                try:
-                    _vs = get_vector_store()
-                    _bm25 = get_bm25_store()
-                    if not _bm25.load():
-                        _active = _vs.snapshot_active_chunks()
-                        if _active:
-                            _bm25.rebuild(_active)
-                            logger.info(
-                                f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
-                            )
-                except Exception as bm25_startup_error:
-                    logger.warning(
-                        f"BM25 startup rebuild failed - hybrid queries will degrade to "
-                        f"dense-only until next ingestion: {bm25_startup_error}"
-                    )
-
-                # Make the processor available to API endpoints
-                set_ingestion_processor(ingestion_processor)
-
-                # Process any pending documents
-                pending_documents = document_repo.get_by_status('pending')
-                if pending_documents:
-                    logger.info(f"Found {len(pending_documents)} pending documents, queuing for processing")
-                    for doc in pending_documents:
-                        if Path(doc.path).exists():
-                            ingestion_processor.queue_document(
-                                file_path=doc.path,
-                                document_id=str(doc.id),
-                                preserve=doc.preserve,
-                                metadata={}
-                            )
-                        else:
-                            logger.warning(f"Document file not found: {doc.path}")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize ingestion processor: {e}")
-            # Continue without ingestion processor (non-blocking)
+        await _start_ingestion()
 
         logger.info("Application startup completed successfully")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - startup boundary: log any failure, then re-raise
         logger.error(f"Failed to initialize application: {e}")
         raise
 
@@ -199,29 +111,144 @@ async def lifespan(app: FastAPI):
         chat_cache_service.invalidate_all()
         logger.info("Cache services cleaned up")
 
-        # Graceful shutdown of ingestion services
-        if ingestion_processor:
-            try:
-                success = await ingestion_processor.stop(timeout=10.0)
-                if success:
-                    logger.info("Ingestion processor stopped gracefully")
-                else:
-                    logger.warning("Ingestion processor stop timeout")
-            except Exception as e:
-                logger.error(f"Error stopping ingestion processor: {e}")
-
-        # Graceful LLM service shutdown to avoid "Event loop is closed"
-        try:
-            from src.api.dependencies import _llm_service
-            if _llm_service is not None:
-                await _llm_service.close()
-                logger.info("LLM service closed gracefully")
-        except Exception as e:
-            logger.error(f"Error closing LLM service: {e}")
+        await _stop_ingestion()
+        await _close_llm_service()
 
         logger.info("Application shutdown completed")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - shutdown boundary: never fail the server stop
         logger.error(f"Error during shutdown: {e}")
+
+
+def _log_services_status() -> None:
+    """Log the cache sizes and whether the email service is configured."""
+    cache_stats = cache_service.get_stats()
+    chat_cache_stats = chat_cache_service.get_stats()
+    logger.info(
+        f"Cache services initialized - Main: {cache_stats['max_size']} entries, Chat: {chat_cache_stats['max_size']} entries"
+    )
+
+    email_config = email_service.get_configuration_status()
+    if email_config["configured"]:
+        logger.info("Email service configured and ready")
+    else:
+        logger.warning("Email service not fully configured - escalation features will be limited")
+
+
+async def _start_ingestion() -> None:
+    """Start the ingestion processor and queue the pending documents.
+
+    Non-blocking: the API starts even if ingestion cannot.
+    """
+    global ingestion_processor
+    try:
+        # section_title_tracking is defaulted from the settings flag here
+        # (single caller-side default): when structure_aware_chunking_enabled
+        # is False (current default), chunking output stays byte-identical.
+        chunking_config = ChunkingConfig(
+            chunk_size=settings.max_chunk_size,
+            overlap=settings.chunk_overlap,
+            section_title_tracking=settings.structure_aware_chunking_enabled,
+        )
+
+        # Get database session
+        from src.database.connection import db_manager
+
+        with db_manager.get_session_context() as session:
+            document_repo = get_document_repository(session)
+
+            ingestion_processor = IngestionProcessor(
+                llm_service=get_llm_service(),
+                vector_store=get_vector_store(),
+                document_repository=document_repo,
+                chunking_config=chunking_config,
+                max_file_size_mb=settings.max_file_size_mb,
+                max_chunks_per_doc=settings.max_chunks_per_doc,
+                bm25_store=get_bm25_store(),
+            )
+            await ingestion_processor.start()
+            logger.info("Ingestion processor started successfully")
+
+            _ensure_bm25_index()
+
+            # Make the processor available to API endpoints
+            set_ingestion_processor(ingestion_processor)
+
+            _queue_pending_documents(document_repo, ingestion_processor)
+
+    except Exception as e:  # noqa: BLE001 - startup boundary: the API starts even if ingestion cannot
+        logger.error(f"Failed to initialize ingestion processor: {e}")
+
+
+def _ensure_bm25_index() -> None:
+    """Rebuild the BM25 lexical index at startup when it is missing on disk.
+
+    It is a derived artifact rebuilt from the FAISS source of truth only at
+    ingestion/deletion; on a cold start or an upgrade of an existing FAISS
+    install it may be missing. With hybrid search enabled by default, a
+    missing BM25 index would otherwise force every query to degrade to
+    dense-only until the next ingestion. Non-fatal: the per-query dense-only
+    fallback in RagService remains the safety net.
+    """
+    try:
+        _vs = get_vector_store()
+        _bm25 = get_bm25_store()
+        if not _bm25.load():
+            _active = _vs.snapshot_active_chunks()
+            if _active:
+                _bm25.rebuild(_active)
+                logger.info(
+                    f"BM25 lexical index rebuilt at startup from {len(_active)} active chunks"
+                )
+    except Exception as bm25_startup_error:  # noqa: BLE001 - startup boundary: never fail on a bad index
+        logger.warning(
+            f"BM25 startup rebuild failed - hybrid queries will degrade to "
+            f"dense-only until next ingestion: {bm25_startup_error}"
+        )
+
+
+def _queue_pending_documents(document_repo, processor) -> None:
+    """Queue the documents left pending by a previous run."""
+    pending_documents = document_repo.get_by_status("pending")
+    if not pending_documents:
+        return
+
+    logger.info(f"Found {len(pending_documents)} pending documents, queuing for processing")
+    for doc in pending_documents:
+        if Path(doc.path).exists():
+            processor.queue_document(
+                file_path=doc.path,
+                document_id=str(doc.id),
+                preserve=doc.preserve,
+                metadata={},
+            )
+        else:
+            logger.warning(f"Document file not found: {doc.path}")
+
+
+async def _stop_ingestion() -> None:
+    """Gracefully stop the ingestion processor, if it was started."""
+    if not ingestion_processor:
+        return
+    try:
+        success = await ingestion_processor.stop(timeout=10.0)
+        if success:
+            logger.info("Ingestion processor stopped gracefully")
+        else:
+            logger.warning("Ingestion processor stop timeout")
+    except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
+        logger.error(f"Error stopping ingestion processor: {e}")
+
+
+async def _close_llm_service() -> None:
+    """Close the LLM service's HTTP session to avoid "Event loop is closed"."""
+    try:
+        from src.api.dependencies import _llm_service
+
+        if _llm_service is not None:
+            await _llm_service.close()
+            logger.info("LLM service closed gracefully")
+    except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
+        logger.error(f"Error closing LLM service: {e}")
 
 
 # FastAPI application configuration
@@ -232,11 +259,11 @@ app = FastAPI(
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
     openapi_url=f"/api/{settings.api_version}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
-# Middleware configuration - Milestone 3
+# Middleware configuration
 
 # CORS middleware (advanced configuration)
 configure_cors_middleware(app)
@@ -249,10 +276,7 @@ configure_rate_limiting(app)
 # default "*" preserves the permissive behaviour for local/dev deploys where the
 # hostname is not known ahead of time.
 _trusted_hosts = [h.strip() for h in settings.trusted_hosts.split(",") if h.strip()]
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=_trusted_hosts or ["*"]
-)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted_hosts or ["*"])
 
 
 # Custom middleware for request logging
@@ -262,9 +286,10 @@ async def request_logging_middleware(request: Request, call_next):
     start_time = time.time()
 
     # Client information extraction
-    client_ip = request.headers.get("X-Forwarded-For",
-                                   request.headers.get("X-Real-IP",
-                                                     request.client.host if request.client else "unknown"))
+    client_ip = request.headers.get(
+        "X-Forwarded-For",
+        request.headers.get("X-Real-IP", request.client.host if request.client else "unknown"),
+    )
 
     # Log incoming request (less verbose for health checks)
     if not request.url.path.startswith("/health"):
@@ -278,9 +303,13 @@ async def request_logging_middleware(request: Request, call_next):
 
     # Log response (with appropriate level based on status code)
     if response.status_code >= 400:
-        logger.warning(f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
+        logger.warning(
+            f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)"
+        )
     elif not request.url.path.startswith("/health"):
-        logger.debug(f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
+        logger.debug(
+            f"Response: {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)"
+        )
 
     # Add monitoring headers
     response.headers["X-Process-Time"] = f"{process_time:.3f}"
@@ -298,8 +327,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content=ErrorResponse(
             error_code=f"HTTP_{exc.status_code}",
             error_message=exc.detail,
-            details={"path": str(request.url.path)}
-        ).model_dump()
+            details={"path": str(request.url.path)},
+        ).model_dump(),
     )
 
 
@@ -312,8 +341,8 @@ async def value_error_handler(request: Request, exc: ValueError):
         content=ErrorResponse(
             error_code="VALIDATION_ERROR",
             error_message=str(exc),
-            details={"path": str(request.url.path)}
-        ).model_dump()
+            details={"path": str(request.url.path)},
+        ).model_dump(),
     )
 
 
@@ -330,26 +359,40 @@ async def general_exception_handler(request: Request, exc: Exception):
         content=ErrorResponse(
             error_code="INTERNAL_ERROR",
             error_message=error_message,
-            details={"path": str(request.url.path)} if not settings.is_production else None
-        ).model_dump()
+            details={"path": str(request.url.path)} if not settings.is_production else None,
+        ).model_dump(),
     )
+
+
+@app.exception_handler(BudgetExceeded)
+async def budget_exceeded_handler(request: Request, exc: BudgetExceeded):
+    """Daily AI budget exhausted: the same 429 as the chat route."""
+    logger.warning(f"Daily budget exceeded on {request.url.path}: {exc}")
+    return budget_exceeded_response()
+
+
+@app.exception_handler(MimirError)
+async def domain_error_handler(request: Request, exc: MimirError):
+    """Domain error escaping a route: the same 500 payload as an unexpected error."""
+    return await general_exception_handler(request, exc)
 
 
 # Base routes
 
-@app.get("/", response_model=dict)
-async def root():
+
+@app.get("/", response_model=RootResponse)
+async def root() -> RootResponse:
     """Main API entry point"""
-    return {
-        "name": "Mimir",
-        "description": "Chatbot documentaire d'entreprise",
-        "version": settings.api_version,
-        "status": "running",
-        "docs_url": f"/docs" if not settings.is_production else None  # noqa: F541
-    }
+    return RootResponse(
+        name="Mimir",
+        description="Chatbot documentaire d'entreprise",
+        version=settings.api_version,
+        status="running",
+        docs_url="/docs" if not settings.is_production else None,
+    )
 
 
-# API endpoints registration - Milestone 3
+# API endpoints registration
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
@@ -362,21 +405,17 @@ app.include_router(logs.router, prefix="/api/v1")
 # Compatibility route for root health check
 @app.get("/health", response_model=HealthCheckResponse)
 async def root_health_check(response: Response):
-    """
-    Root health check for compatibility
-    Delegates to the full Milestone 3 health check
-    """
+    """Root health check kept for compatibility; delegates to the full health check."""
     try:
         # Delegate to the full health check
         from src.api.endpoints.health import health_check
-        from src.database.connection import get_db_session  # noqa: F401
 
         # Create a session for the health check; pass this route's Response
         # through so an unhealthy state is reported as HTTP 503 here too.
         with db_manager.get_session_context() as session:
             return await health_check(response=response, db=session)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as a 503
         logger.error(f"Root health check failed: {e}")
         return CustomJSONResponse(
             status_code=503,
@@ -384,8 +423,8 @@ async def root_health_check(response: Response):
                 "success": False,
                 "status": "unhealthy",
                 "message": f"Health check failed: {e}",
-                "timestamp": time.time()
-            }
+                "timestamp": time.time(),
+            },
         )
 
 
@@ -394,23 +433,19 @@ def custom_openapi():
     """OpenAPI configuration with security information"""
     if app.openapi_schema:
         return app.openapi_schema
-    
+
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
         description=app.description,
         routes=app.routes,
     )
-    
+
     # Add security information for API endpoints
     openapi_schema["components"]["securitySchemes"] = {
-        "Bearer": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
+        "Bearer": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
     }
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
@@ -421,12 +456,12 @@ app.openapi = custom_openapi
 # Development entry point
 if __name__ == "__main__":
     logger.info(f"Starting Mimir in development mode on {settings.api_host}:{settings.api_port}")
-    
+
     uvicorn.run(
         "main:app",
         host=settings.api_host,
         port=settings.api_port,
         reload=True,  # Hot reload in development
         log_level=settings.log_level.lower(),
-        access_log=True
+        access_log=True,
     )

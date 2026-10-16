@@ -28,8 +28,14 @@ from src.services.rag_service import _process_question_with_rag_stream
 
 def _sr(chunk_id, document_id, text, source, score):
     return SearchResult(
-        chunk_id=chunk_id, document_id=document_id, text=text, source=source,
-        similarity_score=score, chunk_index=0, total_chunks=1, metadata={},
+        chunk_id=chunk_id,
+        document_id=document_id,
+        text=text,
+        source=source,
+        similarity_score=score,
+        chunk_index=0,
+        total_chunks=1,
+        metadata={},
     )
 
 
@@ -49,15 +55,24 @@ def _base_mocks():
     # No fuzzy filename pre-inclusion matches (keeps the pipeline on the pure
     # dense retrieval path).
     mock_document_repository.get_all.return_value = []
-    mock_document_repository.get_by_ids.side_effect = lambda ids: {i: Mock(filename="doc.pdf") for i in ids}
+    mock_document_repository.get_by_ids.side_effect = lambda ids: {
+        i: Mock(filename="doc.pdf") for i in ids
+    }
 
     mock_llm_service.embed.return_value = AsyncMock(
-        embeddings=[[0.1] * 1024], usage_tokens=10,
-        model="mistral-embed", prompt_tokens=10, completion_tokens=0,
+        embeddings=[[0.1] * 1024],
+        usage_tokens=10,
+        model="mistral-embed",
+        prompt_tokens=10,
+        completion_tokens=0,
     )
     mock_llm_service.generate.return_value = AsyncMock(
-        content="Réponse synthétique [1].", model="mistral",
-        usage_tokens=100, prompt_tokens=80, completion_tokens=20, finish_reason="stop",
+        content="Réponse synthétique [1].",
+        model="mistral",
+        usage_tokens=100,
+        prompt_tokens=80,
+        completion_tokens=20,
+        finish_reason="stop",
     )
     return mock_llm_service, mock_vector_store, mock_document_repository, mock_rag_debug
 
@@ -90,6 +105,7 @@ def _make_generate_stream(captured, chunks=("Réponse ", "[1].")):
     It records the kwargs it was called with (so the numbered system_prompt can
     be inspected) and yields the given text chunks.
     """
+
     async def _fake_stream(*args, **kwargs):
         captured.update(kwargs)
         for c in chunks:
@@ -121,16 +137,18 @@ class TestStreamCitationEvent:
 
         with patch("src.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
-            events = asyncio.run(_drain_stream(
-                question="question stream",
-                context_limit=5,
-                include_sources=True,
-                session_id="cit_s_1",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-            ))
+            events = asyncio.run(
+                _drain_stream(
+                    question="question stream",
+                    context_limit=5,
+                    include_sources=True,
+                    session_id="cit_s_1",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                )
+            )
 
         types = [e["type"] for e in events]
         # Exactly one citation event, strictly before the done event.
@@ -163,16 +181,18 @@ class TestStreamCitationEvent:
 
         with patch("src.services.rag_service.settings") as mock_settings:
             _dense_settings(mock_settings)
-            events = asyncio.run(_drain_stream(
-                question="stream sans source",
-                context_limit=5,
-                include_sources=True,
-                session_id="cit_s_0",
-                llm_service=llm,
-                vector_store=vs,
-                document_repository=docs,
-                rag_debug=dbg,
-            ))
+            events = asyncio.run(
+                _drain_stream(
+                    question="stream sans source",
+                    context_limit=5,
+                    include_sources=True,
+                    session_id="cit_s_0",
+                    llm_service=llm,
+                    vector_store=vs,
+                    document_repository=docs,
+                    rag_debug=dbg,
+                )
+            )
 
         types = [e["type"] for e in events]
         done_event = next(e for e in events if e["type"] == "done")

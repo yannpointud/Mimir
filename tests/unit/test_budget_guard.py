@@ -11,6 +11,7 @@ tests/performance/test_budget_concurrency.py: redirect the global db_manager
 singleton to a fresh temporary SQLite file for the test's lifetime, so no
 synthetic ledger/config rows leak into the developer's real database.
 """
+
 import shutil
 import tempfile
 from pathlib import Path
@@ -144,9 +145,7 @@ class TestHotConfigOverride:
         # the default 20.0), this second reservation would still succeed.
         session = db_manager.get_session()
         try:
-            ConfigurationRepository(session).set(
-                "daily_budget_eur", str(first.estimate_eur)
-            )
+            ConfigurationRepository(session).set("daily_budget_eur", str(first.estimate_eur))
         finally:
             session.close()
 

@@ -14,7 +14,6 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, Mock, patch
 
-import pytest
 
 from scripts.ragas_eval.golden_set_schema import ADVERSARIAL_REFERENCE, GoldenSetEntry
 from scripts.ragas_eval.run_pipeline import (
@@ -50,10 +49,7 @@ def _rag_result(answer: str, chunk_texts):
     """Build a RagService.answer()-shaped result dict (mock, no network)."""
     return {
         "answer": answer,
-        "sources": [
-            {"document_id": 1, "filename": "f.pdf", "chunk_text": t}
-            for t in chunk_texts
-        ],
+        "sources": [{"document_id": 1, "filename": "f.pdf", "chunk_text": t} for t in chunk_texts],
         "confidence_score": 0.8,
         "session_id": "ragas-eval-0",
     }
@@ -132,11 +128,13 @@ class TestThrottle:
 
     def test_collect_sleeps_between_calls_only(self):
         entries = [_corpus_entry(), _adversarial_entry(), _corpus_entry()]
-        answer_fn = AsyncMock(side_effect=[
-            _rag_result("r0", ["c0"]),
-            _rag_result("r1", []),
-            _rag_result("r2", ["c2"]),
-        ])
+        answer_fn = AsyncMock(
+            side_effect=[
+                _rag_result("r0", ["c0"]),
+                _rag_result("r1", []),
+                _rag_result("r2", ["c2"]),
+            ]
+        )
 
         with patch(
             "scripts.ragas_eval.run_pipeline.asyncio.sleep",
@@ -158,14 +156,14 @@ class TestCollectEvalRows:
 
     def test_collects_a_row_per_entry(self):
         entries = [_corpus_entry(), _adversarial_entry()]
-        answer_fn = AsyncMock(side_effect=[
-            _rag_result("grounded", ["ctx"]),
-            _rag_result("abstain", []),
-        ])
-
-        rows = asyncio.run(
-            _collect_eval_rows(entries, answer_fn, throttle_seconds=0)
+        answer_fn = AsyncMock(
+            side_effect=[
+                _rag_result("grounded", ["ctx"]),
+                _rag_result("abstain", []),
+            ]
         )
+
+        rows = asyncio.run(_collect_eval_rows(entries, answer_fn, throttle_seconds=0))
 
         assert answer_fn.await_count == 2
         assert [r["response"] for r in rows] == ["grounded", "abstain"]
@@ -176,15 +174,15 @@ class TestCollectEvalRows:
     def test_none_result_stops_the_loop(self):
         # answer_fn returning None signals budget exhaustion -> stop early.
         entries = [_corpus_entry(), _adversarial_entry(), _corpus_entry()]
-        answer_fn = AsyncMock(side_effect=[
-            _rag_result("first", ["c"]),
-            None,
-            _rag_result("never", ["c"]),
-        ])
-
-        rows = asyncio.run(
-            _collect_eval_rows(entries, answer_fn, throttle_seconds=0)
+        answer_fn = AsyncMock(
+            side_effect=[
+                _rag_result("first", ["c"]),
+                None,
+                _rag_result("never", ["c"]),
+            ]
         )
+
+        rows = asyncio.run(_collect_eval_rows(entries, answer_fn, throttle_seconds=0))
 
         assert len(rows) == 1
         assert rows[0]["response"] == "first"
@@ -192,14 +190,14 @@ class TestCollectEvalRows:
     def test_respects_limit_via_slicing(self):
         # The loop itself takes pre-sliced entries; verify it honors the count.
         entries = [_corpus_entry() for _ in range(2)]
-        answer_fn = AsyncMock(side_effect=[
-            _rag_result("a", ["c"]),
-            _rag_result("b", ["c"]),
-        ])
-
-        rows = asyncio.run(
-            _collect_eval_rows(entries, answer_fn, throttle_seconds=0)
+        answer_fn = AsyncMock(
+            side_effect=[
+                _rag_result("a", ["c"]),
+                _rag_result("b", ["c"]),
+            ]
         )
+
+        rows = asyncio.run(_collect_eval_rows(entries, answer_fn, throttle_seconds=0))
 
         assert len(rows) == 2
 
@@ -214,9 +212,12 @@ class TestAnswerViaStream:
             {"type": "chunk", "content": "La réponse "},
             {"type": "chunk", "content": "est 1,2 M€."},
             {"type": "citation", "citations": {"1": {"document_id": 1}}},
-            {"type": "done",
-             "sources": [{"document_id": 1, "filename": "f.pdf", "chunk_text": "ctx A"}],
-             "confidence_score": 0.83, "cached": False},
+            {
+                "type": "done",
+                "sources": [{"document_id": 1, "filename": "f.pdf", "chunk_text": "ctx A"}],
+                "confidence_score": 0.83,
+                "cached": False,
+            },
         ]
 
         class _FakeRagService:
@@ -224,14 +225,16 @@ class TestAnswerViaStream:
                 for event in events:
                     yield event
 
-        result = asyncio.run(answer_via_stream(
-            _FakeRagService(),
-            question="Quel est le coût ?",
-            session_id="s0",
-            document_repository=Mock(),
-            reservation=Mock(),
-            context_limit=5,
-        ))
+        result = asyncio.run(
+            answer_via_stream(
+                _FakeRagService(),
+                question="Quel est le coût ?",
+                session_id="s0",
+                document_repository=Mock(),
+                reservation=Mock(),
+                context_limit=5,
+            )
+        )
 
         # answer = concatenated chunk contents; sources + confidence from done.
         assert result["answer"] == "La réponse est 1,2 M€."
@@ -246,14 +249,16 @@ class TestAnswerViaStream:
             async def answer_stream(self, **kwargs):
                 yield {"type": "error", "message": "boom"}
 
-        result = asyncio.run(answer_via_stream(
-            _FakeRagService(),
-            question="q",
-            session_id="s1",
-            document_repository=Mock(),
-            reservation=Mock(),
-            context_limit=5,
-        ))
+        result = asyncio.run(
+            answer_via_stream(
+                _FakeRagService(),
+                question="q",
+                session_id="s1",
+                document_repository=Mock(),
+                reservation=Mock(),
+                context_limit=5,
+            )
+        )
 
         assert result["answer"] == ""
         assert result["sources"] == []

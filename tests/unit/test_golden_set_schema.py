@@ -54,6 +54,7 @@ def _make_entries(count: int, adversarial_count: int = 1) -> list:
 
 # --- Schema + loader + validator ------------------------------------------
 
+
 class TestGoldenSetEntrySchema:
     def test_valid_entry_accepts_all_required_fields(self):
         entry = _make_entry(1)
@@ -147,6 +148,7 @@ class TestValidateGoldenSet:
 
 
 # --- Pure generation helpers (mock responses, zero network) ---------------
+
 
 class TestBuildGenerationPrompt:
     def test_corpus_prompt_embeds_chunk_texts_as_data(self):

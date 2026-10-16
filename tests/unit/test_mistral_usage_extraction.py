@@ -32,19 +32,14 @@ class TestNonStreamUsageSplit:
     async def test_generate_splits_prompt_and_completion_tokens(self, mistral_service):
         """generate() returns prompt_tokens/completion_tokens from the usage object"""
         mock_response_data = {
-            "choices": [{
-                "message": {"content": "Hello, how can I help you?"},
-                "finish_reason": "stop"
-            }],
+            "choices": [
+                {"message": {"content": "Hello, how can I help you?"}, "finish_reason": "stop"}
+            ],
             "model": "mistral-small-latest",
-            "usage": {
-                "prompt_tokens": 30,
-                "completion_tokens": 70,
-                "total_tokens": 100
-            }
+            "usage": {"prompt_tokens": 30, "completion_tokens": 70, "total_tokens": 100},
         }
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=mock_response_data)
@@ -63,10 +58,10 @@ class TestNonStreamUsageSplit:
         mock_response_data = {
             "data": [{"embedding": [0.1, 0.2, 0.3]}],
             "model": "mistral-embed",
-            "usage": {"prompt_tokens": 50, "total_tokens": 50}
+            "usage": {"prompt_tokens": 50, "total_tokens": 50},
         }
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value=mock_response_data)
@@ -84,7 +79,7 @@ def _sse_lines(*chunks):
     """Build an async iterator of raw SSE byte lines from a list of chunk dicts."""
     lines = []
     for chunk in chunks:
-        lines.append(f"data: {json.dumps(chunk)}".encode('utf-8'))
+        lines.append(f"data: {json.dumps(chunk)}".encode())
     lines.append(b"data: [DONE]")
 
     async def _aiter():
@@ -106,11 +101,11 @@ class TestStreamingUsageExtraction:
             {"choices": [{"delta": {"content": "lo"}, "finish_reason": "stop"}]},
             {
                 "choices": [],
-                "usage": {"prompt_tokens": 12, "completion_tokens": 34, "total_tokens": 46}
+                "usage": {"prompt_tokens": 12, "completion_tokens": 34, "total_tokens": 46},
             },
         ]
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.content = _sse_lines(*chunks)
@@ -126,7 +121,7 @@ class TestStreamingUsageExtraction:
 
             # Payload sent must request stream usage explicitly.
             call_args = mock_post.call_args
-            json_data = call_args[1]['json']
+            json_data = call_args[1]["json"]
             assert json_data["stream_options"] == {"include_usage": True}
             assert json_data["stream"] is True
 
@@ -138,7 +133,7 @@ class TestStreamingUsageExtraction:
             {"choices": [{"delta": {"content": "Hi"}, "finish_reason": "stop"}]},
         ]
 
-        with patch('aiohttp.ClientSession.post') as mock_post:
+        with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.content = _sse_lines(*chunks)

@@ -5,14 +5,12 @@ This module provides asynchronous email sending capabilities for
 escalating user conversations to human support agents.
 """
 
-import asyncio  # noqa: F401
-import smtplib  # noqa: F401
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from email.utils import formatdate
-from typing import List, Optional, Dict, Any
+from typing import Any
 from datetime import datetime
 import logging
 import aiosmtplib
@@ -27,7 +25,6 @@ class EmailService:
     """Handles email sending for escalation and notifications."""
 
     def __init__(self):
-        """Initialize email service with SMTP configuration."""
         self.smtp_host = settings.smtp_host
         self.smtp_port = settings.smtp_port
         self.smtp_user = settings.smtp_user
@@ -43,22 +40,11 @@ class EmailService:
     async def send_escalation_email(
         self,
         user_question: str,
-        chat_history: List[Dict[str, Any]],
-        user_info: Optional[Dict[str, str]] = None,
-        context_sources: Optional[List[str]] = None
+        chat_history: list[dict[str, Any]],
+        user_info: dict[str, Any] | None = None,
+        context_sources: list[str] | None = None,
     ) -> bool:
-        """
-        Send escalation email to support team.
-
-        Args:
-            user_question: The question that triggered escalation
-            chat_history: Recent chat conversation history
-            user_info: Optional user information (IP, session, etc.)
-            context_sources: Sources used to answer the question
-
-        Returns:
-            bool: True if email sent successfully
-        """
+        """Send escalation email to support team."""
         try:
             if not self._is_configured():
                 logger.error("Email service not configured for escalation")
@@ -78,7 +64,7 @@ class EmailService:
                 to_emails=[self.escalation_email],
                 subject=subject,
                 html_content=html_content,
-                text_content=text_content
+                text_content=text_content,
             )
 
             if success:
@@ -88,76 +74,46 @@ class EmailService:
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not sent
             logger.error(f"Error sending escalation email: {e}")
             return False
 
     async def send_notification_email(
-        self,
-        to_email: str,
-        subject: str,
-        message: str,
-        is_html: bool = False
+        self, to_email: str, subject: str, message: str, is_html: bool = False
     ) -> bool:
-        """
-        Send a general notification email.
-
-        Args:
-            to_email: Recipient email address
-            subject: Email subject
-            message: Email message content
-            is_html: Whether message is HTML formatted
-
-        Returns:
-            bool: True if sent successfully
-        """
+        """Send a general notification email."""
         try:
             if not self._is_configured():
                 logger.error("Email service not configured")
                 return False
 
-            content_kwargs = {}
             if is_html:
-                content_kwargs["html_content"] = message
+                success = await self._send_email(
+                    to_emails=[to_email], subject=subject, html_content=message
+                )
             else:
-                content_kwargs["text_content"] = message
-
-            success = await self._send_email(
-                to_emails=[to_email],
-                subject=subject,
-                **content_kwargs
-            )
+                success = await self._send_email(
+                    to_emails=[to_email], subject=subject, text_content=message
+                )
 
             if success:
                 logger.info(f"Notification email sent to {to_email}")
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not sent
             logger.error(f"Error sending notification email: {e}")
             return False
 
     async def _send_email(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
-        text_content: Optional[str] = None,
-        html_content: Optional[str] = None,
-        attachments: Optional[List[Dict[str, Any]]] = None
+        text_content: str | None = None,
+        html_content: str | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> bool:
-        """
-        Internal method to send email via SMTP.
-
-        Args:
-            to_emails: List of recipient email addresses
-            subject: Email subject
-            text_content: Plain text content
-            html_content: HTML content
-            attachments: Optional list of attachments
-
-        Returns:
-            bool: True if sent successfully
-        """
+        """Internal method to send email via SMTP."""
         try:
             # Create message
             message = MIMEMultipart("alternative")
@@ -183,9 +139,7 @@ class EmailService:
 
             # Send email using aiosmtplib for async operation
             smtp_client = aiosmtplib.SMTP(
-                hostname=self.smtp_host,
-                port=self.smtp_port,
-                use_tls=self.smtp_use_tls
+                hostname=self.smtp_host, port=self.smtp_port, use_tls=self.smtp_use_tls
             )
 
             await smtp_client.connect()
@@ -198,38 +152,30 @@ class EmailService:
 
             return True
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure is reported as not sent
             logger.error(f"SMTP send error: {e}")
             return False
 
-    def _add_attachment(self, message: MIMEMultipart, attachment: Dict[str, Any]):
-        """
-        Add attachment to email message.
-
-        Args:
-            message: The email message object
-            attachment: Attachment info dict with 'filename', 'content', 'mime_type'
-        """
+    def _add_attachment(self, message: MIMEMultipart, attachment: dict[str, Any]):
+        """Add an attachment (dict with 'filename', 'content', 'mime_type') to the message."""
         try:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment['content'])
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment["content"])
             encoders.encode_base64(part)
             part.add_header(
-                'Content-Disposition',
-                f'attachment; filename= {attachment["filename"]}'
+                "Content-Disposition", f"attachment; filename= {attachment['filename']}"
             )
             message.attach(part)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best effort: the email is sent without this attachment
             logger.error(f"Error adding attachment: {e}")
 
     def _generate_escalation_html(
         self,
         user_question: str,
-        chat_history: List[Dict[str, Any]],
-        user_info: Optional[Dict[str, str]],
-        context_sources: Optional[List[str]]
+        chat_history: list[dict[str, Any]],
+        user_info: dict[str, Any] | None,
+        context_sources: list[str] | None,
     ) -> str:
-        """Generate HTML content for escalation email."""
         template_str = """
         <!DOCTYPE html>
         <html>
@@ -326,17 +272,16 @@ class EmailService:
             user_question=user_question,
             chat_history=chat_history,
             context_sources=context_sources,
-            user_info=user_info
+            user_info=user_info,
         )
 
     def _generate_escalation_text(
         self,
         user_question: str,
-        chat_history: List[Dict[str, Any]],
-        user_info: Optional[Dict[str, str]],
-        context_sources: Optional[List[str]]
+        chat_history: list[dict[str, Any]],
+        user_info: dict[str, Any] | None,
+        context_sources: list[str] | None,
     ) -> str:
-        """Generate plain text content for escalation email."""
         content = []
         content.append("MIMIR CHAT ESCALATION")
         content.append("=" * 50)
@@ -353,7 +298,9 @@ class EmailService:
             content.append("RECENT CHAT HISTORY:")
             content.append("-" * 20)
             for message in chat_history[-5:]:
-                content.append(f"{message.get('type', 'unknown').upper()}: {message.get('content', '')[:200]}")
+                content.append(
+                    f"{message.get('type', 'unknown').upper()}: {message.get('content', '')[:200]}"
+                )
             content.append("")
 
         if context_sources:
@@ -383,27 +330,17 @@ class EmailService:
         return "\n".join(content)
 
     def _is_configured(self) -> bool:
-        """Check if email service is properly configured."""
-        return bool(
-            self.smtp_host and
-            self.smtp_user and
-            self.escalation_email
-        )
+        return bool(self.smtp_host and self.smtp_user and self.escalation_email)
 
-    def get_configuration_status(self) -> Dict[str, Any]:
-        """
-        Get email service configuration status.
-
-        Returns:
-            dict: Configuration status information
-        """
+    def get_configuration_status(self) -> dict[str, Any]:
+        """Get email service configuration status."""
         return {
             "configured": self._is_configured(),
             "smtp_host": bool(self.smtp_host),
             "smtp_user": bool(self.smtp_user),
             "escalation_email": bool(self.escalation_email),
             "smtp_port": self.smtp_port,
-            "smtp_use_tls": self.smtp_use_tls
+            "smtp_use_tls": self.smtp_use_tls,
         }
 
 

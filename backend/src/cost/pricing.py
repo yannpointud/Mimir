@@ -5,14 +5,12 @@ Contains no DB access and no imports from src.database or src.llm_interface:
 it is a pure function of (model, tokens, price grid) -> cost in euros.
 """
 
-from typing import Dict
-
 
 def compute_cost_eur(
     model: str,
     prompt_tokens: int,
     completion_tokens: int,
-    price_table: Dict[str, Dict[str, float]],
+    price_table: dict[str, dict[str, float]],
 ) -> float:
     """
     Compute the cost in euros of an LLM call from its token counts and a price grid.
@@ -39,7 +37,6 @@ def compute_cost_eur(
     if prices is None:
         raise ValueError(f"No price configured for model '{model}'")
 
-    return (
-        (prompt_tokens / 1_000_000) * prices["input"]
-        + (completion_tokens / 1_000_000) * prices["output"]
-    )
+    return (prompt_tokens / 1_000_000) * prices["input"] + (completion_tokens / 1_000_000) * prices[
+        "output"
+    ]

@@ -1,11 +1,10 @@
 # Mimir - Python tooling configuration.
-# This project had no Python linter before; ruff is onboarded here
-# with a small, high-value rule set so local CI is green from the first commit and only
-# NEW violations fail going forward (pre-existing ones are baselined with inline noqa).
 
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+# Exclusions also apply to paths passed explicitly on the command line.
+force-exclude = true
 
 # Non-source / generated paths must never be linted.
 extend-exclude = [
@@ -16,12 +15,62 @@ extend-exclude = [
     "frontend",
     ".venv",
     "venv",
+    # Frozen characterization tests: their SHA-256 sums are pinned in
+    # docs/cleanup/ORACLE.sha256, so neither the formatter nor any autofix
+    # may rewrite them.
+    "tests/oracle",
+    "tests/integration",
 ]
 
 [tool.ruff.lint]
-# Deliberately small, high-value selection: real bugs, not style churn.
-# F  = pyflakes (unused imports, undefined names, f-string issues)
-# E9 = syntax errors / IndentationError
-# An aggressive rule set on a previously-unlinted ~800-test codebase would surface
-# hundreds of pre-existing findings (out of scope for this hardening milestone).
-select = ["F", "E9"]
+# F   = pyflakes (unused imports, undefined names, f-string issues)
+# E9  = syntax errors / IndentationError
+# B   = flake8-bugbear (likely bugs and design problems)
+# SIM = flake8-simplify
+# UP  = pyupgrade (modern syntax for the target Python version)
+# BLE = flake8-blind-except (`except Exception` swallowing errors)
+# C90 = mccabe cyclomatic complexity
+select = ["F", "E9", "B", "SIM", "UP", "BLE", "C90"]
+ignore = [
+    # FastAPI dependency injection relies on calls in argument defaults
+    # (Depends(), Query(), File(), Form()).
+    "B008",
+    # (str, Enum) -> StrEnum changes str() and format() of the members, which
+    # end up in log messages and f-strings: not a pure syntax upgrade.
+    "UP042",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.mypy]
+# Normal (non-strict) mode, run as `mypy backend/src` locally and in CI.
+python_version = "3.13"
+warn_unused_ignores = true
+warn_redundant_casts = true
+show_error_codes = true
+
+# Third-party libraries shipping neither inline types nor a stub package.
+# Libraries that do have stubs (cachetools, Markdown, psutil) get them from
+# requirements-dev.txt instead of being ignored.
+[[tool.mypy.overrides]]
+module = ["faiss", "faiss.*", "bm25s", "bm25s.*", "docx", "docx.*"]
+ignore_missing_imports = true
+
+# Mutation testing of the pure retrieval/ingestion helpers: `mutmut run`, then
+# `mutmut results` (mutants are generated under mutants/, git-ignored).
+[tool.mutmut]
+source_paths = ["backend/src"]
+only_mutate = [
+    "backend/src/rag_core/fusion.py",
+    "backend/src/ingestion/chunking.py",
+    "backend/src/rag_core/tokenizer_fr.py",
+]
+also_copy = ["pytest.ini"]
+# tests/mutmut_aliases.py makes the src.* imports of the tests see the mutants.
+pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider", "-p", "tests.mutmut_aliases"]
+pytest_add_cli_args_test_selection = [
+    "tests/unit/test_fusion.py",
+    "tests/unit/test_ingestion_chunking.py",
+    "tests/unit/test_bm25_store.py",
+]

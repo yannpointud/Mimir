@@ -16,22 +16,14 @@ session. This matters for two reasons:
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from src.config import settings
 from src.database.connection import db_manager
 from src.database.repository import ConfigurationRepository, UsageRepository
+from src.shared.errors import BudgetExceeded
 
-
-class BudgetExceededError(Exception):
-    """
-    Raised by callers (e.g. the ingestion fail-closed path in processor.py)
-    to signal a budget-exhausted rejection. BudgetGuard.reserve() itself
-    never raises this -- it returns None on rejection so HTTP call sites can
-    turn that into a 429 response; only non-HTTP call sites (ingestion)
-    raise this exception to short-circuit their own retry logic.
-    """
-    pass
+# Historical name of the budget-exhausted error, still imported by callers.
+BudgetExceededError = BudgetExceeded
 
 
 @dataclass
@@ -41,6 +33,7 @@ class BudgetReservation:
     a later finalize()/release() call knows which ledger row and how much
     to adjust.
     """
+
     today: str
     estimate_eur: float
 
@@ -62,7 +55,7 @@ class BudgetGuard:
             return float(override.value)
         return settings.daily_budget_eur
 
-    def reserve(self, call_type: str) -> Optional[BudgetReservation]:
+    def reserve(self, call_type: str) -> BudgetReservation | None:
         """
         Attempt to reserve today's flat per-type budget estimate.
 

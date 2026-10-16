@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Synthetic golden set generator for the RAGAS baseline (venv principal).
+"""Synthetic golden set generator for the RAGAS baseline (main venv).
 
 Why this exists: every RAGAS measurement is gated on a frozen golden set
 of 50 to 200 questions (including out-of-corpus adversarials). This script
@@ -32,7 +32,6 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 # sys.path bootstrap (same discipline as scripts/backup_sqlite.py): make the
 # project root and the backend package importable whether this file is run as a
@@ -67,7 +66,7 @@ _SCHEMA_HINT = (
 )
 
 
-def _build_generation_prompt(chunk_texts: List[str], adversarial: bool) -> str:
+def _build_generation_prompt(chunk_texts: list[str], adversarial: bool) -> str:
     """Build the Mistral generation prompt (pure, no network).
 
     The document passages are embedded between explicit delimiters and framed
@@ -146,13 +145,13 @@ def _extract_json_payload(raw: str):
         end = text.rfind(closer)
         if start != -1 and end != -1 and end > start:
             try:
-                return json.loads(text[start:end + 1])
+                return json.loads(text[start : end + 1])
             except json.JSONDecodeError:
                 continue
     return None
 
 
-def _parse_generation_response(raw: str, adversarial: bool = False) -> List[GoldenSetEntry]:
+def _parse_generation_response(raw: str, adversarial: bool = False) -> list[GoldenSetEntry]:
     """Parse a Mistral response into ``GoldenSetEntry`` items (pure, no network).
 
     The response is treated strictly as data. Malformed entries are dropped
@@ -183,7 +182,7 @@ def _parse_generation_response(raw: str, adversarial: bool = False) -> List[Gold
     if not isinstance(payload, list):
         return []
 
-    entries: List[GoldenSetEntry] = []
+    entries: list[GoldenSetEntry] = []
     for item in payload:
         if not isinstance(item, dict):
             continue
@@ -204,27 +203,42 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Génère un golden set synthétique (Mistral, budget-tracké) pour la "
-            "baseline RAGAS (RAG-01). N'affiche jamais MISTRAL_API_KEY."
+            "baseline RAGAS. N'affiche jamais MISTRAL_API_KEY."
         )
     )
-    parser.add_argument("--count", type=int, default=80,
-                        help="Nombre total de questions visées (50-200).")
-    parser.add_argument("--adversarial-ratio", type=float, default=0.15,
-                        help="Fraction de questions adversariales hors-corpus.")
-    parser.add_argument("--questions-per-call", type=int, default=5,
-                        help="Nombre de questions demandées par appel Mistral.")
-    parser.add_argument("--chunks-per-call", type=int, default=4,
-                        help="Nombre de passages échantillonnés par appel.")
-    parser.add_argument("--out", type=Path, default=_DEFAULT_OUT,
-                        help="Chemin de sortie du fichier JSONL gelé.")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Graine du tirage aléatoire des passages.")
+    parser.add_argument(
+        "--count", type=int, default=80, help="Nombre total de questions visées (50-200)."
+    )
+    parser.add_argument(
+        "--adversarial-ratio",
+        type=float,
+        default=0.15,
+        help="Fraction de questions adversariales hors-corpus.",
+    )
+    parser.add_argument(
+        "--questions-per-call",
+        type=int,
+        default=5,
+        help="Nombre de questions demandées par appel Mistral.",
+    )
+    parser.add_argument(
+        "--chunks-per-call",
+        type=int,
+        default=4,
+        help="Nombre de passages échantillonnés par appel.",
+    )
+    parser.add_argument(
+        "--out", type=Path, default=_DEFAULT_OUT, help="Chemin de sortie du fichier JSONL gelé."
+    )
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Graine du tirage aléatoire des passages."
+    )
     return parser
 
 
-def _sample_active_chunk_texts(vector_store) -> List[str]:
+def _sample_active_chunk_texts(vector_store) -> list[str]:
     """Return the text of active (non-deleted) chunks from the vector store."""
-    texts: List[str] = []
+    texts: list[str] = []
     for meta in vector_store.metadata:
         if meta.get("deleted", False):
             continue
@@ -240,7 +254,7 @@ async def _generate_entries(
     llm_service,
     budget_guard,
     usage_tracker,
-) -> List[GoldenSetEntry]:
+) -> list[GoldenSetEntry]:
     """Run the throttled, budget-reserved generation loop over `prompts`.
 
     For each prompt: reserve the budget BEFORE the network call (fail-closed if
@@ -249,7 +263,7 @@ async def _generate_entries(
     """
     import asyncio
 
-    entries: List[GoldenSetEntry] = []
+    entries: list[GoldenSetEntry] = []
     for index, (prompt, is_adversarial) in enumerate(prompts):
         # Throttle to stay under the Mistral free-tier 1 req/s ceiling.
         if index > 0:
@@ -308,9 +322,9 @@ _FALLBACK_ADVERSARIAL_QUESTIONS = [
 ]
 
 
-def _fallback_adversarial_entries(count: int) -> List[GoldenSetEntry]:
+def _fallback_adversarial_entries(count: int) -> list[GoldenSetEntry]:
     """Build `count` deterministic out-of-corpus adversarial entries."""
-    picks = _FALLBACK_ADVERSARIAL_QUESTIONS[:max(1, count)]
+    picks = _FALLBACK_ADVERSARIAL_QUESTIONS[: max(1, count)]
     return [
         GoldenSetEntry(
             user_input=q,
@@ -322,7 +336,7 @@ def _fallback_adversarial_entries(count: int) -> List[GoldenSetEntry]:
     ]
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Heavy service imports are deferred past argument parsing
     so ``--help`` never imports FastAPI nor touches any secret."""
     args = _build_arg_parser().parse_args(argv)
@@ -343,8 +357,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     vector_store.load()
     chunk_texts = _sample_active_chunk_texts(vector_store)
     if not chunk_texts:
-        print("Aucun chunk actif dans le vector store -- ingérez un corpus d'abord.",
-              file=sys.stderr)
+        print(
+            "Aucun chunk actif dans le vector store -- ingérez un corpus d'abord.", file=sys.stderr
+        )
         return 1
 
     rng = random.Random(args.seed)
@@ -355,21 +370,28 @@ def main(argv: Optional[List[str]] = None) -> int:
     corpus_calls = max(1, -(-num_corpus // args.questions_per_call))  # ceil
     adversarial_calls = max(1, -(-num_adversarial // args.questions_per_call))
 
-    def _sample() -> List[str]:
+    def _sample() -> list[str]:
         k = min(args.chunks_per_call, len(chunk_texts))
         return rng.sample(chunk_texts, k)
 
     # Carry the adversarial flag alongside each prompt so the parser can stamp
     # is_adversarial authoritatively (the model does not self-report it).
-    prompts = [(_build_generation_prompt(_sample(), adversarial=False), False) for _ in range(corpus_calls)]
-    prompts += [(_build_generation_prompt(_sample(), adversarial=True), True) for _ in range(adversarial_calls)]
+    prompts = [
+        (_build_generation_prompt(_sample(), adversarial=False), False) for _ in range(corpus_calls)
+    ]
+    prompts += [
+        (_build_generation_prompt(_sample(), adversarial=True), True)
+        for _ in range(adversarial_calls)
+    ]
 
-    entries = asyncio.run(_generate_entries(
-        prompts=prompts,
-        llm_service=get_llm_service(),
-        budget_guard=get_budget_guard(),
-        usage_tracker=get_usage_tracker(),
-    ))
+    entries = asyncio.run(
+        _generate_entries(
+            prompts=prompts,
+            llm_service=get_llm_service(),
+            budget_guard=get_budget_guard(),
+            usage_tracker=get_usage_tracker(),
+        )
+    )
 
     # Split by kind so the trim never drops all adversarials (they are the last
     # prompts, so a naive head-slice would cut them first).
@@ -380,20 +402,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     # deterministic out-of-corpus questions so the contract still holds.
     if not adversarial_entries:
         adversarial_entries = _fallback_adversarial_entries(num_adversarial)
-        print("Aucune adversariale parsée depuis Mistral -- repli déterministe "
-              f"({len(adversarial_entries)} questions hors-corpus).", file=sys.stderr)
+        print(
+            "Aucune adversariale parsée depuis Mistral -- repli déterministe "
+            f"({len(adversarial_entries)} questions hors-corpus).",
+            file=sys.stderr,
+        )
 
     n_adv = min(len(adversarial_entries), max(1, num_adversarial))
     adversarial_entries = adversarial_entries[:n_adv]
-    corpus_entries = corpus_entries[:max(0, args.count - len(adversarial_entries))]
+    corpus_entries = corpus_entries[: max(0, args.count - len(adversarial_entries))]
     entries = corpus_entries + adversarial_entries
 
     validate_golden_set(entries)
     write_golden_set(entries, args.out)
 
     adversarial_total = sum(1 for entry in entries if entry.is_adversarial)
-    print(f"Golden set écrit: {args.out} ({len(entries)} entrées, "
-          f"{adversarial_total} adversariales)")
+    print(
+        f"Golden set écrit: {args.out} ({len(entries)} entrées, {adversarial_total} adversariales)"
+    )
     return 0
 
 

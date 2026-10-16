@@ -7,7 +7,7 @@ legacy verification-only hasher for pre-migration credentials).
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any
 import logging
 import jwt  # PyJWT
 from pwdlib import PasswordHash
@@ -22,7 +22,6 @@ class JWTHandler:
     """Handles JWT token creation, validation, and password operations."""
 
     def __init__(self):
-        """Initialize JWT handler with configuration from settings."""
         self.secret_key = settings.jwt_secret_key
         self.algorithm = settings.jwt_algorithm
         self.expiration_hours = settings.jwt_expiration_hours
@@ -35,20 +34,9 @@ class JWTHandler:
             raise ValueError("JWT secret key must be at least 32 characters long")
 
     def create_access_token(
-        self,
-        data: Dict[str, Any],
-        expires_delta: Optional[timedelta] = None
+        self, data: dict[str, Any], expires_delta: timedelta | None = None
     ) -> str:
-        """
-        Create a JWT access token.
-
-        Args:
-            data: Dictionary with claims to encode in the token
-            expires_delta: Optional custom expiration time
-
-        Returns:
-            str: The encoded JWT token
-        """
+        """Create a JWT access token."""
         to_encode = data.copy()
 
         # Set expiration time
@@ -57,30 +45,18 @@ class JWTHandler:
         else:
             expire = datetime.utcnow() + timedelta(hours=self.expiration_hours)
 
-        to_encode.update({
-            "exp": expire,
-            "iat": datetime.utcnow(),
-            "type": "access"
-        })
+        to_encode.update({"exp": expire, "iat": datetime.utcnow(), "type": "access"})
 
         try:
             encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
             logger.debug(f"Created JWT token with expiration: {expire}")
             return encoded_jwt
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - log any failure, then re-raise unchanged
             logger.error(f"Failed to create JWT token: {e}")
             raise
 
-    def verify_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """
-        Verify and decode a JWT token.
-
-        Args:
-            token: The JWT token to verify
-
-        Returns:
-            Dict containing the token payload if valid, None otherwise
-        """
+    def verify_token(self, token: str) -> dict[str, Any] | None:
+        """Verify and decode a JWT token."""
         try:
             payload = jwt.decode(
                 token,
@@ -91,7 +67,7 @@ class JWTHandler:
                 # behavior and avoid rejecting legitimate tokens under clock skew
                 # between servers -- exp is still enforced, so this is not a security
                 # regression (python-jose -> PyJWT migration).
-                options={"verify_iat": False}
+                options={"verify_iat": False},
             )
 
             # Validate token type
@@ -108,55 +84,30 @@ class JWTHandler:
         except jwt.InvalidTokenError as e:
             logger.warning(f"JWT token validation failed: {e}")
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - fail closed: any other error rejects the token (401)
             logger.error(f"Unexpected error during token verification: {e}")
             return None
 
     def hash_password(self, password: str) -> str:
-        """
-        Hash a password using Argon2 (current default hasher).
-
-        Args:
-            password: The plain text password
-
-        Returns:
-            str: The hashed password
-        """
+        """Hash a password using Argon2 (current default hasher)."""
         if not password:
             raise ValueError("Password cannot be empty")
 
         return self.pwd_context.hash(password)
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """
-        Verify a password against its hash.
-
-        Args:
-            plain_password: The plain text password
-            hashed_password: The hashed password to verify against
-
-        Returns:
-            bool: True if password matches, False otherwise
-        """
+        """Verify a password against its hash."""
         if not plain_password or not hashed_password:
             return False
 
         try:
             return self.pwd_context.verify(plain_password, hashed_password)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - fail closed: any error denies the password
             logger.error(f"Password verification error: {e}")
             return False
 
-    def get_token_expiry(self, token: str) -> Optional[datetime]:
-        """
-        Get the expiration time of a token.
-
-        Args:
-            token: The JWT token
-
-        Returns:
-            datetime: The expiration time if valid, None otherwise
-        """
+    def get_token_expiry(self, token: str) -> datetime | None:
+        """Get the expiration time of a token."""
         payload = self.verify_token(token)
         if payload and "exp" in payload:
             return datetime.utcfromtimestamp(payload["exp"])

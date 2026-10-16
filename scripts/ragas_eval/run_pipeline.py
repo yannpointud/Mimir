@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""RAGAS pipeline stage 1/2 (venv PRINCIPAL): answers the golden set.
+"""RAGAS pipeline stage 1/2 (MAIN venv): answers the golden set.
 
 Why this exists: the RAGAS baseline is measured in two strictly separated
 stages joined by a JSONL boundary file. This script is the MAIN-venv stage: it
@@ -32,7 +32,8 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
+from typing import Any
+from collections.abc import Awaitable, Callable, Sequence
 
 # sys.path bootstrap (same discipline as scripts/backup_sqlite.py and
 # generate_golden_set.py): make the project root and the backend package
@@ -61,7 +62,7 @@ _DEFAULT_OUT = _SCRIPT_DIR / "eval_input.jsonl"
 # Type of the injected answer function: (question, session_id) -> result dict,
 # or None to signal budget exhaustion (stop the loop). Decoupling the loop from
 # RagService/budget_guard keeps it unit-testable with a mocked async callable.
-AnswerFn = Callable[[str, str], Awaitable[Optional[Dict[str, Any]]]]
+AnswerFn = Callable[[str, str], Awaitable[dict[str, Any] | None]]
 
 
 async def answer_via_stream(
@@ -72,7 +73,7 @@ async def answer_via_stream(
     document_repository,
     reservation,
     context_limit: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Drain ``RagService.answer_stream()`` into an ``answer()``-shaped result dict.
 
     The runtime serves answers as SSE events, but the eval harness needs the
@@ -99,8 +100,8 @@ async def answer_via_stream(
     Returns:
         A ``RagService.answer()``-shaped result dict.
     """
-    answer_parts: List[str] = []
-    sources: List[Dict[str, Any]] = []
+    answer_parts: list[str] = []
+    sources: list[dict[str, Any]] = []
     confidence_score = 0.0
     async for event in rag_service.answer_stream(
         question=question,
@@ -126,7 +127,7 @@ async def answer_via_stream(
     }
 
 
-def _assemble_eval_row(entry: GoldenSetEntry, result: Dict[str, Any]) -> Dict[str, Any]:
+def _assemble_eval_row(entry: GoldenSetEntry, result: dict[str, Any]) -> dict[str, Any]:
     """Map a golden set entry + a RagService result to a ragas eval row (pure).
 
     The output shape is the JSONL boundary contract consumed by
@@ -158,15 +159,11 @@ def _assemble_eval_row(entry: GoldenSetEntry, result: Dict[str, Any]) -> Dict[st
     }
 
 
-def _write_eval_rows(rows: Sequence[Dict[str, Any]], path: Path) -> None:
+def _write_eval_rows(rows: Sequence[dict[str, Any]], path: Path) -> None:
     """Write eval rows as newline-delimited JSON (the venv boundary file).
 
     One compact JSON object per line, UTF-8, ``ensure_ascii=False`` so French
     text stays readable. Creates the parent directory if needed.
-
-    Args:
-        rows: The assembled eval rows.
-        path: Destination ``.jsonl`` path.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -180,7 +177,7 @@ async def _collect_eval_rows(
     answer_fn: AnswerFn,
     *,
     throttle_seconds: float,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Replay each entry through ``answer_fn``, throttled, assembling eval rows.
 
     Throttles to <= 1 call/sec between questions (never before the first) so a
@@ -196,7 +193,7 @@ async def _collect_eval_rows(
     Returns:
         The assembled eval rows, in entry order.
     """
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for index, entry in enumerate(entries):
         if index > 0 and throttle_seconds > 0:
             await asyncio.sleep(throttle_seconds)
@@ -220,25 +217,33 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument(
-        "--retrieval-mode", choices=("dense", "hybrid"), default="dense",
+        "--retrieval-mode",
+        choices=("dense", "hybrid"),
+        default="dense",
         help="dense (défaut, baseline gelée) ou hybrid (met HYBRID_SEARCH_ENABLED avant l'import config).",
     )
     parser.add_argument(
-        "--golden-set", type=Path, default=_DEFAULT_GOLDEN,
+        "--golden-set",
+        type=Path,
+        default=_DEFAULT_GOLDEN,
         help="Chemin du golden set JSONL gelé (source).",
     )
     parser.add_argument(
-        "--out", type=Path, default=_DEFAULT_OUT,
+        "--out",
+        type=Path,
+        default=_DEFAULT_OUT,
         help="Chemin de sortie de eval_input.jsonl (frontière entre venvs).",
     )
     parser.add_argument(
-        "--limit", type=int, default=None,
+        "--limit",
+        type=int,
+        default=None,
         help="N'answer que les N premières questions (conservation de tokens / smoke-test).",
     )
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
 
     Heavy backend imports (and the settings singleton, which reads the Mistral
@@ -286,7 +291,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     rag_service = get_rag_service()
     budget_guard = get_budget_guard()
 
-    async def _run() -> List[Dict[str, Any]]:
+    async def _run() -> list[dict[str, Any]]:
         # One synchronous session for the whole run: document_repository is
         # request-scoped in the API but here a single script-scoped session is
         # fine (read-only lookups of document filenames).
@@ -312,9 +317,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     context_limit=settings.max_sources,
                 )
 
-            return await _collect_eval_rows(
-                entries, answer_fn, throttle_seconds=THROTTLE_SECONDS
-            )
+            return await _collect_eval_rows(entries, answer_fn, throttle_seconds=THROTTLE_SECONDS)
 
     rows = asyncio.run(_run())
     _write_eval_rows(rows, args.out)

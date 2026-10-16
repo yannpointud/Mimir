@@ -58,9 +58,9 @@ import json
 import os
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # sys.path bootstrap (same discipline as run_pipeline.py / ingest_corpus.py):
 # make the project root and the backend package importable whether this file is
@@ -88,7 +88,7 @@ def _eval_input_path(mode: str) -> Path:
     return _SCRIPT_DIR / f"eval_input_chunk_{mode}.jsonl"
 
 
-def _isolated_env(mode: str) -> Dict[str, str]:
+def _isolated_env(mode: str) -> dict[str, str]:
     """Environment overrides isolating a mode's data dir + toggling the flag.
 
     Every persistent path is redirected under ``.measure/{mode}/`` so the run
@@ -123,8 +123,7 @@ def _dry_run() -> int:
 
     # 1. Frozen corpus present and ingestable.
     if _SOURCE_DIR.is_dir():
-        docs = [p for p in _SOURCE_DIR.iterdir()
-                if p.suffix.lower() in _INGESTABLE_SUFFIXES]
+        docs = [p for p in _SOURCE_DIR.iterdir() if p.suffix.lower() in _INGESTABLE_SUFFIXES]
         print(f"[ok] corpus: {len(docs)} ingestable documents in {_SOURCE_DIR}")
         ok = ok and len(docs) > 0
     else:
@@ -133,8 +132,7 @@ def _dry_run() -> int:
 
     # 2. Frozen golden set present and non-empty.
     if _GOLDEN_SET.is_file():
-        n = sum(1 for line in _GOLDEN_SET.read_text(encoding="utf-8").splitlines()
-                if line.strip())
+        n = sum(1 for line in _GOLDEN_SET.read_text(encoding="utf-8").splitlines() if line.strip())
         print(f"[ok] golden set: {n} entries in {_GOLDEN_SET.name}")
         ok = ok and n > 0
     else:
@@ -145,6 +143,7 @@ def _dry_run() -> int:
     #    baseline until the delta is measured and adoption is decided).
     try:
         from src.config import Settings  # noqa: E402
+
         field = Settings.model_fields.get("structure_aware_chunking_enabled")
         if field is None:
             print("[MISSING] settings.structure_aware_chunking_enabled not defined")
@@ -153,14 +152,16 @@ def _dry_run() -> int:
             print(f"[ok] flag structure_aware_chunking_enabled default={field.default}")
             if field.default is not False:
                 print("     note: default is not False -- adoption already applied?")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - CLI check: any import failure is reported as missing
         print(f"[MISSING] cannot import Settings: {exc}")
         ok = False
 
     # 4. The env-toggle mechanism actually flips the setting (no tokens).
     _probe = os.environ.get("STRUCTURE_AWARE_CHUNKING_ENABLED")
-    print(f"[ok] env toggle STRUCTURE_AWARE_CHUNKING_ENABLED currently={_probe!r} "
-          f"(child processes set it per mode: {_MODE_FLAG})")
+    print(
+        f"[ok] env toggle STRUCTURE_AWARE_CHUNKING_ENABLED currently={_probe!r} "
+        f"(child processes set it per mode: {_MODE_FLAG})"
+    )
 
     # 5. Output paths writable.
     for mode in MODES:
@@ -175,8 +176,10 @@ def _dry_run() -> int:
     print("\nFull-run command sequence (operator-gated, spends Mistral tokens):")
     print("  1. python scripts/ragas_eval/measure_chunking.py --run")
     print("  2. score each eval_input_chunk_*.jsonl with score_baseline.py (ragas venv)")
-    print("  3. python scripts/ragas_eval/measure_chunking.py --summarize "
-          "--baseline-json ... --structure-json ...")
+    print(
+        "  3. python scripts/ragas_eval/measure_chunking.py --summarize "
+        "--baseline-json ... --structure-json ..."
+    )
 
     print("\nDRY-RUN OK" if ok else "\nDRY-RUN FAILED")
     return 0 if ok else 1
@@ -185,11 +188,8 @@ def _dry_run() -> int:
 # --------------------------------------------------------------------------- #
 # Answer stage: run inside a child process with the mode's env already set.
 # --------------------------------------------------------------------------- #
-def _list_corpus() -> List[Path]:
-    return sorted(
-        p for p in _SOURCE_DIR.iterdir()
-        if p.suffix.lower() in _INGESTABLE_SUFFIXES
-    )
+def _list_corpus() -> list[Path]:
+    return sorted(p for p in _SOURCE_DIR.iterdir() if p.suffix.lower() in _INGESTABLE_SUFFIXES)
 
 
 async def _ingest_corpus_isolated() -> int:
@@ -229,8 +229,10 @@ async def _ingest_corpus_isolated() -> int:
         # The whole point of this measurement: honor the flag at ingestion.
         section_title_tracking=settings.structure_aware_chunking_enabled,
     )
-    print(f"ingest: section_title_tracking={chunking_config.section_title_tracking} "
-          f"({len(files)} documents)")
+    print(
+        f"ingest: section_title_tracking={chunking_config.section_title_tracking} "
+        f"({len(files)} documents)"
+    )
 
     with db_manager.get_session_context() as session:
         document_repo = get_document_repository(session)
@@ -253,11 +255,16 @@ async def _ingest_corpus_isolated() -> int:
             dest = upload_dir / f"{file_hash}_{src.name}"
             shutil.copyfile(src, dest)
             document = document_repo.create(
-                filename=src.name, path=str(dest), file_hash=file_hash, preserve=False,
+                filename=src.name,
+                path=str(dest),
+                file_hash=file_hash,
+                preserve=False,
             )
             processor.queue_document(
-                file_path=str(dest), document_id=str(document.id),
-                preserve=False, metadata={"source": "measure_chunking.py"},
+                file_path=str(dest),
+                document_id=str(document.id),
+                preserve=False,
+                metadata={"source": "measure_chunking.py"},
             )
 
         # Drain the queue (embedding is batched + budget-guarded + throttled).
@@ -275,7 +282,7 @@ async def _ingest_corpus_isolated() -> int:
     return 0
 
 
-async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
+async def _answer_golden_set(mode: str, limit: int | None) -> int:
     """Answer the frozen golden set through the real pipeline -> eval_input file.
 
     Reuses run_pipeline.py's pure building blocks (no edit to that module) for
@@ -328,9 +335,7 @@ async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
         # _collect_eval_rows uses _assemble_eval_row internally; imported above
         # only to keep the dependency explicit for readers.
         _ = _assemble_eval_row
-        rows = await _collect_eval_rows(
-            entries, answer_fn, throttle_seconds=THROTTLE_SECONDS
-        )
+        rows = await _collect_eval_rows(entries, answer_fn, throttle_seconds=THROTTLE_SECONDS)
 
     out = _eval_input_path(mode)
     _write_eval_rows(rows, out)
@@ -338,7 +343,7 @@ async def _answer_golden_set(mode: str, limit: Optional[int]) -> int:
     return 0
 
 
-def _answer_stage(mode: str, limit: Optional[int]) -> int:
+def _answer_stage(mode: str, limit: int | None) -> int:
     """Child-process entry: ingest (honoring the flag) then answer the golden set."""
     rc = asyncio.run(_ingest_corpus_isolated())
     if rc != 0:
@@ -349,7 +354,7 @@ def _answer_stage(mode: str, limit: Optional[int]) -> int:
 # --------------------------------------------------------------------------- #
 # Orchestrate: one isolated child process per mode.
 # --------------------------------------------------------------------------- #
-def _orchestrate(limit: Optional[int], modes: List[str]) -> int:
+def _orchestrate(limit: int | None, modes: list[str]) -> int:
     """Run each mode in its own process (fresh config import with the flag set)."""
     import subprocess
 
@@ -358,21 +363,21 @@ def _orchestrate(limit: Optional[int], modes: List[str]) -> int:
         print(f"\n=== mode={mode} (structure_aware={_MODE_FLAG[mode]}) ===")
         child_env = dict(os.environ)
         child_env.update(_isolated_env(mode))
-        cmd = [sys.executable, str(Path(__file__).resolve()),
-               "--stage", "answer", "--mode", mode]
+        cmd = [sys.executable, str(Path(__file__).resolve()), "--stage", "answer", "--mode", mode]
         if limit is not None:
             cmd += ["--limit", str(limit)]
         result = subprocess.run(cmd, env=child_env)
         if result.returncode != 0:
-            print(f"mode={mode} failed (rc={result.returncode}) -- aborting.",
-                  file=sys.stderr)
+            print(f"mode={mode} failed (rc={result.returncode}) -- aborting.", file=sys.stderr)
             return result.returncode
 
     print("\nBoth eval_input files written. Score each in the SEPARATE ragas venv:")
     for mode in modes:
-        print(f"  python scripts/ragas_eval/score_baseline.py "
-              f"--in {_eval_input_path(mode).name} "
-              f"--out results/chunk_{mode}_run.json")
+        print(
+            f"  python scripts/ragas_eval/score_baseline.py "
+            f"--in {_eval_input_path(mode).name} "
+            f"--out results/chunk_{mode}_run.json"
+        )
     print("Then: measure_chunking.py --summarize --baseline-json ... --structure-json ...")
     return 0
 
@@ -380,11 +385,11 @@ def _orchestrate(limit: Optional[int], modes: List[str]) -> int:
 # --------------------------------------------------------------------------- #
 # Summarize: two score JSONs -> chunking_adoption_decision.md with a verdict.
 # --------------------------------------------------------------------------- #
-def _metric(payload: Dict[str, Any], name: str) -> Dict[str, Any]:
+def _metric(payload: dict[str, Any], name: str) -> dict[str, Any]:
     return payload.get("per_metric", {}).get(name, {}) or {}
 
 
-def _fmt(value: Optional[float]) -> str:
+def _fmt(value: float | None) -> str:
     return f"{value:.4f}" if isinstance(value, (int, float)) else "NaN"
 
 
@@ -408,21 +413,34 @@ def _summarize(baseline_json: Path, structure_json: Path, out_path: Path) -> int
         if not (isinstance(delta, (int, float)) and delta > 0):
             verdict_positive = False
 
-    b_nan = max((_metric(baseline, m).get("nan_rate", 0.0) for m in
-                 ("context_recall", "context_precision")), default=0.0)
-    s_nan = max((_metric(structure, m).get("nan_rate", 0.0) for m in
-                 ("context_recall", "context_precision")), default=0.0)
+    b_nan = max(
+        (
+            _metric(baseline, m).get("nan_rate", 0.0)
+            for m in ("context_recall", "context_precision")
+        ),
+        default=0.0,
+    )
+    s_nan = max(
+        (
+            _metric(structure, m).get("nan_rate", 0.0)
+            for m in ("context_recall", "context_precision")
+        ),
+        default=0.0,
+    )
     nan_ok = b_nan <= 0.2 and s_nan <= 0.2
     adopt = verdict_positive and nan_ok
     verdict = "ADOPT" if adopt else "DO-NOT-ADOPT"
 
     lines = [
-        "# Décision d'adoption — Chunking structure-aware (RAG-05, 07-06)",
+        "# Décision d'adoption — Chunking structure-aware",
         "",
-        f"**Date:** {datetime.now(timezone.utc).date().isoformat()}",
+        f"**Date:** {datetime.now(UTC).date().isoformat()}",
         f"**Décision:** **{verdict}** — "
-        + ("`structure_aware_chunking_enabled` passe à `True`."
-           if adopt else "`structure_aware_chunking_enabled` reste `False`."),
+        + (
+            "`structure_aware_chunking_enabled` passe à `True`."
+            if adopt
+            else "`structure_aware_chunking_enabled` reste `False`."
+        ),
         "",
         "## Contexte de mesure",
         "",
@@ -465,44 +483,79 @@ def _summarize(baseline_json: Path, structure_json: Path, out_path: Path) -> int
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Adoption decision written: {out_path} (verdict={verdict})")
     if adopt:
-        print("NOTE: verdict ADOPT -- flip structure_aware_chunking_enabled default "
-              "to True in backend/src/config.py (human-confirmed step).")
+        print(
+            "NOTE: verdict ADOPT -- flip structure_aware_chunking_enabled default "
+            "to True in backend/src/config.py (human-confirmed step)."
+        )
     return 0
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Mesure le delta RAGAS du chunking structure-aware (RAG-05) sur le "
+            "Mesure le delta RAGAS du chunking structure-aware sur le "
             "corpus gelé. --dry-run ne dépense aucun token. Le run complet est "
             "gated opérateur (ré-ingestion + réponses = tokens Mistral)."
         )
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Validation zéro-token de tout le câblage (défaut recommandé).")
-    parser.add_argument("--run", action="store_true",
-                        help="Run complet : ré-ingère + répond pour chaque mode (tokens).")
-    parser.add_argument("--stage", choices=("orchestrate", "answer"), default="orchestrate",
-                        help="Interne : 'answer' est l'entrée du sous-processus par mode.")
-    parser.add_argument("--mode", choices=MODES, default=None,
-                        help="Interne : mode du sous-processus answer.")
-    parser.add_argument("--limit", type=int, default=None,
-                        help="N'answer que les N premières questions (économie de tokens).")
-    parser.add_argument("--modes", type=str, default=",".join(MODES),
-                        help="Modes à exécuter, séparés par des virgules.")
-    parser.add_argument("--summarize", action="store_true",
-                        help="Écrit chunking_adoption_decision.md depuis deux JSON de score.")
-    parser.add_argument("--baseline-json", type=Path, default=None,
-                        help="JSON de score du mode baseline (pour --summarize).")
-    parser.add_argument("--structure-json", type=Path, default=None,
-                        help="JSON de score du mode structure (pour --summarize).")
-    parser.add_argument("--out", type=Path,
-                        default=_SCRIPT_DIR / "chunking_adoption_decision.md",
-                        help="Chemin du fichier de décision d'adoption.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validation zéro-token de tout le câblage (défaut recommandé).",
+    )
+    parser.add_argument(
+        "--run",
+        action="store_true",
+        help="Run complet : ré-ingère + répond pour chaque mode (tokens).",
+    )
+    parser.add_argument(
+        "--stage",
+        choices=("orchestrate", "answer"),
+        default="orchestrate",
+        help="Interne : 'answer' est l'entrée du sous-processus par mode.",
+    )
+    parser.add_argument(
+        "--mode", choices=MODES, default=None, help="Interne : mode du sous-processus answer."
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="N'answer que les N premières questions (économie de tokens).",
+    )
+    parser.add_argument(
+        "--modes",
+        type=str,
+        default=",".join(MODES),
+        help="Modes à exécuter, séparés par des virgules.",
+    )
+    parser.add_argument(
+        "--summarize",
+        action="store_true",
+        help="Écrit chunking_adoption_decision.md depuis deux JSON de score.",
+    )
+    parser.add_argument(
+        "--baseline-json",
+        type=Path,
+        default=None,
+        help="JSON de score du mode baseline (pour --summarize).",
+    )
+    parser.add_argument(
+        "--structure-json",
+        type=Path,
+        default=None,
+        help="JSON de score du mode structure (pour --summarize).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=_SCRIPT_DIR / "chunking_adoption_decision.md",
+        help="Chemin du fichier de décision d'adoption.",
+    )
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
     if args.dry_run:
@@ -510,8 +563,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.summarize:
         if not args.baseline_json or not args.structure_json:
-            print("--summarize requires --baseline-json and --structure-json.",
-                  file=sys.stderr)
+            print("--summarize requires --baseline-json and --structure-json.", file=sys.stderr)
             return 2
         return _summarize(args.baseline_json, args.structure_json, args.out)
 

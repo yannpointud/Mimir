@@ -1,0 +1,111 @@
+{
+  "budget guard calls": {
+    "calls": [
+      "reserve:chat"
+    ]
+  },
+  "clear": {
+    "body": {
+      "message": "Session oracle-session history cleared",
+      "success": true,
+      "timestamp": "<timestamp>"
+    },
+    "status": 200
+  },
+  "escalate": {
+    "body": {
+      "escalation_id": null,
+      "message": "Impossible d'envoyer votre demande pour le moment. Veuillez réessayer plus tard.",
+      "success": false
+    },
+    "status": 200
+  },
+  "escalate invalid": {
+    "body": {
+      "detail": [
+        {
+          "input": {},
+          "loc": [
+            "body",
+            "question"
+          ],
+          "msg": "Field required",
+          "type": "missing"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "history": {
+    "body": {
+      "created_at": "<created_at>",
+      "messages": [],
+      "session_id": "<session_id>"
+    },
+    "status": 200
+  },
+  "stream bad context_limit": {
+    "body": {
+      "detail": [
+        {
+          "ctx": {
+            "le": 10
+          },
+          "input": 11,
+          "loc": [
+            "body",
+            "context_limit"
+          ],
+          "msg": "Input should be less than or equal to 10",
+          "type": "less_than_equal"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "stream budget exceeded": {
+    "body": {
+      "error_code": "budget_exceeded",
+      "error_message": "Plafond quotidien de dépense IA atteint."
+    },
+    "status": 429
+  },
+  "stream empty question": {
+    "body": {
+      "detail": [
+        {
+          "ctx": {
+            "min_length": 1
+          },
+          "input": "",
+          "loc": [
+            "body",
+            "question"
+          ],
+          "msg": "String should have at least 1 character",
+          "type": "string_too_short"
+        }
+      ]
+    },
+    "status": 422
+  },
+  "stream question too long": {
+    "body": {
+      "detail": [
+        {
+          "ctx": {
+            "max_length": 1000
+          },
+          "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "loc": [
+            "body",
+            "question"
+          ],
+          "msg": "String should have at most 1000 characters",
+          "type": "string_too_long"
+        }
+      ]
+    },
+    "status": 422
+  }
+}

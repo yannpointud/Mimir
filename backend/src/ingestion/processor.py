@@ -7,8 +7,7 @@ import asyncio
 import hashlib
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple  # noqa: F401
-from datetime import datetime  # noqa: F401
+from typing import Any
 import numpy as np
 
 from .extractors import ExtractorFactory, ExtractionError, UnsupportedFormatError
@@ -17,19 +16,22 @@ from .async_queue_manager import AsyncQueueManager
 from .queue_manager import IngestionTask
 
 from ..llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
-from ..rag_core.interfaces import AbstractVectorStore, Chunk, VectorStoreException  # noqa: F401
+from ..rag_core.interfaces import AbstractVectorStore, Chunk
 from ..database.repository import DocumentRepository
-from ..database.models import Document  # noqa: F401
 from ..monitoring.logger import setup_logger
 from ..config import settings
-from ..cost.budget_guard import BudgetExceededError, budget_guard as default_budget_guard
+from ..cost.budget_guard import budget_guard as default_budget_guard
 from ..cost.usage_tracker import usage_tracker as default_usage_tracker
+from ..shared.errors import BudgetExceeded, IngestionError
 
 logger = setup_logger(__name__)
 
-class ProcessingError(Exception):
+
+class ProcessingError(IngestionError):
     """Base exception for processing errors"""
+
     pass
+
 
 class IngestionProcessor:
     """
@@ -37,35 +39,26 @@ class IngestionProcessor:
     Coordinates extraction, chunking, embedding, and indexing
     """
 
-    def __init__(self,
-                 llm_service: AbstractLLMService,
-                 vector_store: AbstractVectorStore,
-                 document_repository: DocumentRepository,
-                 chunking_config: Optional[ChunkingConfig] = None,
-                 max_file_size_mb: int = 100,
-                 max_chunks_per_doc: int = 2000,
-                 budget_guard=None,
-                 usage_tracker=None,
-                 bm25_store=None):
-        """
-        Initialize ingestion processor
+    def __init__(
+        self,
+        llm_service: AbstractLLMService,
+        vector_store: AbstractVectorStore,
+        document_repository: DocumentRepository,
+        chunking_config: ChunkingConfig | None = None,
+        max_file_size_mb: int = 100,
+        max_chunks_per_doc: int = 2000,
+        budget_guard=None,
+        usage_tracker=None,
+        bm25_store=None,
+    ):
+        """Initialize ingestion processor.
 
-        Args:
-            llm_service: LLM service for embeddings
-            vector_store: Vector store for indexing
-            document_repository: Database repository for documents
-            chunking_config: Configuration for text chunking
-            max_file_size_mb: Maximum file size in MB
-            max_chunks_per_doc: Maximum chunks per document
-            budget_guard: Optional BudgetGuard override (defaults to the
-                module-level singleton); injectable for tests
-            usage_tracker: Optional UsageTracker override (defaults to the
-                module-level singleton); injectable for tests
-            bm25_store: Optional BM25 lexical store. When provided, the
-                lexical index is rebuilt from the FAISS source of truth after
-                each successful upsert, keeping both indexes synchronized
-                through this single-writer worker. None disables the hybrid
-                sync (dense-only behavior unchanged).
+        ``budget_guard`` and ``usage_tracker`` default to the module-level
+        singletons (injectable for tests). When ``bm25_store`` is provided, the
+        lexical index is rebuilt from the FAISS source of truth after successful
+        upserts (coalesced once the queue drains), keeping both indexes
+        synchronized through this single-writer worker. None disables the
+        hybrid sync (dense-only behavior unchanged).
         """
         self.llm_service = llm_service
         self.vector_store = vector_store
@@ -92,7 +85,7 @@ class IngestionProcessor:
         self.queue_manager = AsyncQueueManager(
             max_size=settings.ingestion_queue_max_size,
             retry_base_delay=settings.ingestion_retry_base_delay,
-            retry_max_delay=settings.ingestion_retry_max_delay
+            retry_max_delay=settings.ingestion_retry_max_delay,
         )
 
         logger.info(
@@ -111,22 +104,17 @@ class IngestionProcessor:
         logger.info("Ingestion processor stopped")
         return success
 
-    def queue_document(self,
-                      file_path: str,
-                      document_id: Optional[str] = None,
-                      preserve: bool = False,
-                      metadata: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Queue a document for processing
+    def queue_document(
+        self,
+        file_path: str,
+        document_id: str | None = None,
+        preserve: bool = False,
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Queue a document for processing; return True if queued.
 
-        Args:
-            file_path: Path to the document file
-            document_id: Optional document ID, will be generated if None
-            preserve: Whether to protect from deletion
-            metadata: Additional metadata
-
-        Returns:
-            True if queued successfully
+        Without ``document_id`` a new document record is created; otherwise the
+        existing document is reprocessed.
         """
         try:
             # Validate file
@@ -155,10 +143,10 @@ class IngestionProcessor:
                         filename=file_path_obj.name,
                         file_hash=file_hash,
                         path=str(file_path_obj.absolute()),
-                        preserve=preserve
+                        preserve=preserve,
                     )
                     document_id = str(document.id)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - a duplicate is reported as not queued; anything else re-raised
                     if "already exists" in str(e).lower():
                         logger.warning(f"Document already exists with hash: {file_hash}")
                         return False
@@ -166,13 +154,17 @@ class IngestionProcessor:
             else:
                 # Reprocessing existing document - validate it exists
                 try:
-                    document = self.document_repository.get_by_id(int(document_id))
-                    if not document:
+                    existing = self.document_repository.get_by_id(int(document_id))
+                    if not existing:
                         logger.error(f"Document ID {document_id} not found for reprocessing")
                         return False
-                    logger.info(f"Reprocessing existing document: {document.filename} (ID: {document_id})")
-                except Exception as e:
-                    logger.error(f"Failed to retrieve document {document_id} for reprocessing: {str(e)}")
+                    logger.info(
+                        f"Reprocessing existing document: {existing.filename} (ID: {document_id})"
+                    )
+                except Exception as e:  # noqa: BLE001 - never raise: any lookup failure means not queued
+                    logger.error(
+                        f"Failed to retrieve document {document_id} for reprocessing: {str(e)}"
+                    )
                     return False
 
             # Create ingestion task
@@ -180,7 +172,7 @@ class IngestionProcessor:
                 file_path=file_path,
                 document_id=document_id,
                 metadata=metadata or {},
-                max_retries=settings.ingestion_max_retries
+                max_retries=settings.ingestion_max_retries,
             )
 
             # Queue the task
@@ -189,36 +181,30 @@ class IngestionProcessor:
             if success:
                 logger.info(
                     f"Queued document for processing: {file_path_obj.name}",
-                    extra={'extra_fields': {
-                        'file_path': file_path,
-                        'document_id': document_id,
-                        'file_size_mb': file_size / 1024 / 1024,
-                        'type': 'document_queued'
-                    }}
+                    extra={
+                        "extra_fields": {
+                            # str(): callers pass a Path, which the JSON log
+                            # formatter cannot serialize (the record was lost)
+                            "file_path": str(file_path),
+                            "document_id": document_id,
+                            "file_size_mb": file_size / 1024 / 1024,
+                            "type": "document_queued",
+                        }
+                    },
                 )
 
             return success
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - never raise: any failure means not queued (returns False)
             logger.error(f"Failed to queue document {file_path}: {str(e)}")
             return False
 
     async def _process_task(self, task: IngestionTask) -> bool:
-        """
-        Process a single ingestion task
-
-        Args:
-            task: Ingestion task to process
-
-        Returns:
-            True if processing succeeded
-        """
+        """Process a single ingestion task"""
         try:
             # Update status to indexing
             self.document_repository.update_status(
-                int(task.document_id),
-                'indexing',
-                error_message=None
+                int(task.document_id), "indexing", error_message=None
             )
 
             # Run the processing pipeline - Full async now
@@ -228,48 +214,44 @@ class IngestionProcessor:
                 # Update status to indexed
                 # Note: chunk_count will be updated by the pipeline
                 self.document_repository.update_status(
-                    int(task.document_id),
-                    'indexed',
-                    error_message=None
+                    int(task.document_id), "indexed", error_message=None
                 )
                 logger.info(f"Document processing completed: {task.file_path}")
             else:
                 # Update status to error
                 self.document_repository.update_status(
-                    int(task.document_id),
-                    'error',
-                    error_message="Processing pipeline failed"
+                    int(task.document_id), "error", error_message="Processing pipeline failed"
                 )
 
             return success
 
-        except BudgetExceededError:
+        except BudgetExceeded:
             # Fail-closed, non-retriable: budget exhaustion is not a
             # transient failure and a retry cannot succeed before the next
             # day's ledger reset. Exhaust the task's retry
             # budget so the async queue worker loop does not re-queue it.
             logger.warning(
                 f"Ingestion stopped (fail-closed): daily budget exceeded for document {task.document_id}",
-                extra={'extra_fields': {
-                    'document_id': task.document_id,
-                    'file_path': task.file_path,
-                    'type': 'budget_exceeded_ingestion'
-                }}
+                extra={
+                    "extra_fields": {
+                        "document_id": task.document_id,
+                        "file_path": task.file_path,
+                        "type": "budget_exceeded_ingestion",
+                    }
+                },
             )
 
             try:
                 self.document_repository.update_status(
-                    int(task.document_id),
-                    'error',
-                    error_message="Daily budget exceeded"
+                    int(task.document_id), "error", error_message="Daily budget exceeded"
                 )
-            except Exception as db_error:
+            except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             task.retry_count = task.max_retries
             return False
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - worker boundary: a failing document must not stop the worker
             error_msg = f"Task processing failed: {str(e)}"
             logger.error(error_msg)
 
@@ -277,10 +259,10 @@ class IngestionProcessor:
                 # Update status to error
                 self.document_repository.update_status(
                     int(task.document_id),
-                    'error',
-                    error_message=error_msg[:500]  # Limit error message length
+                    "error",
+                    error_message=error_msg[:500],  # Limit error message length
                 )
-            except Exception as db_error:
+            except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
                 logger.error(f"Failed to update document status: {str(db_error)}")
 
             return False
@@ -294,21 +276,11 @@ class IngestionProcessor:
             # _bm25_dirty guard; never allowed to mask the task result.
             try:
                 await self._maybe_rebuild_bm25_on_drain()
-            except Exception as drain_error:
-                logger.warning(
-                    f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}"
-                )
+            except Exception as drain_error:  # noqa: BLE001 - worker boundary: never mask the task result
+                logger.warning(f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}")
 
     async def _process_document_pipeline(self, task: IngestionTask) -> bool:
-        """
-        Execute the complete processing pipeline
-
-        Args:
-            task: Ingestion task
-
-        Returns:
-            True if pipeline succeeded
-        """
+        """Execute the complete processing pipeline"""
         start_time = time.time()
 
         try:
@@ -322,10 +294,7 @@ class IngestionProcessor:
 
             # Step 2: Chunk text
             logger.debug(f"Chunking text: {len(extracted_text)} characters")
-            chunks_data = self.chunking_strategy.chunk_text(
-                extracted_text,
-                source=task.file_path
-            )
+            chunks_data = self.chunking_strategy.chunk_text(extracted_text, source=task.file_path)
 
             if not chunks_data:
                 logger.warning(f"No chunks created from: {task.file_path}")
@@ -337,12 +306,12 @@ class IngestionProcessor:
                     f"Too many chunks ({len(chunks_data)} > {self.max_chunks_per_doc}), "
                     f"truncating: {task.file_path}"
                 )
-                chunks_data = chunks_data[:self.max_chunks_per_doc]
+                chunks_data = chunks_data[: self.max_chunks_per_doc]
 
             # Step 3: Generate embeddings
             # Reserve the daily budget BEFORE the paid Mistral embedding call
             # (fail-closed): None means the effective daily cap is already
-            # exhausted, so raise a non-retriable BudgetExceededError instead
+            # exhausted, so raise a non-retriable BudgetExceeded instead
             # of ever calling embed().
             #
             # asyncio.to_thread on every reserve/release/record/finalize call
@@ -351,12 +320,12 @@ class IngestionProcessor:
             # rationale as the vector_store.upsert/persist wrapping.
             reservation = await asyncio.to_thread(self.budget_guard.reserve, "embedding")
             if reservation is None:
-                raise BudgetExceededError("Daily budget exceeded")
+                raise BudgetExceeded("Daily budget exceeded")
 
             logger.debug(f"Generating embeddings for {len(chunks_data)} chunks")
             try:
                 embedding_response = await self._generate_embeddings(chunks_data)
-            except Exception:
+            except Exception:  # noqa: BLE001 - refund on any failure, then re-raise unchanged
                 # No embedding call actually succeeded -- refund the
                 # reservation and let the original error propagate to the
                 # outer except blocks below.
@@ -376,23 +345,17 @@ class IngestionProcessor:
                 embedding_response.prompt_tokens,
                 embedding_response.completion_tokens,
                 estimated=False,
-                session_id=f"doc:{task.document_id}"
+                session_id=f"doc:{task.document_id}",
             )
             await asyncio.to_thread(self.budget_guard.finalize, reservation, actual_cost_eur)
 
             if len(embeddings) != len(chunks_data):
-                logger.error(
-                    f"Embedding count mismatch: {len(embeddings)} != {len(chunks_data)}"
-                )
+                logger.error(f"Embedding count mismatch: {len(embeddings)} != {len(chunks_data)}")
                 return False
 
             # Step 4: Create chunk objects
             chunks = self._create_chunks(
-                chunks_data,
-                embeddings,
-                task.document_id,
-                task.file_path,
-                task.metadata
+                chunks_data, embeddings, task.document_id, task.file_path, task.metadata
             )
 
             # Step 5: Index in vector store
@@ -411,8 +374,8 @@ class IngestionProcessor:
             # Step 6: Update document chunk count
             self.document_repository.update_status(
                 int(task.document_id),
-                'indexing',  # Still processing
-                chunk_count=len(chunks)
+                "indexing",  # Still processing
+                chunk_count=len(chunks),
             )
 
             # Step 7: Persist vector store
@@ -432,35 +395,39 @@ class IngestionProcessor:
             logger.info(
                 f"Document processing pipeline completed in {processing_time:.2f}s: "
                 f"{len(chunks)} chunks indexed",
-                extra={'extra_fields': {
-                    'file_path': task.file_path,
-                    'document_id': task.document_id,
-                    'chunks': len(chunks),
-                    'characters': len(extracted_text),
-                    'processing_time': processing_time,
-                    'type': 'pipeline_completed'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": task.file_path,
+                        "document_id": task.document_id,
+                        "chunks": len(chunks),
+                        "characters": len(extracted_text),
+                        "processing_time": processing_time,
+                        "type": "pipeline_completed",
+                    }
+                },
             )
 
             return True
 
-        except BudgetExceededError:
+        except BudgetExceeded:
             # Non-retriable fail-closed stop: propagate to _process_task's
-            # dedicated except BudgetExceededError branch, bypassing the
+            # dedicated except BudgetExceeded branch, bypassing the
             # retry loop entirely (a retry cannot succeed before the next reset).
             raise
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - worker boundary: any failure marks the document as failed
             processing_time = time.time() - start_time
             logger.error(
                 f"Document processing pipeline failed after {processing_time:.2f}s: {str(e)}",
-                extra={'extra_fields': {
-                    'file_path': task.file_path,
-                    'document_id': task.document_id,
-                    'processing_time': processing_time,
-                    'error': str(e),
-                    'type': 'pipeline_failed'
-                }}
+                extra={
+                    "extra_fields": {
+                        "file_path": task.file_path,
+                        "document_id": task.document_id,
+                        "processing_time": processing_time,
+                        "error": str(e),
+                        "type": "pipeline_failed",
+                    }
+                },
             )
             return False
 
@@ -505,20 +472,11 @@ class IngestionProcessor:
             active_chunks = self.vector_store.snapshot_active_chunks()
             await asyncio.to_thread(self.bm25_store.rebuild, active_chunks)
             self._bm25_dirty = False
-        except Exception as bm25_error:
-            logger.warning(
-                f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}"
-            )
+        except Exception as bm25_error:  # noqa: BLE001 - best effort: FAISS already holds the chunks
+            logger.warning(f"BM25 rebuild failed at drain - continuing anyway: {bm25_error}")
 
     def _extract_text(self, file_path: str) -> str:
-        """
-        Extract text from file
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            Extracted text
+        """Extract text from file
 
         Raises:
             ProcessingError: If extraction fails
@@ -526,14 +484,10 @@ class IngestionProcessor:
         try:
             return self.extractor_factory.extract_text(file_path)
         except (ExtractionError, UnsupportedFormatError) as e:
-            raise ProcessingError(f"Text extraction failed: {str(e)}")
+            raise ProcessingError(f"Text extraction failed: {str(e)}") from e
 
-    async def _generate_embeddings(self, chunks_data: List[Dict[str, Any]]) -> EmbeddingResponse:
-        """
-        Generate embeddings for chunks
-
-        Args:
-            chunks_data: List of chunk dictionaries
+    async def _generate_embeddings(self, chunks_data: list[dict[str, Any]]) -> EmbeddingResponse:
+        """Generate embeddings for chunks
 
         Returns:
             EmbeddingResponse carrying both the embedding vectors and the
@@ -544,55 +498,45 @@ class IngestionProcessor:
             ProcessingError: If embedding generation fails
         """
         try:
-            texts = [chunk['text'] for chunk in chunks_data]
+            texts = [chunk["text"] for chunk in chunks_data]
 
             response = await self.llm_service.embed(texts)
             return response
 
         except LLMException as e:
-            raise ProcessingError(f"Embedding generation failed: {str(e)}")
+            raise ProcessingError(f"Embedding generation failed: {str(e)}") from e
 
-    def _create_chunks(self,
-                      chunks_data: List[Dict[str, Any]],
-                      embeddings: List[List[float]],
-                      document_id: str,
-                      source: str,
-                      metadata: Dict[str, Any]) -> List[Chunk]:
-        """
-        Create Chunk objects from data
-
-        Args:
-            chunks_data: Chunk data dictionaries
-            embeddings: Embedding vectors
-            document_id: Document identifier
-            source: Source file path
-            metadata: Additional metadata
-
-        Returns:
-            List of Chunk objects
-        """
+    def _create_chunks(
+        self,
+        chunks_data: list[dict[str, Any]],
+        embeddings: list[list[float]],
+        document_id: str,
+        source: str,
+        metadata: dict[str, Any],
+    ) -> list[Chunk]:
+        """Create Chunk objects from data"""
         chunks = []
 
-        for i, (chunk_data, embedding) in enumerate(zip(chunks_data, embeddings)):
+        for chunk_data, embedding in zip(chunks_data, embeddings, strict=False):
             chunk = Chunk(
-                text=chunk_data['text'],
+                text=chunk_data["text"],
                 embedding=np.array(embedding, dtype=np.float32),
                 document_id=document_id,
-                chunk_index=chunk_data['chunk_index'],
-                total_chunks=chunk_data['total_chunks'],
+                chunk_index=chunk_data["chunk_index"],
+                total_chunks=chunk_data["total_chunks"],
                 source=source,
                 metadata={
                     **metadata,
-                    'start_char': chunk_data.get('start_char', 0),
-                    'end_char': chunk_data.get('end_char', 0),
-                    'word_count': chunk_data.get('word_count', 0),
-                    'char_count': chunk_data.get('char_count', 0),
+                    "start_char": chunk_data.get("start_char", 0),
+                    "end_char": chunk_data.get("end_char", 0),
+                    "word_count": chunk_data.get("word_count", 0),
+                    "char_count": chunk_data.get("char_count", 0),
                     # Structure-aware chunking. `.get()` keeps the
                     # flag-off path safe: no section_title key in the chunk dict
                     # yields None here (open metadata dict, no schema migration).
-                    'section_title': chunk_data.get('section_title')
+                    "section_title": chunk_data.get("section_title"),
                 },
-                preserve=metadata.get('preserve', False)
+                preserve=metadata.get("preserve", False),
             )
             chunks.append(chunk)
 
@@ -601,7 +545,7 @@ class IngestionProcessor:
     def _calculate_file_hash(self, file_path: str) -> str:
         """Calculate SHA-256 hash of file"""
         hasher = hashlib.sha256()
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hasher.update(chunk)
         return hasher.hexdigest()
@@ -612,16 +556,16 @@ class IngestionProcessor:
         timestamp = int(time.time())
         return f"{file_path_obj.stem}_{timestamp}"
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get processing statistics"""
         queue_stats = self.queue_manager.get_stats()
 
         return {
-            'processor_running': self.queue_manager.is_running(),
-            'supported_extensions': self.extractor_factory.get_supported_extensions(),
-            'max_file_size_mb': self.max_file_size_bytes / 1024 / 1024,
-            'max_chunks_per_doc': self.max_chunks_per_doc,
-            'queue_stats': queue_stats
+            "processor_running": self.queue_manager.is_running(),
+            "supported_extensions": self.extractor_factory.get_supported_extensions(),
+            "max_file_size_mb": self.max_file_size_bytes / 1024 / 1024,
+            "max_chunks_per_doc": self.max_chunks_per_doc,
+            "queue_stats": queue_stats,
         }
 
     def get_queue_size(self) -> int:

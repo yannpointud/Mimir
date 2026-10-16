@@ -1,4 +1,4 @@
-# Décision d'adoption — Chunking structure-aware (RAG-05, 07-06)
+# Décision d'adoption — Chunking structure-aware
 
 **Date:** 2026-07-14
 **Décision:** **ADOPT** — `structure_aware_chunking_enabled` passe à `True`.

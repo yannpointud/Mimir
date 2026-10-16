@@ -1,4 +1,4 @@
-# Décision d'adoption — Recherche hybride BM25 + RRF (RAG-02, critère 2)
+# Décision d'adoption — Recherche hybride BM25 + RRF
 
 **Date:** 2026-07-13
 **Décision:** **ADOPTÉE** — `hybrid_search_enabled` passe à `True` par défaut.
@@ -38,19 +38,19 @@ les deux modes retrouvent le bon document pour les 5 requêtes.
 
 ## Jugement d'adoption
 
-Règle (ROADMAP critère 2 + directive utilisateur) : adopter uniquement si le gain est
+Règle (critère fixé avant la mesure + directive utilisateur) : adopter uniquement si le gain est
 **net et marqué** (pas un simple > 0, pas ~+5 % qui ne vaudrait pas la complexité d'un
 second index), ET **sans régression terme-exact**.
 
 - Gain de **+17.8 % (recall)** et **+14.1 % (precision)** — largement au-dessus du seuil
   ~+5 % jugé insuffisant ; les deux métriques de retrieval s'améliorent.
 - Taux de NaN à **0 %** sur les deux runs → le juge Mistral est fiable pour ces métriques
-  (lève le blocker STATE « fiabilité RAGAS+Mistral inconnue »).
+  (lève l'incertitude « fiabilité RAGAS+Mistral inconnue »).
 - **Aucune régression terme-exact.**
 
 → Les trois conditions sont remplies. **L'hybride est adopté** (`hybrid_search_enabled=True`).
 Le seuil `rrf_score_threshold=0.015` est validé empiriquement : le run hybride a produit des
-contextes **non vides** sur les 40 questions (pas d'artefact de seuil, RESEARCH Pitfall #2) et
+contextes **non vides** sur les 40 questions (pas d'artefact de seuil vidant le mode hybride) et
 un recall en hausse — un seuil qui filtrerait les bons résultats aurait fait CHUTER le recall,
 pas monter de +18 %.
 

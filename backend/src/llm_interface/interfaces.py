@@ -4,13 +4,17 @@ Provides base classes for implementing different LLM providers
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional  # noqa: F401
-import numpy as np  # noqa: F401
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Any
+
+from ..shared.errors import LLMError
+
 
 @dataclass
 class GenerationResponse:
     """Response from LLM generation"""
+
     content: str
     model: str
     usage_tokens: int
@@ -21,10 +25,12 @@ class GenerationResponse:
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
+
 @dataclass
 class EmbeddingResponse:
     """Response from embedding generation"""
-    embeddings: List[List[float]]
+
+    embeddings: list[list[float]]
     model: str
     usage_tokens: int
     # Split token counts for cost accounting. Embeddings have no completion
@@ -32,21 +38,30 @@ class EmbeddingResponse:
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
-class LLMException(Exception):
+
+class LLMException(LLMError):
     """Base exception for LLM operations"""
+
     pass
+
 
 class LLMAPIError(LLMException):
     """API-related errors (network, authentication, etc.)"""
+
     pass
+
 
 class LLMRateLimitError(LLMException):
     """Rate limiting errors"""
+
     pass
+
 
 class LLMInvalidRequestError(LLMException):
     """Invalid request errors (malformed prompt, etc.)"""
+
     pass
+
 
 class AbstractLLMService(ABC):
     """
@@ -55,24 +70,15 @@ class AbstractLLMService(ABC):
     """
 
     @abstractmethod
-    async def generate(self,
-                      prompt: str,
-                      system_prompt: Optional[str] = None,
-                      max_tokens: Optional[int] = None,
-                      temperature: float = 0.1,
-                      **kwargs) -> GenerationResponse:
-        """
-        Generate text response from prompt
-
-        Args:
-            prompt: User input prompt
-            system_prompt: Optional system instruction
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0 to 1.0)
-            **kwargs: Additional model-specific parameters
-
-        Returns:
-            GenerationResponse with generated text and metadata
+    async def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.1,
+        **kwargs,
+    ) -> GenerationResponse:
+        """Generate text response from prompt
 
         Raises:
             LLMAPIError: API communication issues
@@ -82,15 +88,32 @@ class AbstractLLMService(ABC):
         pass
 
     @abstractmethod
-    async def embed(self, texts: List[str]) -> EmbeddingResponse:
+    def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float = 0.1,
+        session_id: str | None = None,
+        rag_debug: Any = None,
+        usage_out: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Stream the generated text chunk by chunk.
+
+        ``usage_out``, when given, is filled with the real token usage
+        (prompt_tokens, completion_tokens, total_tokens) once the provider
+        reports it; it is left empty otherwise.
+
+        Raises:
+            LLMAPIError: API communication issues
         """
-        Generate embeddings for list of texts
 
-        Args:
-            texts: List of texts to embed
-
-        Returns:
-            EmbeddingResponse with embeddings and metadata
+    @abstractmethod
+    async def embed(
+        self, texts: list[str], session_id: str | None = None, rag_debug: Any = None
+    ) -> EmbeddingResponse:
+        """Generate embeddings for list of texts
 
         Raises:
             LLMAPIError: API communication issues
@@ -98,15 +121,14 @@ class AbstractLLMService(ABC):
             LLMInvalidRequestError: Invalid request parameters
         """
         pass
+
+    async def close(self) -> None:
+        """Release network resources held by the service (none by default)."""
+        return None
 
     @abstractmethod
     async def health_check(self) -> bool:
-        """
-        Check if LLM service is available
-
-        Returns:
-            True if service is healthy, False otherwise
-        """
+        """Check if LLM service is available"""
         pass
 
     @property

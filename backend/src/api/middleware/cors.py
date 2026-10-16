@@ -13,12 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def configure_cors_middleware(app):
-    """
-    Configure CORS middleware for the FastAPI application.
-
-    Args:
-        app: FastAPI application instance
-    """
+    """Configure CORS middleware for the FastAPI application."""
     # CORS configuration based on environment
     if settings.is_production:
         # Production: restrictive CORS
@@ -29,8 +24,8 @@ def configure_cors_middleware(app):
         ]
 
         # Add custom allowed origins from settings if available
-        if hasattr(settings, 'allowed_origins') and settings.allowed_origins:
-            allowed_origins.extend(settings.allowed_origins.split(','))
+        if hasattr(settings, "allowed_origins") and settings.allowed_origins:
+            allowed_origins.extend(settings.allowed_origins.split(","))
 
         logger.info(f"CORS configured for production - allowed origins: {allowed_origins}")
     else:

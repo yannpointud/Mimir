@@ -4,32 +4,38 @@ Unit tests for document management endpoints.
 
 import pytest
 import asyncio
-import os  # noqa: F401
 import tempfile
 from unittest.mock import Mock, patch, AsyncMock, mock_open
 from datetime import datetime
 from pathlib import Path
 from fastapi import HTTPException, status, UploadFile
-from pydantic import ValidationError  # noqa: F401
 
 from backend.src.api.endpoints.documents import (
-    router, list_documents, get_document, upload_document, delete_document,  # noqa: F401
-    toggle_document_preservation, reprocess_document, get_document_stats
+    list_documents,
+    get_document,
+    upload_document,
+    delete_document,
+    toggle_document_preservation,
+    reprocess_document,
+    get_document_stats,
 )
 
 
-@patch('backend.src.shared.models.DocumentResponse.from_orm', side_effect=lambda obj: Mock(
-    id=getattr(obj, 'id', 1),
-    filename=getattr(obj, 'filename', 'test.pdf'),
-    status=getattr(obj, 'status', 'indexed'),
-    path=getattr(obj, 'path', '/test'),
-    preserve=getattr(obj, 'preserve', False),
-    file_hash=getattr(obj, 'file_hash', 'a'*64),
-    error_message=getattr(obj, 'error_message', None),
-    chunk_count=getattr(obj, 'chunk_count', 5),
-    created_at=getattr(obj, 'created_at', datetime.utcnow()),
-    indexed_at=getattr(obj, 'indexed_at', datetime.utcnow())
-))
+@patch(
+    "backend.src.shared.models.DocumentResponse.from_orm",
+    side_effect=lambda obj: Mock(
+        id=getattr(obj, "id", 1),
+        filename=getattr(obj, "filename", "test.pdf"),
+        status=getattr(obj, "status", "indexed"),
+        path=getattr(obj, "path", "/test"),
+        preserve=getattr(obj, "preserve", False),
+        file_hash=getattr(obj, "file_hash", "a" * 64),
+        error_message=getattr(obj, "error_message", None),
+        chunk_count=getattr(obj, "chunk_count", 5),
+        created_at=getattr(obj, "created_at", datetime.utcnow()),
+        indexed_at=getattr(obj, "indexed_at", datetime.utcnow()),
+    ),
+)
 class TestDocumentEndpoints:
     """Tests for document endpoints."""
 
@@ -39,16 +45,16 @@ class TestDocumentEndpoints:
 
         # Default values
         defaults = {
-            'id': 1,
-            'filename': 'test.pdf',
-            'path': '/uploads/test.pdf',
-            'preserve': False,
-            'file_hash': 'a' * 64,  # 64-character hexadecimal hash
-            'status': 'indexed',
-            'error_message': None,
-            'chunk_count': 5,
-            'created_at': datetime.utcnow(),
-            'indexed_at': datetime.utcnow()
+            "id": 1,
+            "filename": "test.pdf",
+            "path": "/uploads/test.pdf",
+            "preserve": False,
+            "file_hash": "a" * 64,  # 64-character hexadecimal hash
+            "status": "indexed",
+            "error_message": None,
+            "chunk_count": 5,
+            "created_at": datetime.utcnow(),
+            "indexed_at": datetime.utcnow(),
         }
 
         # Merge with provided kwargs
@@ -87,10 +93,9 @@ class TestDocumentEndpoints:
 class TestListDocumentsEndpoint(TestDocumentEndpoints):
     """Tests for the document listing endpoint."""
 
-    @patch('backend.src.api.endpoints.documents.DocumentListResponse')
+    @patch("backend.src.api.endpoints.documents.DocumentListResponse")
     def test_list_documents_success(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
         """Test successful document listing."""
-        from datetime import datetime  # noqa: F401
 
         # Configure mocks with all required attributes
         mock_doc1 = self.create_mock_document(
@@ -100,7 +105,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
             path="/uploads/doc1.pdf",
             preserve=False,
             file_hash="b" * 64,
-            chunk_count=5
+            chunk_count=5,
         )
 
         mock_doc2 = self.create_mock_document(
@@ -111,7 +116,7 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
             preserve=True,
             file_hash="c" * 64,
             chunk_count=0,
-            indexed_at=None
+            indexed_at=None,
         )
 
         mock_documents = [mock_doc1, mock_doc2]
@@ -125,19 +130,20 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_doc_list_response.return_value = mock_response
 
         # Call the function
-        result = asyncio.run(list_documents(
-            pagination=mock_pagination,
-            status_filter=None,
-            search=None,
-            doc_repo=mock_doc_repo
-        ))
+        result = asyncio.run(
+            list_documents(
+                pagination=mock_pagination, status_filter=None, search=None, doc_repo=mock_doc_repo
+            )
+        )
 
         # Assertions
         assert result == mock_response
         mock_doc_list_response.assert_called_once()
 
-    @patch('backend.src.api.endpoints.documents.DocumentListResponse')
-    def test_list_documents_with_filters(self, mock_doc_list_response, mock_doc_repo, mock_pagination):
+    @patch("backend.src.api.endpoints.documents.DocumentListResponse")
+    def test_list_documents_with_filters(
+        self, mock_doc_list_response, mock_doc_repo, mock_pagination
+    ):
         """Test listing with filters."""
 
         # Configure mocks
@@ -151,23 +157,22 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_doc_list_response.return_value = mock_response
 
         # Call the function
-        result = asyncio.run(list_documents(
-            pagination=mock_pagination,
-            status_filter="indexed",
-            search="doc1",
-            doc_repo=mock_doc_repo
-        ))
+        result = asyncio.run(
+            list_documents(
+                pagination=mock_pagination,
+                status_filter="indexed",
+                search="doc1",
+                doc_repo=mock_doc_repo,
+            )
+        )
 
         # Assertions
         assert result == mock_response
         mock_doc_repo.get_all_paginated.assert_called_once_with(
-            offset=0,
-            limit=20,
-            filters={"status": "indexed"},
-            search="doc1"
+            offset=0, limit=20, filters={"status": "indexed"}, search="doc1"
         )
 
-    @patch('backend.src.api.endpoints.documents.DocumentListResponse')
+    @patch("backend.src.api.endpoints.documents.DocumentListResponse")
     def test_list_documents_pagination(self, mock_doc_list_response, mock_doc_repo):
         """Test listing with pagination."""
 
@@ -176,7 +181,9 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_pagination.offset = 20
         mock_pagination.limit = 10
 
-        mock_documents = [self.create_mock_document(id=i, filename=f"doc{i}.pdf") for i in range(21, 31)]
+        mock_documents = [
+            self.create_mock_document(id=i, filename=f"doc{i}.pdf") for i in range(21, 31)
+        ]
         mock_doc_repo.get_all_paginated.return_value = (mock_documents, 50)
 
         # Mock response
@@ -187,12 +194,11 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
         mock_doc_list_response.return_value = mock_response
 
         # Call the function
-        result = asyncio.run(list_documents(
-            pagination=mock_pagination,
-            status_filter=None,
-            search=None,
-            doc_repo=mock_doc_repo
-        ))
+        result = asyncio.run(
+            list_documents(
+                pagination=mock_pagination, status_filter=None, search=None, doc_repo=mock_doc_repo
+            )
+        )
 
         # Assertions
         assert result == mock_response
@@ -205,12 +211,14 @@ class TestListDocumentsEndpoint(TestDocumentEndpoints):
 
         # Test that exception is handled
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(list_documents(
-                pagination=mock_pagination,
-                status_filter=None,
-                search=None,
-                doc_repo=mock_doc_repo
-            ))
+            asyncio.run(
+                list_documents(
+                    pagination=mock_pagination,
+                    status_filter=None,
+                    search=None,
+                    doc_repo=mock_doc_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -226,10 +234,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
         mock_doc_repo.get_by_id.return_value = mock_document
 
         # Call the function
-        result = asyncio.run(get_document(  # noqa: F841
-            document_id=1,
-            doc_repo=mock_doc_repo
-        ))
+        asyncio.run(get_document(document_id=1, doc_repo=mock_doc_repo))
 
         # Assertions
         mock_doc_repo.get_by_id.assert_called_once_with(1)
@@ -243,10 +248,7 @@ class TestGetDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(get_document(
-                document_id=999,
-                doc_repo=mock_doc_repo
-            ))
+            asyncio.run(get_document(document_id=999, doc_repo=mock_doc_repo))
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert "999" in str(exc_info.value.detail)
@@ -269,14 +271,22 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         with tempfile.TemporaryDirectory() as temp_dir:
             yield temp_dir
 
-    @patch('backend.src.api.endpoints.documents.settings')
-    @patch('backend.src.api.endpoints.documents.Path')
-    @patch('backend.src.api.endpoints.documents.hashlib.sha256')
-    @patch('backend.src.api.endpoints.documents.validate_filename')
-    @patch('backend.src.api.endpoints.documents.sanitize_filename')
+    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("src.services.document_upload.Path")
+    @patch("src.services.document_upload.hashlib.sha256")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
     def test_upload_document_success(
-        self, mock_sanitize, mock_validate, mock_sha256, mock_path, mock_settings,
-        mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
+        self,
+        mock_sanitize,
+        mock_validate,
+        mock_sha256,
+        mock_path,
+        mock_settings,
+        mock_upload_file,
+        mock_doc_repo,
+        mock_audit_repo,
+        mock_current_user,
     ):
         """Test successful document upload."""
 
@@ -324,17 +334,19 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
         mock_ingestion_processor.queue_document.return_value = True
 
         # Call the function
-        with patch('builtins.open', mock_open()) as mock_file_open:  # noqa: F841
-            result = asyncio.run(upload_document(  # noqa: F841
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_upload_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo,
-                ingestion_processor=mock_ingestion_processor
-            ))
+        with patch("builtins.open", mock_open()):
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_upload_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                    ingestion_processor=mock_ingestion_processor,
+                )
+            )
 
         # Assertions
         mock_validate.assert_called_once_with("test.pdf")
@@ -351,20 +363,22 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "No filename" in str(exc_info.value.detail)
 
-    @patch('backend.src.api.endpoints.documents.validate_filename')
+    @patch("src.services.document_upload.validate_filename")
     def test_upload_document_invalid_filename(
         self, mock_validate, mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
     ):
@@ -374,23 +388,31 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_upload_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_upload_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Invalid filename" in str(exc_info.value.detail)
 
-    @patch('backend.src.api.endpoints.documents.settings')
-    @patch('backend.src.api.endpoints.documents.validate_filename')
+    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("src.services.document_upload.validate_filename")
     def test_upload_document_file_too_large(
-        self, mock_validate, mock_settings, mock_upload_file, mock_doc_repo, mock_audit_repo, mock_current_user
+        self,
+        mock_validate,
+        mock_settings,
+        mock_upload_file,
+        mock_doc_repo,
+        mock_audit_repo,
+        mock_current_user,
     ):
         """Test upload with file too large."""
 
@@ -400,25 +422,33 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_upload_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_upload_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
         assert "File too large" in str(exc_info.value.detail)
 
-    @patch('backend.src.api.endpoints.documents.settings')
-    @patch('backend.src.api.endpoints.documents.validate_filename')
-    @patch('backend.src.api.endpoints.documents.sanitize_filename')
+    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
     def test_upload_document_unsupported_extension(
-        self, mock_sanitize, mock_validate, mock_settings, mock_upload_file,
-        mock_doc_repo, mock_audit_repo, mock_current_user
+        self,
+        mock_sanitize,
+        mock_validate,
+        mock_settings,
+        mock_upload_file,
+        mock_doc_repo,
+        mock_audit_repo,
+        mock_current_user,
     ):
         """Test upload with unsupported extension."""
 
@@ -429,25 +459,33 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_upload_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_upload_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Unsupported file type" in str(exc_info.value.detail)
 
-    @patch('backend.src.api.endpoints.documents.settings')
-    @patch('backend.src.api.endpoints.documents.validate_filename')
-    @patch('backend.src.api.endpoints.documents.sanitize_filename')
+    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
     def test_upload_document_empty_file(
-        self, mock_sanitize, mock_validate, mock_settings, mock_upload_file,
-        mock_doc_repo, mock_audit_repo, mock_current_user
+        self,
+        mock_sanitize,
+        mock_validate,
+        mock_settings,
+        mock_upload_file,
+        mock_doc_repo,
+        mock_audit_repo,
+        mock_current_user,
     ):
         """Test upload with empty file."""
 
@@ -459,26 +497,35 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_upload_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_upload_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "Empty file" in str(exc_info.value.detail)
 
-    @patch('backend.src.api.endpoints.documents.settings')
-    @patch('backend.src.api.endpoints.documents.validate_filename')
-    @patch('backend.src.api.endpoints.documents.sanitize_filename')
-    @patch('backend.src.api.endpoints.documents.hashlib.sha256')
+    @patch("backend.src.api.endpoints.documents.settings")
+    @patch("src.services.document_upload.validate_filename")
+    @patch("src.services.document_upload.sanitize_filename")
+    @patch("src.services.document_upload.hashlib.sha256")
     def test_upload_document_duplicate(
-        self, mock_sha256, mock_sanitize, mock_validate, mock_settings, mock_upload_file,
-        mock_doc_repo, mock_audit_repo, mock_current_user
+        self,
+        mock_sha256,
+        mock_sanitize,
+        mock_validate,
+        mock_settings,
+        mock_upload_file,
+        mock_doc_repo,
+        mock_audit_repo,
+        mock_current_user,
     ):
         """Test upload with duplicate file."""
 
@@ -498,15 +545,17 @@ class TestUploadDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(upload_document(
-                request=Mock(),  # required by slowapi decorator
-                response=Mock(),  # required by slowapi header injection
-                file=mock_upload_file,
-                preserve=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                upload_document(
+                    request=Mock(),  # required by slowapi decorator
+                    response=Mock(),  # required by slowapi header injection
+                    file=mock_upload_file,
+                    preserve=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_409_CONFLICT
         assert "already exists" in str(exc_info.value.detail)
@@ -520,27 +569,27 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
 
         # Configure mocks
         mock_document = Mock(
-            id=1,
-            filename="test.pdf",
-            path="/uploads/abc123_test.pdf",
-            preserve=False
+            id=1, filename="test.pdf", path="/uploads/abc123_test.pdf", preserve=False
         )
         mock_doc_repo.get_by_id.return_value = mock_document
         mock_doc_repo.delete.return_value = True
 
-        with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:
-
+        with (
+            patch("backend.src.api.endpoints.documents.os.path.exists") as mock_exists,
+            patch("backend.src.api.endpoints.documents.os.remove") as mock_remove,
+        ):
             mock_exists.return_value = True
 
             # Call the function
-            result = asyncio.run(delete_document(
-                document_id=1,
-                force=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            result = asyncio.run(
+                delete_document(
+                    document_id=1,
+                    force=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         # Assertions
         assert result.success is True
@@ -557,92 +606,96 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(delete_document(
-                document_id=999,
-                force=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                delete_document(
+                    document_id=999,
+                    force=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_delete_document_protected_without_force(self, mock_doc_repo, mock_audit_repo, mock_current_user):
+    def test_delete_document_protected_without_force(
+        self, mock_doc_repo, mock_audit_repo, mock_current_user
+    ):
         """Test deletion of protected document without force."""
 
         # Configure mocks
-        mock_document = Mock(
-            id=1,
-            filename="protected.pdf",
-            preserve=True
-        )
+        mock_document = Mock(id=1, filename="protected.pdf", preserve=True)
         mock_doc_repo.get_by_id.return_value = mock_document
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(delete_document(
-                document_id=1,
-                force=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                delete_document(
+                    document_id=1,
+                    force=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
         assert "protected" in str(exc_info.value.detail)
 
-    def test_delete_document_protected_with_force(self, mock_doc_repo, mock_audit_repo, mock_current_user):
+    def test_delete_document_protected_with_force(
+        self, mock_doc_repo, mock_audit_repo, mock_current_user
+    ):
         """Test deletion of protected document with force."""
 
         # Configure mocks
         mock_document = Mock(
-            id=1,
-            filename="protected.pdf",
-            path="/uploads/abc123_protected.pdf",
-            preserve=True
+            id=1, filename="protected.pdf", path="/uploads/abc123_protected.pdf", preserve=True
         )
         mock_doc_repo.get_by_id.return_value = mock_document
         mock_doc_repo.delete.return_value = True
 
-        with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:  # noqa: F841
-
+        with (
+            patch("backend.src.api.endpoints.documents.os.path.exists") as mock_exists,
+            patch("backend.src.api.endpoints.documents.os.remove"),
+        ):
             mock_exists.return_value = True
 
             # Call the function
-            result = asyncio.run(delete_document(
-                document_id=1,
-                force=True,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            result = asyncio.run(
+                delete_document(
+                    document_id=1,
+                    force=True,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         # Assertions
         assert result.success is True
         mock_doc_repo.delete.assert_called_once_with(1, force=True)
 
-    def test_delete_document_database_failure(self, mock_doc_repo, mock_audit_repo, mock_current_user):
+    def test_delete_document_database_failure(
+        self, mock_doc_repo, mock_audit_repo, mock_current_user
+    ):
         """Test deletion with database failure."""
 
         # Configure mocks
-        mock_document = Mock(
-            id=1,
-            filename="test.pdf",
-            preserve=False
-        )
+        mock_document = Mock(id=1, filename="test.pdf", preserve=False)
         mock_doc_repo.get_by_id.return_value = mock_document
         mock_doc_repo.delete.return_value = False  # Failure
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(delete_document(
-                document_id=1,
-                force=False,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                delete_document(
+                    document_id=1,
+                    force=False,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -650,7 +703,9 @@ class TestDeleteDocumentEndpoint(TestDocumentEndpoints):
 class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
     """Tests for the preservation toggle endpoint."""
 
-    def test_toggle_document_preservation_success(self, mock_doc_repo, mock_audit_repo, mock_current_user):
+    def test_toggle_document_preservation_success(
+        self, mock_doc_repo, mock_audit_repo, mock_current_user
+    ):
         """Test successful preservation toggle."""
 
         # Configure mocks
@@ -661,19 +716,23 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
         mock_doc_repo.update_preserve_status.return_value = updated_doc
 
         # Call the function
-        result = asyncio.run(toggle_document_preservation(  # noqa: F841
-            document_id=1,
-            preserve=True,
-            current_user=mock_current_user,
-            doc_repo=mock_doc_repo,
-            audit_repo=mock_audit_repo
-        ))
+        asyncio.run(
+            toggle_document_preservation(
+                document_id=1,
+                preserve=True,
+                current_user=mock_current_user,
+                doc_repo=mock_doc_repo,
+                audit_repo=mock_audit_repo,
+            )
+        )
 
         # Assertions
         mock_doc_repo.update_preserve_status.assert_called_once_with(1, True)
         mock_audit_repo.create_log.assert_called_once()
 
-    def test_toggle_document_preservation_not_found(self, mock_doc_repo, mock_audit_repo, mock_current_user):
+    def test_toggle_document_preservation_not_found(
+        self, mock_doc_repo, mock_audit_repo, mock_current_user
+    ):
         """Test toggle on non-existent document."""
 
         # Configure mock
@@ -681,13 +740,15 @@ class TestToggleDocumentPreservationEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(toggle_document_preservation(
-                document_id=999,
-                preserve=True,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                toggle_document_preservation(
+                    document_id=999,
+                    preserve=True,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -707,13 +768,15 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
         mock_ingestion_processor.queue_document.return_value = True
 
         # Call the function
-        result = asyncio.run(reprocess_document(
-            document_id=1,
-            current_user=mock_current_user,
-            doc_repo=mock_doc_repo,
-            audit_repo=mock_audit_repo,
-            ingestion_processor=mock_ingestion_processor
-        ))
+        result = asyncio.run(
+            reprocess_document(
+                document_id=1,
+                current_user=mock_current_user,
+                doc_repo=mock_doc_repo,
+                audit_repo=mock_audit_repo,
+                ingestion_processor=mock_ingestion_processor,
+            )
+        )
 
         # Assertions
         assert result.success is True
@@ -730,12 +793,14 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
 
         # Test that exception is raised
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(reprocess_document(
-                document_id=999,
-                current_user=mock_current_user,
-                doc_repo=mock_doc_repo,
-                audit_repo=mock_audit_repo
-            ))
+            asyncio.run(
+                reprocess_document(
+                    document_id=999,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                )
+            )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -743,7 +808,7 @@ class TestReprocessDocumentEndpoint(TestDocumentEndpoints):
 class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
     """Tests for the document statistics endpoint."""
 
-    @patch('backend.src.api.endpoints.documents.settings')
+    @patch("backend.src.api.endpoints.documents.settings")
     def test_get_document_stats_success(self, mock_settings, mock_doc_repo):
         """Test successful statistics retrieval."""
 
@@ -760,7 +825,7 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
             "count_indexed": 20,
             "count_error": 2,
             "total_chunks": 150,
-            "protected_documents": 5
+            "protected_documents": 5,
         }
         mock_doc_repo.get_statistics.return_value = mock_stats
 
@@ -771,22 +836,24 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
             "active_vectors": 140,
             "deleted_vectors": 10,
             "total_documents": 25,
-            "memory_usage_mb": 12.5
+            "memory_usage_mb": 12.5,
         }
         mock_vector_store.health_check.return_value = True
 
         # Call the function
-        result = asyncio.run(get_document_stats(doc_repo=mock_doc_repo, vector_store=mock_vector_store))
+        result = asyncio.run(
+            get_document_stats(doc_repo=mock_doc_repo, vector_store=mock_vector_store)
+        )
 
         # Assertions
-        assert result["total_documents"] == 25
-        assert result["by_status"]["indexed"] == 20
-        assert result["by_status"]["indexing"] == 3
-        assert result["by_status"]["error"] == 2
-        assert result["total_chunks"] == 150
-        assert result["preserved_documents"] == 5
-        assert result["storage_info"]["upload_directory"] == "/uploads"
-        assert result["storage_info"]["max_file_size_mb"] == 10
+        assert result.total_documents == 25
+        assert result.by_status.indexed == 20
+        assert result.by_status.indexing == 3
+        assert result.by_status.error == 2
+        assert result.total_chunks == 150
+        assert result.preserved_documents == 5
+        assert result.storage_info.upload_directory == "/uploads"
+        assert result.storage_info.max_file_size_mb == 10
 
     def test_get_document_stats_exception_handling(self, mock_doc_repo):
         """Test exception handling in statistics."""
@@ -804,9 +871,7 @@ class TestGetDocumentStatsEndpoint(TestDocumentEndpoints):
 class TestDocumentIntegration(TestDocumentEndpoints):
     """Integration tests for document endpoints."""
 
-    def test_full_document_lifecycle(
-        self, mock_doc_repo, mock_audit_repo, mock_current_user
-    ):
+    def test_full_document_lifecycle(self, mock_doc_repo, mock_audit_repo, mock_current_user):
         """Test full document lifecycle (simplified version)."""
 
         # Mock created document
@@ -815,7 +880,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             filename="document.pdf",
             path="/uploads/abc123def456_document.pdf",
             preserve=False,
-            status="pending"
+            status="pending",
         )
 
         # Configure repo returns
@@ -834,55 +899,61 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         mock_vector_store.delete.return_value = True
 
         # 1. Document retrieval (skip upload as too complex to mock)
-        get_result = asyncio.run(get_document(
-            document_id=1,
-            doc_repo=mock_doc_repo
-        ))
+        get_result = asyncio.run(get_document(document_id=1, doc_repo=mock_doc_repo))
 
         # 2. Preservation toggle
-        preserve_result = asyncio.run(toggle_document_preservation(
-            document_id=1,
-            preserve=True,
-            current_user=mock_current_user,
-            doc_repo=mock_doc_repo,
-            audit_repo=mock_audit_repo
-        ))
-
-        # 3. Reprocessing
-        reprocess_result = asyncio.run(reprocess_document(
-            document_id=1,
-            current_user=mock_current_user,
-            doc_repo=mock_doc_repo,
-            audit_repo=mock_audit_repo,
-            ingestion_processor=mock_ingestion_processor
-        ))
-
-        # 4. Forced deletion (because protected)
-        with patch('backend.src.api.endpoints.documents.os.path.exists') as mock_exists, \
-             patch('backend.src.api.endpoints.documents.os.remove') as mock_remove:  # noqa: F841
-
-            mock_exists.return_value = True
-            mock_document.preserve = True  # Document now protected
-
-            delete_result = asyncio.run(delete_document(
+        preserve_result = asyncio.run(
+            toggle_document_preservation(
                 document_id=1,
-                force=True,
+                preserve=True,
                 current_user=mock_current_user,
                 doc_repo=mock_doc_repo,
                 audit_repo=mock_audit_repo,
-                vector_store=mock_vector_store
-            ))
+            )
+        )
+
+        # 3. Reprocessing
+        reprocess_result = asyncio.run(
+            reprocess_document(
+                document_id=1,
+                current_user=mock_current_user,
+                doc_repo=mock_doc_repo,
+                audit_repo=mock_audit_repo,
+                ingestion_processor=mock_ingestion_processor,
+            )
+        )
+
+        # 4. Forced deletion (because protected)
+        with (
+            patch("backend.src.api.endpoints.documents.os.path.exists") as mock_exists,
+            patch("backend.src.api.endpoints.documents.os.remove"),
+        ):
+            mock_exists.return_value = True
+            mock_document.preserve = True  # Document now protected
+
+            delete_result = asyncio.run(
+                delete_document(
+                    document_id=1,
+                    force=True,
+                    current_user=mock_current_user,
+                    doc_repo=mock_doc_repo,
+                    audit_repo=mock_audit_repo,
+                    vector_store=mock_vector_store,
+                )
+            )
 
         # Full cycle assertions
-        assert get_result is not None     # Retrieval successful
+        assert get_result is not None  # Retrieval successful
         assert preserve_result is not None  # Preservation successful
         assert reprocess_result.success is True  # Reprocessing successful
-        assert delete_result.success is True     # Deletion successful
+        assert delete_result.success is True  # Deletion successful
 
         # Verify audit calls (3 actions: preserve, reprocess, delete)
         assert mock_audit_repo.create_log.call_count == 3
 
-    def test_document_upload_and_stats_workflow(self, mock_doc_repo, mock_audit_repo, mock_current_user):
+    def test_document_upload_and_stats_workflow(
+        self, mock_doc_repo, mock_audit_repo, mock_current_user
+    ):
         """Test upload and statistics workflow."""
 
         # Corrected to match keys used by production code
@@ -893,7 +964,7 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             "count_indexed": 0,
             "count_error": 0,
             "total_chunks": 0,
-            "protected_documents": 0
+            "protected_documents": 0,
         }
         mock_doc_repo.get_statistics.return_value = mock_stats
 
@@ -904,48 +975,39 @@ class TestDocumentIntegration(TestDocumentEndpoints):
             "active_vectors": 0,
             "deleted_vectors": 0,
             "total_documents": 0,
-            "memory_usage_mb": 0
+            "memory_usage_mb": 0,
         }
         mock_vector_store.health_check.return_value = True
 
-        with patch('backend.src.api.endpoints.documents.settings') as mock_settings:
+        with patch("backend.src.api.endpoints.documents.settings") as mock_settings:
             mock_settings.upload_dir = "/uploads"
             mock_settings.supported_file_extensions = {".pdf", ".txt"}
             mock_settings.max_file_size_mb = 10
 
             # Retrieve statistics
-            stats_result = asyncio.run(get_document_stats(doc_repo=mock_doc_repo, vector_store=mock_vector_store))
+            stats_result = asyncio.run(
+                get_document_stats(doc_repo=mock_doc_repo, vector_store=mock_vector_store)
+            )
 
         # Assertions
-        assert stats_result["total_documents"] == 1
-        assert stats_result["by_status"]["pending"] == 1
-        assert stats_result["total_chunks"] == 0
-        assert stats_result["storage_info"]["max_file_size_mb"] == 10
+        assert stats_result.total_documents == 1
+        assert stats_result.by_status.pending == 1
+        assert stats_result.total_chunks == 0
+        assert stats_result.storage_info.max_file_size_mb == 10
 
-    def test_simple_document_operations(self, mock_doc_repo):
-        """Simple tests to improve coverage."""
-        # Simple test - just verify we can import the functions
-        from backend.src.api.endpoints.documents import get_document, download_document, get_document_stats
-
-        # These imports prove that the modules are accessible for tests
-        assert get_document is not None
-        assert download_document is not None
-        assert get_document_stats is not None
-
-    @patch('backend.src.api.endpoints.documents.FileResponse')
+    @patch("backend.src.api.endpoints.documents.FileResponse")
     def test_download_document_success(self, mock_file_response, mock_doc_repo):
         """Test successful document download."""
         # Mock document
         mock_doc = self.create_mock_document(
-            id=1,
-            filename="test_document.pdf",
-            path="/uploads/test_document.pdf"
+            id=1, filename="test_document.pdf", path="/uploads/test_document.pdf"
         )
         mock_doc_repo.get_by_id.return_value = mock_doc
 
         # Mock file exists
-        with patch('os.path.exists', return_value=True):
+        with patch("os.path.exists", return_value=True):
             from backend.src.api.endpoints.documents import download_document
+
             asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
 
         # Assertions
@@ -954,9 +1016,9 @@ class TestDocumentIntegration(TestDocumentEndpoints):
 
         # Verify FileResponse arguments
         call_args = mock_file_response.call_args
-        assert call_args[1]['path'] == "/uploads/test_document.pdf"
-        assert call_args[1]['media_type'] == "application/pdf"
-        assert "test_document.pdf" in call_args[1]['filename']
+        assert call_args[1]["path"] == "/uploads/test_document.pdf"
+        assert call_args[1]["media_type"] == "application/pdf"
+        assert "test_document.pdf" in call_args[1]["filename"]
 
     def test_download_document_not_found(self, mock_doc_repo):
         """Test document download - document not found."""
@@ -973,15 +1035,11 @@ class TestDocumentIntegration(TestDocumentEndpoints):
     def test_download_document_file_not_found(self, mock_doc_repo):
         """Test document download - physical file not found."""
         # Mock document with non-existent path
-        mock_doc = self.create_mock_document(
-            id=1,
-            filename="missing.pdf",
-            path="/missing/file.pdf"
-        )
+        mock_doc = self.create_mock_document(id=1, filename="missing.pdf", path="/missing/file.pdf")
         mock_doc_repo.get_by_id.return_value = mock_doc
 
         # Mock file doesn't exist
-        with patch('os.path.exists', return_value=False):
+        with patch("os.path.exists", return_value=False):
             from backend.src.api.endpoints.documents import download_document
 
             with pytest.raises(HTTPException) as exc_info:
@@ -990,25 +1048,26 @@ class TestDocumentIntegration(TestDocumentEndpoints):
         assert exc_info.value.status_code == 404
         assert "Original document file not found on disk" in str(exc_info.value.detail)
 
-    @patch('backend.src.api.endpoints.documents.FileResponse')
+    @patch("backend.src.api.endpoints.documents.FileResponse")
     def test_download_document_unknown_extension(self, mock_file_response, mock_doc_repo):
         """Test document download - unknown extension."""
         # Mock document with unknown extension
         mock_doc = self.create_mock_document(
             id=1,
             filename="test.xyz",  # Unsupported extension
-            path="/uploads/test.xyz"
+            path="/uploads/test.xyz",
         )
         mock_doc_repo.get_by_id.return_value = mock_doc
 
         # Mock file exists
-        with patch('os.path.exists', return_value=True):
+        with patch("os.path.exists", return_value=True):
             from backend.src.api.endpoints.documents import download_document
+
             asyncio.run(download_document(document_id=1, doc_repo=mock_doc_repo))
 
         # Verify default mime type is used
         call_args = mock_file_response.call_args
-        assert call_args[1]['media_type'] == "application/octet-stream"
+        assert call_args[1]["media_type"] == "application/octet-stream"
 
 
 class TestUploadQueueFullCleanup:
@@ -1016,7 +1075,7 @@ class TestUploadQueueFullCleanup:
     file must be rolled back, otherwise any retry of the same file hits 409
     (get_by_hash matches the orphaned pending record) and is never ingested."""
 
-    @patch('backend.src.api.endpoints.documents.settings')
+    @patch("backend.src.api.endpoints.documents.settings")
     def test_upload_queue_full_deletes_record_and_file(self, mock_settings):
         """queue_document() == False -> 503 + record deleted + file removed."""
         import hashlib
@@ -1044,18 +1103,19 @@ class TestUploadQueueFullCleanup:
             mock_ingestion.get_queue_size.return_value = 100
 
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(upload_document(
-                    request=Mock(),  # required by slowapi decorator
-                    response=Mock(),  # required by slowapi header injection
-                    file=mock_file,
-                    preserve=False,
-                    current_user={"sub": "admin", "user_type": "admin"},
-                    doc_repo=mock_doc_repo,
-                    audit_repo=Mock(),
-                    ingestion_processor=mock_ingestion
-                ))
+                asyncio.run(
+                    upload_document(
+                        request=Mock(),  # required by slowapi decorator
+                        response=Mock(),  # required by slowapi header injection
+                        file=mock_file,
+                        preserve=False,
+                        current_user={"sub": "admin", "user_type": "admin"},
+                        doc_repo=mock_doc_repo,
+                        audit_repo=Mock(),
+                        ingestion_processor=mock_ingestion,
+                    )
+                )
 
             assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
             mock_doc_repo.delete.assert_called_once_with(7, force=True)
-            assert not expected_path.exists(), \
-                "stored file must be removed on queue-full rejection"
+            assert not expected_path.exists(), "stored file must be removed on queue-full rejection"

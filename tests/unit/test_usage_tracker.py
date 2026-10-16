@@ -9,6 +9,7 @@ redirect the global db_manager singleton to a fresh temporary SQLite file
 for the test's lifetime, so no synthetic usage rows leak into the
 developer's real database.
 """
+
 import shutil
 import tempfile
 from pathlib import Path
@@ -145,9 +146,7 @@ class TestRecordUnpricedModel:
         assert row.prompt_tokens == 42
         assert row.completion_tokens == 7
 
-    def test_unpriced_embedding_model_bills_embedding_flat_estimate(
-        self, isolated_db_manager
-    ):
+    def test_unpriced_embedding_model_bills_embedding_flat_estimate(self, isolated_db_manager):
         """The flat estimate is selected per call_type: an unpriced
         embedding call bills budget_reservation_embedding_eur."""
         tracker = UsageTracker()

@@ -21,8 +21,7 @@ __all__ = ["resolve_admin_password"]
 
 
 def resolve_admin_password(settings) -> None:
-    """
-    Derive settings.admin_password_hash from ADMIN_PASSWORD when it is set.
+    """Derive settings.admin_password_hash from ADMIN_PASSWORD when it is set.
 
     Must run before validate_production_secrets so the default-secret checks apply to
     the hash the application will actually use.
@@ -36,9 +35,6 @@ def resolve_admin_password(settings) -> None:
     The password must satisfy the same strength rules the password-change
     endpoint enforces, so a value set through the environment cannot be weaker
     than one set through the UI.
-
-    Args:
-        settings: Application Settings instance (src.config.Settings)
 
     Raises:
         RuntimeError: In production, when ADMIN_PASSWORD fails the strength

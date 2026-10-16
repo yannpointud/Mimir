@@ -5,12 +5,16 @@ This module provides dependency injection functions for accessing
 various services throughout the API endpoints.
 """
 
-from typing import Generator  # noqa: F401
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from src.database.connection import get_db_session
-from src.database.repository import DocumentRepository, ConfigurationRepository, AuditLogRepository, UsageRepository
+from src.database.repository import (
+    DocumentRepository,
+    ConfigurationRepository,
+    AuditLogRepository,
+    UsageRepository,
+)
 from src.cache.lru_cache import cache_service, chat_cache_service
 from src.email_service.smtp_client import email_service
 from src.auth.jwt_handler import jwt_handler
@@ -28,52 +32,42 @@ logger = setup_logger(__name__)
 
 
 def get_document_repository(db: Session = Depends(get_db_session)) -> DocumentRepository:
-    """Get document repository instance."""
     return DocumentRepository(db)
 
 
 def get_configuration_repository(db: Session = Depends(get_db_session)) -> ConfigurationRepository:
-    """Get configuration repository instance."""
     return ConfigurationRepository(db)
 
 
 def get_audit_log_repository(db: Session = Depends(get_db_session)) -> AuditLogRepository:
-    """Get audit log repository instance."""
     return AuditLogRepository(db)
 
 
 def get_usage_repository(db: Session = Depends(get_db_session)) -> UsageRepository:
-    """Get usage repository instance."""
     return UsageRepository(db)
 
 
 def get_cache_service():
-    """Get cache service instance."""
     return cache_service
 
 
 def get_chat_cache_service():
-    """Get chat cache service instance."""
     return chat_cache_service
 
 
 def get_email_service():
-    """Get email service instance."""
     return email_service
 
 
 def get_jwt_handler():
-    """Get JWT handler instance."""
     return jwt_handler
 
 
 def get_budget_guard() -> BudgetGuard:
-    """Get budget guard instance (singleton)."""
     return budget_guard
 
 
 def get_usage_tracker() -> UsageTracker:
-    """Get usage tracker instance (singleton)."""
     return usage_tracker
 
 
@@ -84,7 +78,6 @@ _ingestion_processor = None
 
 
 def get_llm_service() -> MistralAPIService:
-    """Get LLM service instance (singleton)."""
     global _llm_service
     if _llm_service is None:
         _llm_service = MistralAPIService(
@@ -92,13 +85,12 @@ def get_llm_service() -> MistralAPIService:
             model=settings.mistral_model,
             embedding_model=settings.mistral_embedding_model,
             max_retries=3,
-            retry_delay=1.0
+            retry_delay=1.0,
         )
     return _llm_service
 
 
 def get_vector_store() -> FaissVectorStore:
-    """Get vector store instance (singleton)."""
     global _vector_store
     if _vector_store is None:
         _vector_store = FaissVectorStore(
@@ -106,7 +98,7 @@ def get_vector_store() -> FaissVectorStore:
             index_path=settings.faiss_index_path,
             metadata_path=settings.faiss_metadata_path,
             similarity_threshold=settings.similarity_threshold,
-            index_type="FlatL2"
+            index_type="FlatL2",
         )
     return _vector_store
 
@@ -128,16 +120,17 @@ def get_bm25_store() -> Bm25LexicalStore:
         _bm25_store = Bm25LexicalStore(index_path=settings.bm25_index_path)
         try:
             _bm25_store.load()
-        except Exception as e:  # noqa: BLE001 - never fail startup on a bad/missing index
+        except Exception as e:  # noqa: BLE001 - startup boundary: never fail on a bad/missing index
             logger.warning(f"BM25 lexical index failed to load, starting empty: {e}")
     return _bm25_store
 
 
 def get_ingestion_processor():
-    """Get ingestion processor instance (singleton)."""
     global _ingestion_processor
     if _ingestion_processor is None:
-        raise RuntimeError("Ingestion processor not initialized. Application startup may have failed.")
+        raise RuntimeError(
+            "Ingestion processor not initialized. Application startup may have failed."
+        )
     return _ingestion_processor
 
 
@@ -148,13 +141,12 @@ def set_ingestion_processor(processor):
 
 
 def get_rag_debug_service():
-    """Get RAG debug service instance."""
     # Configure the service from settings on first call
     rag_debug_service.configure(
         enabled=settings.rag_debug_enabled,
         log_prompts=settings.rag_debug_log_prompts,
         log_context=settings.rag_debug_log_context,
-        log_responses=settings.rag_debug_log_responses
+        log_responses=settings.rag_debug_log_responses,
     )
     return rag_debug_service
 

@@ -1,0 +1,65 @@
+{
+  "embedding failure": {
+    "budget_calls": [
+      "reserve:chat",
+      "release"
+    ],
+    "events": [
+      {
+        "session_id": "<session_id>",
+        "type": "start"
+      },
+      {
+        "message": "Une erreur interne est survenue.",
+        "type": "error"
+      }
+    ],
+    "llm_generate_calls": [],
+    "usage_records": []
+  },
+  "generation failure": {
+    "budget_calls": [
+      "reserve:chat",
+      "finalize"
+    ],
+    "events": [
+      {
+        "session_id": "<session_id>",
+        "type": "start"
+      },
+      {
+        "content": "Réponse fondée sur ",
+        "type": "chunk"
+      },
+      {
+        "message": "Une erreur interne est survenue.",
+        "type": "error"
+      }
+    ],
+    "llm_generate_calls": [
+      {
+        "max_tokens": 800,
+        "prompt": "Que faire en cas de perte d'un ordinateur portable ?",
+        "temperature": 0.1
+      }
+    ],
+    "usage_records": [
+      {
+        "call_type": "embedding",
+        "completion_tokens": 0,
+        "estimated": false,
+        "model": "mistral-embed",
+        "prompt_tokens": 13,
+        "session_id": "<session_id>"
+      },
+      {
+        "call_type": "chat",
+        "completion_tokens": 4,
+        "estimated": true,
+        "model": "mistral-small-latest",
+        "prompt_tokens": 1625,
+        "session_id": "<session_id>"
+      }
+    ]
+  }
+}

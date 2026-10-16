@@ -3,13 +3,11 @@ Tests pour le module database/connection.py
 Couvre la gestion de connexion, configuration SQLite et pattern Singleton
 """
 
-import pytest
+import contextlib
 import sqlite3
-import tempfile  # noqa: F401
-import os  # noqa: F401
-from unittest.mock import Mock, patch, MagicMock  # noqa: F401
-from sqlalchemy import text  # noqa: F401
-from sqlalchemy.exc import SQLAlchemyError  # noqa: F401
+
+import pytest
+from unittest.mock import Mock, patch
 
 from backend.src.database.connection import (
     DatabaseManager,
@@ -18,9 +16,8 @@ from backend.src.database.connection import (
     get_db_session,
     get_db_manager,
     init_database,
-    reset_database
+    reset_database,
 )
-from backend.src import config  # noqa: F401
 
 
 class TestConfigureSqlitePerformance:
@@ -34,7 +31,7 @@ class TestConfigureSqlitePerformance:
         mock_connection.cursor.return_value = mock_cursor
 
         # Mock des settings avec WAL activé
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings.sqlite_wal_mode = True
 
             configure_sqlite_performance(mock_connection, None)
@@ -46,7 +43,7 @@ class TestConfigureSqlitePerformance:
                 "PRAGMA cache_size=10000",
                 "PRAGMA temp_store=MEMORY",
                 "PRAGMA mmap_size=268435456",
-                "PRAGMA busy_timeout=30000"
+                "PRAGMA busy_timeout=30000",
             ]
 
             actual_calls = [call[0][0] for call in mock_cursor.execute.call_args_list]
@@ -59,7 +56,7 @@ class TestConfigureSqlitePerformance:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings.sqlite_wal_mode = False
 
             configure_sqlite_performance(mock_connection, None)
@@ -75,7 +72,7 @@ class TestConfigureSqlitePerformance:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        with patch('backend.src.database.connection.config.settings', None):
+        with patch("backend.src.database.connection.config.settings", None):
             configure_sqlite_performance(mock_connection, None)
 
             # Vérifier que les optimisations de base sont appliquées
@@ -107,9 +104,9 @@ class TestDatabaseManager:
         assert manager1 is manager2
         assert isinstance(manager1, DatabaseManager)
 
-    @patch('backend.src.database.connection.create_engine')
-    @patch('backend.src.database.connection.sessionmaker')
-    @patch('backend.src.database.connection.event.listen')
+    @patch("backend.src.database.connection.create_engine")
+    @patch("backend.src.database.connection.sessionmaker")
+    @patch("backend.src.database.connection.event.listen")
     def test_initialize_database_success(self, mock_listen, mock_sessionmaker, mock_create_engine):
         """Test initialisation réussie de la base de données"""
         mock_engine = Mock()
@@ -117,10 +114,10 @@ class TestDatabaseManager:
         mock_session_factory = Mock()
         mock_sessionmaker.return_value = mock_session_factory
 
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings.database_url_sync = "sqlite:///test.db"
 
-            manager = DatabaseManager()  # noqa: F841
+            DatabaseManager()
 
             # Vérifier la création du moteur
             mock_create_engine.assert_called_once()
@@ -129,14 +126,17 @@ class TestDatabaseManager:
 
             # Vérifier que listen a été appelé (peut être appelé plusieurs fois pour différents événements)
             # Vérifier qu'au moins un appel contient configure_sqlite_performance
-            configure_calls = [call for call in mock_listen.call_args_list
-                             if len(call[0]) >= 3 and call[0][2].__name__ == 'configure_sqlite_performance']
+            configure_calls = [
+                call
+                for call in mock_listen.call_args_list
+                if len(call[0]) >= 3 and call[0][2].__name__ == "configure_sqlite_performance"
+            ]
             assert len(configure_calls) >= 1, "configure_sqlite_performance should be registered"
 
             # Vérifier la création de la session factory
             mock_sessionmaker.assert_called_once()
 
-    @patch('backend.src.database.connection.create_engine')
+    @patch("backend.src.database.connection.create_engine")
     def test_initialize_database_failure(self, mock_create_engine):
         """Test échec d'initialisation de la base de données"""
         mock_create_engine.side_effect = Exception("Database connection failed")
@@ -148,7 +148,7 @@ class TestDatabaseManager:
         """Test initialisation paresseuse du moteur"""
         manager = DatabaseManager()
 
-        with patch.object(manager, '_initialize_database') as mock_init:
+        with patch.object(manager, "_initialize_database") as mock_init:
             manager._engine = None
 
             # Accès à la propriété engine
@@ -161,10 +161,11 @@ class TestDatabaseManager:
         manager = DatabaseManager()
         mock_session_factory = Mock()
 
-        with patch.object(manager, '_initialize_database') as mock_init:
+        with patch.object(manager, "_initialize_database") as mock_init:
             # Setup mock to simulate lazy initialization
             def side_effect():
                 manager._session_factory = mock_session_factory
+
             mock_init.side_effect = side_effect
 
             manager._session_factory = None
@@ -179,7 +180,7 @@ class TestDatabaseManager:
         manager = DatabaseManager()
         mock_session = Mock()
 
-        with patch.object(manager, 'get_session', return_value=mock_session):
+        with patch.object(manager, "get_session", return_value=mock_session):
             with manager.get_session_context() as session:
                 assert session is mock_session
                 # Simuler une opération
@@ -194,27 +195,26 @@ class TestDatabaseManager:
         manager = DatabaseManager()
         mock_session = Mock()
 
-        with patch.object(manager, 'get_session', return_value=mock_session):
-            with pytest.raises(ValueError):
-                with manager.get_session_context() as session:  # noqa: F841
-                    raise ValueError("Test exception")
+        with patch.object(manager, "get_session", return_value=mock_session):
+            with pytest.raises(ValueError), manager.get_session_context():
+                raise ValueError("Test exception")
 
             # Vérifier rollback et close appelés
             mock_session.rollback.assert_called_once()
             mock_session.close.assert_called_once()
 
-    @patch('backend.src.database.connection.Base.metadata.create_all')
+    @patch("backend.src.database.connection.Base.metadata.create_all")
     def test_create_tables_success(self, mock_create_all):
         """Test création réussie des tables"""
         manager = DatabaseManager()
         mock_engine = Mock()
 
-        with patch.object(manager, '_engine', mock_engine):
+        with patch.object(manager, "_engine", mock_engine):
             manager.create_tables()
 
             mock_create_all.assert_called_once_with(bind=mock_engine)
 
-    @patch('backend.src.database.connection.Base.metadata.create_all')
+    @patch("backend.src.database.connection.Base.metadata.create_all")
     def test_create_tables_failure(self, mock_create_all):
         """Test échec de création des tables"""
         mock_create_all.side_effect = Exception("Table creation failed")
@@ -224,13 +224,13 @@ class TestDatabaseManager:
         with pytest.raises(Exception, match="Table creation failed"):
             manager.create_tables()
 
-    @patch('backend.src.database.connection.Base.metadata.drop_all')
+    @patch("backend.src.database.connection.Base.metadata.drop_all")
     def test_drop_tables_success(self, mock_drop_all):
         """Test suppression réussie des tables"""
         manager = DatabaseManager()
         mock_engine = Mock()
 
-        with patch.object(manager, '_engine', mock_engine):
+        with patch.object(manager, "_engine", mock_engine):
             manager.drop_tables()
 
             mock_drop_all.assert_called_once_with(bind=mock_engine)
@@ -240,7 +240,7 @@ class TestDatabaseManager:
         manager = DatabaseManager()
         mock_session = Mock()
 
-        with patch.object(manager, 'get_session_context') as mock_context:
+        with patch.object(manager, "get_session_context") as mock_context:
             mock_context.return_value.__enter__.return_value = mock_session
             mock_context.return_value.__exit__.return_value = None
 
@@ -253,7 +253,7 @@ class TestDatabaseManager:
         """Test health check échoué"""
         manager = DatabaseManager()
 
-        with patch.object(manager, 'get_session_context') as mock_context:
+        with patch.object(manager, "get_session_context") as mock_context:
             mock_context.side_effect = Exception("Database unreachable")
 
             result = manager.health_check()
@@ -268,7 +268,7 @@ class TestUtilityFunctions:
         """Test get_db_session avec succès"""
         mock_session = Mock()
 
-        with patch.object(db_manager, 'get_session', return_value=mock_session):
+        with patch.object(db_manager, "get_session", return_value=mock_session):
             # Simuler l'usage du générateur
             session_gen = get_db_session()
             session = next(session_gen)
@@ -276,10 +276,8 @@ class TestUtilityFunctions:
             assert session is mock_session
 
             # Fermer le générateur normalement
-            try:
+            with contextlib.suppress(StopIteration):
                 next(session_gen)
-            except StopIteration:
-                pass
 
             mock_session.commit.assert_called_once()
             mock_session.close.assert_called_once()
@@ -288,15 +286,13 @@ class TestUtilityFunctions:
         """Test get_db_session avec exception"""
         mock_session = Mock()
 
-        with patch.object(db_manager, 'get_session', return_value=mock_session):
+        with patch.object(db_manager, "get_session", return_value=mock_session):
             session_gen = get_db_session()
-            session = next(session_gen)  # noqa: F841
+            next(session_gen)
 
             # Simuler une exception
-            try:
+            with contextlib.suppress(ValueError):
                 session_gen.throw(ValueError("Test error"))
-            except ValueError:
-                pass
 
             mock_session.rollback.assert_called_once()
             mock_session.close.assert_called_once()
@@ -310,13 +306,13 @@ class TestUtilityFunctions:
 class TestInitializationFunctions:
     """Tests pour les fonctions d'initialisation"""
 
-    @patch.object(db_manager, 'create_tables')
-    @patch.object(db_manager, 'health_check')
+    @patch.object(db_manager, "create_tables")
+    @patch.object(db_manager, "health_check")
     def test_init_database_success(self, mock_health_check, mock_create_tables):
         """Test initialisation réussie de la base de données"""
         mock_health_check.return_value = True
 
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings._ensure_directories = Mock()
 
             init_database()
@@ -325,13 +321,13 @@ class TestInitializationFunctions:
             mock_create_tables.assert_called_once()
             mock_health_check.assert_called_once()
 
-    @patch.object(db_manager, 'create_tables')
-    @patch.object(db_manager, 'health_check')
+    @patch.object(db_manager, "create_tables")
+    @patch.object(db_manager, "health_check")
     def test_init_database_health_check_failure(self, mock_health_check, mock_create_tables):
         """Test initialisation avec échec du health check"""
         mock_health_check.return_value = False
 
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings._ensure_directories = Mock()
 
             with pytest.raises(RuntimeError, match="Database health check failed"):
@@ -339,17 +335,19 @@ class TestInitializationFunctions:
 
     def test_init_database_no_settings(self):
         """Test initialisation sans settings configuré"""
-        with patch('backend.src.database.connection.config.settings', None):
-            with patch.object(db_manager, 'create_tables'):
-                with patch.object(db_manager, 'health_check', return_value=True):
-                    # Ne devrait pas lever d'erreur
-                    init_database()
+        with (
+            patch("backend.src.database.connection.config.settings", None),
+            patch.object(db_manager, "create_tables"),
+            patch.object(db_manager, "health_check", return_value=True),
+        ):
+            # Ne devrait pas lever d'erreur
+            init_database()
 
-    @patch.object(db_manager, 'drop_tables')
-    @patch.object(db_manager, 'create_tables')
+    @patch.object(db_manager, "drop_tables")
+    @patch.object(db_manager, "create_tables")
     def test_reset_database_success(self, mock_create_tables, mock_drop_tables):
         """Test reset réussi de la base de données"""
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings.is_production = False
 
             reset_database()
@@ -359,7 +357,7 @@ class TestInitializationFunctions:
 
     def test_reset_database_production_protection(self):
         """Test protection contre reset en production"""
-        with patch('backend.src.database.connection.config.settings') as mock_settings:
+        with patch("backend.src.database.connection.config.settings") as mock_settings:
             mock_settings.is_production = True
 
             with pytest.raises(RuntimeError, match="Database reset not allowed in production"):
@@ -367,8 +365,10 @@ class TestInitializationFunctions:
 
     def test_reset_database_no_settings(self):
         """Test reset sans settings configuré"""
-        with patch('backend.src.database.connection.config.settings', None):
-            with patch.object(db_manager, 'drop_tables'):
-                with patch.object(db_manager, 'create_tables'):
-                    # Ne devrait pas lever d'erreur
-                    reset_database()
+        with (
+            patch("backend.src.database.connection.config.settings", None),
+            patch.object(db_manager, "drop_tables"),
+            patch.object(db_manager, "create_tables"),
+        ):
+            # Ne devrait pas lever d'erreur
+            reset_database()
