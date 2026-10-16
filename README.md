@@ -1,6 +1,7 @@
 # Mimir - Chatbot Documentaire d'Entreprise
 
 ![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+[![CI](https://github.com/yannpointud/Mimir/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yannpointud/Mimir/actions/workflows/ci.yml?query=branch%3Amain)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.133-teal.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
@@ -373,7 +374,7 @@ Les tests de caractérisation (`tests/oracle/`) figent le comportement observabl
 
 `bash scripts/local_ci.sh` enchaîne ruff, mypy, pytest et pip-audit (outils installés depuis `requirements-dev.txt`).
 
-La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs Python ruff, mypy, pytest et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt` ; un job frontend (Node 22, `npm ci`) enchaîne ESLint, vitest, le build et `npm audit --omit=dev --audit-level=high`.
+La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request et après chaque fusion dans `main` (badge en tête du README) : quatre jobs Python ruff, mypy, pytest et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt` ; un job frontend (Node 22, `npm ci`) enchaîne ESLint, vitest, le build et `npm audit --omit=dev --audit-level=high`.
 
 **Dépendances**
 - `requirements.txt` (runtime seul, installé dans l'image Docker) et `requirements-dev.txt` (runtime, tests et outils de qualité) restent la source.

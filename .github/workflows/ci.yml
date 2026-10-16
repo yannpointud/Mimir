@@ -1,13 +1,17 @@
 name: CI
 
+# Pull requests are checked before merge; main is checked again after each
+# merge, which gives the status shown by the README badge.
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Every job installs from the hash-pinned requirements-dev.lock (runtime, test

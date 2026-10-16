@@ -137,4 +137,4 @@ http://localhost:8000/docs   # Swagger UI
 - ruff rules F, E9, B, SIM, UP, BLE, C90, TID (absolute imports only), I, RUF; ruff format
 - mypy with `disallow_untyped_defs` and `check_untyped_defs` on `backend/mimir`
 - pytest (`pytest.ini`) fails under 85 % coverage of `backend/mimir`, and a DeprecationWarning raised from `mimir` or `tests` is an error
-- CI jobs (`.github/workflows/ci.yml`): ruff, mypy, pytest, pip-audit, frontend (ESLint, vitest, build, `npm audit --omit=dev --audit-level=high`)
+- CI jobs (`.github/workflows/ci.yml`, on pull requests and after each merge into main): ruff, mypy, pytest, pip-audit, frontend (ESLint, vitest, build, `npm audit --omit=dev --audit-level=high`)
