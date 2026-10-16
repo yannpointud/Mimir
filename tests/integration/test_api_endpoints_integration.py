@@ -1,6 +1,6 @@
 """
-Tests d'intégration pour les endpoints API de Mimir
-Tests complets des fonctionnalités avec authentification, validation et cas d'erreur
+Integration tests of the Mimir API endpoints
+Feature tests with authentication, validation and error cases
 """
 
 import json
@@ -18,21 +18,20 @@ def _sse_events(body):
 
 
 class TestHealthEndpointsIntegration:
-    """Tests d'intégration pour les endpoints de santé du système"""
+    """Health endpoint integration tests"""
 
     def test_root_endpoint_structure(self, test_app):
-        """Test de l'endpoint racine avec vérification complète de la structure"""
         client = TestClient(test_app)
         response = client.get("/")
 
         assert response.status_code == 200
         data = response.json()
 
-        # Structure complète attendue
+        # Complete expected structure
         required_fields = {"name", "description", "version", "status"}
         assert all(field in data for field in required_fields)
 
-        # Validation des types et valeurs
+        # Type and value checks
         assert data["name"] == "Mimir"
         assert data["status"] == "running"
         assert isinstance(data["description"], str)
@@ -40,7 +39,6 @@ class TestHealthEndpointsIntegration:
         assert isinstance(data["version"], str)
 
     def test_basic_health_endpoint(self, test_app):
-        """Test du health check simple avec timing"""
         client = TestClient(test_app)
 
         start_time = time.time()
@@ -52,41 +50,39 @@ class TestHealthEndpointsIntegration:
         assert response.status_code in (200, 503)
         data = response.json()
 
-        # Vérifications structurelles
+        # Structural checks
         assert "status" in data
         assert "timestamp" in data
         assert "success" in data
 
-        # Vérifications de valeurs
+        # Value checks
         assert data["status"] in ["healthy", "unhealthy", "degraded"]
         assert isinstance(data["success"], bool)
 
         # Performance check
-        assert duration < 1.0  # Health check doit être rapide
+        assert duration < 1.0  # The health check must be fast
 
     def test_detailed_health_endpoint(self, test_app):
-        """Test du health check détaillé"""
         client = TestClient(test_app)
         response = client.get("/api/v1/health/")
 
-        # Accepte 200 (healthy) ou 503 (services non configurés)
+        # Accepts 200 (healthy) or 503 (services not configured)
         assert response.status_code in [200, 503]
         data = response.json()
 
-        # Structure attendue du health check détaillé
+        # Expected structure of the detailed health check
         expected_fields = {"status", "timestamp", "services", "version", "environment"}  # noqa: F841
         present_fields = set(data.keys())
 
-        # Au moins les champs de base doivent être présents
+        # At least the base fields must be present
         basic_fields = {"status", "timestamp"}
         assert basic_fields.issubset(present_fields)
 
 
 class TestAuthenticationIntegration:
-    """Tests d'intégration pour l'authentification"""
+    """Authentication integration tests"""
 
     def test_login_success_flow(self, test_app):
-        """Test du flow complet de connexion réussie"""
         client = TestClient(test_app)
 
         login_data = {"username": "admin", "password": "admin123"}
@@ -96,22 +92,21 @@ class TestAuthenticationIntegration:
         if response.status_code == 200:
             data = response.json()
 
-            # Structure de réponse JWT
+            # JWT response structure
             required_fields = {"access_token", "token_type", "user_type"}
             assert all(field in data for field in required_fields)
 
             assert data["token_type"] == "bearer"
             assert data["user_type"] == "admin"
             assert isinstance(data["access_token"], str)
-            assert len(data["access_token"]) > 50  # JWT doit être assez long
+            assert len(data["access_token"]) > 50  # The JWT must be long enough
 
             return data["access_token"]
         else:
-            # Si échec, vérifier que l'erreur est correcte
+            # On failure, check the error
             assert response.status_code == 401
 
     def test_login_failure_cases(self, test_app):
-        """Test des cas d'échec de connexion"""
         client = TestClient(test_app)
 
         # Cas 1: Mot de passe incorrect
@@ -126,12 +121,11 @@ class TestAuthenticationIntegration:
         )
         assert response.status_code == 401
 
-        # Cas 3: Données manquantes
+        # Case 3: missing data
         response = client.post("/api/v1/auth/login", json={"username": "admin"})
         assert response.status_code == 422
 
     def test_protected_endpoint_without_auth(self, test_app):
-        """Test d'accès aux endpoints protégés sans authentification"""
         client = TestClient(test_app)
 
         protected_endpoints = [
@@ -151,7 +145,7 @@ class TestAuthenticationIntegration:
 
 
 class TestChatEndpointIntegration:
-    """Tests d'intégration pour l'endpoint de chat"""
+    """Chat endpoint integration tests"""
 
     def test_chat_basic_functionality(self, test_app):
         """Test de base de l'endpoint de chat"""
@@ -182,19 +176,18 @@ class TestChatEndpointIntegration:
         assert response_time < 10.0
 
     def test_chat_with_session_persistence(self, test_app):
-        """Test de la persistance de session dans le chat"""
         client = TestClient(test_app)
 
         session_id = "test_session_123"
 
-        # Première question
+        # First question
         response1 = client.post(
             "/api/v1/chat/stream", json={"question": "Bonjour", "session_id": session_id}
         )
         assert response1.status_code == 200
         events1 = _sse_events(response1.text)
 
-        # Deuxième question avec même session
+        # Second question in the same session
         response2 = client.post(
             "/api/v1/chat/stream", json={"question": "Peux-tu répéter ?", "session_id": session_id}
         )
@@ -207,7 +200,6 @@ class TestChatEndpointIntegration:
         assert events1[0]["session_id"] == events2[0]["session_id"] == session_id
 
     def test_chat_input_validation(self, test_app):
-        """Test de validation des entrées du chat"""
         client = TestClient(test_app)
 
         # Question vide
@@ -242,18 +234,18 @@ class TestChatEndpointIntegration:
         assert response.status_code == 200
         data = response.json()
 
-        # Structure de réponse d'escalade
+        # Escalation response structure
         assert "success" in data
         assert "message" in data
         assert isinstance(data["success"], bool)
 
 
 class TestAdminEndpointsIntegration:
-    """Tests d'intégration pour les endpoints d'administration"""
+    """Administration endpoint integration tests"""
 
     @pytest.fixture
     def admin_token(self, test_app):
-        """Fixture pour obtenir un token admin valide"""
+        """Valid admin token"""
         client = TestClient(test_app)
         response = client.post(
             "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
@@ -262,16 +254,16 @@ class TestAdminEndpointsIntegration:
             return response.json()["access_token"]
         return None
 
-    # Tests admin supprimés - nécessitent une configuration complète avec authentification
-    # Ces tests sont couverts par les tests unitaires
+    # Admin tests removed - they need a full configuration with authentication
+    # These cases are covered by the unit tests
 
 
 class TestDocumentEndpointsIntegration:
-    """Tests d'intégration pour les endpoints de documents"""
+    """Document endpoint integration tests"""
 
     @pytest.fixture
     def admin_token(self, test_app):
-        """Fixture pour obtenir un token admin valide"""
+        """Valid admin token"""
         client = TestClient(test_app)
         response = client.post(
             "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
@@ -280,36 +272,33 @@ class TestDocumentEndpointsIntegration:
             return response.json()["access_token"]
         return None
 
-    # Tests documents supprimés - nécessitent une configuration complète avec authentification
-    # Ces tests sont couverts par les tests unitaires
+    # Document tests removed - they need a full configuration with authentication
+    # These cases are covered by the unit tests
     pass
 
 
 class TestErrorHandlingIntegration:
-    """Tests d'intégration pour la gestion d'erreurs"""
+    """Error handling integration tests"""
 
     def test_404_error_handling(self, test_app):
-        """Test de gestion des erreurs 404"""
         client = TestClient(test_app)
 
         response = client.get("/api/v1/nonexistent")
         assert response.status_code == 404
 
     def test_method_not_allowed_handling(self, test_app):
-        """Test de gestion des erreurs 405"""
         client = TestClient(test_app)
 
-        # POST sur un endpoint GET only
+        # POST on a GET-only endpoint
         response = client.post("/api/v1/health/")
         assert response.status_code == 405
 
     def test_validation_error_consistency(self, test_app):
-        """Test de cohérence des erreurs de validation"""
         client = TestClient(test_app)
 
-        # Plusieurs cas de validation échouée
+        # Several failed validations
         validation_cases = [
-            ("/api/v1/chat/stream", {}),  # Données manquantes
+            ("/api/v1/chat/stream", {}),  # Missing data
             ("/api/v1/auth/login", {"username": "admin"}),  # Password manquant
         ]
 
@@ -322,7 +311,7 @@ class TestErrorHandlingIntegration:
 
 
 class TestPerformanceIntegration:
-    """Tests d'intégration pour les performances"""
+    """Performance integration tests"""
 
     def test_concurrent_health_checks(self, test_app):
         """Test de health checks concurrents"""
@@ -338,7 +327,7 @@ class TestPerformanceIntegration:
             duration = time.time() - start
             results.append((response.status_code, duration))
 
-        # Lancer 5 health checks en parallèle
+        # Run 5 health checks in parallel
         threads = []
         for _ in range(5):
             thread = threading.Thread(target=health_check_worker)
@@ -348,15 +337,14 @@ class TestPerformanceIntegration:
         for thread in threads:
             thread.join()
 
-        # Tous doivent répondre et être rapides (200 healthy, 503 unhealthy
-        # dans l'environnement de test -- l'endpoint reste joignable)
+        # Every request must answer quickly (200 healthy, 503 unhealthy
+        # in the test environment -- the endpoint stays reachable)
         assert len(results) == 5
         for status_code, duration in results:
             assert status_code in (200, 503)
             assert duration < 2.0
 
     def test_api_response_times(self, test_app):
-        """Test des temps de réponse des endpoints critiques"""
         client = TestClient(test_app)
 
         endpoints_timing = [
@@ -375,20 +363,19 @@ class TestPerformanceIntegration:
 
             duration = time.time() - start_time
 
-            # Vérifier que la réponse est dans les temps
+            # Check that the response came in time
             assert duration < max_time, f"{endpoint} took {duration:.2f}s (max: {max_time}s)"
 
 
 class TestSecurityIntegration:
-    """Tests d'intégration pour la sécurité"""
+    """Security integration tests"""
 
     def test_cors_headers(self, test_app):
-        """Test de la présence des headers CORS"""
         client = TestClient(test_app)
 
         response = client.get("/", headers={"Origin": "http://localhost:3000"})
 
-        # Vérifier les headers CORS si configurés
+        # Check the CORS headers, if configured
         if "access-control-allow-origin" in response.headers:
             assert response.headers["access-control-allow-origin"] is not None
 
@@ -396,7 +383,7 @@ class TestSecurityIntegration:
         """Test de protection contre l'injection SQL"""
         client = TestClient(test_app)
 
-        # Tentatives d'injection dans le chat
+        # Injection attempts in the chat
         malicious_inputs = [
             "'; DROP TABLE documents; --",
             "' OR '1'='1",
@@ -405,20 +392,19 @@ class TestSecurityIntegration:
 
         for malicious_input in malicious_inputs:
             response = client.post("/api/v1/chat/stream", json={"question": malicious_input})
-            # Doit soit réussir normalement, soit échouer proprement
+            # Must either succeed or fail cleanly
             assert response.status_code in [200, 422]
 
     def test_rate_limiting_behavior(self, test_app):
-        """Test du comportement du rate limiting"""
         client = TestClient(test_app)
 
-        # Faire plusieurs requêtes rapides
+        # Send several quick requests
         responses = []
         for _ in range(10):
             response = client.get("/api/v1/health/")
             responses.append(response.status_code)
 
-        # Au moins quelques requêtes doivent passer (200 healthy ou 503
-        # unhealthy : les deux prouvent que le rate limiting n'a pas bloqué)
+        # At least some requests must succeed (200 healthy or 503
+        # unhealthy: both show that rate limiting did not block)
         success_count = sum(1 for status in responses if status in (200, 503))
         assert success_count > 0

@@ -1,5 +1,5 @@
 """
-Tests d'intégration pour la gestion centralisée des logs
+Integration tests of the centralized logging
 """
 
 import json  # noqa: F401
@@ -18,20 +18,19 @@ from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 
 
 class TestLoggingIntegration:
-    """Tests d'intégration pour le système de logging centralisé"""
+    """Integration tests of the centralized logging system"""
 
     @pytest.fixture
     def temp_log_dir(self):
-        """Répertoire temporaire pour les logs de test"""
+        """Temporary directory for the test logs"""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
 
     def test_logger_setup_and_configuration(self, temp_log_dir):
-        """Test de configuration du logger avec fichiers multiples"""
-        # Configurer un logger de test
+        # Configure a test logger
         logger = setup_logger("test_module")
 
-        # Vérifier que le logger est configuré
+        # Check that the logger is configured
         assert logger.name == "test_module"
         assert len(logger.handlers) >= 1  # Au moins console handler
 
@@ -40,12 +39,11 @@ class TestLoggingIntegration:
         logger.error("Test error message")
 
     def test_faiss_store_logging(self, temp_log_dir):
-        """Test du logging dans FaissVectorStore"""
         import numpy as np
 
         from mimir.rag_core.interfaces import Chunk
 
-        # Créer un store FAISS temporaire
+        # Create a temporary FAISS store
         index_path = temp_log_dir / "test.index"
         metadata_path = temp_log_dir / "test.json"
 
@@ -56,7 +54,7 @@ class TestLoggingIntegration:
             similarity_threshold=0.5,
         )
 
-        # Créer un chunk de test
+        # Create a test chunk
         chunk = Chunk(
             text="Test chunk for logging",
             embedding=np.random.rand(128).astype(np.float32),
@@ -67,61 +65,58 @@ class TestLoggingIntegration:
             metadata={"test": True},
         )
 
-        # Test des opérations avec logging
+        # Operations with logging
         success = store.upsert([chunk])
         assert success is True
 
-        # Test query avec logging
+        # Query with logging
         query_vector = np.random.rand(128).astype(np.float32)
         results = store.query(query_vector, top_k=5)  # noqa: F841
 
-        # Test health check avec logging
+        # Health check with logging
         is_healthy = store.health_check()
         assert isinstance(is_healthy, bool)
 
     @pytest.mark.asyncio
     async def test_mistral_api_logging(self):
-        """Test du logging dans MistralAPIService"""
-        # Créer un service avec API key de test
+        # Create a service with a test API key
         service = MistralAPIService(api_key="test_logging_key")
 
-        # Test health check qui génère des logs
+        # Health check that writes logs
         is_healthy = await service.health_check()
 
-        # Le service doit logger même en cas d'échec (API key invalide)
+        # The service must log even when it fails (invalid API key)
         assert isinstance(is_healthy, bool)
 
     def test_ingestion_pipeline_logging(self, temp_log_dir):
-        """Test du logging dans le pipeline d'ingestion"""
         from mimir.ingestion.chunking import ChunkingStrategy
         from mimir.ingestion.extractors import ExtractorFactory
 
-        # Créer un fichier de test
+        # Create a test file
         test_file = temp_log_dir / "logging_test.txt"
         test_file.write_text("This is a test document for logging validation. " * 10)
 
-        # Test extraction avec logging
+        # Extraction with logging
         factory = ExtractorFactory()
         extracted_text = factory.extract_text(str(test_file))
         assert len(extracted_text) > 0
 
-        # Test chunking avec logging
+        # Chunking with logging
         chunking = ChunkingStrategy()
         chunks = chunking.chunk_text(extracted_text)
         assert len(chunks) >= 1
 
 
-class TestJalon2AcceptanceCriteria:
-    """Tests d'acceptation pour les critères du Jalon 2"""
+class TestIngestionPipelineAcceptance:
+    """Acceptance tests of the ingestion pipeline"""
 
     @pytest.fixture
     def temp_workspace(self):
-        """Espace de travail temporaire pour les tests d'acceptation"""
+        """Temporary workspace for the acceptance tests"""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
 
-    def test_jalon2_component_initialization(self, temp_workspace):
-        """Critère: Tous les composants du Jalon 2 peuvent être initialisés"""
+    def test_component_initialization(self, temp_workspace):
         import numpy as np  # noqa: F401
 
         # 1. LLM Interface - Mistral API
@@ -153,8 +148,7 @@ class TestJalon2AcceptanceCriteria:
         assert chunking_strategy.config.chunk_size == 1000
         assert chunking_strategy.config.overlap == 120
 
-    def test_jalon2_text_extraction_workflow(self, temp_workspace):
-        """Critère: Le système peut extraire du texte des formats supportés"""
+    def test_text_extraction_workflow(self, temp_workspace):
         from mimir.ingestion.extractors import ExtractorFactory
 
         factory = ExtractorFactory()
@@ -176,14 +170,13 @@ class TestJalon2AcceptanceCriteria:
         assert "Test Document" in extracted_md
         assert "markdown document" in extracted_md
 
-    def test_jalon2_chunking_workflow(self, temp_workspace):
-        """Critère: Le système peut découper intelligemment les textes"""
+    def test_chunking_workflow(self, temp_workspace):
         from mimir.ingestion.chunking import ChunkingConfig, ChunkingStrategy
 
-        # Texte assez long pour nécessiter plusieurs chunks (doit dépasser max_chunk_size de 3000)
-        long_text = "This is a test document. " * 150  # ~3750 caractères
+        # Text long enough to need several chunks (must exceed the max_chunk_size of 3000)
+        long_text = "This is a test document. " * 150  # ~3750 characters
 
-        # Configuration selon les spécifications Jalon 2
+        # Configuration of the ingestion pipeline
         config = ChunkingConfig(
             chunk_size=1000, overlap=120, preserve_sentences=True, preserve_paragraphs=True
         )
@@ -191,10 +184,10 @@ class TestJalon2AcceptanceCriteria:
         strategy = ChunkingStrategy(config)
         chunks = strategy.chunk_text(long_text)
 
-        # Vérifications des critères Jalon 2
-        assert len(chunks) >= 1  # Au moins un chunk doit être créé
+        # Pipeline acceptance checks
+        assert len(chunks) >= 1  # At least one chunk must be created
 
-        # Chaque chunk doit respecter les critères
+        # Every chunk must meet the criteria
         for chunk in chunks:
             assert chunk["char_count"] <= config.max_chunk_size
             assert (
@@ -204,13 +197,12 @@ class TestJalon2AcceptanceCriteria:
             assert len(chunk["text"].strip()) > 0
             assert chunk["chunk_index"] < chunk["total_chunks"]
 
-    def test_jalon2_vector_storage_workflow(self, temp_workspace):
-        """Critère: Le système peut stocker et rechercher des vecteurs"""
+    def test_vector_storage_workflow(self, temp_workspace):
         import numpy as np
 
         from mimir.rag_core.interfaces import Chunk
 
-        # Créer un store FAISS
+        # Create a FAISS store
         index_path = temp_workspace / "workflow.index"
         metadata_path = temp_workspace / "workflow.json"
 
@@ -221,7 +213,7 @@ class TestJalon2AcceptanceCriteria:
             similarity_threshold=0.5,
         )
 
-        # Créer des chunks de test avec embeddings
+        # Create test chunks with embeddings
         test_chunks = []
         for i in range(5):
             embedding = np.random.rand(128).astype(np.float32)
@@ -241,7 +233,7 @@ class TestJalon2AcceptanceCriteria:
         assert success is True
 
         # Test de recherche (query)
-        query_vector = test_chunks[0].embedding + 0.01  # Proche du premier
+        query_vector = test_chunks[0].embedding + 0.01  # Close to the first one
         results = store.query(query_vector, top_k=3)
         assert len(results) > 0
 
@@ -249,12 +241,11 @@ class TestJalon2AcceptanceCriteria:
         persist_success = store.persist()
         assert persist_success is True
 
-        # Vérifier que les fichiers ont été créés (metadata_path est normalisé
-        # en .json par le store, quelle que soit l'extension passée en config)
+        # Check that the files were created
         assert index_path.exists()
         assert store.metadata_path.exists()
 
-        # Test de chargement dans un nouveau store
+        # Load into a new store
         new_store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
@@ -262,20 +253,19 @@ class TestJalon2AcceptanceCriteria:
         load_success = new_store.load()
         assert load_success is True
 
-        # Tester que les données ont été chargées
+        # The data was loaded
         query_results = new_store.query(query_vector, top_k=3)
         assert len(query_results) > 0
 
     @pytest.mark.integration
-    def test_jalon2_end_to_end_pipeline(self, temp_workspace):
-        """Test d'acceptation complet du pipeline Jalon 2"""
+    def test_end_to_end_pipeline(self, temp_workspace):
         import numpy as np
 
         from mimir.ingestion.chunking import ChunkingStrategy
         from mimir.ingestion.extractors import ExtractorFactory
         from mimir.rag_core.interfaces import Chunk
 
-        # 1. Préparation des données
+        # 1. Prepare the data
         test_document = temp_workspace / "end_to_end_test.txt"
         document_content = """
         Intelligence Artificielle et Machine Learning
@@ -304,10 +294,10 @@ class TestJalon2AcceptanceCriteria:
         chunks_data = strategy.chunk_text(extracted_text, source=str(test_document))
         assert len(chunks_data) >= 1
 
-        # 4. Simulation d'embeddings (normalement généré par Mistral)
+        # 4. Simulated embeddings (generated by Mistral in production)
         chunks = []
         for chunk_data in chunks_data:
-            # Simuler un embedding (en prod, généré par MistralAPIService)
+            # Simulated embedding (generated by MistralAPIService in production)
             simulated_embedding = np.random.rand(128).astype(np.float32)
 
             chunk = Chunk(
@@ -337,12 +327,12 @@ class TestJalon2AcceptanceCriteria:
         results = store.query(query_vector, top_k=3)
         assert len(results) > 0
 
-        # 7. Persistance et récupération
+        # 7. Persistence and reload
         store.persist()
         assert index_path.exists()
         assert store.metadata_path.exists()
 
-        # Test de récupération complète
+        # Full reload
         new_store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )

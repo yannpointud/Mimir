@@ -1,7 +1,7 @@
 """
-Tests unitaires supplémentaires pour le module cache/lru_cache.py
+More unit tests of cache/lru_cache.py
 
-Ces tests couvrent les cas d'edge et fonctionnalités avancées du cache.
+Edge cases and advanced features of the cache.
 """
 
 import threading
@@ -12,45 +12,42 @@ from mimir.cache.lru_cache import CacheService
 
 
 class TestCacheServiceAdvanced:
-    """Tests avancés pour CacheService."""
+    """Advanced tests of CacheService."""
 
     def test_cache_service_custom_ttl(self):
-        """Test avec TTL personnalisé."""
-        cache = CacheService(max_size=10, ttl_seconds=1)  # TTL très court
+        cache = CacheService(max_size=10, ttl_seconds=1)  # Very short TTL
 
-        # Ajouter une entrée
+        # Add an entry
         cache.set("key1", "value1")
         assert cache.get("key1") == "value1"
 
-        # Attendre expiration
+        # Wait for the expiration
         time.sleep(1.1)
 
-        # La valeur devrait avoir expiré
+        # The value should have expired
         assert cache.get("key1") is None
         assert cache._stats["misses"] == 1
 
     def test_cache_service_eviction(self):
-        """Test d'éviction avec cache plein."""
-        cache = CacheService(max_size=2)  # Cache très petit
+        cache = CacheService(max_size=2)  # Very small cache
 
-        # Remplir le cache
+        # Fill the cache
         cache.set("key1", "value1")
         cache.set("key2", "value2")
 
-        # Vérifier que les deux sont présents
+        # Check that both are present
         assert cache.get("key1") == "value1"
         assert cache.get("key2") == "value2"
 
-        # Ajouter une troisième entrée (devrait évincer la première)
+        # Add a third entry (should evict the first one)
         cache.set("key3", "value3")
 
-        # key1 devrait être évincée
+        # key1 should be evicted
         assert cache.get("key1") is None
         assert cache.get("key2") == "value2"
         assert cache.get("key3") == "value3"
 
     def test_cache_service_stats_tracking(self):
-        """Test du suivi des statistiques."""
         cache = CacheService(max_size=5)
 
         # Test hits et misses
@@ -81,82 +78,78 @@ class TestCacheServiceAdvanced:
                 retrieved = cache.get(key)
                 results.append((key, value, retrieved))
 
-        # Créer plusieurs threads
+        # Create several threads
         threads = []
         for i in range(5):
             thread = threading.Thread(target=worker, args=(i,))
             threads.append(thread)
             thread.start()
 
-        # Attendre que tous les threads se terminent
+        # Wait for every thread to finish
         for thread in threads:
             thread.join()
 
-        # Vérifier que toutes les opérations ont réussi
+        # Check that every operation succeeded
         for _key, original_value, retrieved_value in results:
             assert original_value == retrieved_value
 
     def test_cache_service_update_existing_key(self):
-        """Test de mise à jour d'une clé existante."""
         cache = CacheService(max_size=10)
 
-        # Ajouter une entrée
+        # Add an entry
         cache.set("key1", "value1")
         assert cache.get("key1") == "value1"
 
-        # Mettre à jour la même clé
+        # Update the same key
         cache.set("key1", "value2")
         assert cache.get("key1") == "value2"
 
-        # La taille du cache ne devrait pas avoir augmenté
+        # The cache size should not have grown
         assert len(cache._cache) == 1
 
     def test_cache_service_clear_functionality(self):
-        """Test de la fonctionnalité de nettoyage."""
         cache = CacheService(max_size=10)
 
-        # Ajouter plusieurs entrées
+        # Add several entries
         for i in range(5):
             cache.set(f"key{i}", f"value{i}")
 
         assert len(cache._cache) == 5
 
-        # Nettoyer le cache (utiliser invalidate_all au lieu de clear)
+        # Clear the cache
         cache.invalidate_all()
 
         assert len(cache._cache) == 0
         assert len(cache._expiry_times) == 0
 
-        # Vérifier que les clés ne sont plus accessibles
+        # Check that the keys are no longer reachable
         for i in range(5):
             assert cache.get(f"key{i}") is None
 
     def test_cache_service_contains_check(self):
-        """Test de vérification d'existence de clé."""
         cache = CacheService(max_size=10)
 
-        # Fonction helper pour contains (puisque cette méthode n'existe pas)
+        # contains() helper (the method does not exist)
         def contains(cache, key):
             return cache.get(key) is not None
 
-        # Clé inexistante
+        # Missing key
         assert not contains(cache, "nonexistent")
 
-        # Ajouter une clé
+        # Add a key
         cache.set("existing_key", "value")
         assert contains(cache, "existing_key")
 
-        # Clé expirée
+        # Expired key
         cache.set("expiring_key", "value")
-        # Simuler expiration
+        # Simulate the expiration
         cache._expiry_times["expiring_key"] = datetime.now() - timedelta(seconds=3600)
         assert not contains(cache, "expiring_key")
 
     def test_cache_service_get_stats(self):
-        """Test de récupération des statistiques."""
         cache = CacheService(max_size=10)
 
-        # Opérations de test
+        # Test operations
         cache.set("key1", "value1")
         cache.get("key1")  # hit
         cache.get("key2")  # miss
@@ -166,27 +159,26 @@ class TestCacheServiceAdvanced:
         assert stats["hits"] == 1
         assert stats["misses"] == 1
         assert stats["total_requests"] == 2
-        # Le nom réel du champ est hit_rate_percent, pas hit_rate
+        # The actual field name is hit_rate_percent, not hit_rate
         assert "hit_rate_percent" in stats
         assert stats["hit_rate_percent"] == 50.0  # 1/2 * 100
-        assert "size" in stats  # Le nom réel du champ est size, pas cache_size
+        assert "size" in stats  # The actual field name is size, not cache_size
         assert stats["size"] == 1
 
     def test_cache_service_cleanup_expired(self):
-        """Test de nettoyage des entrées expirées."""
         cache = CacheService(max_size=10, ttl_seconds=1)
 
-        # Ajouter des entrées
+        # Add entries
         cache.set("key1", "value1")
         cache.set("key2", "value2")
 
-        # Simuler expiration pour key1
+        # Simulate the expiration of key1
         cache._expiry_times["key1"] = datetime.now() - timedelta(seconds=2)
 
-        # Déclencher nettoyage (utiliser cleanup_expired au lieu de _cleanup_expired)
+        # Trigger the cleanup
         expired_count = cache.cleanup_expired()
 
-        # key1 devrait être supprimée, key2 devrait rester
+        # key1 should be removed, key2 should stay
         assert "key1" not in cache._cache
         assert "key2" in cache._cache
         assert "key1" not in cache._expiry_times
@@ -194,37 +186,35 @@ class TestCacheServiceAdvanced:
         assert expired_count == 1
 
     def test_cache_service_memory_efficiency(self):
-        """Test d'efficacité mémoire avec beaucoup d'entrées."""
         cache = CacheService(max_size=1000)
 
-        # Ajouter beaucoup d'entrées
+        # Add many entries
         for i in range(1500):  # Plus que max_size
             cache.set(f"key_{i:04d}", f"value_{i:04d}")
 
-        # Le cache ne devrait jamais dépasser max_size
+        # The cache must never exceed max_size
         assert len(cache._cache) <= 1000
 
-        # Les entrées récentes devraient être présentes
+        # The recent entries should be present
         for i in range(1400, 1500):
             assert cache.get(f"key_{i:04d}") == f"value_{i:04d}"
 
     def test_cache_service_edge_cases(self):
-        """Test des cas limites."""
         cache = CacheService(max_size=1)  # Cache de taille 1
 
-        # Fonction helper pour contains
+        # contains() helper
         def contains(cache, key):
             return cache.get(key) is not None
 
-        # Ajouter None comme valeur
+        # Add None as a value
         cache.set("null_key", None)
         assert cache.get("null_key") is None
-        # Problème: get() retourne None aussi pour les clés inexistantes
-        # Donc on ne peut pas distinguer None stocké de clé inexistante
-        # On teste plutôt en regardant directement dans le cache
+        # get() also returns None for missing keys
+        # So a stored None cannot be told apart from a missing key
+        # Check the cache directly instead
         assert "null_key" in cache._cache
 
-        # Clé vide
+        # Empty key
         cache.set("", "empty_key_value")
         assert cache.get("") == "empty_key_value"
 
@@ -233,11 +223,10 @@ class TestCacheServiceAdvanced:
         assert cache.get("empty_value") == ""
 
     def test_cache_service_concurrent_access(self):
-        """Test d'accès concurrent intensif."""
         cache = CacheService(max_size=50)
         errors = []
 
-        # Fonction helper pour contains
+        # contains() helper
         def contains(cache, key):
             return cache.get(key) is not None
 
@@ -245,7 +234,7 @@ class TestCacheServiceAdvanced:
             try:
                 for i in range(100):
                     key = f"worker_{worker_id}_item_{i}"
-                    # Mélange d'opérations
+                    # Mixed operations
                     cache.set(key, f"value_{i}")
                     if i % 2 == 0:
                         cache.get(key)
@@ -266,14 +255,13 @@ class TestCacheServiceAdvanced:
         for thread in threads:
             thread.join()
 
-        # Aucune erreur ne devrait s'être produite
+        # No error should have occurred
         assert len(errors) == 0, f"Errors occurred: {errors}"
 
     def test_cache_service_performance_characteristics(self):
-        """Test des caractéristiques de performance."""
         cache = CacheService(max_size=1000)
 
-        # Mesurer le temps pour de nombreuses opérations
+        # Measure the time of many operations
         start_time = time.time()
 
         for i in range(1000):
@@ -288,37 +276,36 @@ class TestCacheServiceAdvanced:
 
         get_time = time.time() - start_time
 
-        # Les opérations devraient être rapides (< 1s pour 1000 opérations)
+        # The operations should be fast (< 1s for 1000 operations)
         assert set_time < 1.0, f"Set operations too slow: {set_time}s"
         assert get_time < 1.0, f"Get operations too slow: {get_time}s"
 
 
 class TestCacheServiceIntegration:
-    """Tests d'intégration pour CacheService."""
+    """Integration tests of CacheService."""
 
     def test_cache_service_realistic_usage(self):
-        """Test d'usage réaliste du cache."""
         cache = CacheService(max_size=20, ttl_seconds=5)
 
-        # Simuler des requêtes répétées
+        # Simulate repeated requests
         questions = [
             "What is machine learning?",
             "How does neural network work?",
             "What is deep learning?",
             "Explain reinforcement learning",
-            "What is machine learning?",  # Répétée
+            "What is machine learning?",  # Repeated
         ]
 
-        # Première passe - cache misses
+        # First pass - cache misses
         for _i, question in enumerate(questions):
             key = cache._generate_key(question)
             result = cache.get(key)
             if result is None:
-                # Simuler génération de réponse
+                # Simulate an answer
                 response = f"Generated response for: {question}"
                 cache.set(key, response)
 
-        # Deuxième passe - certaines devraient être des hits
+        # Second pass - some should be hits
         hit_count = 0
         for question in questions:
             key = cache._generate_key(question)
@@ -326,7 +313,7 @@ class TestCacheServiceIntegration:
             if result is not None:
                 hit_count += 1
 
-        # Au moins la question répétée devrait être un hit
+        # At least the repeated question should be a hit
         assert hit_count > 0
 
         stats = cache.get_stats()
@@ -334,25 +321,24 @@ class TestCacheServiceIntegration:
         assert stats["total_requests"] > len(questions)
 
     def test_cache_service_with_context(self):
-        """Test du cache avec contexte."""
         cache = CacheService(max_size=10)
 
         question = "What is AI?"
         context1 = "Machine learning context"
         context2 = "Computer vision context"
 
-        # Même question avec contextes différents
+        # Same question with different contexts
         key1 = cache._generate_key(question, context1)
         key2 = cache._generate_key(question, context2)
 
-        # Les clés devraient être différentes
+        # The keys should differ
         assert key1 != key2
 
-        # Stocker des réponses différentes
+        # Store different answers
         cache.set(key1, "AI in ML context")
         cache.set(key2, "AI in CV context")
 
-        # Récupérer les bonnes réponses
+        # Get the expected answers
         assert cache.get(key1) == "AI in ML context"
         assert cache.get(key2) == "AI in CV context"
 
@@ -360,7 +346,7 @@ class TestCacheServiceIntegration:
         """Test de gestion d'erreurs robuste."""
         cache = CacheService(max_size=10)
 
-        # Tester avec des types de données variés
+        # Various data types
         test_data = [
             ("string_key", "string_value"),
             ("int_key", 42),

@@ -17,7 +17,7 @@ from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 
 @pytest.fixture
 def mistral_service():
-    """Instance MistralAPIService pour les tests"""
+    """MistralAPIService instance"""
     return MistralAPIService(
         api_key="test_api_key",
         model="mistral-small-latest",

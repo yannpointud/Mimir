@@ -31,7 +31,6 @@ class TestLightFrenchTokenizer:
     """Tokenizer: accent fold + exact-term preservation, no stemming/stopwords."""
 
     def test_accent_fold_produces_matching_tokens(self):
-        """Café == cafe == CAFÉ collapse to the same token."""
         assert light_french_tokenizer(["Café", "cafe", "CAFÉ"]) == [["cafe"], ["cafe"], ["cafe"]]
 
     def test_exact_identifier_preserved_no_stemming(self):
@@ -48,7 +47,6 @@ class TestLightFrenchTokenizer:
             assert word in tokens
 
     def test_various_accents_folded(self):
-        """à ç è ê ï ô ù all fold to their base letters."""
         tokens = light_french_tokenizer(["àçèêïôù"])[0]
         assert tokens == ["aceeiou"]
 

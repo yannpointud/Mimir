@@ -287,7 +287,7 @@ class TestCleanupPerformance:
     @pytest.mark.performance
     def test_rebuild_optimization_performance(self, vector_store):
         """Performance test for optimization/rebuild"""
-        # Create a dataset avec beaucoup de chunks supprimés
+        # Create a dataset with many deleted chunks
         chunks = self.create_test_chunks(num_docs=2000, chunks_per_doc=5)
         vector_store.upsert(chunks)
 
@@ -358,7 +358,7 @@ class TestCleanupStressTest:
         for cycle in range(num_cycles):
             print(f"\\nStress test cycle {cycle + 1}/{num_cycles}")
 
-            # Ajouter de nouveaux documents
+            # Add new documents
             chunks = []
             for doc_id in range(cycle * docs_per_cycle, (cycle + 1) * docs_per_cycle):
                 for chunk_idx in range(chunks_per_doc):
@@ -376,9 +376,9 @@ class TestCleanupStressTest:
 
             vector_store.upsert(chunks)
 
-            # Nettoyer les documents des cycles précédents (les rendre orphelins)
+            # Clean the documents of previous cycles (making them orphans)
             if cycle > 0:
-                # Garder seulement les documents du cycle actuel
+                # Keep only the documents of the current cycle
                 existing_docs = {
                     str(i) for i in range(cycle * docs_per_cycle, (cycle + 1) * docs_per_cycle)
                 }
@@ -394,7 +394,7 @@ class TestCleanupStressTest:
                     f"Cycle {cycle}: cleaned {result['cleaned_chunks']} chunks in {cleanup_time:.2f}s"
                 )
 
-        # Analyser les résultats
+        # Analyze the results
         if cleanup_times:
             avg_cleanup_time = statistics.mean(cleanup_times)
             max_cleanup_time = max(cleanup_times)
@@ -410,5 +410,5 @@ class TestCleanupStressTest:
 
 
 if __name__ == "__main__":
-    # Lancer les tests de performance
+    # Run the performance tests
     pytest.main([__file__, "-v", "-m", "performance", "--tb=short"])

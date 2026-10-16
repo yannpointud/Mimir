@@ -1,8 +1,8 @@
 """
-Tests pour l'authentification middleware.
+Authentication middleware tests.
 
-Ce module teste les composants d'authentification JWT, incluant
-les tokens bearer, les dépendances utilisateur et les vérifications admin.
+Tests of the JWT authentication components, including
+bearer tokens, user dependencies and admin checks.
 """
 
 from unittest.mock import Mock, patch
@@ -20,21 +20,18 @@ from mimir.auth.middleware import (
 
 
 class TestJWTBearer:
-    """Tests pour la classe JWTBearer."""
+    """JWTBearer tests."""
 
     def test_init_default(self):
-        """Test d'initialisation par défaut."""
         bearer = JWTBearer()
         assert bearer.auto_error is True
 
     def test_init_custom(self):
-        """Test d'initialisation avec paramètres personnalisés."""
         bearer = JWTBearer(auto_error=False)
         assert bearer.auto_error is False
 
     @pytest.mark.asyncio
     async def test_call_valid_bearer_token(self):
-        """Test avec un token Bearer valide."""
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
 
@@ -57,7 +54,6 @@ class TestJWTBearer:
 
     @pytest.mark.asyncio
     async def test_call_invalid_scheme(self):
-        """Test avec un schéma d'authentification invalide."""
         mock_request = Mock(spec=Request)
 
         with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
@@ -76,7 +72,6 @@ class TestJWTBearer:
 
     @pytest.mark.asyncio
     async def test_call_invalid_token(self):
-        """Test avec un token invalide."""
         mock_request = Mock(spec=Request)
 
         with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
@@ -98,7 +93,6 @@ class TestJWTBearer:
 
     @pytest.mark.asyncio
     async def test_call_no_credentials(self):
-        """Test sans credentials."""
         mock_request = Mock(spec=Request)
 
         with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
@@ -111,7 +105,6 @@ class TestJWTBearer:
 
     @pytest.mark.asyncio
     async def test_call_jwt_handler_exception(self):
-        """Test avec exception du JWT handler."""
         mock_request = Mock(spec=Request)
 
         with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
@@ -132,11 +125,10 @@ class TestJWTBearer:
 
 
 class TestGetCurrentUser:
-    """Tests pour la fonction get_current_user."""
+    """get_current_user tests."""
 
     @pytest.mark.asyncio
     async def test_get_current_user_valid_token(self):
-        """Test avec un token valide."""
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         payload = {
@@ -152,13 +144,12 @@ class TestGetCurrentUser:
 
         result = await get_current_user(mock_request, mock_credentials)
 
-        # get_current_user retourne seulement certains champs du payload
+        # get_current_user returns only some fields of the payload
         expected = {"user_type": "admin", "sub": "admin123", "exp": 1234567890, "iat": 1234567800}
         assert result == expected
 
     @pytest.mark.asyncio
     async def test_get_current_user_invalid_token(self):
-        """Test avec un token invalide."""
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         mock_request.state.jwt_payload = None
@@ -175,11 +166,10 @@ class TestGetCurrentUser:
 
 
 class TestRequireAdmin:
-    """Tests pour la fonction require_admin."""
+    """require_admin tests."""
 
     @pytest.mark.asyncio
     async def test_require_admin_valid_admin(self):
-        """Test avec un utilisateur admin valide."""
         current_user = {
             "user_type": "admin",
             "sub": "admin123",
@@ -192,7 +182,6 @@ class TestRequireAdmin:
 
     @pytest.mark.asyncio
     async def test_require_admin_non_admin(self):
-        """Test avec un utilisateur non admin."""
         current_user = {"user_type": "user", "sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
@@ -203,7 +192,6 @@ class TestRequireAdmin:
 
     @pytest.mark.asyncio
     async def test_require_admin_missing_user_type(self):
-        """Test avec user_type manquant."""
         current_user = {"sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
@@ -214,7 +202,6 @@ class TestRequireAdmin:
 
     @pytest.mark.asyncio
     async def test_require_admin_none_user_type(self):
-        """Test avec user_type None."""
         current_user = {"user_type": None, "sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
@@ -225,7 +212,6 @@ class TestRequireAdmin:
 
     @pytest.mark.asyncio
     async def test_require_admin_empty_user_type(self):
-        """Test avec user_type vide."""
         current_user = {"user_type": "", "sub": "user123", "exp": 1234567890, "iat": 1234567800}
 
         with pytest.raises(HTTPException) as exc_info:
@@ -236,9 +222,8 @@ class TestRequireAdmin:
 
     @pytest.mark.asyncio
     async def test_require_admin_case_sensitive(self):
-        """Test que la vérification admin est sensible à la casse."""
         current_user = {
-            "user_type": "Admin",  # Casse différente
+            "user_type": "Admin",  # Different case
             "sub": "user123",
             "exp": 1234567890,
             "iat": 1234567800,
@@ -252,7 +237,6 @@ class TestRequireAdmin:
 
     @pytest.mark.asyncio
     async def test_require_admin_malformed_user(self):
-        """Test avec un dictionnaire utilisateur malformé."""
         current_user = {}
 
         with pytest.raises(HTTPException) as exc_info:
@@ -263,11 +247,10 @@ class TestRequireAdmin:
 
 
 class TestMiddlewareIntegration:
-    """Tests d'intégration pour les middleware d'authentification."""
+    """Integration tests of the authentication middleware."""
 
     @pytest.mark.asyncio
     async def test_full_authentication_flow_success(self):
-        """Test du flux complet d'authentification réussi."""
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
 
@@ -308,7 +291,6 @@ class TestMiddlewareIntegration:
 
     @pytest.mark.asyncio
     async def test_full_authentication_flow_non_admin(self):
-        """Test du flux complet avec utilisateur non admin."""
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
 
@@ -351,7 +333,6 @@ class TestMiddlewareIntegration:
 
     @pytest.mark.asyncio
     async def test_logging_behavior(self):
-        """Test du comportement de logging."""
         mock_request = Mock(spec=Request)
 
         with patch("fastapi.security.HTTPBearer.__call__") as mock_parent_call:
@@ -372,11 +353,10 @@ class TestMiddlewareIntegration:
 
 
 class TestGetOptionalUser:
-    """Tests pour la fonction get_optional_user."""
+    """get_optional_user tests."""
 
     @pytest.mark.asyncio
     async def test_get_optional_user_no_credentials(self):
-        """Test avec credentials None - doit retourner None."""
         mock_request = Mock(spec=Request)
 
         result = await get_optional_user(mock_request, None)
@@ -385,9 +365,10 @@ class TestGetOptionalUser:
 
     @pytest.mark.asyncio
     async def test_get_optional_user_no_payload(self):
-        """Test avec payload absent - doit retourner None."""
         mock_request = Mock(spec=Request)
-        mock_request.state = type("State", (), {})()  # Créer un objet sans attribut jwt_payload
+        mock_request.state = type(
+            "State", (), {}
+        )()  # Create an object without a jwt_payload attribute
 
         mock_credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="some_token")
 
@@ -397,7 +378,6 @@ class TestGetOptionalUser:
 
     @pytest.mark.asyncio
     async def test_get_optional_user_valid_token(self):
-        """Test avec token valide - doit retourner les infos user."""
         mock_request = Mock(spec=Request)
         mock_request.state = Mock()
         payload = {

@@ -1,5 +1,5 @@
 """
-Tests unitaires pour le système de logging centralisé
+Unit tests of the centralized logging system
 """
 
 import json
@@ -15,7 +15,7 @@ from mimir.monitoring.logger import (
 
 
 class TestJSONFormatter:
-    """Tests pour le formateur JSON"""
+    """JSON formatter tests"""
 
     def test_json_formatter_basic(self):
         """Test de formatage de base"""
@@ -48,7 +48,6 @@ class TestJSONFormatter:
         assert "timestamp" in log_data
 
     def test_json_formatter_with_extra_fields(self):
-        """Test de formatage avec champs supplémentaires"""
         formatter = JSONFormatter()
         record = logging.LogRecord(
             name="test",
@@ -73,7 +72,6 @@ class TestJSONFormatter:
         assert log_data["action"] == "login"
 
     def test_json_formatter_with_exception(self):
-        """Test de formatage avec exception"""
         formatter = JSONFormatter()
 
         try:
@@ -155,7 +153,7 @@ class TestJSONFormatter:
 
 
 class TestConsoleFormatter:
-    """Tests pour le formateur console"""
+    """Console formatter tests"""
 
     def test_console_formatter_basic(self):
         """Test de formatage console de base"""
@@ -179,7 +177,7 @@ class TestConsoleFormatter:
 
 
 class TestSetupLogger:
-    """Tests pour la configuration des loggers"""
+    """Logger configuration tests"""
 
     def test_setup_logger_basic(self):
         """Test de configuration de base"""
@@ -190,54 +188,49 @@ class TestSetupLogger:
         assert len(logger.handlers) > 0
 
     def test_setup_logger_with_level(self):
-        """Test de configuration avec niveau spécifique"""
         logger = setup_logger("test_logger", level="DEBUG")
 
         assert logger.level == logging.DEBUG
 
     def test_setup_logger_singleton(self):
-        """Test que setup_logger renvoie le même logger pour le même nom"""
         logger1 = setup_logger("same_logger")
         logger2 = setup_logger("same_logger")
 
         assert logger1 is logger2
 
     def test_setup_logger_with_file_handler(self):
-        """Test de configuration avec handler de fichier"""
-        # Le setup_logger n'accepte pas de paramètre log_file, on teste juste la création
+        # setup_logger takes no log_file parameter: only its creation is tested
         logger = setup_logger("file_logger")
 
-        # Vérifier qu'un handler de fichier existe (créé automatiquement)
+        # Check that a file handler exists (created automatically)
         file_handlers = [h for h in logger.handlers if hasattr(h, "baseFilename")]
         assert len(file_handlers) > 0
 
 
 class TestLoggerIntegration:
-    """Tests d'intégration du système de logging"""
+    """Integration tests of the logging system"""
 
     def test_end_to_end_logging(self):
-        """Test d'intégration complète du logging"""
-        # Configuration du logger
+        # Logger configuration
         logger = setup_logger("integration_test")
 
-        # Test des différents niveaux de log
+        # The different log levels
         logger.debug("Debug message")
         logger.info("Info message")
         logger.warning("Warning message")
         logger.error("Error message")
         logger.critical("Critical message")
 
-        # Vérifier que le logger a bien été configuré avec des handlers
+        # Check that the logger has handlers
         assert len(logger.handlers) > 0
 
-        # Vérifier que les logs par défaut sont créés dans ./logs
+        # Check that the default logs are created in ./logs
         log_dir = Path("./logs")
         if log_dir.exists():
             log_files = list(log_dir.glob("*.log"))
             assert len(log_files) > 0
 
     def test_multiple_loggers_independence(self):
-        """Test que plusieurs loggers sont indépendants"""
         logger1 = setup_logger("module1")
         logger2 = setup_logger("module2")
 

@@ -1,5 +1,5 @@
 """
-Tests unitaires pour l'interface LLM et l'implémentation Mistral API - Version corrigée
+Unit tests of the LLM interface and of the Mistral API implementation
 """
 
 from unittest.mock import AsyncMock, Mock, patch
@@ -20,19 +20,17 @@ from mimir.llm_interface.interfaces import (
 
 
 class TestAbstractLLMService:
-    """Tests pour l'interface abstraite LLMService"""
+    """Tests of the abstract LLMService interface"""
 
     def test_abstract_class_cannot_be_instantiated(self):
-        """L'interface abstraite ne peut pas être instanciée"""
         with pytest.raises(TypeError):
             AbstractLLMService()
 
 
 class TestGenerationResponse:
-    """Tests pour la classe GenerationResponse"""
+    """GenerationResponse tests"""
 
     def test_generation_response_creation(self):
-        """Test de création d'une réponse de génération"""
         response = GenerationResponse(
             content="Hello world",
             model="mistral-small-latest",
@@ -47,10 +45,9 @@ class TestGenerationResponse:
 
 
 class TestEmbeddingResponse:
-    """Tests pour la classe EmbeddingResponse"""
+    """EmbeddingResponse tests"""
 
     def test_embedding_response_creation(self):
-        """Test de création d'une réponse d'embedding"""
         embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
         response = EmbeddingResponse(embeddings=embeddings, model="mistral-embed", usage_tokens=20)
 
@@ -60,16 +57,14 @@ class TestEmbeddingResponse:
 
 
 class TestLLMExceptions:
-    """Tests pour les exceptions LLM"""
+    """LLM exception tests"""
 
     def test_llm_exception_hierarchy(self):
-        """Test de la hiérarchie des exceptions"""
         assert issubclass(LLMAPIError, LLMException)
         assert issubclass(LLMRateLimitError, LLMException)
         assert issubclass(LLMInvalidRequestError, LLMException)
 
     def test_exception_messages(self):
-        """Test des messages d'exception"""
         exc = LLMAPIError("API connection failed")
         assert str(exc) == "API connection failed"
 
@@ -78,11 +73,11 @@ class TestLLMExceptions:
 
 
 class TestMistralAPIService:
-    """Tests pour l'implémentation MistralAPIService"""
+    """MistralAPIService tests"""
 
     @pytest.fixture
     def mistral_service(self):
-        """Instance MistralAPIService pour les tests"""
+        """MistralAPIService instance"""
         return MistralAPIService(
             api_key="test_api_key", model="mistral-small-latest", embedding_model="mistral-embed"
         )
@@ -96,7 +91,6 @@ class TestMistralAPIService:
         assert service._embedding_model == "mistral-embed"
 
     def test_mistral_api_custom_config(self):
-        """Test avec configuration personnalisée"""
         service = MistralAPIService(
             api_key="test_key",
             model="custom-model",
@@ -112,7 +106,6 @@ class TestMistralAPIService:
 
     @pytest.mark.asyncio
     async def test_generate_success(self, mistral_service):
-        """Test de génération réussie"""
         mock_response_data = {
             "choices": [
                 {"message": {"content": "Hello, how can I help you?"}, "finish_reason": "stop"}
@@ -138,7 +131,6 @@ class TestMistralAPIService:
 
     @pytest.mark.asyncio
     async def test_embed_success(self, mistral_service):
-        """Test d'embedding réussi"""
         mock_response_data = {
             "data": [{"embedding": [0.1, 0.2, 0.3]}, {"embedding": [0.4, 0.5, 0.6]}],
             "model": "mistral-embed",
@@ -162,7 +154,6 @@ class TestMistralAPIService:
 
     @pytest.mark.asyncio
     async def test_health_check_success(self, mistral_service):
-        """Test de health check réussi"""
         with patch.object(mistral_service, "_make_request") as mock_request:
             mock_request.return_value = {
                 "choices": [{"message": {"content": "test"}}],
@@ -177,7 +168,6 @@ class TestMistralAPIService:
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self, mistral_service):
-        """Test de health check en échec"""
         with patch.object(mistral_service, "_make_request") as mock_request:
             mock_request.side_effect = LLMAPIError("Connection failed")
 
@@ -205,14 +195,14 @@ class TestMistralAPIService:
     @pytest.mark.asyncio
     async def test_rate_limit_error(self, mistral_service):
         """Test d'erreur de limite de taux"""
-        # Patch asyncio.sleep pour éviter d'attendre réellement
+        # Patch asyncio.sleep to avoid real waits
         with (
             patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
             patch("aiohttp.ClientSession.post") as mock_post,
         ):
             mock_response = AsyncMock()
             mock_response.status = 429
-            mock_response.headers = {"Retry-After": "1"}  # Court délai
+            mock_response.headers = {"Retry-After": "1"}  # Short delay
             mock_response.text = AsyncMock(
                 return_value='{"error": {"message": "Rate limit exceeded"}}'
             )
@@ -228,12 +218,11 @@ class TestMistralAPIService:
                 await mistral_service.generate("test")
 
             assert "Rate limit exceeded" in str(exc_info.value)
-            # Vérifier que sleep a été appelé pour les retries
+            # Check that sleep was called for the retries
             assert mock_sleep.call_count > 0
 
     @pytest.mark.asyncio
     async def test_invalid_request_error(self, mistral_service):
-        """Test d'erreur de requête invalide"""
         with patch("aiohttp.ClientSession.post") as mock_post:
             mock_response = AsyncMock()
             mock_response.status = 400
@@ -261,7 +250,6 @@ class TestMistralAPIService:
 
     @pytest.mark.asyncio
     async def test_retry_mechanism(self, mistral_service):
-        """Test du mécanisme de retry"""
         call_count = 0
 
         def side_effect(*args, **kwargs):
@@ -269,10 +257,10 @@ class TestMistralAPIService:
             call_count += 1
 
             if call_count == 1:
-                # Premier appel : erreur de connexion
+                # First call: connection error
                 raise aiohttp.ClientConnectionError("Connection failed")
             else:
-                # Deuxième appel : succès
+                # Second call: success
                 mock_response = AsyncMock()
                 mock_response.status = 200
                 mock_response.text = AsyncMock(return_value='{"success": true}')
@@ -290,24 +278,20 @@ class TestMistralAPIService:
 
         with patch("aiohttp.ClientSession.post") as mock_post:
             mock_post.side_effect = side_effect
-            with patch(
-                "asyncio.sleep", new_callable=AsyncMock
-            ):  # Mock sleep pour accélérer les tests
+            with patch("asyncio.sleep", new_callable=AsyncMock):  # Mock sleep to speed the tests up
                 response = await mistral_service.generate("test")
 
                 assert response.content == "Success"
-                assert call_count == 2  # Premier échec, puis succès
+                assert call_count == 2  # First a failure, then a success
 
     def test_embedding_dimension_property(self, mistral_service):
-        """Test de la propriété embedding_dimension"""
-        # La dimension dépend du modèle d'embedding utilisé
+        # The dimension depends on the embedding model
         dimension = mistral_service.embedding_dimension
         assert isinstance(dimension, int)
         assert dimension > 0
 
     @pytest.mark.asyncio
     async def test_generate_with_system_prompt(self, mistral_service):
-        """Test de génération avec prompt système"""
         mock_response_data = {
             "choices": [{"message": {"content": "System response"}, "finish_reason": "stop"}],
             "model": "mistral-small-latest",
@@ -328,11 +312,11 @@ class TestMistralAPIService:
                 temperature=0.7,
             )
 
-            # Vérifier que les paramètres ont été envoyés
+            # Check that the parameters were sent
             call_args = mock_post.call_args
             json_data = call_args[1]["json"]
 
-            # Vérifier la structure des messages avec système
+            # Check the message structure with a system prompt
             assert len(json_data["messages"]) == 2
             assert json_data["messages"][0]["role"] == "system"
             assert json_data["messages"][1]["role"] == "user"
@@ -341,10 +325,9 @@ class TestMistralAPIService:
 
     @pytest.mark.asyncio
     async def test_empty_texts_validation(self, mistral_service):
-        """Test de validation pour liste de textes vide"""
         with pytest.raises(LLMInvalidRequestError):
             await mistral_service.embed([])
 
 
-# Tests d'intégration avec l'API Mistral réelle supprimés
-# Ces tests nécessitent une vraie clé API et ne peuvent pas être exécutés en CI/CD
+# Integration tests against the real Mistral API removed
+# These tests need a real API key and cannot run in CI/CD

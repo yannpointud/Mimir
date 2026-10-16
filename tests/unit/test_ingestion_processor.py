@@ -1,5 +1,5 @@
 """
-Tests unitaires pour le processeur d'ingestion principal
+Unit tests of the ingestion processor
 """
 
 import asyncio
@@ -20,18 +20,18 @@ from mimir.shared.errors import IngestionError, NotFoundError
 
 
 class TestIngestionProcessor:
-    """Tests pour le processeur d'ingestion"""
+    """Ingestion processor tests"""
 
     @pytest.fixture
     def temp_dir(self):
-        """Répertoire temporaire pour les tests"""
+        """Temporary directory"""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
         shutil.rmtree(temp_dir)
 
     @pytest.fixture
     def mock_llm_service(self):
-        """Service LLM mocké"""
+        """Mocked LLM service"""
         mock_service = AsyncMock()
         mock_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], model="test-embed", usage_tokens=10
@@ -40,7 +40,7 @@ class TestIngestionProcessor:
 
     @pytest.fixture
     def mock_vector_store(self):
-        """Vector store mocké"""
+        """Mocked vector store"""
         mock_store = Mock()
         mock_store.upsert.return_value = True
         mock_store.persist.return_value = True
@@ -48,7 +48,7 @@ class TestIngestionProcessor:
 
     @pytest.fixture
     def mock_document_repository(self):
-        """Repository de documents mocké"""
+        """Mocked document repository"""
         mock_repo = Mock()
         mock_doc = Mock()
         mock_doc.id = 123
@@ -57,9 +57,9 @@ class TestIngestionProcessor:
 
     @pytest.fixture
     def mock_budget_guard(self):
-        """Budget guard mocké -- accepte toujours la reservation, pour garder
-        ces tests hermetiques (aucune ecriture dans la vraie DB de cout via
-        le singleton reel)"""
+        """Mocked budget guard -- always accepts the reservation, to keep
+        these tests hermetic (no write to the real cost database through
+        the real singleton)"""
         mock_guard = Mock()
         mock_guard.reserve.return_value = BudgetReservation(today="2024-01-01", estimate_eur=0.001)
         mock_guard.finalize.return_value = None
@@ -68,8 +68,8 @@ class TestIngestionProcessor:
 
     @pytest.fixture
     def mock_usage_tracker(self):
-        """Usage tracker mocké -- evite d'ecrire des lignes llm_usage reelles
-        pendant les tests unitaires du pipeline d'ingestion"""
+        """Mocked usage tracker -- writes no real llm_usage rows
+        during the ingestion pipeline unit tests"""
         mock_tracker = Mock()
         mock_tracker.record.return_value = 0.001
         return mock_tracker
@@ -83,7 +83,7 @@ class TestIngestionProcessor:
         mock_budget_guard,
         mock_usage_tracker,
     ):
-        """Processeur d'ingestion pour les tests"""
+        """Ingestion processor"""
         config = ChunkingConfig(chunk_size=100, overlap=20)
         return IngestionProcessor(
             llm_service=mock_llm_service,
@@ -98,7 +98,7 @@ class TestIngestionProcessor:
 
     @pytest.fixture
     def sample_text_file(self, temp_dir):
-        """Fichier texte d'exemple"""
+        """Sample text file"""
         file_path = temp_dir / "sample.txt"
         content = "This is a sample text file for testing the ingestion processor. " * 10
         file_path.write_text(content, encoding="utf-8")
@@ -107,7 +107,6 @@ class TestIngestionProcessor:
     def test_processor_initialization(
         self, mock_llm_service, mock_vector_store, mock_document_repository
     ):
-        """Test d'initialisation du processeur"""
         processor = IngestionProcessor(
             llm_service=mock_llm_service,
             vector_store=mock_vector_store,
@@ -117,13 +116,12 @@ class TestIngestionProcessor:
         assert processor.llm_service == mock_llm_service
         assert processor.vector_store == mock_vector_store
         assert processor.document_repository == mock_document_repository
-        assert processor.max_file_size_bytes == 100 * 1024 * 1024  # 100MB par défaut
+        assert processor.max_file_size_bytes == 100 * 1024 * 1024  # 100MB by default
         assert processor.max_chunks_per_doc == 2000
 
     def test_processor_custom_config(
         self, mock_llm_service, mock_vector_store, mock_document_repository
     ):
-        """Test avec configuration personnalisée"""
         config = ChunkingConfig(chunk_size=500, overlap=100)
         processor = IngestionProcessor(
             llm_service=mock_llm_service,
@@ -140,7 +138,6 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_start_and_stop_processor(self, processor):
-        """Test de démarrage et arrêt du processeur"""
         assert not processor.is_running()
 
         await processor.start()
@@ -178,32 +175,28 @@ class TestIngestionProcessor:
         assert processor.queue_document(str(sample_text_file), document_id="1") is False
 
     def test_extract_text_success(self, processor, sample_text_file):
-        """Test d'extraction de texte réussie"""
         extracted_text = processor._extract_text(str(sample_text_file))
 
         assert len(extracted_text) > 0
         assert "sample text file" in extracted_text
 
     def test_extract_text_failure(self, processor):
-        """Test d'échec d'extraction de texte"""
         with pytest.raises(ProcessingError):
             processor._extract_text("/nonexistent/file.txt")
 
     @pytest.mark.asyncio
     async def test_generate_embeddings_success(self, processor):
-        """Test de génération d'embeddings réussi"""
         chunks_data = [{"text": "First chunk"}, {"text": "Second chunk"}]
 
         response = await processor._generate_embeddings(chunks_data)
 
         assert isinstance(response, EmbeddingResponse)
         assert len(response.embeddings) == 2
-        assert len(response.embeddings[0]) == 3  # Dimension de l'embedding mocké
+        assert len(response.embeddings[0]) == 3  # Dimension of the mocked embedding
         processor.llm_service.embed.assert_called_once_with(["First chunk", "Second chunk"])
 
     @pytest.mark.asyncio
     async def test_generate_embeddings_failure(self, processor, mock_llm_service):
-        """Test d'échec de génération d'embeddings"""
         mock_llm_service.embed.side_effect = LLMException("API Error")
 
         chunks_data = [{"text": "Test chunk"}]
@@ -212,7 +205,6 @@ class TestIngestionProcessor:
             await processor._generate_embeddings(chunks_data)
 
     def test_create_chunks(self, processor):
-        """Test de création d'objets Chunk"""
         chunks_data = [
             {
                 "text": "First chunk",
@@ -253,21 +245,20 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_success(self, processor, mock_document_repository):
-        """Test du pipeline complet de traitement de document"""
         task = IngestionTask(
-            file_path="dummy_path",  # sera mocké
+            file_path="dummy_path",  # will be mocked
             document_id="123",
             metadata={"test": True},
         )
 
-        # Ajuster le mock LLM pour retourner un seul embedding correspondant à un chunk
+        # Make the LLM mock return a single embedding, matching one chunk
         processor.llm_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding pour un chunk
+            embeddings=[[0.1, 0.2, 0.3]],  # A single embedding for one chunk
             model="test-embed",
             usage_tokens=10,
         )
 
-        # Mock des étapes du pipeline
+        # Mock the pipeline steps
         with (
             patch.object(
                 processor, "_extract_text", return_value="Sample text for chunking test"
@@ -505,7 +496,6 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_empty_text(self, processor):
-        """Test avec texte vide extrait"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
         with patch.object(processor, "_extract_text", return_value="   \n  "):
@@ -515,7 +505,6 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_no_chunks(self, processor):
-        """Test sans chunks créés"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
         with (
@@ -528,12 +517,11 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_too_many_chunks(self, processor):
-        """Test avec trop de chunks"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        # Créer plus de chunks que la limite
+        # Create more chunks than the limit
         many_chunks = []
-        for i in range(150):  # Plus que max_chunks_per_doc (100 dans ce test)
+        for i in range(150):  # More than max_chunks_per_doc (100 in this test)
             many_chunks.append(
                 {
                     "text": f"Chunk {i}",
@@ -546,9 +534,9 @@ class TestIngestionProcessor:
                 }
             )
 
-        # Ajuster le mock pour retourner 100 embeddings (le nombre après troncature)
+        # Make the mock return 100 embeddings (the count after truncation)
         processor.llm_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3]] * 100,  # 100 embeddings pour 100 chunks tronqués
+            embeddings=[[0.1, 0.2, 0.3]] * 100,  # 100 embeddings for 100 truncated chunks
             model="test-embed",
             usage_tokens=100,
         )
@@ -559,18 +547,17 @@ class TestIngestionProcessor:
         ):
             success = await processor._process_document_pipeline(task)
 
-            # Doit réussir mais tronquer les chunks
+            # Must succeed and truncate the chunks
             assert success is True
-            # Vérifier que seulement max_chunks_per_doc chunks ont été traités
+            # Check that only max_chunks_per_doc chunks were processed
             call_args = processor.llm_service.embed.call_args[0][0]
             assert len(call_args) == processor.max_chunks_per_doc
 
     @pytest.mark.asyncio
     async def test_process_document_pipeline_embedding_mismatch(self, processor, mock_llm_service):
-        """Test avec nombre d'embeddings incorrect"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
-        # Configurer pour retourner le mauvais nombre d'embeddings
+        # Configure it to return the wrong number of embeddings
         mock_llm_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding
             model="test",
@@ -594,7 +581,6 @@ class TestIngestionProcessor:
     async def test_process_document_pipeline_vector_store_failure(
         self, processor, mock_vector_store
     ):
-        """Test d'échec du vector store"""
         task = IngestionTask(file_path="dummy", document_id="123")
         mock_vector_store.upsert.return_value = False
 
@@ -620,7 +606,6 @@ class TestIngestionProcessor:
 
     @pytest.mark.asyncio
     async def test_process_task_success(self, processor, mock_document_repository):
-        """Test de traitement de tâche réussi"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
         with patch.object(
@@ -631,12 +616,11 @@ class TestIngestionProcessor:
             success = await processor._process_task(task)
 
             assert success is True
-            # Vérifier que le statut a été mis à jour
+            # Check that the status was updated
             assert mock_document_repository.update_status.call_count >= 2  # indexing puis indexed
 
     @pytest.mark.asyncio
     async def test_process_task_failure(self, processor, mock_document_repository):
-        """Test d'échec de traitement de tâche"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
         with patch.object(
@@ -647,14 +631,13 @@ class TestIngestionProcessor:
             success = await processor._process_task(task)
 
             assert success is False
-            # Vérifier que le statut d'erreur a été mis à jour
+            # Check that the error status was updated
             mock_document_repository.update_status.assert_called()
             last_call = mock_document_repository.update_status.call_args_list[-1]
             assert last_call[0][1] == "error"  # statut d'erreur
 
     @pytest.mark.asyncio
     async def test_process_task_exception(self, processor, mock_document_repository):
-        """Test d'exception lors du traitement"""
         task = IngestionTask(file_path="dummy", document_id="123")
 
         with patch.object(
@@ -665,11 +648,10 @@ class TestIngestionProcessor:
             success = await processor._process_task(task)
 
             assert success is False
-            # Vérifier que le statut d'erreur a été mis à jour
+            # Check that the error status was updated
             mock_document_repository.update_status.assert_called()
 
     def test_get_stats(self, processor):
-        """Test des statistiques du processeur"""
         stats = processor.get_stats()
 
         expected_keys = [
@@ -691,11 +673,10 @@ class TestIngestionProcessor:
         """Test de taille de queue"""
         assert processor.get_queue_size() == 0
 
-        # La méthode déléguée au queue_manager devrait être appelée
+        # The method delegated to the queue_manager should be called
 
     @pytest.mark.asyncio
     async def test_is_running(self, processor):
-        """Test de vérification d'état"""
         assert processor.is_running() is False
 
         await processor.start()
@@ -707,29 +688,29 @@ class TestIngestionProcessor:
     @pytest.mark.asyncio
     async def test_clear_queue(self, processor, sample_text_file):
         """Test de vidage de queue"""
-        # Ajouter quelques documents
+        # Add a few documents
         processor.queue_document(str(sample_text_file), document_id="1")
         initial_size = processor.get_queue_size()
-        assert initial_size >= 0  # Peut être 0 ou 1 selon le timing
+        assert initial_size >= 0  # May be 0 or 1 depending on timing
 
         cleared = await processor.clear_queue()
-        assert cleared >= 0  # Peut être 0 si la tâche a déjà été traitée
+        assert cleared >= 0  # May be 0 if the task was already processed
         assert processor.get_queue_size() == 0
 
 
 class TestIngestionProcessorIntegration:
-    """Tests d'intégration pour le processeur d'ingestion"""
+    """Ingestion processor integration tests"""
 
     @pytest.fixture
     def temp_dir(self):
-        """Répertoire temporaire pour les tests"""
+        """Temporary directory"""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
         shutil.rmtree(temp_dir)
 
     @pytest.fixture
     def mock_llm_service(self):
-        """Service LLM mocké pour les tests d'intégration"""
+        """Mocked LLM service for the integration tests"""
         mock_service = AsyncMock()
         mock_service.embed.return_value = EmbeddingResponse(
             embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]], model="test-embed", usage_tokens=10
@@ -738,7 +719,7 @@ class TestIngestionProcessorIntegration:
 
     @pytest.fixture
     def mock_vector_store(self):
-        """Vector store mocké pour les tests d'intégration"""
+        """Mocked vector store for the integration tests"""
         mock_store = Mock()
         mock_store.upsert.return_value = True
         mock_store.persist.return_value = True
@@ -747,7 +728,7 @@ class TestIngestionProcessorIntegration:
 
     @pytest.fixture
     def mock_document_repository(self):
-        """Repository de documents mocké pour les tests d'intégration"""
+        """Mocked document repository for the integration tests"""
         mock_repo = Mock()
         mock_doc = Mock()
         mock_doc.id = 123
@@ -757,9 +738,9 @@ class TestIngestionProcessorIntegration:
 
     @pytest.fixture
     def mock_budget_guard(self):
-        """Budget guard mocké -- accepte toujours la reservation, pour garder
-        ces tests hermetiques (aucune ecriture dans la vraie DB de cout via
-        le singleton reel)"""
+        """Mocked budget guard -- always accepts the reservation, to keep
+        these tests hermetic (no write to the real cost database through
+        the real singleton)"""
         mock_guard = Mock()
         mock_guard.reserve.return_value = BudgetReservation(today="2024-01-01", estimate_eur=0.001)
         mock_guard.finalize.return_value = None
@@ -768,8 +749,8 @@ class TestIngestionProcessorIntegration:
 
     @pytest.fixture
     def mock_usage_tracker(self):
-        """Usage tracker mocké -- evite d'ecrire des lignes llm_usage reelles
-        pendant les tests d'integration du pipeline d'ingestion"""
+        """Mocked usage tracker -- writes no real llm_usage rows
+        during the ingestion pipeline integration tests"""
         mock_tracker = Mock()
         mock_tracker.record.return_value = 0.001
         return mock_tracker
@@ -779,7 +760,7 @@ class TestIngestionProcessorIntegration:
         """Vrais fichiers de test"""
         files = {}
 
-        # Fichier texte simple
+        # Plain text file
         txt_file = temp_dir / "simple.txt"
         txt_file.write_text(
             "This is a simple text file for testing. It contains multiple sentences. Each sentence should be processed correctly.",
@@ -787,7 +768,7 @@ class TestIngestionProcessorIntegration:
         )
         files["txt"] = txt_file
 
-        # Fichier markdown
+        # Markdown file
         md_file = temp_dir / "document.md"
         md_content = """# Test Document
 
@@ -821,9 +802,9 @@ Even more detailed content here.
         mock_usage_tracker,
     ):
         """Test de traitement bout en bout"""
-        # Configurer les mocks pour un comportement réaliste - adapter selon le nombre de chunks réel
+        # Configure the mocks realistically, for the actual number of chunks
         mock_llm_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3, 0.4]],  # Un seul chunk pour le fichier texte simple
+            embeddings=[[0.1, 0.2, 0.3, 0.4]],  # A single chunk for the plain text file
             model="test-embed",
             usage_tokens=50,
         )
@@ -838,7 +819,7 @@ Even more detailed content here.
             usage_tracker=mock_usage_tracker,
         )
 
-        # Traitement d'un fichier texte
+        # Processing of a text file
         task = IngestionTask(
             file_path=str(real_files["txt"]), document_id="123", metadata={"type": "test"}
         )
@@ -847,12 +828,12 @@ Even more detailed content here.
 
         assert success is True
 
-        # Vérifier que les mocks ont été appelés
+        # Check that the mocks were called
         mock_llm_service.embed.assert_called_once()
         mock_vector_store.upsert.assert_called_once()
         mock_vector_store.persist.assert_called_once()
 
-        # Vérifier les chunks créés
+        # Check the created chunks
         upsert_call = mock_vector_store.upsert.call_args[0][0]
         chunks = upsert_call
 
@@ -871,10 +852,9 @@ Even more detailed content here.
         mock_budget_guard,
         mock_usage_tracker,
     ):
-        """Test de traitement de fichier Markdown"""
-        # Configurer le mock pour le fichier markdown (probablement 1 chunk)
+        # Configure the mock for the markdown file (probably 1 chunk)
         mock_llm_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding pour le fichier markdown
+            embeddings=[[0.1, 0.2, 0.3]],  # A single embedding for the markdown file
             model="test-embed",
             usage_tokens=25,
         )
@@ -889,7 +869,7 @@ Even more detailed content here.
 
         task = IngestionTask(
             file_path=str(real_files["md"]),
-            document_id="123",  # Utiliser un entier sous forme de chaîne
+            document_id="123",  # Use an integer as a string
             metadata={"format": "markdown"},
         )
 
@@ -897,7 +877,7 @@ Even more detailed content here.
 
         assert success is True
 
-        # Vérifier que le contenu markdown a été traité
+        # Check that the markdown content was processed
         upsert_call = mock_vector_store.upsert.call_args[0][0]
         chunks = upsert_call
 
@@ -917,14 +897,14 @@ Even more detailed content here.
         mock_usage_tracker,
     ):
         """Test de simulation de traitement concurrent"""
-        # Configurer le mock pour les multiples fichiers (probablement 1 chunk chacun)
+        # Configure the mock for the files (probably 1 chunk each)
         mock_llm_service.embed.return_value = EmbeddingResponse(
-            embeddings=[[0.1, 0.2, 0.3]],  # Un seul embedding par fichier
+            embeddings=[[0.1, 0.2, 0.3]],  # One embedding per file
             model="test-embed",
             usage_tokens=20,
         )
 
-        # La fixture mock_document_repository est configurée correctement
+        # The mock_document_repository fixture is already configured
 
         processor = IngestionProcessor(
             llm_service=mock_llm_service,
@@ -937,7 +917,7 @@ Even more detailed content here.
         processed_docs = []
 
         async def tracking_callback(task):
-            # Simuler le traitement avec le vrai pipeline
+            # Simulate the processing with the real pipeline
             success = await processor._process_document_pipeline(task)
             if success:
                 processed_docs.append(task.document_id)
@@ -945,17 +925,17 @@ Even more detailed content here.
 
         await processor.start()
 
-        # Remplacer le callback de traitement pour traquer les résultats
+        # Replace the processing callback to record the results
         processor.queue_manager.processing_callback = tracking_callback
 
         files_to_process = [str(real_files["txt"]), str(real_files["md"])]
         for document_id, file_path in enumerate(files_to_process, start=1):
             assert processor.queue_document(file_path, document_id=str(document_id)) is True
 
-        # Attendre que le traitement se termine
+        # Wait for the processing to finish
         await asyncio.sleep(1.0)
 
         await processor.stop()
 
-        # Vérifier que les documents ont été traités
+        # Check that the documents were processed
         assert sorted(processed_docs) == ["1", "2"]

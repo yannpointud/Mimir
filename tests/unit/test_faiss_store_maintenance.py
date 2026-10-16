@@ -1,6 +1,6 @@
 """
-Tests unitaires supplémentaires pour FaissVectorStore
-Focus sur l'amélioration de la couverture
+More FaissVectorStore unit tests
+Edge cases
 """
 
 import tempfile
@@ -14,12 +14,12 @@ from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.rag_core.interfaces import Chunk, VectorStoreOperationError
 
 
-class TestFaissVectorStoreAdditional:
-    """Tests supplémentaires pour améliorer la couverture"""
+class TestFaissVectorStoreEdgeCases:
+    """Edge-case tests"""
 
     @pytest.fixture
     def temp_store(self):
-        """Fixture pour créer un store temporaire"""
+        """Temporary store"""
         with tempfile.TemporaryDirectory() as temp_dir:
             index_path = Path(temp_dir) / "test.index"
             metadata_path = Path(temp_dir) / "test.metadata"
@@ -30,7 +30,7 @@ class TestFaissVectorStoreAdditional:
 
     def test_faiss_store_add_chunks_basic(self, temp_store):
         """Test d'ajout de base de chunks"""
-        # Créer des chunks de test avec la bonne signature
+        # Create test chunks with the right signature
         chunks = [
             Chunk(
                 text="Test chunk 1",
@@ -56,7 +56,7 @@ class TestFaissVectorStoreAdditional:
 
     def test_faiss_store_search_basic(self, temp_store):
         """Test de recherche de base"""
-        # Ajouter quelques vecteurs
+        # Add a few vectors
         chunks = [
             Chunk(
                 text=f"Test chunk {i}",
@@ -72,7 +72,7 @@ class TestFaissVectorStoreAdditional:
 
         temp_store.upsert(chunks)
 
-        # Effectuer une recherche
+        # Run a search
         query_vector = np.random.random(128).astype(np.float32)
         results = temp_store.query(query_vector, top_k=3)
 
@@ -80,12 +80,11 @@ class TestFaissVectorStoreAdditional:
         assert len(results) <= 3
 
     def test_faiss_store_get_stats(self, temp_store):
-        """Test des statistiques du store"""
-        # Au début, doit être 0
+        # Initially 0
         stats = temp_store.get_stats()
         assert stats["total_vectors"] == 0
 
-        # Ajouter des chunks
+        # Add chunks
         chunks = [
             Chunk(
                 text="Test",
@@ -99,13 +98,13 @@ class TestFaissVectorStoreAdditional:
         ]
         temp_store.upsert(chunks)
 
-        # Maintenant doit être 1
+        # Now 1
         stats = temp_store.get_stats()
         assert stats["total_vectors"] == 1
 
     def test_faiss_store_delete_documents(self, temp_store):
         """Test de suppression de documents"""
-        # Ajouter plusieurs chunks pour éviter l'optimisation automatique (>25% supprimés)
+        # Add several chunks to avoid the automatic optimization (>25% deleted)
         chunks = [
             Chunk(
                 text=f"Test {i}",
@@ -123,18 +122,17 @@ class TestFaissVectorStoreAdditional:
         initial_total = stats["total_vectors"]
         assert initial_total == 5
 
-        # Supprimer un document (ne déclenche pas l'optimisation car <25%)
+        # Delete a document (no optimization: <25%)
         temp_store.delete("doc_1")
         stats_after = temp_store.get_stats()
 
-        # Vérifier que le document a été marqué comme supprimé
-        # L'optimisation ne se déclenche pas car 1/5 = 20% < 25%
+        # Check that the document was marked as deleted
+        # No optimization: 1/5 = 20% < 25%
         assert stats_after["deleted_vectors"] == 1
         assert stats_after["active_vectors"] == 4
         assert stats_after["total_vectors"] == initial_total  # Index pas reconstruit
 
     def test_faiss_store_empty_search(self, temp_store):
-        """Test de recherche sur un store vide"""
         query_vector = np.random.random(128).astype(np.float32)
         results = temp_store.query(query_vector, top_k=5)
 
@@ -142,8 +140,7 @@ class TestFaissVectorStoreAdditional:
         assert len(results) == 0
 
     def test_faiss_store_large_batch(self, temp_store):
-        """Test avec un lot important de données"""
-        # Créer un lot de 100 chunks
+        # Create a batch of 100 chunks
         chunks = [
             Chunk(
                 text=f"Large batch chunk {i}",
@@ -162,18 +159,18 @@ class TestFaissVectorStoreAdditional:
         assert stats["total_vectors"] == 100
 
         # Recherche
-        # Utiliser un des vecteurs ajoutés comme query pour garantir des résultats
+        # Query with one of the added vectors to guarantee results
         query_vector = chunks[0].embedding
         results = temp_store.query(query_vector, top_k=10)
-        assert len(results) > 0  # Au moins quelques résultats
+        assert len(results) > 0  # At least a few results
 
 
 class TestFaissStoreFunctionality:
-    """Tests de fonctionnalité avancée"""
+    """Advanced feature tests"""
 
     @pytest.fixture
     def populated_store(self):
-        """Store pré-rempli pour les tests"""
+        """Pre-filled store"""
         with tempfile.TemporaryDirectory() as temp_dir:
             index_path = Path(temp_dir) / "populated.index"
             metadata_path = Path(temp_dir) / "populated.metadata"
@@ -182,7 +179,7 @@ class TestFaissStoreFunctionality:
                 dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
-            # Ajouter des données de test
+            # Add test data
             chunks = [
                 Chunk(
                     text=f"Content {i}",
@@ -199,20 +196,18 @@ class TestFaissStoreFunctionality:
             yield store
 
     def test_faiss_store_consistent_search(self, populated_store):
-        """Test de cohérence des résultats de recherche"""
         query_vector = np.random.random(128).astype(np.float32)
 
-        # Effectuer la même recherche plusieurs fois
+        # Run the same search several times
         results1 = populated_store.query(query_vector, top_k=5)
         results2 = populated_store.query(query_vector, top_k=5)
 
-        # Les résultats doivent être identiques
+        # The results must be identical
         assert len(results1) == len(results2)
         for i in range(len(results1)):
             assert results1[i].text == results2[i].text
 
     def test_faiss_store_vector_validation(self):
-        """Test de validation des vecteurs"""
         with tempfile.TemporaryDirectory() as temp_dir:
             index_path = Path(temp_dir) / "validation.index"
             metadata_path = Path(temp_dir) / "validation.metadata"
@@ -221,7 +216,7 @@ class TestFaissStoreFunctionality:
                 dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
             )
 
-            # Test avec dimension incorrecte
+            # Wrong dimension
             invalid_chunk = Chunk(
                 text="Invalid dimension",
                 embedding=np.random.random(64).astype(np.float32),  # Wrong dimension
@@ -236,11 +231,10 @@ class TestFaissStoreFunctionality:
                 store.upsert([invalid_chunk])
 
     def test_faiss_store_search_top_k_variations(self, populated_store):
-        """Test avec différentes valeurs de top_k"""
         query_vector = np.random.random(128).astype(np.float32)
 
-        # Utiliser un vecteur existant pour garantir des résultats
-        # Récupérer un vecteur de test via les stats et les métadonnées
+        # Use an existing vector to guarantee results
+        # Get a test vector from the stats and the metadata
         test_chunks = [
             Chunk(
                 text="Test query",
@@ -259,7 +253,7 @@ class TestFaissStoreFunctionality:
             results = populated_store.query(query_vector, top_k=k)
             stats = populated_store.get_stats()
             min(k, stats["total_vectors"])
-            # Avec un vecteur identique, on devrait avoir au moins 1 résultat
+            # An identical vector should give at least one result
             assert len(results) >= 1
 
 

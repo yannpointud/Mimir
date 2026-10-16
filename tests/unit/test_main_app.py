@@ -1,4 +1,4 @@
-"""Tests unitaires pour l'application FastAPI principale."""
+"""Unit tests of the main FastAPI application."""
 
 import asyncio
 from unittest.mock import patch
@@ -10,7 +10,7 @@ from mimir.main import app
 
 
 class TestMainApp:
-    """Tests pour l'application principale."""
+    """Main application tests."""
 
     @pytest.fixture
     def client(self):
@@ -24,7 +24,7 @@ class TestMainApp:
         assert response.status_code == 200
         data = response.json()
 
-        # Les vrais champs retournés par l'endpoint racine
+        # The fields actually returned by the root endpoint
         assert data["name"] == "Mimir"
         assert data["description"] == "Chatbot documentaire d'entreprise"
         assert "version" in data
@@ -38,8 +38,7 @@ class TestMainApp:
     def test_health_check_success(
         self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
     ):
-        """Test du health check réussi"""
-        # Simuler tous les checks comme sains
+        # Make every check healthy
         mock_db.return_value = {"healthy": True, "connection": "ok"}
         mock_vector.return_value = {"healthy": True, "index_file": "exists"}
         mock_llm.return_value = {"healthy": True, "api_accessible": True}
@@ -65,8 +64,7 @@ class TestMainApp:
     def test_health_check_failure(
         self, mock_email, mock_cache, mock_llm, mock_vector, mock_db, client
     ):
-        """Test du health check en échec"""
-        # Simuler une base de données défaillante
+        # Simulate a failing database
         mock_db.return_value = {
             "healthy": False,
             "connection": "failed",
@@ -84,32 +82,29 @@ class TestMainApp:
         assert response.status_code == 503
         data = response.json()
 
-        assert data["success"] is True  # BaseResponse success est toujours True
+        assert data["success"] is True  # BaseResponse success is always True
         assert data["status"] == "unhealthy"
         assert "checks" in data
         assert data["checks"]["database"]["healthy"] is False
 
     def test_404_handling(self, client):
-        """Test de gestion des 404"""
         response = client.get("/nonexistent-endpoint")
 
         assert response.status_code == 404
 
     def test_cors_headers(self, client):
-        """Test des headers CORS"""
         response = client.options(
             "/", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"}
         )
 
-        # Test de la présence des headers CORS
+        # CORS headers are present
         assert "access-control-allow-origin" in response.headers or response.status_code in [
             200,
             404,
         ]
 
     def test_openapi_schema(self, client):
-        """Test de la disponibilité du schéma OpenAPI"""
-        # L'openapi est sur /api/v1/openapi.json selon la configuration
+        # The OpenAPI schema is served at /api/v1/openapi.json
         response = client.get("/api/v1/openapi.json")
 
         assert response.status_code == 200
@@ -121,7 +116,7 @@ class TestMainApp:
 
 
 class TestErrorHandling:
-    """Tests pour la gestion d'erreurs."""
+    """Error handling tests."""
 
     @pytest.fixture
     def client(self):
@@ -129,8 +124,7 @@ class TestErrorHandling:
         return TestClient(app)
 
     def test_http_exception_handler(self, client):
-        """Test du gestionnaire d'exceptions HTTP"""
-        # Test d'un endpoint qui n'existe pas
+        # Endpoint that does not exist
         response = client.get("/this-endpoint-does-not-exist")
 
         assert response.status_code == 404
@@ -140,7 +134,7 @@ class TestErrorHandling:
 
 
 class TestMiddleware:
-    """Tests pour les middlewares."""
+    """Middleware tests."""
 
     @pytest.fixture
     def client(self):
@@ -148,30 +142,28 @@ class TestMiddleware:
         return TestClient(app)
 
     def test_timing_header_added(self, client):
-        """Test de l'ajout du header de timing"""
         response = client.get("/")
 
         assert response.status_code == 200
 
-        # Le header peut être présent ou non selon la configuration
+        # The header may or may not be present, depending on the configuration
         if "x-process-time" in response.headers:
-            # Si présent, vérifier qu'il s'agit d'un nombre
+            # If present, check it is a number
             timing = response.headers["x-process-time"]
             assert float(timing) >= 0
 
     def test_trusted_host_middleware(self, client):
-        """Test du middleware de hosts de confiance"""
-        # Tester avec un host normal
+        # Regular host
         response = client.get("/", headers={"Host": "testserver"})
 
         assert response.status_code == 200
 
-        # Tester avec un host potentiellement non autorisé
-        # (TestClient utilise "testserver" par défaut qui est généralement autorisé)
+        # Possibly unauthorized host
+        # (TestClient uses "testserver" by default, which is usually allowed)
         response = client.get("/", headers={"Host": "malicious-host.com"})
 
-        # Le middleware peut bloquer ou permettre selon la configuration
-        # On vérifie juste qu'il n'y a pas d'erreur serveur
+        # The middleware may block or allow, depending on the configuration
+        # Only check that there is no server error
         assert response.status_code in [200, 400, 403]
 
 
