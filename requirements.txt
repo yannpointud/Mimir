@@ -25,7 +25,7 @@ numpy==2.3.3
 rapidfuzz==3.14.1
 # Base package only: the [core] extra pulls in PyStemmer, and the BM25
 # tokenizer deliberately avoids stemming (rag_core/tokenizer_fr.py).
-bm25s==0.3.9
+bm25s==0.3.13
 
 # Document processing
 pypdf==6.19.0
