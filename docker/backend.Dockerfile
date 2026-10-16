@@ -10,10 +10,10 @@ RUN groupadd --system mimir && useradd --system --gid mimir --home-dir /app --sh
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching. requirements.txt lives at
-# the repo root, which is the build context (compose sets context: .).
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the hash-pinned runtime lockfile first for better layer caching. It
+# lives at the repo root, which is the build context (compose sets context: .).
+COPY requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 # Copy the backend source. The root .dockerignore strips secrets (.env*),
 # runtime data (data/, logs/) and caches from the context, so this wildcard

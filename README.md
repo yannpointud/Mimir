@@ -195,10 +195,10 @@ python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # ou venv\Scripts\activate  # Windows
 
-# Installer les dépendances (requirements.txt est à la racine du projet)
-pip install -r ../requirements.txt
+# Installer les dépendances (runtime, tests et outils ; fichiers à la racine du projet)
+pip install -r ../requirements-dev.txt
 # ou, versions et hachages figés :
-# pip install --require-hashes -r ../requirements.lock
+# pip install --require-hashes -r ../requirements-dev.lock
 
 # Créer le fichier .env
 cp .env.example .env
@@ -375,7 +375,7 @@ Les instantanés FAISS de `tests/oracle/test_retrieval_ranking.py` et `tests/ora
 - **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90 ; complexité cyclomatique maximale 15).
 - **Typage** : mypy en mode normal sur `backend/src` (`mypy backend/src`), sans erreur.
 - **Tests** : pytest 9 (pytest-asyncio, pytest-cov), vitest côté frontend.
-- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.txt`, avec une seule exclusion : PYSEC-2026-107 (orjson 3.10.18, maintenu sous 3.11 par mistralai 0.4.2).
+- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.lock`, sans exclusion.
 - **Mesures ponctuelles** : radon (complexité), pygount (lignes de code), mutmut (tests de mutation de `rag_core/fusion.py`, `ingestion/chunking.py` et `rag_core/tokenizer_fr.py`, configuré dans `pyproject.toml`).
 
 `bash scripts/local_ci.sh` enchaîne ruff, mypy, pytest et pip-audit (outils installés depuis `requirements-dev.txt`).
@@ -383,15 +383,15 @@ Les instantanés FAISS de `tests/oracle/test_retrieval_ranking.py` et `tests/ora
 La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs ruff, mypy, pytest (sans les deux modules d'oracle dépendants du processeur) et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt`. Les tests vitest et le build du frontend ne sont pas exécutés par la CI.
 
 **Dépendances**
-- `requirements.txt` (runtime et tests) et `requirements-dev.txt` (outils de qualité) restent la source.
+- `requirements.txt` (runtime seul, installé dans l'image Docker) et `requirements-dev.txt` (runtime, tests et outils de qualité) restent la source.
 - `requirements.lock` et `requirements-dev.lock` en sont dérivés (versions et hachages figés, résolution universelle pour Python 3.13). Les régénérer depuis la racine avec les commandes inscrites dans leur en-tête :
 
 ```bash
 uv pip compile requirements.txt --universal --python-version 3.13 --generate-hashes -o requirements.lock
-uv pip compile requirements.txt requirements-dev.txt --universal --python-version 3.13 --generate-hashes -o requirements-dev.lock
+uv pip compile requirements-dev.txt --universal --python-version 3.13 --generate-hashes -o requirements-dev.lock
 ```
 
-- Dependabot (`.github/dependabot.yml`) propose chaque semaine des mises à jour pip, npm (`frontend/`) et GitHub Actions. Pour pip, il ne modifie que les `requirements*.txt` : régénérer les deux lockfiles sur sa branche, sinon la vérification de la CI échoue. Les versions majeures de `mistralai` sont ignorées (la 1.x est un nouveau SDK).
+- Dependabot (`.github/dependabot.yml`) propose chaque semaine des mises à jour pip, npm (`frontend/`) et GitHub Actions. Pour pip, il ne modifie que les `requirements*.txt` : régénérer les deux lockfiles sur sa branche, sinon la vérification de la CI échoue.
 
 ## 🛠️ API Documentation
 
