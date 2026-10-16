@@ -24,9 +24,6 @@ from mimir.shared.models import ConsistencyValidationResponse
 
 logger = logging.getLogger(__name__)
 
-# Share of deleted vectors above which a deletion triggers an orphan cleanup.
-_CLEANUP_DELETED_RATIO = 0.20
-
 
 async def remove_document_from_indexes(
     vector_store: Any, bm25_store: Any, document_id: int, filename: str
