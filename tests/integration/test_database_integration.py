@@ -128,18 +128,17 @@ class TestAuditLogRepositoryIntegration:
     def test_creation_and_filters(self, session):
         repo = AuditLogRepository(session)
         entries = [
-            ("admin", "login_success", True, {"browser": "Chrome"}),
-            ("admin", "document_upload", True, {"file_size": 1024000}),
-            ("system", "cleanup_task", False, {"error": "Permission denied"}),
+            ("admin", "login_success", True),
+            ("admin", "document_upload", True),
+            ("system", "cleanup_task", False),
         ]
-        for user_type, action, success, data in entries:
+        for user_type, action, success in entries:
             log_entry = repo.create_log(
                 user_type=user_type,
                 action=action,
                 details=f"{action} details",
                 ip_address="192.168.1.100",
                 success=success,
-                additional_data=data,
             )
             assert log_entry.id is not None
             assert log_entry.created_at is not None
@@ -190,7 +189,6 @@ class TestCrossRepositoryIntegration:
             details=f"Created document {document.filename}",
             ip_address="127.0.0.1",
             success=True,
-            additional_data={"document_id": document.id},
         )
 
         assert doc_repo.get_by_id(document.id) is not None

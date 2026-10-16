@@ -357,12 +357,9 @@ class AuditLogRepository(BaseRepository):
         ip_address: str | None = None,
         user_agent: str | None = None,
         success: bool = True,
-        additional_data: dict[str, Any] | None = None,
     ) -> AuditLog:
         """Create a new audit log"""
         try:
-            # Note: additional_data is accepted for compatibility but not persisted
-            # In a future version, this field could be added to the model
             log_entry = AuditLog(
                 user_type=user_type,
                 action=action,

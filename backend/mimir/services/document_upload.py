@@ -140,12 +140,6 @@ class DocumentUpload:
             details=f"File uploaded: {self.filename}",
             ip_address="system",
             success=True,
-            additional_data={
-                "document_id": document.id,
-                "filename": self.filename,
-                "file_size": size,
-                "preserve": preserve,
-            },
         )
 
     def _queue(

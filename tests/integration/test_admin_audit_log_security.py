@@ -73,12 +73,7 @@ class TestAuditLogAccessControl:
 
 
 class TestAuditLogRegression:
-    """Regression coverage for the previously deferred audit-log 500.
-
-    The handler calls AuditLogRepository.get_logs_paginated() and reads
-    entry.additional_data; both were missing, so an authenticated admin GET
-    returned 500 instead of the audit trail. These tests lock the fix.
-    """
+    """An authenticated admin reads the paginated audit trail."""
 
     def test_get_with_admin_token_returns_200_and_wellformed_body(self, test_app, admin_token):
         """An authenticated admin GET returns 200 with a paginated body."""

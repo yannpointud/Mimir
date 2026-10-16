@@ -58,7 +58,6 @@ async def delete_document_everywhere(
         details=f"Document deleted: {filename}",
         ip_address="system",
         success=True,
-        additional_data={"document_id": document_id, "filename": filename, "forced": force},
     )
     logger.info(f"Document deleted successfully: {filename} (ID: {document_id})")
     return filename

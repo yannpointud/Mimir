@@ -161,13 +161,6 @@ def record_rebuild(audit_repo: Any, rebuild: IndexRebuild, admin_user: str) -> N
         details=f"FAISS index rebuilt - vectors: {before} → {after}, orphans cleaned: {rebuild.orphans_cleaned}",
         ip_address="system",
         success=True,
-        additional_data={
-            "stats_before": rebuild.stats_before,
-            "stats_after": rebuild.stats_after,
-            "duration_ms": rebuild.duration_ms,
-            "rebuild_result": rebuild.rebuild_result,
-            "admin_user": admin_user,
-        },
     )
     logger.info(
         f"FAISS index rebuilt by admin {admin_user}: {before} → {after} vectors, "
@@ -185,7 +178,6 @@ def record_rebuild_failure(audit_repo: Any, error: Exception, admin_user: str) -
             details=f"FAISS index rebuild failed: {str(error)}",
             ip_address="system",
             success=False,
-            additional_data={"error": str(error), "admin_user": admin_user},
         )
     except Exception as audit_error:  # noqa: BLE001 - best effort: the route still answers its rebuild 500
         # Admin traceability: never silence the audit failure either
@@ -221,17 +213,6 @@ def validate_index_consistency(
         details=f"Consistency validation: {total_issues} issues found",
         ip_address="system",
         success=True,
-        additional_data={
-            "validation_result": {
-                "total_issues": total_issues,
-                "consistency_score": validation_result.get("consistency_score", 0),
-                "fixes_applied": fixes_applied,
-                "duration_seconds": validation_result.get("duration_seconds", 0),
-            },
-            "fix_issues": fix_issues,
-            "report_saved": report_path is not None,
-            "initiated_by": initiated_by,
-        },
     )
 
     consistency_score = validation_result.get("consistency_score", 1.0)
@@ -281,5 +262,4 @@ def record_validation_failure(audit_repo: Any, error: Exception, initiated_by: s
         details=f"Consistency validation failed: {str(error)}",
         ip_address="system",
         success=False,
-        additional_data={"error": str(error), "initiated_by": initiated_by},
     )

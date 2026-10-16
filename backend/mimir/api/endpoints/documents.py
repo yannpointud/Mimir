@@ -309,11 +309,6 @@ async def toggle_document_preservation(
             details=f"Document preservation {'enabled' if preserve else 'disabled'}: {document.filename}",
             ip_address="system",
             success=True,
-            additional_data={
-                "document_id": document_id,
-                "filename": document.filename,
-                "preserve": preserve,
-            },
         )
 
         logger.info(f"Document preservation toggled: {document.filename} -> {preserve}")
@@ -398,7 +393,6 @@ async def reprocess_document(
             details=f"Document queued for reprocessing: {document.filename}",
             ip_address="system",
             success=True,
-            additional_data={"document_id": document_id, "filename": document.filename},
         )
 
         logger.info(f"Document queued for reprocessing: {document.filename} (ID: {document_id})")

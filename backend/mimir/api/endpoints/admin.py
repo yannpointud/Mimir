@@ -197,11 +197,6 @@ async def clear_cache(
             details=f"Cache cleared: {cache_type}",
             ip_address="system",
             success=True,
-            additional_data={
-                "cache_type": cache_type,
-                "cleared_entries": cleared_counts,
-                "admin_user": current_user["sub"],
-            },
         )
 
         total_cleared = sum(cleared_counts.values())
@@ -299,7 +294,6 @@ async def update_configuration(
             details=f"Configuration updated: {', '.join(updated_items)}",
             ip_address="system",
             success=True,
-            additional_data={"updates": config_updates, "admin_user": current_user["sub"]},
         )
 
         logger.info(f"Configuration updated by admin {current_user['sub']}: {updated_items}")
@@ -365,10 +359,6 @@ async def get_audit_log(
                 details=entry.details,
                 ip_address=entry.ip_address,
                 success=entry.success,
-                # additional_data is accepted by create_log for compatibility
-                # but not persisted on the AuditLog model; guard the read so a
-                # missing column cannot turn the audit-log GET into a 500.
-                additional_data=getattr(entry, "additional_data", None),
             )
             for entry in entries
         ]
@@ -463,7 +453,6 @@ async def test_email_service(
             details=f"Test email sent to {test_email}",
             ip_address="system",
             success=success,
-            additional_data={"test_email": test_email, "admin_user": current_user["sub"]},
         )
 
         if success:

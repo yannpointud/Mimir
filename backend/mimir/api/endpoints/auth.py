@@ -373,7 +373,6 @@ async def _log_auth_event(
             details=details,
             ip_address=ip_address,
             success=success,
-            additional_data={"username": username, "timestamp": "auto"},
         )
     except Exception as e:  # noqa: BLE001 - best effort: an audit failure must not break authentication
         logger.error(f"Failed to log auth event: {e}")

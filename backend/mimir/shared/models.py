@@ -360,7 +360,6 @@ class AuditLogEntry(BaseModel):
     details: str | None
     ip_address: str | None
     success: bool
-    additional_data: dict[str, Any] | None
 
 
 class AuditLogFilters(BaseModel):
