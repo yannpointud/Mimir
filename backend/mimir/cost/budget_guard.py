@@ -16,15 +16,12 @@ session. This matters for two reasons:
 
 from dataclasses import dataclass
 
+from sqlalchemy.orm import Session
+
 from mimir.config import settings
 from mimir.database.connection import db_manager
 from mimir.database.repository import ConfigurationRepository, UsageRepository
-from mimir.shared.errors import BudgetExceeded
 from mimir.shared.clock import utc_now
-from sqlalchemy.orm import Session
-
-# Historical name of the budget-exhausted error, still imported by callers.
-BudgetExceededError = BudgetExceeded
 
 
 @dataclass

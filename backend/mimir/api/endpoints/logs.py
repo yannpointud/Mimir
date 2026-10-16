@@ -7,6 +7,7 @@ frontend application logs for debugging and monitoring.
 
 import logging
 from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 

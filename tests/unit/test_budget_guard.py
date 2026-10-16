@@ -15,7 +15,7 @@ synthetic ledger/config rows leak into the developer's real database.
 import pytest
 
 from mimir.config import settings
-from mimir.cost.budget_guard import BudgetGuard, BudgetExceededError, BudgetReservation
+from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
 from mimir.database.connection import db_manager
 from mimir.database.models import LlmBudgetLedger
 from mimir.database.repository import ConfigurationRepository
@@ -115,11 +115,3 @@ class TestHotConfigOverride:
         second = guard.reserve("chat")
 
         assert second is None
-
-
-def test_budget_exceeded_error_is_an_exception_subclass():
-    """BudgetExceededError must be importable and usable as a normal
-    exception (ingestion fail-closed path raises it directly)."""
-    assert issubclass(BudgetExceededError, Exception)
-    with pytest.raises(BudgetExceededError):
-        raise BudgetExceededError("Daily budget exceeded")

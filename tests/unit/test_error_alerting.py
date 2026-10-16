@@ -14,9 +14,9 @@ call is made.
 
 import asyncio
 import logging
+from unittest.mock import AsyncMock
 
 import pytest
-from unittest.mock import AsyncMock
 
 import mimir.monitoring.alerting as alerting
 from mimir.monitoring.alerting import FingerprintAlertHandler

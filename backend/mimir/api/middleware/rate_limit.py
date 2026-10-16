@@ -9,16 +9,16 @@ and breaks SSE streaming responses. Do not "fix" this by re-adding
 the slowapi middleware — only decorated routes are limited, by design.
 """
 
-from fastapi import Request, status
+import logging
+
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import logging
+from slowapi.util import get_remote_address
 
 from mimir.config import settings
 from mimir.shared.models import ErrorResponse
-from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 

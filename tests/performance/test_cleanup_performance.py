@@ -2,20 +2,21 @@
 Performance tests for the orphan chunk cleanup system
 """
 
-import pytest
-import tempfile
-import shutil
 import os
-import time
+import shutil
 import statistics
+import tempfile
+import time
 from pathlib import Path
-import numpy as np
 from unittest.mock import Mock
+
+import numpy as np
+import pytest
 
 # System imports
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
-from mimir.rag_core.interfaces import Chunk
 from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
+from mimir.rag_core.interfaces import Chunk
 from mimir.shared.clock import utc_now
 
 

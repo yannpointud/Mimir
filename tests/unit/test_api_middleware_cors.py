@@ -54,7 +54,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             allowed_origins = kwargs["allow_origins"]
 
             # Vérifier que les origines personnalisées sont ajoutées
@@ -72,7 +72,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             allowed_origins = kwargs["allow_origins"]
 
             # Vérifier les origines de développement
@@ -96,7 +96,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             allowed_methods = kwargs["allow_methods"]
 
             expected_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
@@ -112,7 +112,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             allowed_headers = kwargs["allow_headers"]
 
             expected_headers = [
@@ -137,7 +137,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             expose_headers = kwargs["expose_headers"]
 
             assert "X-Request-ID" in expose_headers
@@ -152,7 +152,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
 
             assert kwargs["allow_credentials"] is True
 
@@ -165,7 +165,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
 
             assert kwargs["max_age"] == 600  # 10 minutes
 
@@ -219,7 +219,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             allowed_origins = kwargs["allow_origins"]
 
             # Les origines doivent être parsées correctement
@@ -237,7 +237,7 @@ class TestConfigureCorsMiddleware:
 
             configure_cors_middleware(mock_app)
 
-            args, kwargs = mock_app.add_middleware.call_args
+            kwargs = mock_app.add_middleware.call_args.kwargs
             allowed_origins = kwargs["allow_origins"]
 
             # Seules les origines par défaut doivent être présentes

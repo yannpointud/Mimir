@@ -1,19 +1,21 @@
 """SQLAlchemy models for Mimir."""
 
+from datetime import datetime
+from typing import Any, Self
+
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    Index,
     Integer,
     String,
-    Boolean,
-    DateTime,
     Text,
-    Float,
-    CheckConstraint,
-    Index,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from datetime import datetime
-from typing import Any, Self
+
 from mimir.shared.clock import utc_now
 
 

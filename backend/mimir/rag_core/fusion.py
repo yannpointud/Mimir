@@ -7,8 +7,8 @@ map. It never touches the dense-only retrieval path, which keeps its cosine
 `similarity_threshold` semantics unchanged.
 """
 
-from dataclasses import dataclass
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 __all__ = ["RankedResult", "reciprocal_rank_fusion"]
 

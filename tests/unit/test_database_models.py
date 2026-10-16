@@ -6,7 +6,7 @@ Vérifie la logique métier et les contraintes
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from mimir.database.models import Document, Configuration, AuditLog
+from mimir.database.models import AuditLog, Configuration, Document
 
 
 class TestDocumentModel:

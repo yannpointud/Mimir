@@ -8,8 +8,9 @@ Includes all details: user query, vector search, context, LLM calls, and final r
 import json
 import logging
 from datetime import datetime
-from typing import Any
 from pathlib import Path
+from typing import Any
+
 from mimir.shared.clock import utc_now
 
 

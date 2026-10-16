@@ -5,9 +5,10 @@ This module provides middleware and dependency functions for protecting routes
 with JWT authentication.
 """
 
-from fastapi import HTTPException, status, Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from mimir.auth.jwt_handler import jwt_handler
 

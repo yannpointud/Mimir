@@ -2,25 +2,25 @@
 Unit tests for document management endpoints.
 """
 
-import pytest
-
-from mimir.shared.errors import NotFoundError
 import asyncio
 import tempfile
-from unittest.mock import Mock, patch, AsyncMock, mock_open
 from pathlib import Path
-from fastapi import HTTPException, status, UploadFile
+from unittest.mock import AsyncMock, Mock, mock_open, patch
+
+import pytest
+from fastapi import HTTPException, UploadFile, status
 
 from mimir.api.endpoints.documents import (
-    list_documents,
-    get_document,
-    upload_document,
     delete_document,
-    toggle_document_preservation,
-    reprocess_document,
+    get_document,
     get_document_stats,
+    list_documents,
+    reprocess_document,
+    toggle_document_preservation,
+    upload_document,
 )
 from mimir.shared.clock import utc_now
+from mimir.shared.errors import NotFoundError
 
 
 class TestDocumentEndpoints:

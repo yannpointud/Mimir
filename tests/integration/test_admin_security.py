@@ -13,7 +13,6 @@ from mimir.auth.jwt_handler import jwt_handler
 from mimir.config import settings
 from mimir.shared.constants import MASKED_VALUE
 
-
 CONFIG_ROUTES = [
     "/api/v1/admin/config",
     "/api/v1/admin/config",

@@ -5,21 +5,23 @@ Provides integration with Mistral AI's API for text generation and embeddings
 
 import asyncio
 import json
-import aiohttp
 import time
 from collections.abc import AsyncIterator
 from typing import Any, Self
 
-from mimir.monitoring.rag_debug_logger import RagDebugService
+import aiohttp
+
+from mimir.config import settings
 from mimir.llm_interface.interfaces import (
     AbstractLLMService,
-    GenerationResponse,
     EmbeddingResponse,
+    GenerationResponse,
     LLMAPIError,
-    LLMRateLimitError,
     LLMInvalidRequestError,
+    LLMRateLimitError,
 )
 from mimir.monitoring.logger import setup_logger
+from mimir.monitoring.rag_debug_logger import RagDebugService
 
 logger = setup_logger(__name__)
 
@@ -185,7 +187,7 @@ class MistralAPIService(AbstractLLMService):
                         raise LLMAPIError(error_msg)
 
             except (aiohttp.ClientError, TimeoutError) as e:
-                error_msg = f"Network error: {str(e)}"
+                error_msg = f"Network error: {e!s}"
                 logger.error(error_msg)
                 last_exception = LLMAPIError(error_msg)
 
@@ -425,8 +427,6 @@ class MistralAPIService(AbstractLLMService):
         if not texts:
             raise LLMInvalidRequestError("No texts provided for embedding")
 
-        from mimir.config import settings
-
         batch_size = settings.embedding_batch_size
 
         start_time = time.time()
@@ -560,7 +560,7 @@ class MistralAPIService(AbstractLLMService):
             return True
 
         except Exception as e:  # noqa: BLE001 - health probe: any failure is reported as unavailable
-            logger.warning(f"Mistral API health check failed: {str(e)}")
+            logger.warning(f"Mistral API health check failed: {e!s}")
             return False
 
     @property

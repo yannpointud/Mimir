@@ -5,14 +5,15 @@ This module provides asynchronous email sending capabilities for
 escalating user conversations to human support agents.
 """
 
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
+import logging
+from datetime import datetime
 from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import formatdate
 from typing import Any
-from datetime import datetime
-import logging
+
 import aiosmtplib
 from jinja2 import Template
 

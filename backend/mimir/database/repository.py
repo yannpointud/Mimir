@@ -3,19 +3,18 @@ Repository pattern for persistence abstraction
 Implements CRUD operations with robust error handling
 """
 
-from typing import Any
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
-from sqlalchemy import desc, asc, func, update
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from datetime import timedelta
 import logging
+from datetime import timedelta
+from typing import Any
 
-from mimir.shared.errors import ConflictError, NotFoundError
+from sqlalchemy import asc, desc, func, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from mimir.database.models import Document, Configuration, AuditLog, LlmUsage, LlmBudgetLedger
+from mimir.database.models import AuditLog, Configuration, Document, LlmBudgetLedger, LlmUsage
 from mimir.shared.clock import utc_now
-
+from mimir.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger(__name__)
 

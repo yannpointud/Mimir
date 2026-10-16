@@ -3,21 +3,21 @@ Tests pour couvrir les lignes manquantes dans database/repository.py
 Couvre la gestion d'erreurs, cas limites et fonctionnalités non testées
 """
 
-import pytest
 from datetime import timedelta
 from unittest.mock import Mock, patch
+
+import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from mimir.shared.errors import NotFoundError
-
 from mimir.database.repository import (
-    DocumentRepository,
-    ConfigurationRepository,
     AuditLogRepository,
     BaseRepository,
+    ConfigurationRepository,
+    DocumentRepository,
     create_repositories,
 )
 from mimir.shared.clock import utc_now
+from mimir.shared.errors import NotFoundError
 
 
 class TestBaseRepository:

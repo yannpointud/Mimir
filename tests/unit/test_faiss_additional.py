@@ -3,11 +3,12 @@ Tests unitaires supplémentaires pour FaissVectorStore
 Focus sur l'amélioration de la couverture
 """
 
-import pytest
-import numpy as np
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import numpy as np
+import pytest
 
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.rag_core.interfaces import Chunk, VectorStoreOperationError

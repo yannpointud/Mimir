@@ -19,8 +19,8 @@ from mimir.config import settings
 from mimir.database.connection import get_db_session
 from mimir.database.models import Document
 from mimir.email_service.smtp_client import email_service
-from mimir.shared.models import HealthCheckResponse
 from mimir.shared.clock import utc_now
+from mimir.shared.models import HealthCheckResponse
 
 logger = logging.getLogger(__name__)
 

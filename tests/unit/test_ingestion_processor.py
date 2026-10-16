@@ -2,20 +2,21 @@
 Tests unitaires pour le processeur d'ingestion principal
 """
 
-import pytest
-import tempfile
-import shutil
 import asyncio
+import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
-from mimir.ingestion.processor import IngestionProcessor, ProcessingError
-from mimir.shared.errors import IngestionError, NotFoundError
-from mimir.ingestion.queue_manager import IngestionTask
+import pytest
+
+from mimir.cost.budget_guard import BudgetReservation
 from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor, ProcessingError
+from mimir.ingestion.queue_manager import IngestionTask
 from mimir.llm_interface.interfaces import EmbeddingResponse, LLMException
 from mimir.rag_core.interfaces import Chunk
-from mimir.cost.budget_guard import BudgetReservation
+from mimir.shared.errors import IngestionError, NotFoundError
 
 
 class TestIngestionProcessor:

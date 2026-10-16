@@ -18,12 +18,12 @@ Mock/synthetic only: no real Mistral call, no real embeddings.
 
 import asyncio
 import math
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import numpy as np
 
-from mimir.rag_core.interfaces import Chunk, SearchResult
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk, SearchResult
 from mimir.services.rag_service import _process_question_with_rag_stream
 
 

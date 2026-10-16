@@ -2,10 +2,11 @@
 Tests unitaires pour le service de debug RAG
 """
 
-import pytest
 import json
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 from mimir.monitoring.rag_debug_logger import RagDebugService, _make_json_serializable
 

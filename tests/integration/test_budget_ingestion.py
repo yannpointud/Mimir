@@ -3,7 +3,7 @@ Integration tests for the ingestion budget fail-closed path.
 
 Covers three guarantees:
   - A budget-exhausted document stops cleanly with status 'error' and message
-    "Daily budget exceeded", and is NOT retried (BudgetExceededError is
+    "Daily budget exceeded", and is NOT retried (BudgetExceeded is
     caught before the generic except, non-retriable).
   - A budget-blocked ingestion makes no embedding call to Mistral.
   - A successful ingestion records the embedding usage as a llm_usage row
@@ -22,13 +22,14 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from mimir.cost.budget_guard import BudgetExceededError, BudgetGuard, BudgetReservation
+from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
 from mimir.cost.usage_tracker import UsageTracker
 from mimir.database.connection import db_manager
 from mimir.database.models import LlmUsage
 from mimir.ingestion.processor import IngestionProcessor
 from mimir.ingestion.queue_manager import IngestionTask
 from mimir.llm_interface.interfaces import EmbeddingResponse
+from mimir.shared.errors import BudgetExceeded
 
 
 def _usage_rows():
@@ -136,7 +137,7 @@ class TestBudgetFailClosed:
         self, mock_document_repository, mock_vector_store
     ):
         """Direct pipeline-level check (bypassing _process_task) that a
-        rejected reservation raises BudgetExceededError, proving the raise
+        rejected reservation raises BudgetExceeded, proving the raise
         site independently of the _process_task fail-closed handling."""
         rejecting_guard = Mock(spec=BudgetGuard)
         rejecting_guard.reserve = Mock(return_value=None)
@@ -155,7 +156,7 @@ class TestBudgetFailClosed:
         task = _single_chunk_task()
         extract_patch, chunk_patch = _patched_pipeline(processor)
 
-        with extract_patch, chunk_patch, pytest.raises(BudgetExceededError):
+        with extract_patch, chunk_patch, pytest.raises(BudgetExceeded):
             await processor._process_document_pipeline(task)
 
         mock_llm.embed.assert_not_called()

@@ -7,23 +7,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-# Import document processing libraries
-try:
-    import pypdf
-except ImportError:
-    # Optional dependency: PDFExtractor checks for None before using it.
-    pypdf = None  # type: ignore[assignment]
-
-try:
-    from docx import Document as DocxDocument
-except ImportError:
-    DocxDocument = None
-
-try:
-    import markdown
-except ImportError:
-    # Optional dependency: MarkdownExtractor checks for None before using it.
-    markdown = None  # type: ignore[assignment]
+import markdown
+import pypdf
+from docx import Document as DocxDocument
 
 from mimir.monitoring.logger import setup_logger
 from mimir.shared.errors import IngestionError
@@ -76,12 +62,6 @@ class TextExtractor(ABC):
 class PDFExtractor(TextExtractor):
     """Extract text from PDF files using pypdf"""
 
-    def __init__(self) -> None:
-        if pypdf is None:
-            raise ImportError(
-                "pypdf is required for PDF extraction. Install with: pip install pypdf"
-            )
-
     def can_extract(self, file_path: str) -> bool:
         """Check if file is PDF"""
         return Path(file_path).suffix.lower() == ".pdf"
@@ -102,7 +82,7 @@ class PDFExtractor(TextExtractor):
                     logger.warning(f"PDF is encrypted, attempting to decrypt: {file_path}")
                     try:
                         reader.decrypt("")  # Try empty password
-                    except Exception as exc:  # noqa: BLE001 - any decryption failure becomes ExtractionError
+                    except Exception as exc:
                         raise ExtractionError(f"Cannot decrypt encrypted PDF: {file_path}") from exc
 
                 # Extract text from each page
@@ -113,7 +93,7 @@ class PDFExtractor(TextExtractor):
                             text_parts.append(page_text)
                     except Exception as e:  # noqa: BLE001 - per-page best effort: a broken page is skipped
                         logger.warning(
-                            f"Failed to extract text from page {page_num + 1} in {file_path}: {str(e)}"
+                            f"Failed to extract text from page {page_num + 1} in {file_path}: {e!s}"
                         )
                         continue
 
@@ -142,20 +122,14 @@ class PDFExtractor(TextExtractor):
 
             return extracted_text
 
-        except Exception as e:  # noqa: BLE001 - any parser failure becomes ExtractionError
-            error_msg = f"Failed to extract text from PDF {file_path}: {str(e)}"
+        except Exception as e:
+            error_msg = f"Failed to extract text from PDF {file_path}: {e!s}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
 
 
 class DOCXExtractor(TextExtractor):
     """Extract text from DOCX files using python-docx"""
-
-    def __init__(self) -> None:
-        if DocxDocument is None:
-            raise ImportError(
-                "python-docx is required for DOCX extraction. Install with: pip install python-docx"
-            )
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is DOCX"""
@@ -206,8 +180,8 @@ class DOCXExtractor(TextExtractor):
 
             return extracted_text
 
-        except Exception as e:  # noqa: BLE001 - any parser failure becomes ExtractionError
-            error_msg = f"Failed to extract text from DOCX {file_path}: {str(e)}"
+        except Exception as e:
+            error_msg = f"Failed to extract text from DOCX {file_path}: {e!s}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
 
@@ -215,7 +189,7 @@ class DOCXExtractor(TextExtractor):
 class TXTExtractor(TextExtractor):
     """Extract text from plain text files"""
 
-    SUPPORTED_ENCODINGS = ["utf-8", "utf-16", "latin-1", "cp1252"]
+    SUPPORTED_ENCODINGS = ("utf-8", "utf-16", "latin-1", "cp1252")
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is text file"""
@@ -266,10 +240,6 @@ class MarkdownExtractor(TextExtractor):
     def __init__(self, convert_to_html: bool = False) -> None:
         """Optionally convert the Markdown to HTML first (requires the markdown library)."""
         self.convert_to_html = convert_to_html
-        if convert_to_html and markdown is None:
-            raise ImportError(
-                "markdown is required for HTML conversion. Install with: pip install markdown"
-            )
 
     def can_extract(self, file_path: str) -> bool:
         """Check if file is Markdown"""
@@ -286,7 +256,7 @@ class MarkdownExtractor(TextExtractor):
             with open(file_path, encoding="utf-8") as file:
                 content = file.read()
 
-            if self.convert_to_html and markdown is not None:
+            if self.convert_to_html:
                 # Convert markdown to HTML (preserves structure better)
                 content = markdown.markdown(content)
 
@@ -304,8 +274,8 @@ class MarkdownExtractor(TextExtractor):
 
             return content
 
-        except Exception as e:  # noqa: BLE001 - any parser failure becomes ExtractionError
-            error_msg = f"Failed to extract text from Markdown {file_path}: {str(e)}"
+        except Exception as e:
+            error_msg = f"Failed to extract text from Markdown {file_path}: {e!s}"
             logger.error(error_msg)
             raise ExtractionError(error_msg) from e
 
@@ -318,35 +288,12 @@ class ExtractorFactory:
         self._initialize_extractors()
 
     def _initialize_extractors(self) -> None:
-        # Add extractors in order of preference
-
-        # PDF extractor
-        try:
-            self._extractors.append(PDFExtractor())
-            logger.debug("PDF extractor initialized")
-        except ImportError as e:
-            logger.warning(f"PDF extractor not available: {e}")
-
-        # DOCX extractor
-        try:
-            self._extractors.append(DOCXExtractor())
-            logger.debug("DOCX extractor initialized")
-        except ImportError as e:
-            logger.warning(f"DOCX extractor not available: {e}")
-
-        # Markdown extractor (with HTML conversion if available)
-        try:
-            self._extractors.append(MarkdownExtractor(convert_to_html=True))
-            logger.debug("Markdown extractor initialized (with HTML conversion)")
-        except ImportError:
-            self._extractors.append(MarkdownExtractor(convert_to_html=False))
-            logger.debug("Markdown extractor initialized (plain text)")
-
-        # Plain text extractor (always available)
-        self._extractors.append(TXTExtractor())
-        logger.debug("TXT extractor initialized")
-
-        logger.info(f"Initialized {len(self._extractors)} text extractors")
+        self._extractors = [
+            PDFExtractor(),
+            DOCXExtractor(),
+            MarkdownExtractor(convert_to_html=True),
+            TXTExtractor(),
+        ]
 
     def get_extractor(self, file_path: str) -> TextExtractor | None:
         """Get appropriate extractor for file"""

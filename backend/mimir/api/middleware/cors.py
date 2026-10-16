@@ -5,10 +5,12 @@ This module provides CORS (Cross-Origin Resource Sharing) middleware
 configuration for the Mimir API.
 """
 
-from fastapi.middleware.cors import CORSMiddleware
-from mimir.config import settings
 import logging
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from mimir.config import settings
 
 logger = logging.getLogger(__name__)
 

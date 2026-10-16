@@ -8,8 +8,8 @@ only the environment variable names are reported.
 """
 
 from mimir.auth.jwt_handler import jwt_handler
-from mimir.monitoring.logger import setup_logger
 from mimir.config import Settings
+from mimir.monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 

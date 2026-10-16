@@ -6,6 +6,7 @@ import logging
 import sqlite3
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Any
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
@@ -14,7 +15,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mimir import config
 from mimir.database.models import Base
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

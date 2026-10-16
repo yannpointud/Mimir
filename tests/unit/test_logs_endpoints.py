@@ -2,9 +2,9 @@
 Tests pour les endpoints de logs frontend.
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
 
 from mimir.api.endpoints.logs import (
     FrontendLogEntry,

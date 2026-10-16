@@ -12,16 +12,15 @@ Fixture style mirrors tests/unit/test_faiss_vector_store.py (tempdir persistence
 absolute mimir.* imports, pytest.raises for error paths).
 """
 
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
 
-from mimir.rag_core.tokenizer_fr import light_french_tokenizer
 from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
 from mimir.rag_core.interfaces import VectorStoreOperationError
-
+from mimir.rag_core.tokenizer_fr import light_french_tokenizer
 
 # --------------------------------------------------------------------------- #
 # Light French tokenizer                                                      #

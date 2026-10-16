@@ -4,8 +4,9 @@ Provides base classes for implementing different vector store providers
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Protocol
 from dataclasses import dataclass
+from typing import Any, Protocol
+
 import numpy as np
 
 from mimir.shared.errors import RetrievalError

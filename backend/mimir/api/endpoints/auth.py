@@ -5,25 +5,24 @@ This module provides authentication endpoints for admin login
 and token management.
 """
 
-from datetime import timedelta
-from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
-from pydantic import BaseModel
-from sqlalchemy.exc import SQLAlchemyError
 import logging
-
+from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel
 from slowapi.util import get_remote_address
+from sqlalchemy.exc import SQLAlchemyError
 
+from mimir.api.client_ip import get_client_ip
+from mimir.api.dependencies import get_audit_log_repository
+from mimir.api.middleware.rate_limit import limiter
 from mimir.auth.jwt_handler import jwt_handler
 from mimir.auth.middleware import get_current_user, require_admin
 from mimir.auth.password_utils import validate_password_strength
-from mimir.database.repository import AuditLogRepository
-from mimir.api.dependencies import get_audit_log_repository
-from mimir.api.middleware.rate_limit import limiter
-from mimir.api.client_ip import get_client_ip
 from mimir.config import settings
+from mimir.database.repository import AuditLogRepository
 
 logger = logging.getLogger(__name__)
 

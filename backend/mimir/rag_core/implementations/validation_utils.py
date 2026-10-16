@@ -2,12 +2,12 @@
 Validation utilities for detecting inconsistencies between SQLite and FAISS
 """
 
-from typing import Any
 import logging
-from mimir.shared.clock import utc_now
+from typing import Any
+
 from mimir.database.repository import DocumentRepository
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
-
+from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 

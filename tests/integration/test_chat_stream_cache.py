@@ -24,16 +24,15 @@ service is visible to the route's read.
 """
 
 import json
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock
 
 from mimir.config import settings
 from mimir.database.connection import db_manager
 from mimir.database.models import LlmUsage
 from mimir.llm_interface.interfaces import EmbeddingResponse
-
 
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
 
@@ -147,14 +146,14 @@ def rag_with_mocks(isolated_db_manager):
     and assert Mistral call counts. Keeps the real budget_guard / usage_tracker
     / rag_debug singletons and the singleton chat cache (shared with the
     route's read)."""
-    from mimir.main import app
     from mimir.api.dependencies import (
-        get_rag_service,
-        get_rag_debug_service,
         get_budget_guard,
-        get_usage_tracker,
         get_chat_cache_service,
+        get_rag_debug_service,
+        get_rag_service,
+        get_usage_tracker,
     )
+    from mimir.main import app
     from mimir.services.rag_service import RagService
 
     mock_llm, embed_calls, gen_calls = _make_mock_llm()
@@ -285,10 +284,10 @@ class TestStreamCacheAntiPartial:
     @pytest.mark.asyncio
     async def test_disconnect_before_done_stores_no_entry(self, isolated_db_manager):
         from mimir.api.dependencies import (
-            get_rag_debug_service,
             get_budget_guard,
-            get_usage_tracker,
             get_chat_cache_service,
+            get_rag_debug_service,
+            get_usage_tracker,
         )
         from mimir.services.rag_service import RagService
 

@@ -7,31 +7,32 @@ scoring -> LLM generation) as a framework-agnostic RagService class, usable
 without HTTP, notably by the RAGAS evaluation harness.
 """
 
+import asyncio
+import logging
+import os
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from typing import Any
-import asyncio
-import logging
 
 import numpy as np
-from sqlalchemy.exc import SQLAlchemyError
 from rapidfuzz import fuzz
+from sqlalchemy.exc import SQLAlchemyError
 
 from mimir.cache.lru_cache import ChatCacheService
+from mimir.config import settings
+from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
+from mimir.cost.usage_tracker import UsageTracker
 from mimir.database.repository import DocumentRepository
 from mimir.llm_interface.interfaces import AbstractLLMService, EmbeddingResponse
+from mimir.monitoring.rag_debug_logger import RagDebugService
+from mimir.rag_core.fusion import reciprocal_rank_fusion
 from mimir.rag_core.interfaces import (
     AbstractVectorStore,
     LexicalIndex,
     SearchResult,
     VectorStoreOperationError,
 )
-from mimir.rag_core.fusion import reciprocal_rank_fusion
-from mimir.monitoring.rag_debug_logger import RagDebugService
-from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
-from mimir.cost.usage_tracker import UsageTracker
-from mimir.config import settings
 from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 # dedicated hybrid threshold trims the result.
 _HYBRID_POOL_SIZE = 50
 
-# System prompt template for RAG context-based responses (moved from chat.py)
+# System prompt template for RAG context-based responses
 MIMIR_SYSTEM_PROMPT = """Vous êtes Mimir, un assistant documentaire intelligent.
 Votre rôle est de répondre aux questions en vous basant UNIQUEMENT sur le contexte documentaire fourni.
 
@@ -79,8 +80,6 @@ def _clean_filename(filename: str) -> str:
     Example: "2e821c8cd63bcacaca47f4f52576ff08fadbad66dde9e359a3fbae80da79a818_CV_Yann_POINTUD.pdf"
             -> "CV Yann POINTUD"
     """
-    import os
-
     # Remove the path if present
     filename = os.path.basename(filename)
 
@@ -318,12 +317,8 @@ def _calculate_weighted_confidence(
     elif algorithm == "weighted":
         # Improved algorithm with degressive weighting
 
-        # Position-weighting assumes a descending-score order. Sort defensively so
-        # the metric stays order-agnostic: on the retrieval path the list is
-        # already sorted, so this is a no-op (byte-identical); the sort only guards
-        # the scoring against any future caller that would pass an unsorted list. The
-        # coherence and quality factors below use max()/std() and are already
-        # order-independent.
+        # Position weighting needs the scores in descending order; the coherence
+        # and quality factors below are order-independent.
         scores = sorted(scores, reverse=True)
 
         # 1. Position-weighted score (first results count more)
@@ -923,8 +918,8 @@ async def _process_question_with_rag_stream(
             chat_cache, corpus_version, question, "".join(answer_parts), context, confidence_score
         )
 
-    except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event
-        logger.error(f"Streaming RAG pipeline failed: {str(e)}", exc_info=True)
+    except Exception as e:
+        logger.error(f"Streaming RAG pipeline failed: {e!s}", exc_info=True)
         rag_debug.log_error(
             session_id=session_id,
             error_type=type(e).__name__,

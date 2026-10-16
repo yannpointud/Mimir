@@ -436,9 +436,9 @@ class OracleEnv:
     """A fully isolated Mimir instance driven through the FastAPI app."""
 
     def __init__(self, tmp: Path):
-        from mimir.main import app
         from mimir.api import dependencies
         from mimir.auth.jwt_handler import jwt_handler
+        from mimir.main import app
         from mimir.services.rag_service import RagService
 
         self.tmp = tmp

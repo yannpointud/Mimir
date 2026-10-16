@@ -2,12 +2,13 @@
 Unit tests for authentication endpoints.
 """
 
-import pytest
-from sqlalchemy.exc import OperationalError
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi import HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy.exc import OperationalError
 
 from mimir.api.endpoints.auth import LoginRequest, LoginResponse, TokenRefreshResponse
 
@@ -273,7 +274,7 @@ class TestAuthIntegration:
     @patch("mimir.api.endpoints.auth._log_auth_event")
     def test_full_auth_workflow(self, mock_log_event, mock_settings, mock_jwt, mock_auth):
         """Test full authentication workflow."""
-        from mimir.api.endpoints.auth import login, refresh_token, logout
+        from mimir.api.endpoints.auth import login, logout, refresh_token
 
         # Configure mocks
         mock_auth.return_value = True

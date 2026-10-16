@@ -3,12 +3,13 @@ Tests d'intégration pour les endpoints API de Mimir
 Tests complets des fonctionnalités avec authentification, validation et cas d'erreur
 """
 
-import pytest
 import json
 import time
 from pathlib import Path  # noqa: F401
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch  # noqa: F401
+
+import pytest
+from fastapi.testclient import TestClient
 
 
 def _sse_events(body):

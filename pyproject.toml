@@ -43,7 +43,9 @@ extend-exclude = [
 # BLE = flake8-blind-except (`except Exception` swallowing errors)
 # C90 = mccabe cyclomatic complexity
 # TID = flake8-tidy-imports (absolute imports only)
-select = ["F", "E9", "B", "SIM", "UP", "BLE", "C90", "TID"]
+# I   = isort (import order)
+# RUF = ruff-specific rules
+select = ["F", "E9", "B", "SIM", "UP", "BLE", "C90", "TID", "I", "RUF"]
 ignore = [
     # FastAPI dependency injection relies on calls in argument defaults
     # (Depends(), Query(), File(), Form()).

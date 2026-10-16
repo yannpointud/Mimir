@@ -5,9 +5,10 @@ Ce module teste les fonctionnalités d'envoi d'emails pour les escalations
 et notifications du système Mimir.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import aiosmtplib
 import pytest
-from unittest.mock import patch, AsyncMock
 
 from mimir.email_service.smtp_client import EmailService
 

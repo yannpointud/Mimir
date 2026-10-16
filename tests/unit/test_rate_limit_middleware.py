@@ -3,12 +3,13 @@ Tests for the rate limiting module.
 """
 
 from unittest.mock import Mock, patch
+
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 
 from mimir.api.middleware.rate_limit import (
-    get_client_identifier,
     configure_rate_limiting,
+    get_client_identifier,
     limiter,
 )
 

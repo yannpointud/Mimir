@@ -7,7 +7,7 @@ Creates the tables and can insert test data.
 import contextlib
 import sys
 
-from mimir.database.connection import init_database, reset_database, db_manager
+from mimir.database.connection import db_manager, init_database, reset_database
 from mimir.database.repository import create_repositories
 
 

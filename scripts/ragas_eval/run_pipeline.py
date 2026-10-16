@@ -31,9 +31,9 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
-from collections.abc import Awaitable, Callable, Sequence
 
 from scripts.ragas_eval.golden_set_schema import (
     GoldenSetEntry,
@@ -256,8 +256,8 @@ def main(argv: list[str] | None = None) -> int:
     # Deferred imports: pulling these at module top would drag FastAPI in for a
     # bare --help. Providers build the same singletons the API uses.
     from mimir.api.dependencies import (
-        get_budget_guard,
         get_bm25_store,
+        get_budget_guard,
         get_rag_service,
         get_vector_store,
     )

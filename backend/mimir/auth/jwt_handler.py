@@ -6,14 +6,16 @@ as well as password hashing/verification using Argon2 (with Bcrypt kept as a
 legacy verification-only hasher for pre-migration credentials).
 """
 
+import logging
 from datetime import timedelta
 from typing import Any
-import logging
+
 import jwt  # PyJWT
 from pwdlib import PasswordHash
 from pwdlib.exceptions import UnknownHashError
 from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
+
 from mimir.config import settings
 from mimir.shared.clock import utc_now
 

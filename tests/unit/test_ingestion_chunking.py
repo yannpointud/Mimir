@@ -3,7 +3,8 @@ Tests unitaires pour le chunking de texte intelligent
 """
 
 import pytest
-from mimir.ingestion.chunking import ChunkingStrategy, ChunkingConfig
+
+from mimir.ingestion.chunking import ChunkingConfig, ChunkingStrategy
 from mimir.ingestion.extractors import MarkdownExtractor
 
 
@@ -588,7 +589,7 @@ class TestCleanTextExact:
 
 
 class TestParagraphChunkingExact:
-    PARAGRAPHS = ["Alpha one. Alpha two.", "Beta one. Beta two.", "Gamma one. Gamma two."]
+    PARAGRAPHS = ("Alpha one. Alpha two.", "Beta one. Beta two.", "Gamma one. Gamma two.")
 
     def _strategy(self, chunk_size, max_chunk_size=200):
         return ChunkingStrategy(

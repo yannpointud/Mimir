@@ -34,9 +34,9 @@ import argparse
 import asyncio
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
-from collections.abc import Sequence
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -245,12 +245,12 @@ def _hybrid_document_ids(question: str, embedding, vector_store, bm25_store, set
     without the generation step, so the collected document_ids match the live
     hybrid pipeline's sources.
     """
+    from mimir.rag_core.fusion import reciprocal_rank_fusion
     from mimir.services.rag_service import (
         _HYBRID_POOL_SIZE,
         _filter_dynamic_sources,
         _merge_and_attach_rrf_scores,
     )
-    from mimir.rag_core.fusion import reciprocal_rank_fusion
 
     dense_pool = vector_store.query(
         vector=embedding,
@@ -338,14 +338,14 @@ def main(argv: list[str] | None = None) -> int:
     # Deferred imports: pulling these at module top would drag the backend
     # service stack in for a bare --help. Providers build the same singletons
     # the API uses.
-    from mimir.config import settings
     from mimir.api.dependencies import (
-        get_budget_guard,
         get_bm25_store,
+        get_budget_guard,
         get_llm_service,
         get_usage_tracker,
         get_vector_store,
     )
+    from mimir.config import settings
 
     queries = _load_exact_term_queries(Path(args.queries))
 

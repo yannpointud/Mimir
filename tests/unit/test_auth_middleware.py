@@ -5,16 +5,17 @@ Ce module teste les composants d'authentification JWT, incluant
 les tokens bearer, les dépendances utilisateur et les vérifications admin.
 """
 
-import pytest
 from unittest.mock import Mock, patch
-from fastapi import HTTPException, status, Request
+
+import pytest
+from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from mimir.auth.middleware import (
     JWTBearer,
     get_current_user,
-    require_admin,
     get_optional_user,
+    require_admin,
 )
 
 

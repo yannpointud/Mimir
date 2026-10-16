@@ -5,34 +5,35 @@ This module provides the main chat endpoint for user questions
 and responses based on document context.
 """
 
+import asyncio
+import hashlib
+import logging
+from datetime import datetime
 from typing import Any
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
-from starlette.background import BackgroundTask
 from pydantic import BaseModel, Field
-from datetime import datetime
-import asyncio
-import logging
-import hashlib
+from starlette.background import BackgroundTask
 
-from mimir.auth.middleware import get_optional_user
-from mimir.api.middleware.rate_limit import limiter, get_client_identifier
-from mimir.api.responses import budget_exceeded_response
-from mimir.cache.lru_cache import ChatCacheService
-from mimir.email_service.smtp_client import EmailService
+from mimir.api.client_ip import get_client_ip
 from mimir.api.dependencies import (
-    get_chat_cache_service,
-    get_email_service,
-    get_document_repository,
-    get_rag_debug_service,
     get_budget_guard,
+    get_chat_cache_service,
+    get_document_repository,
+    get_email_service,
+    get_rag_debug_service,
     get_rag_service,
 )
-from mimir.database.repository import DocumentRepository
-from mimir.monitoring.rag_debug_logger import RagDebugService
-from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
-from mimir.api.client_ip import get_client_ip
+from mimir.api.middleware.rate_limit import get_client_identifier, limiter
+from mimir.api.responses import budget_exceeded_response
+from mimir.auth.middleware import get_optional_user
+from mimir.cache.lru_cache import ChatCacheService
 from mimir.config import settings
+from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
+from mimir.database.repository import DocumentRepository
+from mimir.email_service.smtp_client import EmailService
+from mimir.monitoring.rag_debug_logger import RagDebugService
 
 # RAG pipeline lives in mimir.services.rag_service and the SSE stream in
 # mimir.services.chat_stream: the route stays HTTP-pure (parse + budget gate +

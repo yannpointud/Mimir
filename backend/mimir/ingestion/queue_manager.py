@@ -6,6 +6,7 @@ Provides data structures for document processing
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+
 from mimir.shared.clock import utc_now
 
 

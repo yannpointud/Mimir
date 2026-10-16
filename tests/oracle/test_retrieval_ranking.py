@@ -95,7 +95,7 @@ def test_retrieval_ranking_for_fixed_questions(oracle_corpus_env, index):
             _hit(r) for r in env.vector_store.query(vector, top_k=10, similarity_floor=0.0)
         ],
         "store_bm25": [
-            by_chunk_id.get(chunk_id, ["?", -1]) + [int(chunk_id), round(float(score), 4)]
+            [*by_chunk_id.get(chunk_id, ["?", -1]), int(chunk_id), round(float(score), 4)]
             for chunk_id, score in env.bm25_store.query(question, 10)
         ],
         "pipeline_dense": _pipeline(env, question, hybrid=False),

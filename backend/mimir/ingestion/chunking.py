@@ -4,8 +4,9 @@ Provides intelligent text segmentation for optimal RAG performance
 """
 
 import re
-from typing import Any
 from dataclasses import dataclass
+from typing import Any
+
 from mimir.monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -34,9 +35,8 @@ class ChunkingConfig:
     max_chunk_size: int = 3000  # Maximum chunk size before force split (increased for resumes)
     preserve_sentences: bool = True  # Try to keep sentences intact
     preserve_paragraphs: bool = True  # Try to keep paragraphs intact
-    # Structure-aware chunking (feature flag). When True, each chunk dict
-    # gains a 'section_title' key derived from the nearest preceding heading.
-    # Default False keeps chunking output byte-identical to the current splitter.
+    # When True, each chunk dict gains a 'section_title' key taken from the
+    # nearest preceding heading (settings.structure_aware_chunking_enabled).
     section_title_tracking: bool = False
 
 
@@ -95,8 +95,8 @@ class ChunkingStrategy:
             )
 
         # Structure-aware pass (flag-gated): tag each chunk with its section
-        # title. Runs AFTER boundaries are fixed, so it never alters chunk text
-        # or positions — the flag-off path stays byte-identical.
+        # title. Runs after the boundaries are fixed: chunk text and positions
+        # are the same with or without it.
         if self.config.section_title_tracking:
             headings = self._detect_headings(cleaned_text)
             self._assign_section_titles(chunks, headings)
@@ -180,8 +180,8 @@ class ChunkingStrategy:
         pointer suffices: for each chunk, consume every heading whose signature
         matches inside it (updating the current section to the last consumed),
         then assign the current section to the chunk. Chunks before the first
-        heading get None. This never touches chunk text or positions, so the
-        flag-off path stays byte-identical. Mutates the chunk dicts in place.
+        heading get None. Chunk text and positions are untouched; the chunk
+        dicts are mutated in place.
         """
         current_section: str | None = None
         index = 0

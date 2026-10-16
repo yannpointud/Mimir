@@ -4,15 +4,16 @@ Unit tests for the auth/jwt_handler.py module
 These tests cover JWT token management and password hashing.
 """
 
-import pytest
-from pwdlib.exceptions import UnknownHashError
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
-from freezegun import freeze_time
+
 import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWTHandler
+import pytest
+from freezegun import freeze_time
+from pwdlib.exceptions import UnknownHashError
+
 from mimir.auth.jwt_handler import JWTHandler
 from mimir.shared.clock import utc_now
-
 
 # --- Backward-compatibility fixtures (frozen BEFORE the PyJWT/pwdlib migration) ---
 #

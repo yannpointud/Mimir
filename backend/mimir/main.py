@@ -1,24 +1,27 @@
 """Main FastAPI application for Mimir: entry point with the full configuration."""
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import uvicorn
-import time
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
-from mimir.config import settings
-from mimir.database.connection import init_database
-from mimir.security.admin_password import resolve_admin_password
-from mimir.security.startup_validation import validate_production_secrets
-from mimir.shared.errors import BudgetExceeded, ConflictError, MimirError, NotFoundError
-from mimir.shared.models import ErrorResponse, RootResponse
+from mimir.api.dependencies import (
+    close_llm_service,
+    get_bm25_store,
+    get_document_repository,
+    get_llm_service,
+    get_vector_store,
+    set_ingestion_processor,
+)
 
 # Import API endpoints
-from mimir.api.endpoints import health, auth, chat, documents, admin, logs
+from mimir.api.endpoints import admin, auth, chat, documents, health, logs
 
 # Import middleware
 from mimir.api.middleware.cors import configure_cors_middleware
@@ -27,22 +30,18 @@ from mimir.api.responses import budget_exceeded_response
 
 # Import services
 from mimir.cache.lru_cache import cache_service, chat_cache_service
+from mimir.config import settings
+from mimir.database.connection import db_manager, init_database
+from mimir.database.repository import DocumentRepository
 from mimir.email_service.smtp_client import email_service
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor
 from mimir.monitoring.alerting import setup_alerting
 from mimir.monitoring.logger import setup_logger
-from mimir.ingestion.processor import IngestionProcessor
-from mimir.ingestion.chunking import ChunkingConfig
-from mimir.api.dependencies import (
-    get_llm_service,
-    get_vector_store,
-    get_document_repository,
-    set_ingestion_processor,
-    get_bm25_store,
-)
-from pathlib import Path
-from mimir.database.repository import DocumentRepository
-from fastapi import Response
-
+from mimir.security.admin_password import resolve_admin_password
+from mimir.security.startup_validation import validate_production_secrets
+from mimir.shared.errors import BudgetExceeded, ConflictError, MimirError, NotFoundError
+from mimir.shared.models import ErrorResponse, RootResponse
 
 # Logging configuration with centralized system
 logger = setup_logger("main", level=settings.log_level.upper())
@@ -98,9 +97,6 @@ async def _start_ingestion() -> None:
         overlap=settings.chunk_overlap,
         section_title_tracking=settings.structure_aware_chunking_enabled,
     )
-
-    # Get database session
-    from mimir.database.connection import db_manager
 
     with db_manager.get_session_context() as session:
         document_repo = get_document_repository(session)
@@ -172,11 +168,7 @@ async def _stop_ingestion() -> None:
 async def _close_llm_service() -> None:
     """Close the LLM service's HTTP session to avoid "Event loop is closed"."""
     try:
-        from mimir.api.dependencies import _llm_service
-
-        if _llm_service is not None:
-            await _llm_service.close()
-            logger.info("LLM service closed gracefully")
+        await close_llm_service()
     except Exception as e:  # noqa: BLE001 - shutdown boundary: keep releasing the other resources
         logger.error(f"Error closing LLM service: {e}")
 

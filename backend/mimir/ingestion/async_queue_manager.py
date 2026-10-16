@@ -8,8 +8,8 @@ import asyncio
 import contextlib
 import random
 import time
-from typing import Any
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from mimir.ingestion.queue_manager import IngestionTask
 from mimir.monitoring.logger import setup_logger
@@ -207,7 +207,7 @@ class AsyncQueueManager:
                 # Timeout waiting for task - normal, continue
                 continue
             except Exception as e:  # noqa: BLE001 - worker boundary: the loop must survive any error
-                logger.error(f"Worker loop error: {str(e)}")
+                logger.error(f"Worker loop error: {e!s}")
                 await asyncio.sleep(1.0)  # Brief pause to prevent tight error loop
 
         logger.info("Async worker task stopped")
@@ -275,7 +275,7 @@ class AsyncQueueManager:
         except Exception as e:  # noqa: BLE001 - worker boundary: a failed task is retried, never fatal
             processing_time = time.time() - start_time
             logger.error(
-                f"Task processing failed after {processing_time:.2f}s: {task.file_path} - {str(e)}",
+                f"Task processing failed after {processing_time:.2f}s: {task.file_path} - {e!s}",
                 extra={
                     "extra_fields": {
                         "file_path": task.file_path,

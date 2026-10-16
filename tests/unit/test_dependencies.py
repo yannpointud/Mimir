@@ -2,13 +2,14 @@
 Tests pour les dépendances FastAPI.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
+import pytest
+
 from mimir.api.dependencies import (
+    get_ingestion_processor,
     get_llm_service,
     get_vector_store,
-    get_ingestion_processor,
     set_ingestion_processor,
 )
 

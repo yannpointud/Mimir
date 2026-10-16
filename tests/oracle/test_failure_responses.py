@@ -7,9 +7,9 @@ through ``app.dependency_overrides``; the snapshot pins the HTTP status and
 the JSON body (or the SSE events) returned to the client in each case.
 """
 
+from collections.abc import Callable, Iterable
 from contextlib import contextmanager
 from typing import Any
-from collections.abc import Callable, Iterable
 
 from sqlalchemy.exc import OperationalError
 

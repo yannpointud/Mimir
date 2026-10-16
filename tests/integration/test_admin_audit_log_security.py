@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from mimir.auth.jwt_handler import jwt_handler
 
-
 AUDIT_LOG_ROUTE = "/api/v1/admin/audit-log"
 
 

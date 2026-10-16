@@ -14,6 +14,8 @@ import logging
 import time
 
 from mimir.config import settings
+from mimir.email_service.smtp_client import email_service
+from mimir.monitoring.logger import app_logger
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +100,6 @@ class FingerprintAlertHandler(logging.Handler):
         self, fingerprint: str, record: logging.LogRecord, occurrences: int
     ) -> None:
         """Send one grouped alert. Body carries only non-sensitive fields."""
-        # Local import to avoid an import cycle at module load time.
-        from mimir.email_service.smtp_client import email_service
-
         subject = (
             f"Mimir error alert [{fingerprint}] {record.module}.{record.funcName}:{record.lineno}"
         )
@@ -132,10 +131,6 @@ def setup_alerting() -> None:
     Idempotent: guards against double-registration so repeated calls (e.g. on a
     reloading dev server) do not attach a second handler.
     """
-    # Local import to avoid an import cycle at module load time.
-    from mimir.email_service.smtp_client import email_service
-    from mimir.monitoring.logger import app_logger
-
     if not settings.alerting_enabled:
         logger.info("Error alerting disabled (settings.alerting_enabled is False)")
         return

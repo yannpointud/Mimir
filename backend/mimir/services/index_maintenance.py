@@ -19,8 +19,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from mimir.cache.lru_cache import cache_service, chat_cache_service
 from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
-from mimir.shared.models import ConsistencyValidationResponse
 from mimir.shared.clock import utc_now
+from mimir.shared.models import ConsistencyValidationResponse
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def record_rebuild_failure(audit_repo: Any, error: Exception, admin_user: str) -
         audit_repo.create_log(
             user_type="admin",
             action="vector_index_rebuild",
-            details=f"FAISS index rebuild failed: {str(error)}",
+            details=f"FAISS index rebuild failed: {error!s}",
             ip_address="system",
             success=False,
         )
@@ -215,7 +215,7 @@ def record_validation_failure(audit_repo: Any, error: Exception, initiated_by: s
     audit_repo.create_log(
         user_type="admin",
         action="maintenance_consistency_validation",
-        details=f"Consistency validation failed: {str(error)}",
+        details=f"Consistency validation failed: {error!s}",
         ip_address="system",
         success=False,
     )

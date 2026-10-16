@@ -2,26 +2,27 @@
 Tests unitaires pour FAISS Vector Store - Version corrigée selon le code réel
 """
 
-import pytest
-import numpy as np
-import tempfile
-import shutil
 import json
 import os
-import faiss
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import faiss
+import numpy as np
+import pytest
 from pydantic import ValidationError
 
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
 from mimir.rag_core.interfaces import (
     AbstractVectorStore,
     Chunk,
     SearchResult,
-    VectorStoreException,
     VectorStoreConnectionError,
+    VectorStoreException,
     VectorStoreOperationError,
 )
-from mimir.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
 
 
 class TestAbstractVectorStore:

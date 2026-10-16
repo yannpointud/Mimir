@@ -1,9 +1,9 @@
 """Tests unitaires pour l'application FastAPI principale."""
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from mimir.main import app

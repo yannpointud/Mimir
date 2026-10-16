@@ -10,7 +10,6 @@ import pytest
 
 from mimir.cost.pricing import compute_cost_eur
 
-
 PRICE_TABLE = {
     "mistral-small-latest": {"input": 0.10, "output": 0.30},
     "mistral-embed": {"input": 0.10, "output": 0.0},

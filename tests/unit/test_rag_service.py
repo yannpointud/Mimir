@@ -10,7 +10,7 @@ rag_debug. No real Mistral API call, no real FAISS index.
 """
 
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from mimir.rag_core.interfaces import SearchResult
 from mimir.services.rag_service import _process_question_with_rag_stream

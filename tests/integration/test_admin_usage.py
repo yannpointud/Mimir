@@ -18,7 +18,6 @@ from mimir.database.models import LlmBudgetLedger
 from mimir.database.repository import UsageRepository
 from mimir.shared.clock import utc_now
 
-
 USAGE_ROUTE = "/api/v1/admin/usage"
 CONFIG_ROUTE = "/api/v1/admin/config"
 

@@ -8,9 +8,9 @@ zero real Mistral network calls.
 """
 
 import json
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
 
 from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 

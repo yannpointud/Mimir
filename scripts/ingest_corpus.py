@@ -33,16 +33,16 @@ for _k, _v in dotenv_values(str(_BACKEND / ".env")).items():
     if _v is not None and _k not in os.environ:
         os.environ[_k] = _v
 
-from mimir.config import settings
-from mimir.database.connection import init_database, db_manager
-from mimir.ingestion.processor import IngestionProcessor
-from mimir.ingestion.chunking import ChunkingConfig
 from mimir.api.dependencies import (
+    get_bm25_store,
+    get_document_repository,
     get_llm_service,
     get_vector_store,
-    get_document_repository,
-    get_bm25_store,
 )
+from mimir.config import settings
+from mimir.database.connection import db_manager, init_database
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor
 
 SOURCE_DIR = _REPO_ROOT / "data" / "generated_documents"
 

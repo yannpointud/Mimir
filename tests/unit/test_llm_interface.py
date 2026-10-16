@@ -2,20 +2,21 @@
 Tests unitaires pour l'interface LLM et l'implémentation Mistral API - Version corrigée
 """
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-import aiohttp
+from unittest.mock import AsyncMock, Mock, patch
 
+import aiohttp
+import pytest
+
+from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 from mimir.llm_interface.interfaces import (
     AbstractLLMService,
-    GenerationResponse,
     EmbeddingResponse,
-    LLMException,
+    GenerationResponse,
     LLMAPIError,
-    LLMRateLimitError,
+    LLMException,
     LLMInvalidRequestError,
+    LLMRateLimitError,
 )
-from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 
 
 class TestAbstractLLMService:

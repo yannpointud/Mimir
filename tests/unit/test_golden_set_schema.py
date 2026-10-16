@@ -12,7 +12,6 @@ import json
 
 import pytest
 from pydantic import ValidationError
-
 from scripts.ragas_eval.generate_golden_set import (
     _build_generation_prompt,
     _parse_generation_response,

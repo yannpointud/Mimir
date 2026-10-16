@@ -40,7 +40,6 @@ from mimir.services import index_maintenance
 from mimir.services.document_upload import DocumentUpload, UploadPolicy
 from mimir.services.errors import RequestRejectedError
 
-
 # ---------------------------------------------------------------- B1
 
 

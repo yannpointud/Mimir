@@ -7,24 +7,23 @@ import asyncio
 import time
 from pathlib import Path
 from typing import Any
+
 import numpy as np
 
-from mimir.ingestion.extractors import ExtractorFactory, ExtractionError, UnsupportedFormatError
-from mimir.ingestion.chunking import ChunkingStrategy, ChunkingConfig
-from mimir.ingestion.async_queue_manager import AsyncQueueManager
-from mimir.ingestion.queue_manager import IngestionTask
-
-from mimir.llm_interface.interfaces import AbstractLLMService, LLMException, EmbeddingResponse
-from mimir.rag_core.interfaces import AbstractVectorStore, Chunk
-from mimir.database.repository import DocumentRepository
-from mimir.monitoring.logger import setup_logger
 from mimir.config import settings
-from mimir.cost.budget_guard import budget_guard as default_budget_guard
-from mimir.cost.usage_tracker import usage_tracker as default_usage_tracker
-from mimir.shared.errors import BudgetExceeded, IngestionError, NotFoundError
 from mimir.cost.budget_guard import BudgetGuard
+from mimir.cost.budget_guard import budget_guard as default_budget_guard
 from mimir.cost.usage_tracker import UsageTracker
-from mimir.rag_core.interfaces import LexicalIndex
+from mimir.cost.usage_tracker import usage_tracker as default_usage_tracker
+from mimir.database.repository import DocumentRepository
+from mimir.ingestion.async_queue_manager import AsyncQueueManager
+from mimir.ingestion.chunking import ChunkingConfig, ChunkingStrategy
+from mimir.ingestion.extractors import ExtractionError, ExtractorFactory, UnsupportedFormatError
+from mimir.ingestion.queue_manager import IngestionTask
+from mimir.llm_interface.interfaces import AbstractLLMService, EmbeddingResponse, LLMException
+from mimir.monitoring.logger import setup_logger
+from mimir.rag_core.interfaces import AbstractVectorStore, Chunk, LexicalIndex
+from mimir.shared.errors import BudgetExceeded, IngestionError, NotFoundError
 
 logger = setup_logger(__name__)
 
@@ -70,12 +69,9 @@ class IngestionProcessor:
         self.budget_guard = budget_guard or default_budget_guard
         self.usage_tracker = usage_tracker or default_usage_tracker
         self.bm25_store = bm25_store
-        # "Dirty" signal set on every successful FAISS upsert and cleared
-        # only by a successful BM25 rebuild. Lets the coalesced drain rebuild fire
-        # whenever the ingestion queue empties IF any document was upserted since
-        # the last rebuild -- even when the LAST document of a batch fails before
-        # Step 8, which previously left earlier docs' chunks permanently absent
-        # from BM25 until the next successful ingestion.
+        # Set by every successful FAISS upsert, cleared only by a successful BM25
+        # rebuild: the drain rebuild fires whenever the queue empties after an
+        # upsert, even when the last document of a batch fails.
         self._bm25_dirty = False
 
         # Initialize components
@@ -195,13 +191,13 @@ class IngestionProcessor:
                     int(task.document_id), "error", error_message="Daily budget exceeded"
                 )
             except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
-                logger.error(f"Failed to update document status: {str(db_error)}")
+                logger.error(f"Failed to update document status: {db_error!s}")
 
             task.retry_count = task.max_retries
             return False
 
         except Exception as e:  # noqa: BLE001 - worker boundary: a failing document must not stop the worker
-            error_msg = f"Task processing failed: {str(e)}"
+            error_msg = f"Task processing failed: {e!s}"
             logger.error(error_msg)
 
             try:
@@ -212,7 +208,7 @@ class IngestionProcessor:
                     error_message=error_msg[:500],  # Limit error message length
                 )
             except Exception as db_error:  # noqa: BLE001 - worker boundary: a status write failure is only logged
-                logger.error(f"Failed to update document status: {str(db_error)}")
+                logger.error(f"Failed to update document status: {db_error!s}")
 
             return False
 
@@ -367,7 +363,7 @@ class IngestionProcessor:
         except Exception as e:  # noqa: BLE001 - worker boundary: any failure marks the document as failed
             processing_time = time.time() - start_time
             logger.error(
-                f"Document processing pipeline failed after {processing_time:.2f}s: {str(e)}",
+                f"Document processing pipeline failed after {processing_time:.2f}s: {e!s}",
                 extra={
                     "extra_fields": {
                         "file_path": task.file_path,
@@ -397,13 +393,8 @@ class IngestionProcessor:
         Called from TWO places so the rebuild is owed on every terminal path:
         Step 8 of the success pipeline, and _process_task's finally block. The
         _bm25_dirty guard makes the pair idempotent -- whichever runs first clears
-        the flag and the second is a no-op. Previously the
-        rebuild was gated only inside the success path, so if the LAST document of
-        a multi-doc batch failed before Step 8, the earlier successfully-upserted
-        documents never got their coalesced rebuild and stayed absent from BM25
-        (hybrid retrieval silently lost them from the lexical pool) until the next
-        successful ingestion. Firing from the finally block on the failure path
-        fixes that.
+        the flag and the second is a no-op. Firing from the finally block keeps
+        the documents of a batch whose last document failed in BM25.
 
         A BM25 failure is non-fatal (FAISS already holds the chunks): log and keep
         _bm25_dirty set so a later drain retries. The blocking rebuild is offloaded
@@ -433,7 +424,7 @@ class IngestionProcessor:
         try:
             return self.extractor_factory.extract_text(file_path)
         except (ExtractionError, UnsupportedFormatError) as e:
-            raise ProcessingError(f"Text extraction failed: {str(e)}") from e
+            raise ProcessingError(f"Text extraction failed: {e!s}") from e
 
     async def _generate_embeddings(self, chunks_data: list[dict[str, Any]]) -> EmbeddingResponse:
         """Generate embeddings for chunks
@@ -453,7 +444,7 @@ class IngestionProcessor:
             return response
 
         except LLMException as e:
-            raise ProcessingError(f"Embedding generation failed: {str(e)}") from e
+            raise ProcessingError(f"Embedding generation failed: {e!s}") from e
 
     def _create_chunks(
         self,

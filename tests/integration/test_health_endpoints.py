@@ -15,10 +15,10 @@ No real Mistral network request is issued anywhere in this file: the LLM check
 is patched with an AsyncMock (free-tier constraint).
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
-from fastapi.testclient import TestClient
 
+import pytest
+from fastapi.testclient import TestClient
 
 LIVE_ROUTE = "/api/v1/health/live"
 READY_ROUTE = "/api/v1/health/ready"

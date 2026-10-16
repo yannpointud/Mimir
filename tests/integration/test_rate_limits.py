@@ -11,15 +11,15 @@ so under-limit requests may legitimately return business-level statuses
 (401 wrong password, 400 invalid file) while still consuming the quota.
 """
 
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock
 from fastapi.testclient import TestClient
 
 from mimir.api.middleware.rate_limit import limiter
 from mimir.auth.jwt_handler import jwt_handler
 from mimir.config import settings
 from mimir.llm_interface.interfaces import EmbeddingResponse
-
 
 LOGIN_ROUTE = "/api/v1/auth/login"
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
@@ -79,14 +79,14 @@ def mocked_rag():
     vector store. The real budget_guard / usage_tracker / rag_debug / chat_cache
     singletons are kept so the reservation is still settled and the usage row is
     still written."""
-    from mimir.main import app
     from mimir.api.dependencies import (
-        get_rag_service,
-        get_rag_debug_service,
         get_budget_guard,
-        get_usage_tracker,
         get_chat_cache_service,
+        get_rag_debug_service,
+        get_rag_service,
+        get_usage_tracker,
     )
+    from mimir.main import app
     from mimir.services.rag_service import RagService
 
     mock_llm = Mock()

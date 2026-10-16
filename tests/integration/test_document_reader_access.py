@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 from mimir.auth.middleware import require_admin
 
-
 UNKNOWN_DOCUMENT_ID = 987654321
 
 

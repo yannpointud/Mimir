@@ -5,60 +5,61 @@ This module provides endpoints for uploading, managing, and monitoring
 documents in the RAG system.
 """
 
-from typing import Any
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    status,
-    UploadFile,
-    File,
-    Form,
-    Query,
-    Request,
-    Response,
-)
-from fastapi.responses import FileResponse
 import asyncio
 import logging
 import os
 import urllib.parse
 from pathlib import Path
+from typing import Any
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import FileResponse
+
+from mimir.api.dependencies import (
+    get_audit_log_repository,
+    get_bm25_store,
+    get_document_repository,
+    get_ingestion_processor,
+    get_vector_store,
+)
+from mimir.api.middleware.rate_limit import get_client_identifier, limiter
+from mimir.api.responses import rejection_to_http
+from mimir.auth.middleware import get_current_user, require_admin
+from mimir.config import settings
+from mimir.database.repository import AuditLogRepository, DocumentRepository
 from mimir.ingestion.processor import IngestionProcessor
 from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
-from mimir.auth.middleware import require_admin, get_current_user
-from mimir.api.middleware.rate_limit import limiter, get_client_identifier
-from mimir.database.repository import DocumentRepository, AuditLogRepository
-from mimir.api.dependencies import (
-    get_document_repository,
-    get_audit_log_repository,
-    get_ingestion_processor,
-    get_vector_store,
-    get_bm25_store,
-)
-from mimir.api.responses import rejection_to_http
-from mimir.shared.models import (
-    ConsistencyValidationResponse,
-    DocumentResponse,
-    DocumentListResponse,
-    DocumentStatsOverview,
-    DocumentStatusCounts,
-    BaseResponse,
-    DocumentWithChunksResponse,
-    PaginationModel,
-    StorageInfo,
-    VectorStoreOverview,
-)
 from mimir.services import index_maintenance
 from mimir.services.document_deletion import delete_document_everywhere
 from mimir.services.document_reader import build_document_view
 from mimir.services.document_upload import DocumentUpload, UploadPolicy
 from mimir.services.errors import RequestRejectedError
-from mimir.shared.errors import NotFoundError
-from mimir.config import settings
 from mimir.shared.clock import utc_now
+from mimir.shared.errors import NotFoundError
+from mimir.shared.models import (
+    BaseResponse,
+    ConsistencyValidationResponse,
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentStatsOverview,
+    DocumentStatusCounts,
+    DocumentWithChunksResponse,
+    PaginationModel,
+    StorageInfo,
+    VectorStoreOverview,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -33,6 +33,7 @@ from mimir.email_service.smtp_client import email_service
 from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
 from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 from mimir.services import index_maintenance
+from mimir.shared.clock import utc_now
 from mimir.shared.constants import MASKED_VALUE, mask_secrets
 from mimir.shared.models import (
     AdminCacheStats,
@@ -50,7 +51,6 @@ from mimir.shared.models import (
     UsageResponse,
 )
 from mimir.utils.logs_reader import get_logs, get_logs_summary
-from mimir.shared.clock import utc_now
 
 logger = logging.getLogger(__name__)
 

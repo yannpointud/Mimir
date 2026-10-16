@@ -34,9 +34,9 @@ import asyncio
 import json
 import math
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
-from collections.abc import Sequence
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -381,16 +381,17 @@ def main(argv: list[str] | None = None) -> int:
 
     # Deferred imports: pulling these at module top would drag the backend
     # service stack in for a bare --help.
-    from mimir.config import settings
-    from mimir.services.rag_service import _HYBRID_POOL_SIZE
+    from scripts.ragas_eval.golden_set_schema import load_golden_set
+
     from mimir.api.dependencies import (
-        get_budget_guard,
         get_bm25_store,
+        get_budget_guard,
         get_llm_service,
         get_usage_tracker,
         get_vector_store,
     )
-    from scripts.ragas_eval.golden_set_schema import load_golden_set
+    from mimir.config import settings
+    from mimir.services.rag_service import _HYBRID_POOL_SIZE
 
     top_k = args.top_k if args.top_k is not None else _HYBRID_POOL_SIZE
 

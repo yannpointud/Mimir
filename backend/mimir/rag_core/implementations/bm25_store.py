@@ -27,9 +27,9 @@ from typing import Any
 
 import bm25s
 
+from mimir.monitoring.logger import setup_logger
 from mimir.rag_core.interfaces import VectorStoreConnectionError, VectorStoreOperationError
 from mimir.rag_core.tokenizer_fr import light_french_tokenizer
-from mimir.monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -182,7 +182,7 @@ class Bm25LexicalStore:
                 return True
             # numpy raises EOFError on a truncated .npy, ValueError on bad JSON
             except (OSError, ValueError, EOFError) as e:
-                error_msg = f"Failed to load BM25 lexical index: {str(e)}"
+                error_msg = f"Failed to load BM25 lexical index: {e!s}"
                 logger.error(error_msg)
                 raise VectorStoreConnectionError(error_msg) from e
 

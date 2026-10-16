@@ -8,27 +8,27 @@ various services throughout the API endpoints.
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from mimir.auth.jwt_handler import JWTHandler, jwt_handler
+from mimir.cache.lru_cache import CacheService, ChatCacheService, cache_service, chat_cache_service
+from mimir.config import settings
+from mimir.cost.budget_guard import BudgetGuard, budget_guard
+from mimir.cost.usage_tracker import UsageTracker, usage_tracker
 from mimir.database.connection import get_db_session
 from mimir.database.repository import (
-    DocumentRepository,
-    ConfigurationRepository,
     AuditLogRepository,
+    ConfigurationRepository,
+    DocumentRepository,
     UsageRepository,
 )
-from mimir.cache.lru_cache import CacheService, ChatCacheService, cache_service, chat_cache_service
 from mimir.email_service.smtp_client import EmailService, email_service
-from mimir.auth.jwt_handler import JWTHandler, jwt_handler
-from mimir.cost.budget_guard import budget_guard, BudgetGuard
-from mimir.cost.usage_tracker import usage_tracker, UsageTracker
-from mimir.config import settings
-from mimir.llm_interface.implementations.mistral_api import MistralAPIService
-from mimir.rag_core.implementations.faiss_store import FaissVectorStore
-from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
-from mimir.rag_core.interfaces import VectorStoreConnectionError
-from mimir.monitoring.rag_debug_logger import RagDebugService, rag_debug_service
 from mimir.ingestion.processor import IngestionProcessor
-from mimir.services.rag_service import RagService
+from mimir.llm_interface.implementations.mistral_api import MistralAPIService
 from mimir.monitoring.logger import setup_logger
+from mimir.monitoring.rag_debug_logger import RagDebugService, rag_debug_service
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import VectorStoreConnectionError
+from mimir.services.rag_service import RagService
 
 logger = setup_logger(__name__)
 
@@ -90,6 +90,12 @@ def get_llm_service() -> MistralAPIService:
             retry_delay=1.0,
         )
     return _llm_service
+
+
+async def close_llm_service() -> None:
+    """Close the HTTP session of the LLM service, if it was created."""
+    if _llm_service is not None:
+        await _llm_service.close()
 
 
 def get_vector_store() -> FaissVectorStore:

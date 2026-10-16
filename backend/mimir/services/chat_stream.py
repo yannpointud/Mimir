@@ -177,7 +177,7 @@ class ChatStream:
             logger.info(f"Streaming completed - session: {session_id}, time: {response_time_ms}ms")
 
         except Exception as e:  # noqa: BLE001 - SSE boundary: any failure becomes an error event
-            logger.error(f"Streaming error: {type(e).__name__} - {str(e)}")
+            logger.error(f"Streaming error: {type(e).__name__} - {e!s}")
             # Never leak raw exception details to the client (info disclosure);
             # the full error is kept in the server logs above.
             yield sse_event({"type": "error", "message": ERROR_MESSAGE})

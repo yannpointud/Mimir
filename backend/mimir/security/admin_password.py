@@ -13,8 +13,8 @@ container) nor persisted, so every start re-derives it from the environment.
 
 from mimir.auth.jwt_handler import jwt_handler
 from mimir.auth.password_utils import validate_password_strength
-from mimir.monitoring.logger import setup_logger
 from mimir.config import Settings
+from mimir.monitoring.logger import setup_logger
 
 logger = setup_logger(__name__)
 

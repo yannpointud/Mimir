@@ -3,12 +3,13 @@ Integration tests for Mimir end-to-end workflows
 Tests for complete ingestion, search and response flows
 """
 
-import pytest
-import tempfile
 import asyncio  # noqa: F401
 import json
+import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock  # noqa: F401
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: F401
+
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -28,9 +29,9 @@ class TestDocumentIngestionWorkflow:
 
     def test_complete_text_document_workflow(self, temp_workspace, test_session):
         """Test the complete workflow for a text document"""
-        from mimir.ingestion.extractors import ExtractorFactory
-        from mimir.ingestion.chunking import ChunkingStrategy
         from mimir.database.repository import DocumentRepository
+        from mimir.ingestion.chunking import ChunkingStrategy
+        from mimir.ingestion.extractors import ExtractorFactory
 
         # 1. Prepare a test document
         test_document = temp_workspace / "workflow_test.txt"

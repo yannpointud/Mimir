@@ -8,7 +8,6 @@ anti-regression rule (hybrid must not degrade exact-term recall vs dense).
 """
 
 import pytest
-
 from scripts.ragas_eval.exact_term_check import compare_exact_term_recall
 
 

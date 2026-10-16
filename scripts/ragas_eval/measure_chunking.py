@@ -58,7 +58,7 @@ import json
 import os
 import shutil
 import sys
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -192,16 +192,16 @@ async def _ingest_corpus_isolated() -> int:
     now-imported settings (the child's env already toggled the flag) and runs
     against the isolated data dir, so the mode starts from a clean, empty index.
     """
-    from mimir.config import settings
-    from mimir.database.connection import init_database, db_manager
-    from mimir.ingestion.processor import IngestionProcessor
-    from mimir.ingestion.chunking import ChunkingConfig
     from mimir.api.dependencies import (
+        get_bm25_store,
+        get_document_repository,
         get_llm_service,
         get_vector_store,
-        get_document_repository,
-        get_bm25_store,
     )
+    from mimir.config import settings
+    from mimir.database.connection import db_manager, init_database
+    from mimir.ingestion.chunking import ChunkingConfig
+    from mimir.ingestion.processor import IngestionProcessor
 
     if not settings.mistral_api_key:
         print("ERROR: MISTRAL_API_KEY not set -- cannot embed.", file=sys.stderr)
@@ -280,6 +280,7 @@ async def _answer_golden_set(mode: str, limit: int | None) -> int:
     Reuses run_pipeline.py's pure building blocks (no edit to that module) for
     row assembly / throttling / writing, and the budget-guarded answer loop.
     """
+    from scripts.ragas_eval.golden_set_schema import load_golden_set
     from scripts.ragas_eval.run_pipeline import (
         THROTTLE_SECONDS,
         _assemble_eval_row,
@@ -287,7 +288,7 @@ async def _answer_golden_set(mode: str, limit: int | None) -> int:
         _write_eval_rows,
         answer_via_stream,
     )
-    from scripts.ragas_eval.golden_set_schema import load_golden_set
+
     from mimir.api.dependencies import get_budget_guard, get_rag_service, get_vector_store
     from mimir.config import settings
     from mimir.database.connection import db_manager

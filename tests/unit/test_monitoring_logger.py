@@ -4,12 +4,12 @@ Tests unitaires pour le système de logging centralisé
 
 import json
 import logging
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from mimir.monitoring.logger import (
-    JSONFormatter,
     ConsoleFormatter,
+    JSONFormatter,
     setup_logger,
 )
 
