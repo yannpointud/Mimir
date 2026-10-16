@@ -16,6 +16,9 @@ dependencies = { file = ["requirements.txt"] }
 where = ["backend"]
 include = ["mimir*"]
 
+[tool.setuptools.package-data]
+"mimir.email_service" = ["templates/*.html"]
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100

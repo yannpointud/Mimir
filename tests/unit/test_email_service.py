@@ -5,6 +5,7 @@ Ce module teste les fonctionnalités d'envoi d'emails pour les escalations
 et notifications du système Mimir.
 """
 
+import html
 from unittest.mock import AsyncMock, patch
 
 import aiosmtplib
@@ -551,7 +552,7 @@ class TestIntegration:
             call_args = mock_send.call_args
             assert call_args[1]["to_emails"] == ["support@example.com"]
             assert "Escalation" in call_args[1]["subject"]
-            assert user_question in call_args[1]["html_content"]
+            assert user_question in html.unescape(call_args[1]["html_content"])
             assert user_question in call_args[1]["text_content"]
 
     def test_configuration_validation_workflow(self, email_service):
@@ -565,3 +566,18 @@ class TestIntegration:
         assert status["escalation_email"] is True
         assert status["smtp_port"] == 587
         assert status["smtp_use_tls"] is True
+
+
+def test_escalation_html_escapes_user_content():
+    """User input must never inject markup into the email read by support."""
+    service = EmailService()
+    html = service._generate_escalation_html(
+        user_question='<a href="https://evil.example">Reset your password</a>',
+        chat_history=[{"type": "user", "content": "<script>alert(1)</script>"}],
+        user_info={"user_email": "<img src=x onerror=alert(1)>"},
+        context_sources=["<b>doc</b>.pdf"],
+    )
+    assert "<script>" not in html
+    assert '<a href="https://evil.example">' not in html
+    assert "<img src=x" not in html
+    assert "&lt;script&gt;" in html

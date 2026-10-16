@@ -225,141 +225,29 @@ class IngestionProcessor:
                 logger.warning(f"BM25 drain rebuild raised unexpectedly - ignoring: {drain_error}")
 
     async def _process_document_pipeline(self, task: IngestionTask) -> bool:
-        """Execute the complete processing pipeline"""
+        """Extract, chunk, embed and index one document; False when it yields nothing."""
         start_time = time.time()
-
         try:
-            # Step 1: Extract text
-            logger.debug(f"Extracting text from: {task.file_path}")
             extracted_text = self._extract_text(task.file_path)
-
-            if not extracted_text.strip():
-                logger.warning(f"No text extracted from: {task.file_path}")
-                return False
-
-            # Step 2: Chunk text
-            logger.debug(f"Chunking text: {len(extracted_text)} characters")
-            chunks_data = self.chunking_strategy.chunk_text(extracted_text, source=task.file_path)
-
+            chunks_data = self._chunk(extracted_text, task.file_path)
             if not chunks_data:
-                logger.warning(f"No chunks created from: {task.file_path}")
                 return False
 
-            # Check chunk limit
-            if len(chunks_data) > self.max_chunks_per_doc:
-                logger.warning(
-                    f"Too many chunks ({len(chunks_data)} > {self.max_chunks_per_doc}), "
-                    f"truncating: {task.file_path}"
-                )
-                chunks_data = chunks_data[: self.max_chunks_per_doc]
-
-            # Step 3: Generate embeddings
-            # Reserve the daily budget BEFORE the paid Mistral embedding call
-            # (fail-closed): None means the effective daily cap is already
-            # exhausted, so raise a non-retriable BudgetExceeded instead
-            # of ever calling embed().
-            #
-            # asyncio.to_thread on every reserve/release/record/finalize call
-            # below: these are blocking SQLite writes (WAL serializes
-            # writers) and must never stall the shared event loop -- same
-            # rationale as the vector_store.upsert/persist wrapping.
-            reservation = await asyncio.to_thread(self.budget_guard.reserve, "embedding")
-            if reservation is None:
-                raise BudgetExceeded("Daily budget exceeded")
-
-            logger.debug(f"Generating embeddings for {len(chunks_data)} chunks")
-            try:
-                embedding_response = await self._generate_embeddings(chunks_data)
-            except BaseException:
-                # No embedding call actually succeeded -- refund the
-                # reservation and let the original error propagate to the
-                # outer except blocks below.
-                await asyncio.to_thread(self.budget_guard.release, reservation)
-                raise
-
-            embeddings = embedding_response.embeddings
-
-            # A real embedding call succeeded and was billed by Mistral:
-            # record its usage (keyed by doc:{document_id}, since ingestion
-            # has no user session) and finalize the reservation with the
-            # real cost, regardless of downstream chunk-count validation.
-            actual_cost_eur = await asyncio.to_thread(
-                self.usage_tracker.record,
-                "embedding",
-                embedding_response.model,
-                embedding_response.prompt_tokens,
-                embedding_response.completion_tokens,
-                estimated=False,
-                session_id=f"doc:{task.document_id}",
-            )
-            await asyncio.to_thread(self.budget_guard.finalize, reservation, actual_cost_eur)
-
+            embeddings = await self._embed_within_budget(chunks_data, task.document_id)
             if len(embeddings) != len(chunks_data):
                 logger.error(f"Embedding count mismatch: {len(embeddings)} != {len(chunks_data)}")
                 return False
 
-            # Step 4: Create chunk objects
             chunks = self._create_chunks(
                 chunks_data, embeddings, task.document_id, task.file_path, task.metadata
             )
-
-            # Step 5: Index in vector store
-            logger.debug(f"Indexing {len(chunks)} chunks in vector store")
-            index_success = await asyncio.to_thread(self.vector_store.upsert, chunks)
-
-            if not index_success:
-                logger.error("Failed to index chunks in vector store")
-                return False
-
-            # Mark BM25 stale vs FAISS as soon as the upsert succeeds, so a
-            # later drain (success OR failure path) knows a coalesced rebuild is
-            # owed regardless of which document happens to be last in the batch.
-            self._bm25_dirty = True
-
-            # Step 6: Update document chunk count
-            self.document_repository.update_status(
-                int(task.document_id),
-                "indexing",  # Still processing
-                chunk_count=len(chunks),
-            )
-
-            # Step 7: Persist vector store
-            persist_success = await asyncio.to_thread(self.vector_store.persist)
-            if not persist_success:
-                logger.warning("Failed to persist vector store - continuing anyway")
-
-            # Step 8: Rebuild the BM25 lexical index from the FAISS source of
-            # truth, coalesced to the queue-drain point. The
-            # rebuild itself lives in _maybe_rebuild_bm25_on_drain, which is ALSO
-            # called from _process_task's finally block so a batch whose last
-            # document fails still rebuilds for the earlier successful docs.
+            await self._index_chunks(chunks, task.document_id)
+            # Coalesced to the queue drain; also called from _process_task's
+            # finally block so a failing last document still triggers it.
             await self._maybe_rebuild_bm25_on_drain()
-
-            processing_time = time.time() - start_time
-
-            logger.info(
-                f"Document processing pipeline completed in {processing_time:.2f}s: "
-                f"{len(chunks)} chunks indexed",
-                extra={
-                    "extra_fields": {
-                        "file_path": task.file_path,
-                        "document_id": task.document_id,
-                        "chunks": len(chunks),
-                        "characters": len(extracted_text),
-                        "processing_time": processing_time,
-                        "type": "pipeline_completed",
-                    }
-                },
-            )
-
-            return True
-
         except BudgetExceeded:
-            # Non-retriable fail-closed stop: propagate to _process_task's
-            # dedicated except BudgetExceeded branch, bypassing the
-            # retry loop entirely (a retry cannot succeed before the next reset).
+            # Not retried: _process_task stops the document until the daily reset
             raise
-
         except Exception as e:  # noqa: BLE001 - worker boundary: any failure marks the document as failed
             processing_time = time.time() - start_time
             logger.error(
@@ -375,6 +263,82 @@ class IngestionProcessor:
                 },
             )
             return False
+
+        processing_time = time.time() - start_time
+        logger.info(
+            f"Document processing pipeline completed in {processing_time:.2f}s: "
+            f"{len(chunks)} chunks indexed",
+            extra={
+                "extra_fields": {
+                    "file_path": task.file_path,
+                    "document_id": task.document_id,
+                    "chunks": len(chunks),
+                    "characters": len(extracted_text),
+                    "processing_time": processing_time,
+                    "type": "pipeline_completed",
+                }
+            },
+        )
+        return True
+
+    def _chunk(self, text: str, file_path: str) -> list[dict[str, Any]]:
+        """Chunks of the text, capped at max_chunks_per_doc; empty when there is no text."""
+        if not text.strip():
+            logger.warning(f"No text extracted from: {file_path}")
+            return []
+        chunks_data = self.chunking_strategy.chunk_text(text, source=file_path)
+        if not chunks_data:
+            logger.warning(f"No chunks created from: {file_path}")
+        if len(chunks_data) > self.max_chunks_per_doc:
+            logger.warning(
+                f"Too many chunks ({len(chunks_data)} > {self.max_chunks_per_doc}), "
+                f"truncating: {file_path}"
+            )
+            chunks_data = chunks_data[: self.max_chunks_per_doc]
+        return chunks_data
+
+    async def _embed_within_budget(
+        self, chunks_data: list[dict[str, Any]], document_id: str
+    ) -> list[list[float]]:
+        """Embed the chunks under a budget reservation, then record the real cost.
+
+        Raises:
+            BudgetExceeded: If the daily cap is already exhausted (fail-closed)
+        """
+        # Budget and usage calls are blocking SQLite writes: off the event loop
+        reservation = await asyncio.to_thread(self.budget_guard.reserve, "embedding")
+        if reservation is None:
+            raise BudgetExceeded("Daily budget exceeded")
+        try:
+            embedding_response = await self._generate_embeddings(chunks_data)
+        except BaseException:
+            # No embedding call was billed: refund the reservation
+            await asyncio.to_thread(self.budget_guard.release, reservation)
+            raise
+
+        # Ingestion has no user session: usage is keyed by document
+        actual_cost_eur = await asyncio.to_thread(
+            self.usage_tracker.record,
+            "embedding",
+            embedding_response.model,
+            embedding_response.prompt_tokens,
+            embedding_response.completion_tokens,
+            estimated=False,
+            session_id=f"doc:{document_id}",
+        )
+        await asyncio.to_thread(self.budget_guard.finalize, reservation, actual_cost_eur)
+        return embedding_response.embeddings
+
+    async def _index_chunks(self, chunks: list[Chunk], document_id: str) -> None:
+        """Upsert the chunks in FAISS, record their count and persist the index."""
+        await asyncio.to_thread(self.vector_store.upsert, chunks)
+        # BM25 is now stale until the next drain rebuild, whatever document
+        # ends the batch
+        self._bm25_dirty = True
+        self.document_repository.update_status(
+            int(document_id), "indexing", chunk_count=len(chunks)
+        )
+        await asyncio.to_thread(self.vector_store.persist)
 
     async def _maybe_rebuild_bm25_on_drain(self) -> None:
         """
