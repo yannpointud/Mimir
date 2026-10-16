@@ -70,6 +70,15 @@ class TestDocumentRepositoryIntegration:
         with pytest.raises(ValueError, match="already exists"):
             repo.create(filename="other.pdf", file_hash="duplicate_hash", path="/test/other.pdf")
 
+    def test_update_preserve_status(self, session):
+        repo = DocumentRepository(session)
+        document = repo.create(filename="keep.pdf", file_hash="keep_hash", path="/test/keep.pdf")
+        assert repo.update_preserve_status(document.id, True).preserve is True
+        assert repo.get_by_id(document.id).preserve is True
+        assert repo.update_preserve_status(document.id, False).preserve is False
+        with pytest.raises(ValueError):
+            repo.update_preserve_status(99999, True)
+
     def test_create_commits_immediately(self, session):
         """A later rollback does not undo a document the repository created."""
         repo = DocumentRepository(session)

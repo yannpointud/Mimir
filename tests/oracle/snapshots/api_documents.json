@@ -312,27 +312,33 @@
   },
   "preserve off 1": {
     "body": {
-      "details": {
-        "path": "/api/v1/documents/1/preserve"
-      },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to update document preservation status",
-      "success": false,
-      "timestamp": "<timestamp>"
+      "chunk_count": 2,
+      "created_at": "<created_at>",
+      "error_message": null,
+      "file_hash": "f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1",
+      "filename": "sample.txt",
+      "id": 1,
+      "indexed_at": "<indexed_at>",
+      "path": "<TMP>/data/documents/f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1_sample.txt",
+      "preserve": false,
+      "status": "indexed"
     },
-    "status": 500
+    "status": 200
   },
   "preserve on 1": {
     "body": {
-      "details": {
-        "path": "/api/v1/documents/1/preserve"
-      },
-      "error_code": "HTTP_500",
-      "error_message": "Failed to update document preservation status",
-      "success": false,
-      "timestamp": "<timestamp>"
+      "chunk_count": 2,
+      "created_at": "<created_at>",
+      "error_message": null,
+      "file_hash": "f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1",
+      "filename": "sample.txt",
+      "id": 1,
+      "indexed_at": "<indexed_at>",
+      "path": "<TMP>/data/documents/f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1_sample.txt",
+      "preserve": true,
+      "status": "indexed"
     },
-    "status": 500
+    "status": 200
   },
   "reprocess 1": {
     "body": {

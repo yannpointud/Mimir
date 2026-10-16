@@ -212,6 +212,24 @@ class DocumentRepository(BaseRepository):
             self._handle_db_error(e, f"update document {doc_id} status")
             raise
 
+    def update_preserve_status(self, doc_id: int, preserve: bool) -> Document:
+        """Set whether a document is protected from deletion; returns the document.
+
+        Raises:
+            ValueError: If the document does not exist
+        """
+        try:
+            document = self.get_by_id(doc_id)
+            if not document:
+                raise ValueError(f"Document {doc_id} not found")
+            document.preserve = preserve
+            self.session.commit()
+            logger.info(f"Document {doc_id} preserve flag set to {preserve}")
+            return document
+        except SQLAlchemyError as e:
+            self._handle_db_error(e, f"update document {doc_id} preserve flag")
+            raise
+
     def delete(self, doc_id: int, force: bool = False) -> bool:
         """Delete a document; return False if it does not exist.
 
