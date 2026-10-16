@@ -368,6 +368,8 @@ La couverture de `backend/src` est calculée à chaque exécution de pytest (rap
 
 La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
 
+Les instantanés FAISS de `tests/oracle/test_retrieval_ranking.py` et `tests/oracle/test_chat_stream_events.py` dépendent du jeu d'instructions SIMD du processeur. Ils ont été générés sur une machine AVX-512 ; sur un autre processeur (AVX2, Apple Silicon...), 7 à 11 de ces tests peuvent échouer sans régression, car le code d'origine échoue de la même façon (voir `docs/cleanup/DECISIONS.md`, DF.12). La CI GitHub les ignore.
+
 ## 🔍 Qualité et CI
 
 - **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90 ; complexité cyclomatique maximale 15).
@@ -378,7 +380,7 @@ La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de cara
 
 `bash scripts/local_ci.sh` enchaîne ruff, mypy, pytest et pip-audit (outils installés depuis `requirements-dev.txt`).
 
-La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs ruff, mypy, pytest et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt`. Les tests vitest et le build du frontend ne sont pas exécutés par la CI.
+La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs ruff, mypy, pytest (sans les deux modules d'oracle dépendants du processeur) et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt`. Les tests vitest et le build du frontend ne sont pas exécutés par la CI.
 
 **Dépendances**
 - `requirements.txt` (runtime et tests) et `requirements-dev.txt` (outils de qualité) restent la source.
@@ -551,7 +553,7 @@ Ce projet est libre.
 - **Python** : ruff (lint et format), mypy, type hints, docstrings des API publiques
 - **JavaScript** : ESLint
 - **Commits** : Conventional Commits
-- **Tests** : Couverture 86 % (backend) ; la CI (ruff, mypy, pytest, pip-audit) tourne sur chaque pull request
+- **Tests** : Couverture 88 % (backend) ; la CI (ruff, mypy, pytest, pip-audit) tourne sur chaque pull request
 - **Décisions** : un ADR par décision d'architecture dans `docs/adr/`
 
 ## 📝 License MIT

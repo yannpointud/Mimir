@@ -95,7 +95,7 @@ scripts/
 docs/adr/                            # Architecture decision records
 ```
 
-`tests/oracle/` and `tests/integration/` are characterization tests whose SHA-256 sums are listed in `docs/cleanup/ORACLE.sha256`.
+`tests/oracle/` and `tests/integration/` are characterization tests whose SHA-256 sums are listed in `docs/cleanup/ORACLE.sha256`. The FAISS snapshots of `tests/oracle/test_retrieval_ranking.py` and `test_chat_stream_events.py` depend on the CPU SIMD level (generated on AVX-512): on another CPU some of them fail without any regression, and GitHub CI skips them (`docs/cleanup/DECISIONS.md` DF.12).
 
 ## Key Patterns
 - **Repository pattern** for all DB access (`database/repository.py`)
@@ -117,7 +117,7 @@ pytest                      # All tests with coverage
 pytest tests/unit/ -v       # Unit only
 cd frontend && npx vitest   # Frontend tests
 
-# Quality (same checks as CI)
+# Quality (CI checks; local pytest also runs the 2 CPU-dependent oracle modules CI skips)
 bash scripts/local_ci.sh    # ruff check + ruff format --check + mypy backend/src + pytest + pip-audit
 
 # API docs
