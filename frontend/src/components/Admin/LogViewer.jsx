@@ -16,6 +16,9 @@ import {
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { adminAPI } from '../../services/api';
 import { getErrorMessage, formatRelativeDate, cn } from '../../utils/helpers';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('LogViewer');
 
 const LogViewer = () => {
   const { refreshTrigger } = useOutletContext();
@@ -51,7 +54,7 @@ const LogViewer = () => {
       setLastUpdate(new Date());
 
     } catch (error) {
-      console.error('Erreur lors du chargement des logs:', getErrorMessage(error));
+      logger.error('Failed to load the logs', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -126,7 +129,7 @@ const LogViewer = () => {
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Erreur lors de l\'export:', error);
+      logger.error('Failed to export the logs', error);
     }
   };
 

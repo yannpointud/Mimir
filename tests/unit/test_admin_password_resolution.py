@@ -10,17 +10,17 @@ import logging
 
 import pytest
 
-from src.auth.jwt_handler import jwt_handler
-from src.config import Settings
-from src.security.admin_password import resolve_admin_password
-from src.security.startup_validation import (
+from mimir.auth.jwt_handler import jwt_handler
+from mimir.config import Settings
+from mimir.security.admin_password import resolve_admin_password
+from mimir.security.startup_validation import (
     DEFAULT_ADMIN_PASSWORD,
     validate_production_secrets,
 )
 
 STRONG_PASSWORD = "Xk7!vRq2Pw#tLm9Z"
 WEAK_PASSWORD = "short"
-RESOLVER_LOGGER_NAME = "src.security.admin_password"
+RESOLVER_LOGGER_NAME = "mimir.security.admin_password"
 
 
 @pytest.fixture
@@ -34,10 +34,8 @@ def make_settings(tmp_path):
             "mistral_api_key": "test_key",
             "data_dir": str(tmp_path / "data"),
             "upload_dir": str(tmp_path / "uploads"),
-            "watch_folder": str(tmp_path / "watch"),
             "faiss_index_path": str(tmp_path / "faiss" / "index.bin"),
-            "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.pkl"),
-            "cache_enabled": False,
+            "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.json"),
         }
         base.update(overrides)
         return Settings(**base)

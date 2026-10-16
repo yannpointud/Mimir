@@ -17,7 +17,7 @@ left untouched and are not re-tested here.
 
 import pytest
 
-from backend.src.cache.lru_cache import ChatCacheService
+from mimir.cache.lru_cache import ChatCacheService
 
 
 @pytest.fixture

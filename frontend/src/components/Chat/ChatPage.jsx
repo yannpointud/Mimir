@@ -11,6 +11,9 @@ import { TopbarActions } from '../Common/Layout';
 import { chatAPI } from '../../services/api';
 import { getErrorMessage, generateSessionId } from '../../utils/helpers';
 import { chatHistoryStorage, chatSessionStorage } from '../../utils/storage';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ChatPage');
 
 // Welcome messages seed every session; they render as the home screen, not as bubbles.
 const isWelcomeMessage = (message) => String(message.id).startsWith('welcome');
@@ -164,7 +167,7 @@ const ChatPage = () => {
         },
 
         onError: (errorMessage) => {
-          console.error('Stream error:', errorMessage);
+          logger.error('Chat stream error', null, { errorMessage });
           const readableError = describeChatError(errorMessage);
           reportedInThread = true;
 
@@ -184,7 +187,7 @@ const ChatPage = () => {
       });
 
     } catch (error) {
-      console.error('=== ERREUR STREAMING ===', error);
+      logger.error('Chat streaming failed', error);
       if (!reportedInThread) {
         setError(describeChatError(getErrorMessage(error)));
       }
@@ -208,7 +211,7 @@ const ChatPage = () => {
       setShowEscalation(false);
 
     } catch (error) {
-      console.error('Erreur lors de l\'escalade:', error);
+      logger.error('Escalation failed', error);
       setError('Erreur lors de la transmission vers un opérateur humain');
     }
   };

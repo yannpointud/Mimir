@@ -40,12 +40,8 @@ import time
 
 import numpy as np
 
-# Add backend to PATH (this is a scripts/ dev-test script, not part of the
-# pytest suite -- same sys.path pattern as scripts/test_log_levels.py).
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-
-from src.rag_core.implementations.faiss_store import FaissVectorStore  # noqa: E402
-from src.rag_core.interfaces import Chunk  # noqa: E402
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk
 
 DIMENSION = 64
 ITERATIONS = 15

@@ -22,21 +22,17 @@ Depends(get_rag_service), so the override targets get_rag_service; the
 route and the service share the singleton ChatCacheService so a write by the
 service is visible to the route's read.
 """
+
 import json
-import shutil
-import tempfile
-from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock
 
-from src import config as config_module
-from src.config import settings
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
-from src.llm_interface.interfaces import EmbeddingResponse
-
+from mimir.config import settings
+from mimir.database.connection import db_manager
+from mimir.database.models import LlmUsage
+from mimir.llm_interface.interfaces import EmbeddingResponse
 
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
 
@@ -74,9 +70,7 @@ def _make_mock_llm():
     async def fake_generate_stream(*args, usage_out=None, **kwargs):
         gen_calls["n"] += 1
         if usage_out is not None:
-            usage_out.update(
-                {"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
-            )
+            usage_out.update({"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23})
         yield "mocked "
         yield "answer"
 
@@ -93,7 +87,7 @@ def _parse_sse_events(body: str):
     for line in body.splitlines():
         line = line.strip()
         if line.startswith("data:"):
-            events.append(json.loads(line[len("data:"):].strip()))
+            events.append(json.loads(line[len("data:") :].strip()))
     return events
 
 
@@ -121,44 +115,11 @@ def _normalise_sequence(events):
     return types, answer, done
 
 
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file (BudgetGuard/UsageTracker open their own sessions via this singleton;
-    mirrors test_budget_guard_endpoints.py)."""
-    temp_dir = tempfile.mkdtemp(prefix="chat_stream_cache_test_")
-    temp_db_path = Path(temp_dir) / "chat_stream_cache_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
-
-
 @pytest.fixture(autouse=True)
 def _clear_stream_cache():
     """The ChatCacheService is a process-wide singleton; clear it around every
     test so cache state never leaks across tests."""
-    from src.api.dependencies import get_chat_cache_service
+    from mimir.api.dependencies import get_chat_cache_service
 
     cache = get_chat_cache_service()
     cache.invalidate_all()
@@ -171,7 +132,7 @@ def _clear_stream_cache():
 @pytest.fixture
 def client(isolated_db_manager):
     """TestClient running the real app lifespan against the isolated db."""
-    from main import app
+    from mimir.main import app
 
     with TestClient(app) as test_client:
         yield test_client
@@ -185,12 +146,15 @@ def rag_with_mocks(isolated_db_manager):
     and assert Mistral call counts. Keeps the real budget_guard / usage_tracker
     / rag_debug singletons and the singleton chat cache (shared with the
     route's read)."""
-    from main import app
-    from src.api.dependencies import (
-        get_rag_service, get_rag_debug_service, get_budget_guard,
-        get_usage_tracker, get_chat_cache_service,
+    from mimir.api.dependencies import (
+        get_budget_guard,
+        get_chat_cache_service,
+        get_rag_debug_service,
+        get_rag_service,
+        get_usage_tracker,
     )
-    from src.services.rag_service import RagService
+    from mimir.main import app
+    from mimir.services.rag_service import RagService
 
     mock_llm, embed_calls, gen_calls = _make_mock_llm()
 
@@ -235,9 +199,7 @@ class TestStreamCacheHitReplay:
     """Test 1: repeated question served from cache, indistinguishable SSE
     sequence, no Mistral generate call on the hit."""
 
-    def test_second_call_replays_identical_sequence_without_mistral(
-        self, client, rag_with_mocks
-    ):
+    def test_second_call_replays_identical_sequence_without_mistral(self, client, rag_with_mocks):
         _mock_store, _embed_calls, gen_calls = rag_with_mocks
         question = "What is Mimir stream cache?"
 
@@ -247,9 +209,7 @@ class TestStreamCacheHitReplay:
         cached_body = _stream_body(client, question)
         gen_after_second = gen_calls["n"]
 
-        fresh_types, fresh_answer, fresh_done = _normalise_sequence(
-            _parse_sse_events(fresh_body)
-        )
+        fresh_types, fresh_answer, fresh_done = _normalise_sequence(_parse_sse_events(fresh_body))
         cached_types, cached_answer, cached_done = _normalise_sequence(
             _parse_sse_events(cached_body)
         )
@@ -323,11 +283,13 @@ class TestStreamCacheAntiPartial:
 
     @pytest.mark.asyncio
     async def test_disconnect_before_done_stores_no_entry(self, isolated_db_manager):
-        from src.api.dependencies import (
-            get_rag_debug_service, get_budget_guard, get_usage_tracker,
+        from mimir.api.dependencies import (
+            get_budget_guard,
             get_chat_cache_service,
+            get_rag_debug_service,
+            get_usage_tracker,
         )
-        from src.services.rag_service import RagService
+        from mimir.services.rag_service import RagService
 
         cache = get_chat_cache_service()
         cache.invalidate_all()

@@ -4,13 +4,16 @@ Unit tests for the auth/jwt_handler.py module
 These tests cover JWT token management and password hashing.
 """
 
-import pytest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
-from freezegun import freeze_time
-import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWTHandler
-from backend.src.auth.jwt_handler import JWTHandler
 
+import jwt  # PyJWT -- used as a generic encode/decode helper independent of JWTHandler
+import pytest
+from freezegun import freeze_time
+from pwdlib.exceptions import UnknownHashError
+
+from mimir.auth.jwt_handler import JWTHandler
+from mimir.shared.clock import utc_now
 
 # --- Backward-compatibility fixtures (frozen BEFORE the PyJWT/pwdlib migration) ---
 #
@@ -44,7 +47,7 @@ class TestJWTHandlerInit:
 
     def test_init_with_valid_config(self):
         """Test initialization with valid configuration."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -58,7 +61,7 @@ class TestJWTHandlerInit:
 
     def test_init_with_short_secret_key(self):
         """Test initialization with a secret key that is too short."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "short"
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -70,7 +73,7 @@ class TestJWTHandlerInit:
 
     def test_init_with_empty_secret_key(self):
         """Test initialization with an empty secret key."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = ""
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -87,7 +90,7 @@ class TestCreateAccessToken:
     @pytest.fixture
     def jwt_handler(self):
         """Fixture for JWTHandler with valid configuration."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -120,8 +123,8 @@ class TestCreateAccessToken:
         token = jwt_handler.create_access_token(data, expires_delta=custom_expiration)
 
         payload = jwt.decode(token, jwt_handler.secret_key, algorithms=[jwt_handler.algorithm])
-        expected_exp = datetime.utcnow() + custom_expiration
-        actual_exp = datetime.utcfromtimestamp(payload["exp"])
+        expected_exp = utc_now() + custom_expiration
+        actual_exp = datetime.fromtimestamp(payload["exp"], UTC).replace(tzinfo=None)
 
         # Verify expiration is correct (with a few seconds tolerance)
         assert abs((actual_exp - expected_exp).total_seconds()) < 5
@@ -135,7 +138,7 @@ class TestCreateAccessToken:
         assert "exp" in payload
         assert "iat" in payload
 
-    @patch("backend.src.auth.jwt_handler.jwt.encode")
+    @patch("mimir.auth.jwt_handler.jwt.encode")
     def test_create_token_encoding_error(self, mock_encode, jwt_handler):
         """Test error handling during token encoding."""
         mock_encode.side_effect = Exception("Encoding failed")
@@ -150,7 +153,7 @@ class TestVerifyToken:
     @pytest.fixture
     def jwt_handler(self):
         """Fixture for JWTHandler with valid configuration."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -216,14 +219,12 @@ class TestVerifyToken:
 
         assert payload is None
 
-    @patch("backend.src.auth.jwt_handler.jwt.decode")
-    def test_verify_token_unexpected_error(self, mock_decode, jwt_handler):
-        """Test unexpected error handling during verification."""
-        mock_decode.side_effect = Exception("Unexpected error")
+    @patch("mimir.auth.jwt_handler.jwt.decode")
+    def test_verify_token_does_not_mask_a_programming_error(self, mock_decode, jwt_handler):
+        mock_decode.side_effect = TypeError("unexpected")
 
-        payload = jwt_handler.verify_token("some_token")
-
-        assert payload is None
+        with pytest.raises(TypeError):
+            jwt_handler.verify_token("some_token")
 
 
 class TestPasswordOperations:
@@ -232,7 +233,7 @@ class TestPasswordOperations:
     @pytest.fixture
     def jwt_handler(self):
         """Fixture for JWTHandler with valid configuration."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -298,14 +299,11 @@ class TestPasswordOperations:
         assert jwt_handler.verify_password("password", None) is False
         assert jwt_handler.verify_password(None, None) is False
 
-    @patch("backend.src.auth.jwt_handler.PasswordHash.verify")
-    def test_verify_password_exception(self, mock_verify, jwt_handler):
-        """Test exception handling during verification."""
-        mock_verify.side_effect = Exception("Verification failed")
+    @patch("mimir.auth.jwt_handler.PasswordHash.verify")
+    def test_verify_password_with_an_unknown_hash_format(self, mock_verify, jwt_handler):
+        mock_verify.side_effect = UnknownHashError("hash")
 
-        is_valid = jwt_handler.verify_password("password", "hash")
-
-        assert is_valid is False
+        assert jwt_handler.verify_password("password", "hash") is False
 
 
 class TestBackwardCompatibility:
@@ -321,7 +319,7 @@ class TestBackwardCompatibility:
     @pytest.fixture
     def jwt_handler(self):
         """Fixture for JWTHandler with the secret matching the frozen JWT above."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = FROZEN_JWT_SECRET
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -361,43 +359,11 @@ class TestGetTokenExpiry:
     @pytest.fixture
     def jwt_handler(self):
         """Fixture for JWTHandler with valid configuration."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
             return JWTHandler()
-
-    @freeze_time("2023-01-01 12:00:00")
-    def test_get_token_expiry_valid(self, jwt_handler):
-        """Test expiry extraction from a valid token."""
-        data = {"user_id": 123}
-        token = jwt_handler.create_access_token(data)
-
-        expiry = jwt_handler.get_token_expiry(token)
-
-        assert expiry is not None
-        assert isinstance(expiry, datetime)
-        expected_expiry = datetime.utcnow() + timedelta(hours=24)
-        assert abs((expiry - expected_expiry).total_seconds()) < 5
-
-    def test_get_token_expiry_invalid_token(self, jwt_handler):
-        """Test expiry extraction from an invalid token."""
-        invalid_token = "invalid.token"
-
-        expiry = jwt_handler.get_token_expiry(invalid_token)
-
-        assert expiry is None
-
-    def test_get_token_expiry_expired_token(self, jwt_handler):
-        """Test expiry extraction from an expired token."""
-        with freeze_time("2023-01-01 12:00:00"):
-            data = {"user_id": 123}
-            token = jwt_handler.create_access_token(data, expires_delta=timedelta(seconds=1))
-
-        # Token is expired, but we can still extract its expiration date
-        with freeze_time("2023-01-01 12:01:00"):
-            expiry = jwt_handler.get_token_expiry(token)
-            assert expiry is None  # verify_token returns None for expired token
 
 
 class TestJWTHandlerIntegration:
@@ -406,7 +372,7 @@ class TestJWTHandlerIntegration:
     @pytest.fixture
     def jwt_handler(self):
         """Fixture for JWTHandler with valid configuration."""
-        with patch("backend.src.auth.jwt_handler.settings") as mock_settings:
+        with patch("mimir.auth.jwt_handler.settings") as mock_settings:
             mock_settings.jwt_secret_key = "a" * 32
             mock_settings.jwt_algorithm = "HS256"
             mock_settings.jwt_expiration_hours = 24
@@ -432,9 +398,8 @@ class TestJWTHandlerIntegration:
         assert payload["username"] == "testuser"
 
         # Get the expiration
-        expiry = jwt_handler.get_token_expiry(token)
-        assert expiry is not None
-        assert expiry > datetime.utcnow()
+        expiry = datetime.fromtimestamp(jwt_handler.verify_token(token)["exp"], UTC)
+        assert expiry.replace(tzinfo=None) > utc_now()
 
     def test_password_hash_uniqueness(self, jwt_handler):
         """Test that the same password produces different hashes."""

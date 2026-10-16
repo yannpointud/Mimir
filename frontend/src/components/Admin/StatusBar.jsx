@@ -22,6 +22,9 @@ import LogViewer from './LogViewer';
 
 import { healthAPI, adminAPI } from '../../services/api';
 import { getErrorMessage, formatRelativeDate, safeDisplayValue, cn } from '../../utils/helpers';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('StatusBar');
 
 const CacheGauge = ({ title, stats, onClear, disabled }) => (
   <div>
@@ -78,7 +81,7 @@ const StatusBar = () => {
       setLastUpdate(new Date());
 
     } catch (error) {
-      console.error('Erreur lors du chargement du monitoring:', getErrorMessage(error));
+      logger.error('Failed to load the monitoring data', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -107,7 +110,7 @@ const StatusBar = () => {
       onRefresh?.();
 
     } catch (error) {
-      console.error('Erreur lors du vidage du cache:', getErrorMessage(error));
+      logger.error('Failed to clear the cache', error);
       setError(getErrorMessage(error));
     } finally {
       setClearingCache(false);
@@ -125,7 +128,7 @@ const StatusBar = () => {
       onRefresh?.();
 
     } catch (error) {
-      console.error('Erreur lors du rebuild de l\'index:', getErrorMessage(error));
+      logger.error('Failed to rebuild the index', error);
       setError(getErrorMessage(error));
     } finally {
       setRebuildingIndex(false);

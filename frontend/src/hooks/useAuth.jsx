@@ -10,6 +10,9 @@ import {
   isAuthenticated as utilIsAuthenticated
 } from '../utils/auth';
 import { getErrorMessage } from '../utils/helpers';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('AuthContext');
 
 // Authentication context
 const AuthContext = createContext(null);
@@ -38,7 +41,7 @@ export const AuthProvider = ({ children }) => {
         await authAPI.logout();
       }
     } catch (error) {
-      console.error('Erreur lors de la déconnexion:', getErrorMessage(error));
+      logger.error('Logout failed', error);
     } finally {
       // Clean up local data in all cases
       utilLogout();
@@ -69,7 +72,7 @@ export const AuthProvider = ({ children }) => {
           setUserState(null);
         }
       } catch (error) {
-        console.error('Erreur lors de la vérification de l\'authentification:', getErrorMessage(error));
+        logger.error('Authentication check failed', error);
         // On error, log out the user
         logout();
       } finally {
@@ -107,7 +110,7 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true };
     } catch (error) {
-      console.error('Erreur lors de la connexion:', getErrorMessage(error));
+      logger.error('Login failed', error);
       return {
         success: false,
         error: getErrorMessage(error)
@@ -131,7 +134,7 @@ export const AuthProvider = ({ children }) => {
       setAuthToken(access_token);
       return true;
     } catch (error) {
-      console.error('Erreur lors du rafraîchissement du token:', getErrorMessage(error));
+      logger.error('Token refresh failed', error);
       logout();
       return false;
     }

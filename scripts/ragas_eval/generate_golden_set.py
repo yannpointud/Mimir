@@ -33,23 +33,14 @@ import re
 import sys
 from pathlib import Path
 
-# sys.path bootstrap (same discipline as scripts/backup_sqlite.py): make the
-# project root and the backend package importable whether this file is run as a
-# script (python scripts/ragas_eval/generate_golden_set.py) or imported as the
-# package module scripts.ragas_eval.generate_golden_set (unit tests).
-_SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent.parent
-_BACKEND_DIR = _PROJECT_ROOT / "backend"
-for _path in (_PROJECT_ROOT, _BACKEND_DIR):
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
-
-from scripts.ragas_eval.golden_set_schema import (  # noqa: E402
+from scripts.ragas_eval.golden_set_schema import (
     ADVERSARIAL_REFERENCE,
     GoldenSetEntry,
     validate_golden_set,
     write_golden_set,
 )
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
 
 # Mistral free-tier rate limit is ~1 request/second. Throttle the generation
 # loop below this ceiling so a real run never hits HTTP 429. This is on TOP of
@@ -346,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Deferred imports: pulling these at module top would drag FastAPI in for a
     # bare --help. Providers build the same singletons the API uses.
-    from src.api.dependencies import (  # noqa: E402
+    from mimir.api.dependencies import (
         get_budget_guard,
         get_llm_service,
         get_usage_tracker,

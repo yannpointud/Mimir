@@ -2,21 +2,22 @@
 Performance tests for the orphan chunk cleanup system
 """
 
-import pytest
-import tempfile
-import shutil
 import os
-import time
+import shutil
 import statistics
+import tempfile
+import time
 from pathlib import Path
-import numpy as np
-from datetime import datetime
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
+
 # System imports
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.interfaces import Chunk
-from src.rag_core.implementations.validation_utils import VectorStoreValidator
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.implementations.validation_utils import VectorStoreValidator
+from mimir.rag_core.interfaces import Chunk
+from mimir.shared.clock import utc_now
 
 
 class TestCleanupPerformance:
@@ -33,7 +34,7 @@ class TestCleanupPerformance:
     def vector_store(self, temp_dir):
         """FaissVectorStore instance for tests"""
         index_path = os.path.join(temp_dir, "perf_index.bin")
-        metadata_path = os.path.join(temp_dir, "perf_metadata.pkl")
+        metadata_path = os.path.join(temp_dir, "perf_metadata.json")
 
         store = FaissVectorStore(
             dimension=384,
@@ -237,8 +238,8 @@ class TestCleanupPerformance:
             doc.status = "indexed"
             doc.filename = f"doc_{i}.txt"
             doc.chunk_count = 8
-            doc.created_at = datetime.utcnow()
-            doc.indexed_at = datetime.utcnow()
+            doc.created_at = utc_now()
+            doc.indexed_at = utc_now()
             doc.preserve = False
             doc.path = f"/test/doc_{i}.txt"
             mock_docs.append(doc)
@@ -270,7 +271,7 @@ class TestCleanupPerformance:
 
         # Measure backup creation time
         start_time = time.time()
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
         vector_store._create_backup(timestamp)
         backup_time = time.time() - start_time
 
@@ -286,7 +287,7 @@ class TestCleanupPerformance:
     @pytest.mark.performance
     def test_rebuild_optimization_performance(self, vector_store):
         """Performance test for optimization/rebuild"""
-        # Create a dataset avec beaucoup de chunks supprimés
+        # Create a dataset with many deleted chunks
         chunks = self.create_test_chunks(num_docs=2000, chunks_per_doc=5)
         vector_store.upsert(chunks)
 
@@ -297,7 +298,7 @@ class TestCleanupPerformance:
         for meta in vector_store.metadata:
             if deleted_count < target_deleted:
                 meta["deleted"] = True
-                meta["deleted_at"] = datetime.utcnow().isoformat()
+                meta["deleted_at"] = utc_now().isoformat()
                 deleted_count += 1
 
         # Measure optimization performance
@@ -334,7 +335,7 @@ class TestCleanupStressTest:
     @pytest.fixture
     def vector_store(self, temp_dir):
         index_path = os.path.join(temp_dir, "stress_index.bin")
-        metadata_path = os.path.join(temp_dir, "stress_metadata.pkl")
+        metadata_path = os.path.join(temp_dir, "stress_metadata.json")
 
         store = FaissVectorStore(
             dimension=384,
@@ -357,7 +358,7 @@ class TestCleanupStressTest:
         for cycle in range(num_cycles):
             print(f"\\nStress test cycle {cycle + 1}/{num_cycles}")
 
-            # Ajouter de nouveaux documents
+            # Add new documents
             chunks = []
             for doc_id in range(cycle * docs_per_cycle, (cycle + 1) * docs_per_cycle):
                 for chunk_idx in range(chunks_per_doc):
@@ -375,9 +376,9 @@ class TestCleanupStressTest:
 
             vector_store.upsert(chunks)
 
-            # Nettoyer les documents des cycles précédents (les rendre orphelins)
+            # Clean the documents of previous cycles (making them orphans)
             if cycle > 0:
-                # Garder seulement les documents du cycle actuel
+                # Keep only the documents of the current cycle
                 existing_docs = {
                     str(i) for i in range(cycle * docs_per_cycle, (cycle + 1) * docs_per_cycle)
                 }
@@ -393,7 +394,7 @@ class TestCleanupStressTest:
                     f"Cycle {cycle}: cleaned {result['cleaned_chunks']} chunks in {cleanup_time:.2f}s"
                 )
 
-        # Analyser les résultats
+        # Analyze the results
         if cleanup_times:
             avg_cleanup_time = statistics.mean(cleanup_times)
             max_cleanup_time = max(cleanup_times)
@@ -409,5 +410,5 @@ class TestCleanupStressTest:
 
 
 if __name__ == "__main__":
-    # Lancer les tests de performance
+    # Run the performance tests
     pytest.main([__file__, "-v", "-m", "performance", "--tb=short"])

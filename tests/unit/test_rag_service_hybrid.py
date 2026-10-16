@@ -18,13 +18,13 @@ Mock/synthetic only: no real Mistral call, no real embeddings.
 
 import asyncio
 import math
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import numpy as np
 
-from backend.src.rag_core.interfaces import Chunk, SearchResult
-from backend.src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.services.rag_service import _process_question_with_rag_stream
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
+from mimir.rag_core.interfaces import Chunk, SearchResult
+from mimir.services.rag_service import _process_question_with_rag_stream
 
 
 def _unit(angle_cos: float) -> np.ndarray:
@@ -44,7 +44,7 @@ class TestSimilarityFloorRawPool:
         store = FaissVectorStore(
             dimension=2,
             index_path=str(tmp_path / "hybrid.index"),
-            metadata_path=str(tmp_path / "hybrid.pkl"),
+            metadata_path=str(tmp_path / "hybrid.json"),
             similarity_threshold=0.5,
             index_type="FlatL2",
         )
@@ -112,9 +112,9 @@ class TestGetBm25StoreSingleton:
     def test_returns_singleton(self):
         # Import via the same `src.` namespace dependencies.py uses, otherwise the
         # instance and the class resolve to two distinct module objects
-        # (src.* vs backend.src.*) and isinstance would spuriously fail.
-        from src.api import dependencies
-        from src.rag_core.implementations.bm25_store import Bm25LexicalStore
+        # (src.* vs mimir.*) and isinstance would spuriously fail.
+        from mimir.api import dependencies
+        from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
 
         # Reset any previously created instance so the test is order-independent.
         dependencies._bm25_store = None
@@ -244,7 +244,7 @@ class TestHybridBranch:
         mock_bm25 = Mock()
         mock_bm25.query.return_value = [(1, 5.0), (3, 4.0)]
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             # Only override the hybrid knobs; keep the rest realistic.
             mock_settings.hybrid_search_enabled = True
             mock_settings.rrf_k = 60
@@ -288,7 +288,7 @@ class TestHybridBranch:
 
         mock_bm25 = Mock()
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             mock_settings.hybrid_search_enabled = False
             mock_settings.rrf_k = 60
             mock_settings.rrf_score_threshold = 0.015
@@ -324,7 +324,7 @@ class TestHybridBranch:
         """Prime directive: with hybrid enabled but the BM25 index not yet
         built, bm25_store.query() raises; the engine MUST degrade to dense-only and
         still answer, never surface the exception as a broken (confidence 0) reply."""
-        from src.rag_core.interfaces import VectorStoreOperationError
+        from mimir.rag_core.interfaces import VectorStoreOperationError
 
         llm, vs, docs, dbg = _base_mocks()
 
@@ -357,7 +357,7 @@ class TestHybridBranch:
         mock_bm25 = Mock()
         mock_bm25.query.side_effect = VectorStoreOperationError("BM25 index not built")
 
-        with patch("src.services.rag_service.settings") as mock_settings:
+        with patch("mimir.services.rag_service.settings") as mock_settings:
             mock_settings.hybrid_search_enabled = True
             mock_settings.rrf_k = 60
             mock_settings.rrf_score_threshold = 0.015

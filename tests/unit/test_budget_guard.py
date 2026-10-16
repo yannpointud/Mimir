@@ -12,50 +12,13 @@ singleton to a fresh temporary SQLite file for the test's lifetime, so no
 synthetic ledger/config rows leak into the developer's real database.
 """
 
-import shutil
-import tempfile
-from pathlib import Path
-
 import pytest
 
-from src import config as config_module
-from src.config import settings
-from src.cost.budget_guard import BudgetGuard, BudgetExceededError, BudgetReservation
-from src.database.connection import db_manager
-from src.database.models import Base, LlmBudgetLedger
-from src.database.repository import ConfigurationRepository
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime, then restore the original engine."""
-    temp_dir = tempfile.mkdtemp(prefix="budget_guard_test_")
-    temp_db_path = Path(temp_dir) / "budget_guard_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
+from mimir.config import settings
+from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
+from mimir.database.connection import db_manager
+from mimir.database.models import LlmBudgetLedger
+from mimir.database.repository import ConfigurationRepository
 
 
 def _get_today_ledger(today: str):
@@ -152,11 +115,3 @@ class TestHotConfigOverride:
         second = guard.reserve("chat")
 
         assert second is None
-
-
-def test_budget_exceeded_error_is_an_exception_subclass():
-    """BudgetExceededError must be importable and usable as a normal
-    exception (ingestion fail-closed path raises it directly)."""
-    assert issubclass(BudgetExceededError, Exception)
-    with pytest.raises(BudgetExceededError):
-        raise BudgetExceededError("Daily budget exceeded")

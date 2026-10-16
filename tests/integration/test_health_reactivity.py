@@ -22,7 +22,7 @@ import time
 import httpx
 import pytest
 
-from src.api.dependencies import get_vector_store
+from mimir.api.dependencies import get_vector_store
 
 # Response threshold: /health must answer well before the simulated 1s FAISS
 # operation completes. 300ms leaves generous margin for CI jitter while still
@@ -48,6 +48,7 @@ async def test_health_responds_during_heavy_faiss_operation(test_app):
     original_query = store.query
     store.query = _slow_query
     try:
+
         async def run_heavy_faiss_call():
             # This mirrors the target pattern for every real call site: the
             # blocking store method dispatched via asyncio.to_thread.
@@ -60,7 +61,7 @@ async def test_health_responds_during_heavy_faiss_operation(test_app):
 
         async with httpx.AsyncClient(app=test_app, base_url="http://test") as client:
             start = time.monotonic()
-            response = await client.get("/health")
+            response = await client.get("/api/v1/health/")
             elapsed = time.monotonic() - start
 
         await heavy_task

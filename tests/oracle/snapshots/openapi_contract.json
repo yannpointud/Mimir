@@ -1,31 +1,4 @@
 {
-  "DELETE /api/v1/chat/sessions/{session_id}": {
-    "parameters": [
-      {
-        "in": "path",
-        "name": "session_id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "400",
-      "422",
-      "500"
-    ],
-    "tags": [
-      "chat"
-    ]
-  },
   "DELETE /api/v1/documents/{document_id}": {
     "parameters": [
       {
@@ -72,23 +45,6 @@
     ],
     "tags": []
   },
-  "GET /api/v1/admin/analytics/usage": {
-    "parameters": [],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
   "GET /api/v1/admin/audit-log": {
     "parameters": [
       {
@@ -119,15 +75,6 @@
       },
       {
         "in": "query",
-        "name": "desc_order",
-        "required": false,
-        "schema": {
-          "default": true,
-          "type": "boolean"
-        }
-      },
-      {
-        "in": "query",
         "name": "limit",
         "required": false,
         "schema": {
@@ -145,15 +92,6 @@
           "default": 0,
           "minimum": 0,
           "type": "integer"
-        }
-      },
-      {
-        "in": "query",
-        "name": "order_by",
-        "required": false,
-        "schema": {
-          "default": "created_at",
-          "type": "string"
         }
       },
       {
@@ -221,110 +159,6 @@
     ]
   },
   "GET /api/v1/admin/config": {
-    "parameters": [],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
-  "GET /api/v1/admin/configuration": {
-    "parameters": [],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
-  "GET /api/v1/admin/documents": {
-    "parameters": [
-      {
-        "in": "query",
-        "name": "limit",
-        "required": false,
-        "schema": {
-          "default": 10,
-          "maximum": 100,
-          "minimum": 1,
-          "type": "integer"
-        }
-      },
-      {
-        "in": "query",
-        "name": "page",
-        "required": false,
-        "schema": {
-          "default": 1,
-          "minimum": 1,
-          "type": "integer"
-        }
-      },
-      {
-        "in": "query",
-        "name": "search",
-        "required": false,
-        "schema": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      {
-        "in": "query",
-        "name": "status_filter",
-        "required": false,
-        "schema": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    ],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403",
-      "422"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
-  "GET /api/v1/admin/documents/stats": {
     "parameters": [],
     "request_body": null,
     "security": [
@@ -446,23 +280,6 @@
       "administration"
     ]
   },
-  "GET /api/v1/admin/metrics/chat": {
-    "parameters": [],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
   "GET /api/v1/admin/system-info": {
     "parameters": [],
     "request_body": null,
@@ -527,44 +344,8 @@
       "authentication"
     ]
   },
-  "GET /api/v1/chat/sessions/{session_id}/history": {
-    "parameters": [
-      {
-        "in": "path",
-        "name": "session_id",
-        "required": true,
-        "schema": {
-          "type": "string"
-        }
-      }
-    ],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "400",
-      "422",
-      "500"
-    ],
-    "tags": [
-      "chat"
-    ]
-  },
   "GET /api/v1/documents/": {
     "parameters": [
-      {
-        "in": "query",
-        "name": "desc_order",
-        "required": false,
-        "schema": {
-          "default": true,
-          "type": "boolean"
-        }
-      },
       {
         "in": "query",
         "name": "limit",
@@ -588,15 +369,6 @@
       },
       {
         "in": "query",
-        "name": "order_by",
-        "required": false,
-        "schema": {
-          "default": "created_at",
-          "type": "string"
-        }
-      },
-      {
-        "in": "query",
         "name": "search",
         "required": false,
         "schema": {
@@ -608,6 +380,34 @@
               "type": "null"
             }
           ]
+        }
+      },
+      {
+        "in": "query",
+        "name": "sort_by",
+        "required": false,
+        "schema": {
+          "default": "created_at",
+          "enum": [
+            "filename",
+            "status",
+            "created_at",
+            "chunk_count"
+          ],
+          "type": "string"
+        }
+      },
+      {
+        "in": "query",
+        "name": "sort_order",
+        "required": false,
+        "schema": {
+          "default": "desc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "type": "string"
         }
       },
       {
@@ -805,28 +605,6 @@
       "health"
     ]
   },
-  "GET /api/v1/logs/frontend/health": {
-    "parameters": [],
-    "request_body": null,
-    "security": null,
-    "status_codes": [
-      "200",
-      "400",
-      "500"
-    ],
-    "tags": [
-      "logging"
-    ]
-  },
-  "GET /health": {
-    "parameters": [],
-    "request_body": null,
-    "security": null,
-    "status_codes": [
-      "200"
-    ],
-    "tags": []
-  },
   "PATCH /api/v1/documents/{document_id}/preserve": {
     "parameters": [
       {
@@ -872,86 +650,6 @@
         "schema": {
           "default": "all",
           "type": "string"
-        }
-      }
-    ],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403",
-      "422"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
-  "POST /api/v1/admin/documents/upload": {
-    "parameters": [],
-    "request_body": {
-      "content": {
-        "multipart/form-data": {
-          "properties": {
-            "file": {
-              "contentMediaType": "application/octet-stream",
-              "type": "string"
-            },
-            "preserve": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "file"
-          ],
-          "type": "object"
-        }
-      },
-      "required": true
-    },
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403",
-      "422"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
-  "POST /api/v1/admin/maintenance": {
-    "parameters": [
-      {
-        "in": "query",
-        "name": "enabled",
-        "required": true,
-        "schema": {
-          "type": "boolean"
-        }
-      },
-      {
-        "in": "query",
-        "name": "message",
-        "required": false,
-        "schema": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       }
     ],
@@ -1103,23 +801,6 @@
     ]
   },
   "POST /api/v1/auth/refresh": {
-    "parameters": [],
-    "request_body": null,
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403"
-    ],
-    "tags": [
-      "authentication"
-    ]
-  },
-  "POST /api/v1/auth/verify-admin": {
     "parameters": [],
     "request_body": null,
     "security": [
@@ -1464,34 +1145,6 @@
     ]
   },
   "PUT /api/v1/admin/config": {
-    "parameters": [],
-    "request_body": {
-      "content": {
-        "application/json": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        }
-      },
-      "required": true
-    },
-    "security": [
-      {
-        "JWTBearer": []
-      }
-    ],
-    "status_codes": [
-      "200",
-      "401",
-      "403",
-      "422"
-    ],
-    "tags": [
-      "administration"
-    ]
-  },
-  "PUT /api/v1/admin/configuration": {
     "parameters": [],
     "request_body": {
       "content": {

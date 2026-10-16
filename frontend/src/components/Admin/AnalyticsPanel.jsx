@@ -15,6 +15,9 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 import { adminAPI, usageAPI } from '../../services/api';
 import { getErrorMessage, cn } from '../../utils/helpers';
 import { getBudgetStatus } from '../../utils/budget';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('AnalyticsPanel');
 
 const CHART_DAYS = 14;
 const CHART_HEIGHT_PX = 112;
@@ -211,7 +214,7 @@ const AnalyticsPanel = () => {
       setUsageData(await usageAPI.getUsage());
       setLastUpdate(new Date());
     } catch (error) {
-      console.error('Erreur lors du chargement des analytics:', getErrorMessage(error));
+      logger.error('Failed to load the analytics', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);
@@ -224,7 +227,7 @@ const AnalyticsPanel = () => {
       setSystemError(null);
       setSystemData(await adminAPI.getSystemInfo());
     } catch (error) {
-      console.error('Erreur lors du chargement des ressources serveur:', getErrorMessage(error));
+      logger.error('Failed to load the server resources', error);
       setSystemError(getErrorMessage(error));
     }
   }, []);

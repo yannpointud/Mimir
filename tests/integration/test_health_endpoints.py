@@ -15,19 +15,19 @@ No real Mistral network request is issued anywhere in this file: the LLM check
 is patched with an AsyncMock (free-tier constraint).
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
-from fastapi.testclient import TestClient
 
+import pytest
+from fastapi.testclient import TestClient
 
 LIVE_ROUTE = "/api/v1/health/live"
 READY_ROUTE = "/api/v1/health/ready"
 FULL_HEALTH_ROUTE = "/api/v1/health/"
 
 # Module path of the LLM helper as referenced by the route handlers.
-LLM_HEALTH_TARGET = "src.api.endpoints.health._check_llm_health"
-DB_HEALTH_TARGET = "src.api.endpoints.health._check_database_health"
-VS_HEALTH_TARGET = "src.api.endpoints.health._check_vector_store_health"
+LLM_HEALTH_TARGET = "mimir.api.endpoints.health._check_llm_health"
+DB_HEALTH_TARGET = "mimir.api.endpoints.health._check_database_health"
+VS_HEALTH_TARGET = "mimir.api.endpoints.health._check_vector_store_health"
 
 pytestmark = pytest.mark.integration
 
@@ -36,14 +36,15 @@ pytestmark = pytest.mark.integration
 def initialized_database():
     """Ensure database tables exist: tests that use TestClient without a
     `with` block never run the app lifespan, so init_database() is needed."""
-    from src.database.connection import init_database
+    from mimir.database.connection import init_database
+
     init_database()
 
 
 @pytest.fixture
 def client():
     """TestClient with the app lifespan active (database, services)."""
-    from main import app
+    from mimir.main import app
 
     with TestClient(app) as client:
         yield client
@@ -73,9 +74,11 @@ def test_live_stays_200_when_mistral_down(client):
 def test_ready_200_when_all_dependencies_healthy(client):
     """Readiness returns 200 with status "ready" and an empty unhealthy list
     when every dependency check reports healthy."""
-    with patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())), \
-            patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())), \
-            patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())):
+    with (
+        patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+        patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+        patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+    ):
         response = client.get(READY_ROUTE)
 
     assert response.status_code == 200
@@ -88,9 +91,11 @@ def test_ready_200_when_all_dependencies_healthy(client):
 def test_ready_503_when_mistral_down(client):
     """A Mistral outage (LLM check unhealthy) must fail /ready with 503 and list
     "llm_api" among the unhealthy components."""
-    with patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_unhealthy())), \
-            patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())), \
-            patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())):
+    with (
+        patch(LLM_HEALTH_TARGET, new=AsyncMock(return_value=_unhealthy())),
+        patch(VS_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+        patch(DB_HEALTH_TARGET, new=AsyncMock(return_value=_healthy())),
+    ):
         response = client.get(READY_ROUTE)
 
     assert response.status_code == 503

@@ -2,7 +2,7 @@
 
 # Stage 1: build the static Vite bundle. This node stage is discarded and never
 # ships in the final image.
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 # Install deps first for layer caching; npm ci for reproducible installs.
 COPY package*.json ./

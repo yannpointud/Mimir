@@ -34,19 +34,11 @@ import asyncio
 import json
 import math
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
-from collections.abc import Sequence
 
-# sys.path bootstrap (same discipline as generate_golden_set.py): make the
-# project root and the backend package importable whether this file is run as a
-# script or imported as the package module.
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent.parent
-_BACKEND_DIR = _PROJECT_ROOT / "backend"
-for _path in (_PROJECT_ROOT, _BACKEND_DIR):
-    if str(_path) not in sys.path:
-        sys.path.insert(0, str(_path))
 
 # Mistral free-tier rate limit is ~1 request/second. Throttle the query loop
 # below this ceiling so a real run never hits HTTP 429. This is on TOP of the
@@ -304,7 +296,7 @@ def _fused_scores_for_query(
     pool, fused via ``reciprocal_rank_fusion``) but returns the raw fused score
     values, so the distribution reflects the pre-filter reality.
     """
-    from src.rag_core.fusion import reciprocal_rank_fusion
+    from mimir.rag_core.fusion import reciprocal_rank_fusion
 
     dense_pool = vector_store.query(
         vector=embedding,
@@ -389,16 +381,17 @@ def main(argv: list[str] | None = None) -> int:
 
     # Deferred imports: pulling these at module top would drag the backend
     # service stack in for a bare --help.
-    from src.config import settings
-    from src.services.rag_service import _HYBRID_POOL_SIZE
-    from src.api.dependencies import (
-        get_budget_guard,
+    from scripts.ragas_eval.golden_set_schema import load_golden_set
+
+    from mimir.api.dependencies import (
         get_bm25_store,
+        get_budget_guard,
         get_llm_service,
         get_usage_tracker,
         get_vector_store,
     )
-    from scripts.ragas_eval.golden_set_schema import load_golden_set
+    from mimir.config import settings
+    from mimir.services.rag_service import _HYBRID_POOL_SIZE
 
     top_k = args.top_k if args.top_k is not None else _HYBRID_POOL_SIZE
 

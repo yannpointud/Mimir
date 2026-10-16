@@ -3,12 +3,13 @@ Tests for the rate limiting module.
 """
 
 from unittest.mock import Mock, patch
+
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 
-from src.api.middleware.rate_limit import (
-    get_client_identifier,
+from mimir.api.middleware.rate_limit import (
     configure_rate_limiting,
+    get_client_identifier,
     limiter,
 )
 
@@ -45,7 +46,7 @@ class TestGetClientIdentifier:
             # No 'sub'
         }
 
-        with patch("src.api.middleware.rate_limit.get_remote_address") as mock_get_ip:
+        with patch("mimir.api.middleware.rate_limit.get_remote_address") as mock_get_ip:
             mock_get_ip.return_value = "192.168.1.1"
             result = get_client_identifier(request)
 
@@ -57,7 +58,7 @@ class TestGetClientIdentifier:
         request.state = Mock()
         request.state.jwt_payload = None
 
-        with patch("src.api.middleware.rate_limit.get_remote_address") as mock_get_ip:
+        with patch("mimir.api.middleware.rate_limit.get_remote_address") as mock_get_ip:
             mock_get_ip.return_value = "10.0.0.1"
             result = get_client_identifier(request)
 

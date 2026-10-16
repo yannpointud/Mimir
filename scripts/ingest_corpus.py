@@ -21,12 +21,11 @@ import shutil
 import sys
 from pathlib import Path
 
-# --- bootstrap: load secrets + put the backend package on sys.path ---
+# Load backend/.env before importing settings (read relative to the cwd)
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _BACKEND = _REPO_ROOT / "backend"
-sys.path.insert(0, str(_BACKEND))
 
-from dotenv import dotenv_values  # noqa: E402
+from dotenv import dotenv_values
 
 # Load backend/.env into the process environment BEFORE importing settings,
 # so MISTRAL_API_KEY (and friends) are available. The key is never logged.
@@ -34,16 +33,16 @@ for _k, _v in dotenv_values(str(_BACKEND / ".env")).items():
     if _v is not None and _k not in os.environ:
         os.environ[_k] = _v
 
-from src.config import settings  # noqa: E402
-from src.database.connection import init_database, db_manager  # noqa: E402
-from src.ingestion.processor import IngestionProcessor  # noqa: E402
-from src.ingestion.chunking import ChunkingConfig  # noqa: E402
-from src.api.dependencies import (  # noqa: E402
+from mimir.api.dependencies import (
+    get_bm25_store,
+    get_document_repository,
     get_llm_service,
     get_vector_store,
-    get_document_repository,
-    get_bm25_store,
 )
+from mimir.config import settings
+from mimir.database.connection import db_manager, init_database
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor
 
 SOURCE_DIR = _REPO_ROOT / "data" / "generated_documents"
 
@@ -106,7 +105,6 @@ async def main() -> int:
             if processor.queue_document(
                 file_path=str(dest),
                 document_id=str(document.id),
-                preserve=False,
                 metadata={"source": "ingest_corpus.py"},
             ):
                 queued += 1

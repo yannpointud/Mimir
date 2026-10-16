@@ -20,12 +20,12 @@ Le budget est suivi dans un registre journalier, `llm_budget_ledger`. Il contien
 
 Chaque opération ouvre sa propre session courte (`db_manager.get_session_context()`). La réservation est ainsi commitée avant l'appel réseau.
 
-Les paramètres sont définis dans `backend/src/config.py` :
+Les paramètres sont définis dans `backend/mimir/config.py` :
 - `daily_budget_eur = 20.0` ;
 - estimations forfaitaires `budget_reservation_chat_eur = 0.01` et `budget_reservation_embedding_eur = 0.001` ;
 - `llm_price_table`, la grille de prix en euros par million de tokens.
 
-Le plafond effectif est la clé `daily_budget_eur` de la table `configuration` si elle existe, modifiable à chaud par `PUT /api/v1/admin/configuration` (l'écran Admin > Configuration ne permet pas de la modifier). À défaut, c'est la valeur des settings (`.env`) qui s'applique.
+Le plafond effectif est la clé `daily_budget_eur` de la table `configuration` si elle existe, modifiable à chaud par `PUT /api/v1/admin/config` (l'écran Admin > Configuration ne permet pas de la modifier). À défaut, c'est la valeur des settings (`.env`) qui s'applique.
 
 L'application diffère selon le flux :
 - **Chat.** La route prend une réservation `"chat"` par question, avant de renvoyer le flux. En cas de refus, `budget_exceeded_response()` renvoie un HTTP 429 avec `{"error_code": "budget_exceeded", "error_message": "Plafond quotidien de dépense IA atteint."}`. Cette réponse est renvoyée (et non levée), sinon le gestionnaire global de `HTTPException` réécrirait le corps. La réservation est réglée une seule fois :
@@ -51,11 +51,11 @@ Négatives
 
 ## Où dans le code
 
-- `backend/src/cost/budget_guard.py` : `BudgetGuard` (`reserve`, `finalize`, `release`, `_effective_cap`), `BudgetReservation`, singleton `budget_guard`
-- `backend/src/database/repository.py` : `UsageRepository.reserve/finalize/release`, `get_today_ledger`
-- `backend/src/database/models.py` : `LlmBudgetLedger`, `LlmUsage` ; migration `backend/src/database/migrations/versions/10d18a595afa_add_llm_usage_and_llm_budget_ledger.py`
-- `backend/src/cost/pricing.py` : `compute_cost_eur` ; `backend/src/cost/usage_tracker.py` : `UsageTracker.record`
-- `backend/src/api/responses.py` : `budget_exceeded_response` ; `backend/main.py` : `budget_exceeded_handler`
-- `backend/src/api/endpoints/chat.py` : `chat_stream` ; `backend/src/services/chat_stream.py` : `ReservationSettlement` ; `backend/src/services/rag_service.py` : `_QuestionSpend`
-- `backend/src/ingestion/processor.py` : `_process_document_pipeline`, `_process_task`
-- `backend/src/api/endpoints/admin.py` : `get_usage`, `update_configuration` (clé `daily_budget_eur`)
+- `backend/mimir/cost/budget_guard.py` : `BudgetGuard` (`reserve`, `finalize`, `release`, `_effective_cap`), `BudgetReservation`, singleton `budget_guard`
+- `backend/mimir/database/repository.py` : `UsageRepository.reserve/finalize/release`, `get_today_ledger`
+- `backend/mimir/database/models.py` : `LlmBudgetLedger`, `LlmUsage` ; migration `backend/mimir/database/migrations/versions/10d18a595afa_add_llm_usage_and_llm_budget_ledger.py`
+- `backend/mimir/cost/pricing.py` : `compute_cost_eur` ; `backend/mimir/cost/usage_tracker.py` : `UsageTracker.record`
+- `backend/mimir/api/responses.py` : `budget_exceeded_response` ; `backend/mimir/main.py` : `budget_exceeded_handler`
+- `backend/mimir/api/endpoints/chat.py` : `chat_stream` ; `backend/mimir/services/chat_stream.py` : `ReservationSettlement` ; `backend/mimir/services/rag_service.py` : `_QuestionSpend`
+- `backend/mimir/ingestion/processor.py` : `_process_document_pipeline`, `_process_task`
+- `backend/mimir/api/endpoints/admin.py` : `get_usage`, `update_configuration` (clé `daily_budget_eur`)

@@ -1,44 +1,40 @@
 """
-Tests unitaires pour le service de debug RAG
+Unit tests of the RAG debug service
 """
 
-import pytest
 import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.monitoring.rag_debug_logger import RagDebugService, _make_json_serializable
+import pytest
+
+from mimir.monitoring.rag_debug_logger import RagDebugService, _make_json_serializable
 
 
 class TestMakeJsonSerializable:
-    """Tests pour la fonction de sérialisation JSON"""
+    """JSON serialization tests"""
 
     def test_dict_serialization(self):
-        """Test de sérialisation d'un dictionnaire"""
         data = {"key": "value", "number": 42}
         result = _make_json_serializable(data)
         assert result == {"key": "value", "number": 42}
 
     def test_list_serialization(self):
-        """Test de sérialisation d'une liste"""
         data = [1, 2, "test", True]
         result = _make_json_serializable(data)
         assert result == [1, 2, "test", True]
 
     def test_path_serialization(self):
-        """Test de sérialisation d'un objet Path"""
         path = Path("/test/path")
         result = _make_json_serializable(path)
         assert result == "/test/path"
 
     def test_nested_serialization(self):
-        """Test de sérialisation d'objets imbriqués"""
         data = {"list": [1, 2, Path("/test")], "nested": {"key": "value"}}
         result = _make_json_serializable(data)
         assert result == {"list": [1, 2, "/test"], "nested": {"key": "value"}}
 
     def test_primitive_types(self):
-        """Test de sérialisation des types primitifs"""
         assert _make_json_serializable(42) == 42
         assert _make_json_serializable(3.14) == 3.14
         assert _make_json_serializable("test") == "test"
@@ -47,23 +43,21 @@ class TestMakeJsonSerializable:
 
 
 class TestRagDebugService:
-    """Tests pour le service de debug RAG"""
+    """RAG debug service tests"""
 
     @pytest.fixture
     def debug_service(self):
-        """Fixture pour créer un service de debug"""
-        with patch("src.monitoring.rag_debug_logger.Path.mkdir"):
+        """Debug service"""
+        with patch("mimir.monitoring.rag_debug_logger.Path.mkdir"):
             service = RagDebugService()
             return service
 
     def test_initialization(self, debug_service):
-        """Test d'initialisation du service"""
         assert debug_service.enabled is False
         assert debug_service.logger is not None
         assert debug_service.logger.name == "rag_debug"
 
     def test_configure_enabled(self, debug_service):
-        """Test de configuration du service"""
         debug_service.configure(
             enabled=True, log_prompts=True, log_context=True, log_responses=True
         )
@@ -74,12 +68,10 @@ class TestRagDebugService:
         assert debug_service.log_responses is True
 
     def test_configure_disabled(self, debug_service):
-        """Test de configuration avec service désactivé"""
         debug_service.configure(enabled=False)
         assert debug_service.enabled is False
 
     def test_log_user_request_disabled(self, debug_service):
-        """Test que les logs ne sont pas créés quand le service est désactivé"""
         debug_service.enabled = False
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -89,7 +81,6 @@ class TestRagDebugService:
             mock_debug.assert_not_called()
 
     def test_log_user_request_enabled(self, debug_service):
-        """Test de logging d'une requête utilisateur"""
         debug_service.enabled = True
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -110,7 +101,6 @@ class TestRagDebugService:
             assert log_data["context_limit"] == 3
 
     def test_log_vector_search_disabled(self, debug_service):
-        """Test que les logs de recherche ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -123,7 +113,6 @@ class TestRagDebugService:
             mock_debug.assert_not_called()
 
     def test_log_vector_search_with_results(self, debug_service):
-        """Test de logging des résultats de recherche vectorielle"""
         debug_service.enabled = True
 
         # Mock search results
@@ -154,7 +143,6 @@ class TestRagDebugService:
             assert log_data["best_score"] == 0.9234
 
     def test_log_context_building_prompts_hidden(self, debug_service):
-        """Test de logging du contexte avec prompts cachés"""
         debug_service.enabled = True
         debug_service.log_prompts = False
         debug_service.log_context = False
@@ -176,7 +164,6 @@ class TestRagDebugService:
             assert "[CONTEXT HIDDEN" in log_data["context_text"]
 
     def test_log_context_building_prompts_visible(self, debug_service):
-        """Test de logging du contexte avec prompts visibles"""
         debug_service.enabled = True
         debug_service.log_prompts = True
         debug_service.log_context = True
@@ -197,7 +184,6 @@ class TestRagDebugService:
             assert log_data["context_text"] == "Context information here"
 
     def test_log_llm_request_disabled(self, debug_service):
-        """Test que les logs LLM ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -211,7 +197,6 @@ class TestRagDebugService:
             mock_debug.assert_not_called()
 
     def test_log_llm_request_prompt_hidden(self, debug_service):
-        """Test de logging de requête LLM avec prompt caché"""
         debug_service.enabled = True
         debug_service.log_prompts = False
 
@@ -231,7 +216,6 @@ class TestRagDebugService:
             assert "[PROMPT HIDDEN" in log_data["full_prompt"]
 
     def test_log_llm_response_disabled(self, debug_service):
-        """Test que les logs de réponse LLM ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -245,7 +229,6 @@ class TestRagDebugService:
             mock_debug.assert_not_called()
 
     def test_log_llm_response_hidden(self, debug_service):
-        """Test de logging de réponse LLM avec réponse cachée"""
         debug_service.enabled = True
         debug_service.log_responses = False
 
@@ -268,7 +251,6 @@ class TestRagDebugService:
             assert "[RESPONSE HIDDEN" in log_data["response"]
 
     def test_log_final_response_disabled(self, debug_service):
-        """Test que les logs finaux ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -282,7 +264,6 @@ class TestRagDebugService:
             mock_debug.assert_not_called()
 
     def test_log_final_response_with_cache(self, debug_service):
-        """Test de logging de la réponse finale avec cache"""
         debug_service.enabled = True
 
         with patch.object(debug_service.logger, "debug") as mock_debug:
@@ -305,7 +286,6 @@ class TestRagDebugService:
             assert log_data["cached"] is True
 
     def test_log_error_disabled(self, debug_service):
-        """Test que les logs d'erreur ne sont pas créés quand désactivé"""
         debug_service.enabled = False
 
         with patch.object(debug_service.logger, "error") as mock_error:
@@ -318,7 +298,6 @@ class TestRagDebugService:
             mock_error.assert_not_called()
 
     def test_log_error_with_traceback(self, debug_service):
-        """Test de logging d'erreur avec traceback"""
         debug_service.enabled = True
 
         with patch.object(debug_service.logger, "error") as mock_error:
@@ -340,11 +319,10 @@ class TestRagDebugService:
             assert "traceback" in log_data
 
     def test_format_log(self, debug_service):
-        """Test du formatage des logs en JSON"""
         data = {"key": "value", "number": 42, "path": Path("/test")}
         result = debug_service._format_log(data)
 
-        # Vérifier que c'est du JSON valide
+        # Check that it is valid JSON
         parsed = json.loads(result)
         assert parsed["key"] == "value"
         assert parsed["number"] == 42

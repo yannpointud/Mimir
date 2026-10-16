@@ -14,12 +14,12 @@ call is made.
 
 import asyncio
 import logging
-
-import pytest
 from unittest.mock import AsyncMock
 
-import src.monitoring.alerting as alerting
-from src.monitoring.alerting import FingerprintAlertHandler
+import pytest
+
+import mimir.monitoring.alerting as alerting
+from mimir.monitoring.alerting import FingerprintAlertHandler
 
 # A sentinel secret that must NEVER appear in an alert body.
 SENTINEL_SECRET = "super-secret-jwt-token-value-DO-NOT-LEAK"
@@ -62,7 +62,7 @@ async def _drain_tasks() -> None:
 @pytest.fixture
 def mock_send(monkeypatch):
     """Patch the SMTP send with an AsyncMock and give the email_service an address."""
-    from src.email_service.smtp_client import email_service
+    from mimir.email_service.smtp_client import email_service
 
     mock = AsyncMock(return_value=True)
     monkeypatch.setattr(email_service, "send_notification_email", mock)

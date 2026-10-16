@@ -5,6 +5,9 @@ import { getErrorMessage, escapeHtml, cn } from '../../utils/helpers';
 import { openDocumentInBrowser, validateChunkIndexes } from '../../utils/documentUtils';
 import LoadingSpinner from './LoadingSpinner';
 import Modal from './Modal';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('DocumentModal');
 
 const formatScore = (score) => `${Math.round((score || 0) * 100)} %`;
 
@@ -24,7 +27,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, filename, searchQuery = ''
       const validation = validateChunkIndexes(relevantChunks, documentData.chunks);
 
       if (!validation.isValid) {
-        console.warn(`[DocumentModal] Chunks manquants détectés:`, {
+        logger.warn('Relevant chunks missing from the document', {
           matching: validation.matchingCount,
           total: validation.totalRelevant,
           missing: validation.missingIndexes
@@ -39,7 +42,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, filename, searchQuery = ''
       if (firstRelevantChunk) {
         setSelectedChunk(firstRelevantChunk);
       } else if (validation.matchingCount === 0) {
-        console.error(`[DocumentModal] Aucun chunk pertinent trouvé - problème de correspondance d'index`);
+        logger.error('No relevant chunk found in the document: chunk_index mismatch');
         // Fallback: select the first chunk of the document
         if (documentData.chunks.length > 0) {
           setSelectedChunk(documentData.chunks[0]);
@@ -58,7 +61,7 @@ const DocumentModal = ({ isOpen, onClose, documentId, filename, searchQuery = ''
       setDocumentData(docResponse);
 
     } catch (error) {
-      console.error('Erreur lors du chargement du document:', error);
+      logger.error('Failed to load the document', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);

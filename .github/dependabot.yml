@@ -9,11 +9,6 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    ignore:
-      # mistralai 1.x is a new SDK with a different API: moving to it is a
-      # migration of the LLM client, not a version bump.
-      - dependency-name: mistralai
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: "/frontend"

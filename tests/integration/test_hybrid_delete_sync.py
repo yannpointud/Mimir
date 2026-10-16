@@ -15,19 +15,19 @@ import hashlib
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
-from src.ingestion.processor import IngestionProcessor
-from src.ingestion.queue_manager import IngestionTask
-from src.ingestion.chunking import ChunkingConfig
-from src.llm_interface.interfaces import EmbeddingResponse
-from src.cost.budget_guard import BudgetReservation
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.implementations.bm25_store import Bm25LexicalStore
-from src.api.endpoints.documents import delete_document
+from mimir.api.endpoints.documents import delete_document
+from mimir.cost.budget_guard import BudgetReservation
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor
+from mimir.ingestion.queue_manager import IngestionTask
+from mimir.llm_interface.interfaces import EmbeddingResponse
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 
 # Dense embedding dimension used by the synthetic corpus (small, arbitrary).
 _DIM = 16

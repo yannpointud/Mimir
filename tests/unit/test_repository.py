@@ -1,16 +1,19 @@
 """
-Tests unitaires pour le pattern Repository
-Vérifie les opérations CRUD et la logique métier
+Unit tests of the repositories
+Checks the CRUD operations and the business logic
 """
+
+from datetime import datetime
 
 import pytest
 
+from mimir.shared.errors import ConflictError, NotFoundError
+
 
 class TestDocumentRepository:
-    """Tests du DocumentRepository"""
+    """DocumentRepository tests"""
 
     def test_create_document(self, test_repositories, sample_document_data):
-        """Test de création d'un document"""
         repo = test_repositories["document"]
 
         doc = repo.create(
@@ -27,7 +30,6 @@ class TestDocumentRepository:
         assert doc.preserve == sample_document_data["preserve"]
 
     def test_create_document_duplicate_hash(self, test_repositories, sample_document_data):
-        """Test de création avec hash dupliqué"""
         repo = test_repositories["document"]
 
         # Premier document
@@ -36,11 +38,10 @@ class TestDocumentRepository:
         )
 
         # Tentative de duplication
-        with pytest.raises(ValueError, match="already exists"):
+        with pytest.raises(ConflictError, match="already exists"):
             repo.create(filename="different_name.pdf", file_hash=sample_document_data["file_hash"])
 
     def test_get_by_id(self, test_repositories, sample_document_data):
-        """Test de récupération par ID"""
         repo = test_repositories["document"]
 
         created_doc = repo.create(
@@ -53,7 +54,7 @@ class TestDocumentRepository:
         assert retrieved_doc.id == created_doc.id
         assert retrieved_doc.filename == created_doc.filename
 
-        # Test avec ID inexistant
+        # Unknown id
         assert repo.get_by_id(99999) is None
 
     def test_get_by_ids_batches_and_maps(self, test_repositories, sample_document_data):
@@ -80,7 +81,6 @@ class TestDocumentRepository:
         assert repo.get_by_ids([]) == {}
 
     def test_get_by_hash(self, test_repositories, sample_document_data):
-        """Test de récupération par hash"""
         repo = test_repositories["document"]
 
         created_doc = repo.create(
@@ -92,14 +92,13 @@ class TestDocumentRepository:
         assert retrieved_doc is not None
         assert retrieved_doc.id == created_doc.id
 
-        # Test avec hash inexistant
+        # Unknown hash
         assert repo.get_by_hash("nonexistent_hash") is None
 
     def test_get_by_status(self, test_repositories, sample_document_data):
-        """Test de récupération par statut"""
         repo = test_repositories["document"]
 
-        # Créer plusieurs documents avec différents statuts
+        # Create several documents with different statuses
         doc1 = repo.create("file1.pdf", "hash1")
         doc2 = repo.create("file2.pdf", "hash2")
         doc3 = repo.create("file3.pdf", "hash3")
@@ -107,7 +106,7 @@ class TestDocumentRepository:
         repo.update_status(doc2.id, "indexed", chunk_count=10)
         repo.update_status(doc3.id, "error", error_message="Test error")
 
-        # Vérifications
+        # Checks
         pending_docs = repo.get_by_status("pending")
         indexed_docs = repo.get_by_status("indexed")
         error_docs = repo.get_by_status("error")
@@ -122,14 +121,13 @@ class TestDocumentRepository:
         assert error_docs[0].id == doc3.id
 
     def test_update_status(self, test_repositories, sample_document_data):
-        """Test de mise à jour de statut"""
         repo = test_repositories["document"]
 
         doc = repo.create(
             filename=sample_document_data["filename"], file_hash=sample_document_data["file_hash"]
         )
 
-        # Mise à jour vers indexed
+        # Update to indexed
         repo.update_status(doc.id, "indexed", chunk_count=15)
 
         updated_doc = repo.get_by_id(doc.id)
@@ -138,7 +136,7 @@ class TestDocumentRepository:
         assert updated_doc.indexed_at is not None
         assert updated_doc.error_message is None
 
-        # Mise à jour vers error
+        # Update to error
         repo.update_status(doc.id, "error", error_message="Processing failed")
 
         updated_doc = repo.get_by_id(doc.id)
@@ -146,10 +144,9 @@ class TestDocumentRepository:
         assert updated_doc.error_message == "Processing failed"
 
     def test_update_status_nonexistent(self, test_repositories):
-        """Test de mise à jour d'un document inexistant"""
         repo = test_repositories["document"]
 
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(NotFoundError, match="not found"):
             repo.update_status(99999, "indexed")
 
     def test_delete_document(self, test_repositories, sample_document_data):
@@ -160,7 +157,7 @@ class TestDocumentRepository:
             filename=sample_document_data["filename"], file_hash=sample_document_data["file_hash"]
         )
 
-        # Suppression réussie
+        # Deletion succeeded
         assert repo.delete(doc.id) is True
         assert repo.get_by_id(doc.id) is None
 
@@ -168,7 +165,6 @@ class TestDocumentRepository:
         assert repo.delete(99999) is False
 
     def test_delete_protected_document(self, test_repositories, sample_document_data):
-        """Test de suppression d'un document protégé"""
         repo = test_repositories["document"]
 
         doc = repo.create(
@@ -177,19 +173,18 @@ class TestDocumentRepository:
             preserve=True,
         )
 
-        # Suppression bloquée
-        with pytest.raises(ValueError, match="protected"):
+        # Deletion refused
+        with pytest.raises(ConflictError, match="protected"):
             repo.delete(doc.id)
 
-        # Suppression forcée
+        # Forced deletion
         assert repo.delete(doc.id, force=True) is True
         assert repo.get_by_id(doc.id) is None
 
     def test_get_all_with_pagination(self, test_repositories):
-        """Test de récupération avec pagination"""
         repo = test_repositories["document"]
 
-        # Créer plusieurs documents
+        # Create several documents
         for i in range(5):
             repo.create(f"file{i}.pdf", f"hash{i}")
 
@@ -210,15 +205,14 @@ class TestDocumentRepository:
         assert asc_docs[0].filename != desc_docs[0].filename
 
     def test_get_statistics(self, test_repositories):
-        """Test des statistiques"""
         repo = test_repositories["document"]
 
-        # État initial
+        # Initial state
         stats = repo.get_statistics()
         assert stats["total_documents"] == 0
         assert stats["count_pending"] == 0
 
-        # Ajouter des documents
+        # Add documents
         doc1 = repo.create("file1.pdf", "hash1")
         repo.create("file2.pdf", "hash2", preserve=True)
         doc3 = repo.create("file3.pdf", "hash3")
@@ -235,8 +229,63 @@ class TestDocumentRepository:
         assert stats["protected_documents"] == 1
 
 
+class TestDocumentSorting:
+    """get_all_paginated sorting, as used by the admin documents list."""
+
+    @pytest.fixture
+    def repo(self, test_repositories):
+        repo = test_repositories["document"]
+        rows = [
+            ("gamma.pdf", "indexed", 5, datetime(2026, 1, 3)),
+            ("alpha.pdf", "pending", 0, datetime(2026, 1, 1)),
+            ("Beta.pdf", "error", 5, datetime(2026, 1, 2)),
+        ]
+        for index, (filename, status, chunk_count, created_at) in enumerate(rows):
+            document = repo.create(filename, f"hash{index}")
+            repo.update_status(document.id, status, chunk_count=chunk_count)
+            document.created_at = created_at
+        repo.session.commit()
+        return repo
+
+    @staticmethod
+    def _filenames(repo, **sort):
+        documents, _ = repo.get_all_paginated(**sort)
+        return [document.filename for document in documents]
+
+    def test_defaults_to_newest_first(self, repo):
+        assert self._filenames(repo) == ["gamma.pdf", "Beta.pdf", "alpha.pdf"]
+
+    def test_filenames_sort_case_insensitively(self, repo):
+        ascending = self._filenames(repo, sort_by="filename", descending=False)
+
+        assert ascending == ["alpha.pdf", "Beta.pdf", "gamma.pdf"]
+
+    def test_status_sorts_on_the_stored_value(self, repo):
+        ascending = self._filenames(repo, sort_by="status", descending=False)
+
+        assert ascending == ["Beta.pdf", "gamma.pdf", "alpha.pdf"]
+
+    def test_ties_are_broken_by_id_in_the_sort_direction(self, repo):
+        descending = self._filenames(repo, sort_by="chunk_count", descending=True)
+        ascending = self._filenames(repo, sort_by="chunk_count", descending=False)
+
+        # gamma.pdf and Beta.pdf both have 5 chunks; gamma.pdf was created first
+        assert descending == ["Beta.pdf", "gamma.pdf", "alpha.pdf"]
+        assert ascending == ["alpha.pdf", "gamma.pdf", "Beta.pdf"]
+
+    def test_pages_neither_repeat_nor_skip_tied_documents(self, repo):
+        sort = {"sort_by": "chunk_count", "descending": True, "limit": 1}
+        pages = [repo.get_all_paginated(offset=offset, **sort)[0] for offset in range(3)]
+
+        assert sorted(page[0].filename for page in pages) == [
+            "Beta.pdf",
+            "alpha.pdf",
+            "gamma.pdf",
+        ]
+
+
 class TestConfigurationRepository:
-    """Tests du ConfigurationRepository"""
+    """ConfigurationRepository tests"""
 
     def test_get_set_configuration(self, test_repositories):
         """Test de get/set configuration"""
@@ -267,10 +316,10 @@ class TestConfigurationRepository:
         """Test de suppression de configuration"""
         repo = test_repositories["config"]
 
-        # Créer une config
+        # Create a configuration
         repo.set("test_key", "test_value")
 
-        # Suppression réussie
+        # Deletion succeeded
         assert repo.delete("test_key") is True
         assert repo.get("test_key") is None
 
@@ -278,14 +327,13 @@ class TestConfigurationRepository:
         assert repo.delete("nonexistent") is False
 
     def test_get_all_configurations(self, test_repositories):
-        """Test de récupération de toutes les configurations"""
         repo = test_repositories["config"]
 
-        # État initial
+        # Initial state
         all_configs = repo.get_all()
         assert len(all_configs) == 0
 
-        # Ajouter des configurations
+        # Add configurations
         repo.set("key1", "value1")
         repo.set("key2", "value2")
         repo.set("key3", "value3")
@@ -293,16 +341,15 @@ class TestConfigurationRepository:
         all_configs = repo.get_all()
         assert len(all_configs) == 3
 
-        # Vérifier le tri par clé
+        # Check the order by key
         keys = [config.key for config in all_configs]
         assert keys == sorted(keys)
 
 
 class TestAuditLogRepository:
-    """Tests du AuditLogRepository"""
+    """AuditLogRepository tests"""
 
     def test_create_log(self, test_repositories):
-        """Test de création de log d'audit"""
         repo = test_repositories["audit"]
 
         log = repo.create_log(
@@ -321,16 +368,15 @@ class TestAuditLogRepository:
         assert log.success is True
 
     def test_get_logs_with_filters(self, test_repositories):
-        """Test de récupération avec filtres"""
         repo = test_repositories["audit"]
 
-        # Créer différents logs
+        # Create different logs
         repo.create_log("admin", "login", "Admin login")
         repo.create_log("user", "chat", "User question")
         repo.create_log("admin", "upload", "Document upload")
         repo.create_log("system", "startup", "System start")
 
-        # Test sans filtres
+        # No filters
         all_logs = repo.get_logs()
         assert len(all_logs) == 4
 

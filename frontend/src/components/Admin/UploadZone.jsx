@@ -13,6 +13,9 @@ import {
   Shield,
   Loader
 } from 'lucide-react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('UploadZone');
 
 const UploadZone = () => {
   const { onUploadSuccess } = useOutletContext();
@@ -23,7 +26,7 @@ const UploadZone = () => {
   const onDrop = useCallback((acceptedFiles, rejectedFiles) => {
     // Handle rejected files
     rejectedFiles.forEach(({ file, errors }) => {
-      console.error('Fichier rejeté:', file.name, errors);
+      logger.warn('File rejected', { filename: file.name, errors });
     });
 
     // Add accepted files to the upload list
@@ -86,7 +89,7 @@ const UploadZone = () => {
       onUploadSuccess?.();
 
     } catch (error) {
-      console.error('Erreur lors de l\'upload:', error);
+      logger.error('Upload failed', error);
       setUploads(prev => prev.map(u =>
         u.id === upload.id
           ? {

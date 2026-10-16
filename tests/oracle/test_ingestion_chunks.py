@@ -25,31 +25,36 @@ def test_ingestion_chunks_per_format(oracle_env):
 
     stored = {}
     for meta in env.vector_store.snapshot_active_chunks():
-        stored.setdefault(str(meta["document_id"]), []).append({
-            "chunk_index": meta["chunk_index"],
-            "total_chunks": meta["total_chunks"],
-            "text": meta["text"],
-            "source": str(meta["source"]),
-            "metadata": meta.get("metadata", {}),
-        })
+        stored.setdefault(str(meta["document_id"]), []).append(
+            {
+                "chunk_index": meta["chunk_index"],
+                "total_chunks": meta["total_chunks"],
+                "text": meta["text"],
+                "source": str(meta["source"]),
+                "metadata": meta.get("metadata", {}),
+            }
+        )
 
     result = {}
     for name, doc_id in ids.items():
         document = client.get(f"/api/v1/documents/{doc_id}", headers=env.admin_headers).json()
         full = client.get(f"/api/v1/documents/{doc_id}/full").json()
-        result[name] = normalize({
-            "status": document["status"],
-            "chunk_count": document["chunk_count"],
-            "error_message": document["error_message"],
-            "mime_type": full["mime_type"],
-            "file_size": full["file_size"],
-            "content": full["content"],
-            "chunks": [
-                {"chunk_index": c["chunk_index"], "text": c["text"], "metadata": c["metadata"]}
-                for c in full["chunks"]
-            ],
-            "indexed_chunks": sorted(
-                stored.get(str(doc_id), []), key=lambda c: c["chunk_index"]
-            ),
-        }, env.tmp_root)
+        result[name] = normalize(
+            {
+                "status": document["status"],
+                "chunk_count": document["chunk_count"],
+                "error_message": document["error_message"],
+                "mime_type": full["mime_type"],
+                "file_size": full["file_size"],
+                "content": full["content"],
+                "chunks": [
+                    {"chunk_index": c["chunk_index"], "text": c["text"], "metadata": c["metadata"]}
+                    for c in full["chunks"]
+                ],
+                "indexed_chunks": sorted(
+                    stored.get(str(doc_id), []), key=lambda c: c["chunk_index"]
+                ),
+            },
+            env.tmp_root,
+        )
     assert_snapshot("ingestion_chunks", result)

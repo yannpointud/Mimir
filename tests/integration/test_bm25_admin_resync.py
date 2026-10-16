@@ -20,19 +20,19 @@ import hashlib
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import numpy as np  # noqa: F401
 import pytest
 
-from src.ingestion.processor import IngestionProcessor
-from src.ingestion.queue_manager import IngestionTask
-from src.ingestion.chunking import ChunkingConfig
-from src.llm_interface.interfaces import EmbeddingResponse
-from src.cost.budget_guard import BudgetReservation
-from src.rag_core.implementations.faiss_store import FaissVectorStore
-from src.rag_core.implementations.bm25_store import Bm25LexicalStore
-from src.api.endpoints.admin import rebuild_vector_store
+from mimir.api.endpoints.admin import rebuild_vector_store
+from mimir.cost.budget_guard import BudgetReservation
+from mimir.ingestion.chunking import ChunkingConfig
+from mimir.ingestion.processor import IngestionProcessor
+from mimir.ingestion.queue_manager import IngestionTask
+from mimir.llm_interface.interfaces import EmbeddingResponse
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore
 
 # Dense embedding dimension used by the synthetic corpus (small, arbitrary).
 _DIM = 16
@@ -148,9 +148,7 @@ def _docs_from_bm25(vector_store, bm25_store, term):
     """
     hits = bm25_store.query(term, top_k=50)
     return {
-        vector_store.metadata[chunk_id]["document_id"]
-        for chunk_id, score in hits
-        if score > 0.0
+        vector_store.metadata[chunk_id]["document_id"] for chunk_id, score in hits if score > 0.0
     }
 
 
@@ -194,24 +192,20 @@ async def test_admin_rebuild_resyncs_bm25_and_leaves_no_ghost(
     # --- Run the real admin rebuild endpoint handler. It must optimize FAISS AND
     # resync BM25 from the resulting active-chunk snapshot. Both documents still
     # exist in the database: only the FAISS/BM25 indexes diverged. The orphan
-    # cleanup must take that list from the injected repository, never from the
-    # process-global database, whose content depends on whatever earlier tests
-    # left behind. ---
+    # cleanup takes that list from the injected repository. ---
     audit_repo = Mock()
     audit_repo.create_log.return_value = None
     document_repo = Mock()
     document_repo.get_all.return_value = [Mock(id=int(_DOC_A_ID)), Mock(id=int(_DOC_B_ID))]
 
-    with patch.object(vector_store, "_get_existing_document_ids") as global_db_lookup:
-        response = await rebuild_vector_store(
-            current_user={"sub": "admin"},
-            audit_repo=audit_repo,
-            vector_store=vector_store,
-            bm25_store=bm25_store,
-            document_repo=document_repo,
-        )
+    response = await rebuild_vector_store(
+        current_user={"sub": "admin"},
+        audit_repo=audit_repo,
+        vector_store=vector_store,
+        bm25_store=bm25_store,
+        document_repo=document_repo,
+    )
     assert response.success is True
-    global_db_lookup.assert_not_called()
     document_repo.get_all.assert_called_once()
 
     # --- Anti-ghost core: after the rebuild the BM25 corpus matches the

@@ -3,7 +3,7 @@ Integration tests for the ingestion budget fail-closed path.
 
 Covers three guarantees:
   - A budget-exhausted document stops cleanly with status 'error' and message
-    "Daily budget exceeded", and is NOT retried (BudgetExceededError is
+    "Daily budget exceeded", and is NOT retried (BudgetExceeded is
     caught before the generic except, non-retriable).
   - A budget-blocked ingestion makes no embedding call to Mistral.
   - A successful ingestion records the embedding usage as a llm_usage row
@@ -17,56 +17,19 @@ tests/integration/test_budget_guard_endpoints.py). The fail-closed and
 release-on-failure cases use mocked budget_guard/usage_tracker injected via
 the IngestionProcessor constructor -- no real DB session is ever opened.
 """
-import shutil
-import tempfile
-from pathlib import Path
+
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src import config as config_module
-from src.cost.budget_guard import BudgetExceededError, BudgetGuard, BudgetReservation
-from src.cost.usage_tracker import UsageTracker
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
-from src.ingestion.processor import IngestionProcessor
-from src.ingestion.queue_manager import IngestionTask
-from src.llm_interface.interfaces import EmbeddingResponse
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime. BudgetGuard/UsageTracker open their own
-    sessions via the real db_manager singleton (own-session-per-operation
-    pattern), so the standard test_session fixture would never see
-    their commits."""
-    temp_dir = tempfile.mkdtemp(prefix="ingestion_budget_test_")
-    temp_db_path = Path(temp_dir) / "ingestion_budget_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
+from mimir.cost.budget_guard import BudgetGuard, BudgetReservation
+from mimir.cost.usage_tracker import UsageTracker
+from mimir.database.connection import db_manager
+from mimir.database.models import LlmUsage
+from mimir.ingestion.processor import IngestionProcessor
+from mimir.ingestion.queue_manager import IngestionTask
+from mimir.llm_interface.interfaces import EmbeddingResponse
+from mimir.shared.errors import BudgetExceeded
 
 
 def _usage_rows():
@@ -106,18 +69,20 @@ def _single_chunk_task(document_id="123"):
 def _patched_pipeline(processor, text="Sample text for budget test"):
     """Context manager patching extraction/chunking so the pipeline reaches
     the embeddings step with exactly one chunk."""
-    return patch.object(processor, '_extract_text', return_value=text), patch.object(
+    return patch.object(processor, "_extract_text", return_value=text), patch.object(
         processor.chunking_strategy,
-        'chunk_text',
-        return_value=[{
-            "text": "chunk",
-            "chunk_index": 0,
-            "total_chunks": 1,
-            "start_char": 0,
-            "end_char": 5,
-            "word_count": 1,
-            "char_count": 5,
-        }],
+        "chunk_text",
+        return_value=[
+            {
+                "text": "chunk",
+                "chunk_index": 0,
+                "total_chunks": 1,
+                "start_char": 0,
+                "end_char": 5,
+                "word_count": 1,
+                "char_count": 5,
+            }
+        ],
     )
 
 
@@ -155,13 +120,13 @@ class TestBudgetFailClosed:
         mock_llm.embed.assert_not_called()
 
         mock_document_repository.update_status.assert_any_call(
-            123, 'error', error_message="Daily budget exceeded"
+            123, "error", error_message="Daily budget exceeded"
         )
         # Last call must be the fail-closed status update, not a generic
         # "Processing pipeline failed" message.
         last_call = mock_document_repository.update_status.call_args_list[-1]
-        assert last_call.args[1] == 'error'
-        assert last_call.kwargs.get('error_message') == "Daily budget exceeded"
+        assert last_call.args[1] == "error"
+        assert last_call.kwargs.get("error_message") == "Daily budget exceeded"
 
         # Non-retriable: the task's retry budget was exhausted so the async
         # queue worker loop will not re-queue it.
@@ -172,7 +137,7 @@ class TestBudgetFailClosed:
         self, mock_document_repository, mock_vector_store
     ):
         """Direct pipeline-level check (bypassing _process_task) that a
-        rejected reservation raises BudgetExceededError, proving the raise
+        rejected reservation raises BudgetExceeded, proving the raise
         site independently of the _process_task fail-closed handling."""
         rejecting_guard = Mock(spec=BudgetGuard)
         rejecting_guard.reserve = Mock(return_value=None)
@@ -191,9 +156,8 @@ class TestBudgetFailClosed:
         task = _single_chunk_task()
         extract_patch, chunk_patch = _patched_pipeline(processor)
 
-        with extract_patch, chunk_patch:
-            with pytest.raises(BudgetExceededError):
-                await processor._process_document_pipeline(task)
+        with extract_patch, chunk_patch, pytest.raises(BudgetExceeded):
+            await processor._process_document_pipeline(task)
 
         mock_llm.embed.assert_not_called()
 

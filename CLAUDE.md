@@ -10,12 +10,12 @@ Le dossier scripts/ contient les scripts de tests de developpements temporaire
 Tous les commentaires dans le code doivent etres en anglais
 Pour lancer serveur et arreter : 
 start-servers.sh
-stop_servers.sh
+stop-servers.sh
 
 
 ## Stack
 - **Backend**: Python 3.13, FastAPI, SQLite (WAL), FAISS, Mistral API
-- **Frontend**: React 18, Vite, Tailwind CSS, Axios
+- **Frontend**: React 18, Vite 8, Tailwind CSS, Axios
 - **Auth**: JWT (PyJWT) + Argon2 (pwdlib, bcrypt legacy)
 - **Tests**: pytest (backend), vitest (frontend)
 
@@ -23,8 +23,9 @@ stop_servers.sh
 
 ```
 backend/
-├── main.py                          # FastAPI entry point
-├── src/
+├── alembic.ini                      # Alembic migrations config
+├── mimir/                           # Python package (pip install -e .)
+│   ├── main.py                      # FastAPI entry point
 │   ├── config.py                    # Pydantic settings (reads .env)
 │   ├── api/
 │   │   ├── endpoints/               # REST routes: chat, documents, admin, auth, health, logs
@@ -40,7 +41,6 @@ backend/
 │   │   ├── repository.py            # Repository pattern (CRUD)
 │   │   └── migrations/              # Alembic migrations
 │   ├── email_service/               # SMTP client for escalations
-│   ├── file_watcher/                # FileWatcher class, not wired into the app (WATCH_ENABLED has no effect)
 │   ├── ingestion/
 │   │   ├── processor.py             # Ingestion pipeline orchestrator
 │   │   ├── extractors.py            # Text extraction (PDF, DOCX, TXT, MD)
@@ -58,7 +58,7 @@ backend/
 │   ├── services/                    # Route logic: RAG pipeline, SSE stream, upload, deletion, index maintenance
 │   ├── monitoring/                  # Structured JSON logging, SMTP error alerting
 │   ├── shared/                      # models.py (Pydantic DTOs), errors.py (domain exceptions), constants.py
-│   └── utils/                       # Log parser, logs reader
+│   └── utils/                       # Log file reader (logs_reader.py)
 ├── data/                            # Runtime data (gitignored)
 │   ├── documents/                   # Uploaded files (hashed filenames)
 │   ├── faiss/                       # index.bin + metadata.json
@@ -74,17 +74,17 @@ frontend/
 │   │   ├── Admin/                   # AdminDashboard, DocumentsList, UploadZone, LogViewer
 │   │   └── Common/                  # DocumentModal, Layout, ProtectedRoute
 │   ├── services/api.js              # Axios client (all API calls)
-│   ├── hooks/useAuth.jsx            # Auth context + JWT management
+│   ├── hooks/                       # useAuth (auth context + JWT), useDocumentsList (admin documents list)
 │   ├── utils/                       # storage.js, logger.js, auth.js, helpers.js
-│   └── test/                        # vitest tests (141 tests)
+│   └── test/                        # vitest tests (150 tests)
 └── package.json
 
-tests/                               # pytest test suite (1036 tests, run from the repo root)
-├── conftest.py                      # Shared fixtures
-├── unit/                            # Unit tests (838)
-├── integration/                     # API + workflow tests (154, frozen)
-├── oracle/                          # Characterization snapshots (32, frozen)
-└── performance/                     # Cleanup performance tests (12)
+tests/                               # pytest test suite (921 tests, run from the repo root)
+├── conftest.py                      # Shared fixtures (temporary data paths for the whole run)
+├── unit/                            # Unit tests (727)
+├── integration/                     # API + workflow tests (150)
+├── oracle/                          # Characterization snapshots (32)
+└── performance/                     # Cleanup, budget and FAISS concurrency tests (12)
 
 scripts/
 ├── local_ci.sh                      # ruff + mypy + pytest + pip-audit
@@ -95,11 +95,11 @@ scripts/
 docs/adr/                            # Architecture decision records
 ```
 
-`tests/oracle/` and `tests/integration/` are characterization tests whose SHA-256 sums are listed in `docs/cleanup/ORACLE.sha256`. The FAISS snapshots of `tests/oracle/test_retrieval_ranking.py` and `test_chat_stream_events.py` depend on the CPU SIMD level (generated on AVX-512): on another CPU some of them fail without any regression, and GitHub CI skips them (`docs/cleanup/DECISIONS.md` DF.12).
+`tests/oracle/` pins the observable behavior (OpenAPI contract, JSON responses, SSE events, retrieval ranking, chunks) in JSON snapshots. Regenerate them with `ORACLE_UPDATE=1 pytest tests/oracle` only for an intended behavior change, and review the snapshot diff.
 
 ## Key Patterns
 - **Repository pattern** for all DB access (`database/repository.py`)
-- **Abstract interfaces** `AbstractLLMService`, `AbstractVectorStore` and the `LexicalIndex` Protocol, with a single implementation each (Mistral, FAISS, BM25). `RagService` and `IngestionProcessor` are typed on them, but `api/dependencies.py` instantiates the concrete classes directly (`LLM_PROVIDER` and `VECTOR_STORE_TYPE` are only displayed), and the maintenance paths (rebuild, orphan cleanup, consistency check, document chunks) call FAISS-specific methods: another provider would need code changes, not just configuration
+- **Abstract interfaces** `AbstractLLMService`, `AbstractVectorStore` and the `LexicalIndex` Protocol, with a single implementation each (Mistral, FAISS, BM25). `RagService` and `IngestionProcessor` are typed on them, but `api/dependencies.py` instantiates the concrete classes directly, and the maintenance paths (rebuild, orphan cleanup, consistency check, document chunks) call FAISS-specific methods: another provider would need code changes, not just configuration
 - **Services layer** (`services/`): routes stay thin and delegate to services; domain errors (`shared/errors.py`) and `RequestRejectedError` are translated to HTTP at the API layer
 - **Daily AI budget** reserved atomically before every paid Mistral call (`cost/budget_guard.py`, see `docs/adr/0001`)
 - **Streaming SSE** for chat responses (`POST /api/v1/chat/stream`)
@@ -115,10 +115,11 @@ docs/adr/                            # Architecture decision records
 # Tests
 pytest                      # All tests with coverage
 pytest tests/unit/ -v       # Unit only
-cd frontend && npx vitest   # Frontend tests
+cd frontend && npx vitest run   # Frontend tests
 
-# Quality (CI checks; local pytest also runs the 2 CPU-dependent oracle modules CI skips)
-bash scripts/local_ci.sh    # ruff check + ruff format --check + mypy backend/src + pytest + pip-audit
+# Quality (the CI runs the same checks on every pull request)
+bash scripts/local_ci.sh    # ruff check + ruff format --check + mypy backend/mimir + pytest + pip-audit
+cd frontend && npm run lint && npx vitest run && npm run build
 
 # API docs
 http://localhost:8000/docs   # Swagger UI
@@ -128,4 +129,12 @@ http://localhost:8000/docs   # Swagger UI
 - `backend/.env.example` — copy to `backend/.env` and configure
 - Required: `MISTRAL_API_KEY`, `JWT_SECRET_KEY`
 - Admin account `admin`: password set with `ADMIN_PASSWORD` (clear text, hashed at startup, takes precedence) or `ADMIN_PASSWORD_HASH` (Argon2 hash); see README "Mot de passe admin". With `ENVIRONMENT=production`, startup refuses an unchanged `JWT_SECRET_KEY` or admin password
+- The backend reads the `.env` of its working directory (`backend/` with `start-servers.sh`); an unknown key stops startup (`extra="forbid"`)
+- Frontend logging: warnings and errors always reach the console; `VITE_ENABLE_LOGS`, `VITE_DEBUG_MODE` and `VITE_LOG_TO_FILE` add info, debug and backend forwarding (`frontend/.env.example`)
 - Lockfiles: `requirements.lock` / `requirements-dev.lock` are generated from `requirements*.txt` (regeneration command in their header)
+
+## Quality Gates
+- ruff rules F, E9, B, SIM, UP, BLE, C90, TID (absolute imports only), I, RUF; ruff format
+- mypy with `disallow_untyped_defs` and `check_untyped_defs` on `backend/mimir`
+- pytest (`pytest.ini`) fails under 85 % coverage of `backend/mimir`, and a DeprecationWarning raised from `mimir` or `tests` is an error
+- CI jobs (`.github/workflows/ci.yml`, on pull requests and after each merge into main): ruff, mypy, pytest, pip-audit, frontend (ESLint, vitest, build, `npm audit --omit=dev --audit-level=high`)

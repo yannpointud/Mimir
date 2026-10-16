@@ -8,21 +8,23 @@ Usage:
 
 Requires:
     - MISTRAL_API_KEY environment variable (from backend/.env)
-    - pip install python-docx fpdf mistralai
+    - requirements-dev.txt, plus: pip install fpdf
 """
 
 import os
-import sys
 import random
+import sys
 import time
+
+import httpx
 from docx import Document
 from fpdf import FPDF
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
 
 # --- CONFIGURATION ---
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
 MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-small-latest")
+MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
+REQUEST_TIMEOUT_SECONDS = 120
 
 NUM_DOCUMENTS = 50  # Number of documents to generate
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "generated_documents")
@@ -89,18 +91,6 @@ DOC_TYPES = [
     "Communiqué de Presse",
 ]
 
-# Initialize Mistral client
-if not MISTRAL_API_KEY:
-    print("Error: MISTRAL_API_KEY environment variable is not set.")
-    print("Set it with: export MISTRAL_API_KEY=your_key_here")
-    sys.exit(1)
-
-try:
-    client = MistralClient(api_key=MISTRAL_API_KEY)
-except Exception as e:  # noqa: BLE001 - CLI boundary: report any failure and exit non-zero
-    print(f"Error initializing Mistral client. Check your API key. Error: {e}")
-    sys.exit(1)
-
 
 def generate_long_content(doc_type, subject):
     """Generate a longer, more detailed document content."""
@@ -122,15 +112,17 @@ def generate_long_content(doc_type, subject):
     print(f"  > Envoi de la requête à l'API Mistral pour un document long : {doc_type} - {subject}")
 
     try:
-        messages = [ChatMessage(role="user", content=prompt)]
-        chat_response = client.chat(
-            model=MISTRAL_MODEL,
-            messages=messages,
+        response = httpx.post(
+            MISTRAL_CHAT_URL,
+            headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+            json={"model": MISTRAL_MODEL, "messages": [{"role": "user", "content": prompt}]},
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        return chat_response.choices[0].message.content
-    except Exception as e:  # noqa: BLE001 - CLI boundary: skip the document on any API failure
+        response.raise_for_status()
+    except httpx.HTTPError as e:
         print(f"  !!! Erreur lors de l'appel à l'API Mistral : {e}")
         return None
+    return response.json()["choices"][0]["message"]["content"]
 
 
 def create_docx(content, filepath):
@@ -188,13 +180,17 @@ def create_pdf(content, filepath):
 
 def main():
     """Generate every test document."""
+    if not MISTRAL_API_KEY:
+        print("Error: MISTRAL_API_KEY environment variable is not set.")
+        sys.exit(1)
+
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         print(f"Dossier '{OUTPUT_DIR}' créé.")
 
     for i in range(NUM_DOCUMENTS):
         doc_type = random.choice(DOC_TYPES)
-        subject = f"{random.choice(DEPARTMENTS)} - {random.choice(PROJECT_NAMES)}"  # Simpler, more varied subject logic
+        subject = f"{random.choice(DEPARTMENTS)} - {random.choice(PROJECT_NAMES)}"
 
         print(f"\n--- Génération du document {i + 1}/{NUM_DOCUMENTS} ---")
         content = generate_long_content(doc_type, subject)
@@ -205,14 +201,13 @@ def main():
 
         base_filename = f"{doc_type}_{subject}".replace(" ", "_").replace("/", "_").replace(":", "")
 
-        # --- Random choice of the output format ---
         output_format = random.choice(["docx", "pdf"])
 
         if output_format == "docx":
             filepath = os.path.join(OUTPUT_DIR, f"{base_filename}.docx")
             print(f"  > Création du fichier DOCX : {filepath}")
             create_docx(content, filepath)
-        else:  # pdf
+        else:
             filepath = os.path.join(OUTPUT_DIR, f"{base_filename}.pdf")
             print(f"  > Création du fichier PDF : {filepath}")
             create_pdf(content, filepath)

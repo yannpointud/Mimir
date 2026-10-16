@@ -5,7 +5,7 @@
 services:
   backend:
     build:
-      # Context stays the repo root: the image needs requirements.txt (root) and
+      # Context stays the repo root: the image needs requirements.lock (root) and
       # backend/, and ./.dockerignore — read at the context root — is what keeps
       # secrets and runtime data out of the context.
       context: .

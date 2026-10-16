@@ -9,7 +9,7 @@
           "end_char": 999,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 145
         },
         "text": "Procédure d'astreinte informatique\n\nL'astreinte informatique garantit la continuité des services critiques en dehors des heures ouvrées. Elle est assurée à tour de rôle par les ingénieurs de l'équipe infrastructure, selon un planning publié chaque trimestre.\n\nDéclenchement\n\nL'ingénieur d'astreinte est joint par le centre de supervision dès qu'une alerte de niveau critique est levée. Il accuse réception dans un délai de quinze minutes et commence le diagnostic à distance dans les trente minutes suivant l'appel.\n\nLes services couverts par l'astreinte sont :\n\nla messagerie d'entreprise\n\nle VPN et l'accès distant\n\nl'application de paie\n\nle portail client\n\nEscalade\n\nSi l'incident n'est pas résolu au bout de deux heures, l'ingénieur d'astreinte escalade vers le responsable infrastructure. Au-delà de quatre heures, la direction des systèmes d'information est informée et une cellule de crise peut être réunie. Chaque escalade est tracée dans le ticket d'incident avec l'heure exacte de l'appel."
@@ -21,7 +21,7 @@
           "end_char": 610,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 92
         },
         "text": "Chaque escalade est tracée dans le ticket d'incident avec l'heure exacte de l'appel. Rémunération\n\nChaque semaine d'astreinte donne lieu à une prime forfaitaire. Les interventions réalisées pendant l'astreinte sont rémunérées en heures supplémentaires majorées de cinquante pour cent la nuit et de cent pour cent le dimanche et les jours fériés. Un repos compensateur de onze heures consécutives est garanti après toute intervention nocturne de plus de deux heures.\n\nNiveau | Délai de prise en charge | Interlocuteur\n\nCritique | 15 minutes | Ingénieur d'astreinte\n\nMajeur | 1 heure | Responsable infrastructure"
@@ -38,7 +38,7 @@
           "end_char": 999,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 145
         },
         "source": "<TMP>/data/documents/0ebe94c0289405ee234e64c28bd8573b98bca1f767af808fae1610fe0b404a41_sample.docx",
@@ -52,7 +52,7 @@
           "end_char": 610,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 92
         },
         "source": "<TMP>/data/documents/0ebe94c0289405ee234e64c28bd8573b98bca1f767af808fae1610fe0b404a41_sample.docx",
@@ -73,7 +73,7 @@
           "end_char": 2081,
           "section_title": "Retour d'expérience",
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 291
         },
         "text": "<h1>Guide de déploiement applicatif</h1>\n<p>Ce guide décrit la procédure standard de mise en production des applications internes. Il s'adresse aux équipes de développement et à l'équipe d'exploitation.</p>\n<h2>Préparation</h2>\n<p>Avant toute mise en production, l'équipe de développement vérifie que :</p>\n<ul>\n<li>la branche principale est verte en intégration continue ;</li>\n<li>les migrations de base de données ont été testées sur l'environnement de recette ;</li>\n<li>la note de version est rédigée et validée par le responsable produit.</li>\n</ul>\n<p>La demande de changement est déposée dans l'outil de gestion au moins quarante-huit heures avant la fenêtre de déploiement. Elle précise le périmètre, les risques identifiés et le plan de retour arrière.</p>\n<h2>Fenêtres de déploiement</h2>\n<p>Les déploiements ont lieu le mardi et le jeudi entre dix-huit heures et vingt heures. Aucun déploiement n'est autorisé le vendredi, la veille d'un jour férié ou pendant les périodes de clôture comptable.</p>\n<p>| Environnement | Validation requise | Délai |\n|---------------|--------------------|-------|\n| Recette | Chef de projet | 24 h |\n| Production | Comité de changement | 48 h |</p>\n<h2>Exécution</h2>\n<ol>\n<li>L'exploitant annonce le début de l'intervention sur le canal dédié.</li>\n<li>Il applique les migrations puis déploie la nouvelle version.</li>\n<li>Il exécute les tests de fumée automatisés.</li>\n<li>Il surveille les indicateurs pendant trente minutes.</li>\n</ol>\n<p>En cas d'anomalie bloquante, le retour arrière est déclenché immédiatement, sans attendre la fin de la fenêtre.</p>\n<h2>Après le déploiement</h2>\n<p>Le responsable produit confirme le bon fonctionnement auprès des utilisateurs clés. La demande de changement est clôturée avec un bilan qui mentionne la durée réelle de l'intervention et les éventuels incidents.</p>\n<h3>Retour d'expérience</h3>\n<p>Tout incident survenu pendant un déploiement donne lieu à un retour d'expérience sous cinq jours ouvrés. Les actions correctives sont suivies dans le tableau de bord de l'équipe d'exploitation.</p>"
@@ -90,7 +90,7 @@
           "end_char": 2081,
           "section_title": "Retour d'expérience",
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 291
         },
         "source": "<TMP>/data/documents/884896e79128c11a71dca5968e56888c604b8aa13e43ca3e1d8152dd380cc7a0_sample.md",
@@ -111,7 +111,7 @@
           "end_char": 696,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 105
         },
         "text": "Politique d'archivage des documents\nLes documents de l'entreprise sont conservés selon leur nature et leur\nvaleur juridique. Les contrats commerciaux sont archivés pendant dix ans\naprès la fin de leur exécution. Les factures et pièces comptables sont\nconservées dix ans à compter de la clôture de l'exercice.\nLes bulletins de paie sont conservés pendant cinquante ans sous forme\nélectronique. Les dossiers du personnel sont archivés cinq ans après le\ndépart du salarié, puis détruits de manière sécurisée.\nL'archivage électronique repose sur un coffre-fort numérique certifié.\nChaque document versé reçoit une empreinte qui garantit son intégrité et\nun horodatage qui atteste de sa date de dépôt."
@@ -123,7 +123,7 @@
           "end_char": 682,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 107
         },
         "text": "Chaque document versé reçoit une empreinte qui garantit son intégrité et\nun horodatage qui atteste de sa date de dépôt. Destruction des archives\nÀ l'expiration de la durée de conservation, le service juridique valide\nla liste des documents à détruire. La destruction des supports papier est\nconfiée à un prestataire agréé qui remet un certificat de destruction.\nLes supports électroniques sont effacés selon une méthode de réécriture\nmultiple. Aucun document soumis à une procédure judiciaire en cours ne\npeut être détruit, même si sa durée de conservation est échue.\nLe registre des destructions est tenu par le service juridique et présenté\nchaque année au comité d'audit interne."
@@ -140,7 +140,7 @@
           "end_char": 696,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 105
         },
         "source": "<TMP>/data/documents/6e188b3076daa4dacd4cb3badf10b44e142c706b339b69a988daf2ef6a39baf7_sample.pdf",
@@ -154,7 +154,7 @@
           "end_char": 682,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 107
         },
         "source": "<TMP>/data/documents/6e188b3076daa4dacd4cb3badf10b44e142c706b339b69a988daf2ef6a39baf7_sample.pdf",
@@ -175,7 +175,7 @@
           "end_char": 985,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 150
         },
         "text": "Charte d'utilisation des salles de réunion\n\nLes salles de réunion du siège sont réservées via l'agenda partagé. Une réservation ne peut excéder une demi-journée, sauf pour les séminaires validés par la direction. Toute réservation non honorée dans les quinze minutes est automatiquement libérée afin de permettre à d'autres équipes d'utiliser la salle.\n\nÉquipements disponibles. Chaque salle dispose d'un écran de projection, d'un système de visioconférence et d'un tableau blanc. Les salles Orion et Véga disposent en outre d'une caméra grand angle adaptée aux réunions hybrides de plus de dix participants. Les télécommandes et les câbles d'adaptation ne doivent pas quitter la salle.\n\nRègles de vie. Les participants laissent la salle propre et rangée, effacent le tableau blanc et éteignent les équipements à la fin de la réunion. La nourriture est tolérée uniquement dans la salle Polaris, équipée d'un point d'eau. Les incidents techniques sont signalés au support au poste 4400."
@@ -187,7 +187,7 @@
           "end_char": 899,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 133
         },
         "text": "Les incidents techniques sont signalés au support au poste 4400. Confidentialité. Les documents imprimés ne doivent jamais être laissés dans une salle après une réunion. Les réunions portant sur des sujets confidentiels se tiennent dans les salles fermées du troisième étage, dont les parois vitrées sont équipées de films occultants.\n\nRéunions hybrides. L'organisateur vérifie la connexion vidéo cinq minutes avant le début de la réunion. Il partage l'ordre du jour dans l'invitation et désigne un animateur pour donner la parole aux participants à distance. Le compte rendu est diffusé dans les quarante-huit heures sur l'espace documentaire de l'équipe.\n\nPriorités de réservation. Les comités de direction et les entretiens de recrutement sont prioritaires sur les autres réunions. En cas de conflit, l'assistante de direction arbitre et propose une salle de remplacement de capacité équivalente."
@@ -204,7 +204,7 @@
           "end_char": 985,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 150
         },
         "source": "<TMP>/data/documents/f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1_sample.txt",
@@ -218,7 +218,7 @@
           "end_char": 899,
           "section_title": null,
           "start_char": 0,
-          "uploaded_by": "unknown",
+          "uploaded_by": "admin",
           "word_count": 133
         },
         "source": "<TMP>/data/documents/f5b1e5a5f00bcc8a20b628cfc894cbd6b9cc3e79cef09667d19c3550d483ead1_sample.txt",

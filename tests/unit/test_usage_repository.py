@@ -8,9 +8,10 @@ CRUD/aggregate correctness, not concurrency (see test_budget_concurrency.py
 for the anti-TOCTOU proof, which needs independent connections instead).
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-from src.database.models import LlmUsage
+from mimir.database.models import LlmUsage
+from mimir.shared.clock import utc_now
 
 
 class TestCreateUsageEntryAndTodayByModel:
@@ -88,7 +89,7 @@ class TestGetDailyHistory:
             estimated=False,
         )
         # Backdate one entry to prove multi-date grouping in the history.
-        old_entry.created_at = datetime.utcnow() - timedelta(days=2)
+        old_entry.created_at = utc_now() - timedelta(days=2)
         test_session.commit()
 
         history = usage_repo.get_daily_history(days_back=7)
@@ -103,7 +104,7 @@ class TestGetTodayLedger:
 
     def test_none_when_absent_then_present_after_reserve(self, test_repositories):
         usage_repo = test_repositories["usage"]
-        today = datetime.utcnow().strftime("%Y-%m-%d")
+        today = utc_now().strftime("%Y-%m-%d")
 
         assert usage_repo.get_today_ledger() is None
 
@@ -140,7 +141,7 @@ class TestCleanupOldUsage:
             cost_eur=0.0001,
             estimated=False,
         )
-        old.created_at = datetime.utcnow() - timedelta(days=91)
+        old.created_at = utc_now() - timedelta(days=91)
         test_session.commit()
 
         # Capture ids before cleanup: the deleted row's ORM instance gets

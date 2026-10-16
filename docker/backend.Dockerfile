@@ -10,10 +10,10 @@ RUN groupadd --system mimir && useradd --system --gid mimir --home-dir /app --sh
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching. requirements.txt lives at
-# the repo root, which is the build context (compose sets context: .).
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the hash-pinned runtime lockfile first for better layer caching. It
+# lives at the repo root, which is the build context (compose sets context: .).
+COPY requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 # Copy the backend source. The root .dockerignore strips secrets (.env*),
 # runtime data (data/, logs/) and caches from the context, so this wildcard
@@ -39,4 +39,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 # sequential ingestion queue are process-local and are NOT safe across multiple
 # worker processes, so production MUST run exactly one uvicorn worker.
 # Do not add --workers or --reload here.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers: request.client is the address nginx writes in
+# X-Forwarded-For; the backend is only reachable from nginx (not published).
+CMD ["uvicorn", "mimir.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]

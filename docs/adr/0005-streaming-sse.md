@@ -43,10 +43,10 @@ Négatives
 
 ## Où dans le code
 
-- `backend/src/api/endpoints/chat.py` : `chat_stream`, `ChatRequest`
-- `backend/src/services/chat_stream.py` : `ChatStream.events`, `_replay_cached`, `sse_event`, `SSE_HEADERS`, `ReservationSettlement`
-- `backend/src/services/rag_service.py` : `RagService.answer_stream`, `_process_question_with_rag_stream`, `_stream_answer`, `_cache_answer`
-- `backend/src/cache/lru_cache.py` : `ChatCacheService.get_stream_response/set_stream_response`, `_generate_stream_key`
-- `backend/src/rag_core/implementations/faiss_store.py` : `get_corpus_version`
+- `backend/mimir/api/endpoints/chat.py` : `chat_stream`, `ChatRequest`
+- `backend/mimir/services/chat_stream.py` : `ChatStream.events`, `_replay_cached`, `sse_event`, `SSE_HEADERS`, `ReservationSettlement`
+- `backend/mimir/services/rag_service.py` : `RagService.answer_stream`, `_process_question_with_rag_stream`, `_stream_answer`, `_cache_answer`
+- `backend/mimir/cache/lru_cache.py` : `ChatCacheService.get_stream_response/set_stream_response`, `_generate_stream_key`
+- `backend/mimir/rag_core/implementations/faiss_store.py` : `get_corpus_version`
 - `frontend/src/services/api.js` : `chatAPI.sendMessageStream` ; `frontend/src/components/Chat/ChatPage.jsx` : `describeChatError`
 - `frontend/nginx.conf` : `location /api/v1/chat/stream`

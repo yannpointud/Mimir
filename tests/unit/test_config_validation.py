@@ -11,9 +11,9 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.auth.jwt_handler import jwt_handler
-from src.config import Settings
-from src.security.startup_validation import (
+from mimir.auth.jwt_handler import jwt_handler
+from mimir.config import Settings
+from mimir.security.startup_validation import (
     DEFAULT_ADMIN_PASSWORD,
     DEFAULT_JWT_SECRET,
     validate_production_secrets,
@@ -21,7 +21,7 @@ from src.security.startup_validation import (
 
 # Custom secret used to represent a properly configured production deployment
 CUSTOM_JWT_SECRET = "custom-production-secret-key-well-over-32-characters"
-VALIDATION_LOGGER_NAME = "src.security.startup_validation"
+VALIDATION_LOGGER_NAME = "mimir.security.startup_validation"
 
 
 @pytest.fixture
@@ -35,10 +35,8 @@ def make_settings(tmp_path):
             "mistral_api_key": "test_key",
             "data_dir": str(tmp_path / "data"),
             "upload_dir": str(tmp_path / "uploads"),
-            "watch_folder": str(tmp_path / "watch"),
             "faiss_index_path": str(tmp_path / "faiss" / "index.bin"),
-            "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.pkl"),
-            "cache_enabled": False,
+            "faiss_metadata_path": str(tmp_path / "faiss" / "metadata.json"),
         }
         base.update(overrides)
         return Settings(**base)
@@ -50,7 +48,7 @@ def make_settings(tmp_path):
 def validation_caplog(caplog):
     """Capture validator logs despite propagate=False on project loggers.
 
-    The project logger factory (src.monitoring.logger.setup_logger) sets
+    The project logger factory (mimir.monitoring.logger.setup_logger) sets
     propagate=False, so records never reach the root logger where pytest's
     caplog listens. Attaching caplog's handler directly to the module
     logger makes the records observable in tests.
@@ -182,8 +180,8 @@ class TestStartupFailFast:
     """
 
     def test_production_startup_refuses_default_secrets(self, monkeypatch, caplog):
-        import src.config as config_module
-        from backend.main import app
+        import mimir.config as config_module
+        from mimir.main import app
 
         # Production environment with default secrets (jwt pinned explicitly
         # so the test stays deterministic regardless of any local .env)
@@ -192,7 +190,7 @@ class TestStartupFailFast:
 
         # Track init_database calls: the refusal must precede DB initialization
         init_db_mock = Mock()
-        monkeypatch.setattr("backend.main.init_database", init_db_mock)
+        monkeypatch.setattr("mimir.main.init_database", init_db_mock)
 
         # The "main" logger has propagate=False (setup_logger); attach caplog's
         # handler directly so its records are observable in this test.

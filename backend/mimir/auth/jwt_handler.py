@@ -1,0 +1,106 @@
+"""
+JWT token handling for authentication.
+
+This module provides functionality for creating and validating JWT tokens,
+as well as password hashing/verification using Argon2 (with Bcrypt kept as a
+legacy verification-only hasher for pre-migration credentials).
+"""
+
+import logging
+from datetime import timedelta
+from typing import Any
+
+import jwt  # PyJWT
+from pwdlib import PasswordHash
+from pwdlib.exceptions import UnknownHashError
+from pwdlib.hashers.argon2 import Argon2Hasher
+from pwdlib.hashers.bcrypt import BcryptHasher
+
+from mimir.config import settings
+from mimir.shared.clock import utc_now
+
+logger = logging.getLogger(__name__)
+
+
+class JWTHandler:
+    """Handles JWT token creation, validation, and password operations."""
+
+    def __init__(self) -> None:
+        self.secret_key = settings.jwt_secret_key
+        self.algorithm = settings.jwt_algorithm
+        self.expiration_hours = settings.jwt_expiration_hours
+        # Argon2 is FIRST so new hashes are always Argon2; Bcrypt stays only to verify
+        # legacy hashes issued before this migration (no silent downgrade).
+        self.pwd_context = PasswordHash((Argon2Hasher(), BcryptHasher()))
+
+        # Validate configuration
+        if not self.secret_key or len(self.secret_key) < 32:
+            raise ValueError("JWT secret key must be at least 32 characters long")
+
+    def create_access_token(
+        self, data: dict[str, Any], expires_delta: timedelta | None = None
+    ) -> str:
+        """Create a JWT access token."""
+        to_encode = data.copy()
+
+        # Set expiration time
+        if expires_delta:
+            expire = utc_now() + expires_delta
+        else:
+            expire = utc_now() + timedelta(hours=self.expiration_hours)
+
+        to_encode.update({"exp": expire, "iat": utc_now(), "type": "access"})
+
+        return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+
+    def verify_token(self, token: str) -> dict[str, Any] | None:
+        """Verify and decode a JWT token."""
+        try:
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+                # PyJWT validates "iat" as a not-before claim by default (unlike the
+                # previous jose-based implementation). Disabled to preserve prior
+                # behavior and avoid rejecting legitimate tokens under clock skew
+                # between servers -- exp is still enforced, so this is not a security
+                # regression (python-jose -> PyJWT migration).
+                options={"verify_iat": False},
+            )
+
+            # Validate token type
+            if payload.get("type") != "access":
+                logger.warning("Invalid token type")
+                return None
+
+            logger.debug("Successfully verified JWT token")
+            return payload
+
+        except jwt.ExpiredSignatureError:
+            logger.warning("JWT token has expired")
+            return None
+        except jwt.PyJWTError as e:
+            logger.warning(f"JWT token validation failed: {e}")
+            return None
+
+    def hash_password(self, password: str) -> str:
+        """Hash a password using Argon2 (current default hasher)."""
+        if not password:
+            raise ValueError("Password cannot be empty")
+
+        return self.pwd_context.hash(password)
+
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        """Verify a password against its hash."""
+        if not plain_password or not hashed_password:
+            return False
+
+        try:
+            return self.pwd_context.verify(plain_password, hashed_password)
+        except UnknownHashError:
+            logger.error("Password verification failed: unrecognized hash format")
+            return False
+
+
+# Global JWT handler instance
+jwt_handler = JWTHandler()

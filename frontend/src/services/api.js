@@ -142,7 +142,7 @@ export const chatAPI = {
                       break;
                   }
                 } catch (parseError) {
-                  console.error('Failed to parse SSE event:', jsonStr, parseError);
+                  apiLogger.error('Failed to parse SSE event', parseError, { event: jsonStr });
                 }
               }
             }
@@ -213,7 +213,7 @@ export const authAPI = {
 
 // Documents API service
 export const documentsAPI = {
-  getDocuments: async (page = 1, limit = 10, status = null, search = null) => {
+  getDocuments: async (page = 1, limit = 10, status = null, search = null, sortBy = null, sortOrder = null) => {
     const offset = (page - 1) * limit; // Convert page to offset
     const params = new URLSearchParams({
       offset: offset.toString(),
@@ -221,6 +221,8 @@ export const documentsAPI = {
     });
     if (status) params.append('status_filter', status);
     if (search) params.append('search', search);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortOrder) params.append('sort_order', sortOrder);
 
     const response = await api.get(`/documents/?${params}`);
     return response.data;

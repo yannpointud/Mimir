@@ -1,19 +1,18 @@
 """
-Tests unitaires pour les modèles de base de données
-Vérifie la logique métier et les contraintes
+Unit tests of the database models
+Checks the business logic and the constraints
 """
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.database.models import Document, Configuration, AuditLog
+from mimir.database.models import AuditLog, Configuration, Document
 
 
 class TestDocumentModel:
-    """Tests du modèle Document"""
+    """Document model tests"""
 
     def test_create_document(self, test_session, sample_document_data):
-        """Test de création d'un document"""
         doc = Document(**sample_document_data)
         test_session.add(doc)
         test_session.commit()
@@ -21,14 +20,13 @@ class TestDocumentModel:
         assert doc.id is not None
         assert doc.filename == sample_document_data["filename"]
         assert doc.file_hash == sample_document_data["file_hash"]
-        assert doc.status == "pending"  # Valeur par défaut
+        assert doc.status == "pending"  # Default value
         assert doc.chunk_count == 0
         assert doc.preserve is False
         assert doc.created_at is not None
         assert doc.indexed_at is None
 
     def test_document_to_dict(self, test_session, sample_document_data):
-        """Test de sérialisation en dictionnaire"""
         doc = Document(**sample_document_data)
         test_session.add(doc)
         test_session.commit()
@@ -45,12 +43,11 @@ class TestDocumentModel:
         assert doc_dict["indexed_at"] is None
 
     def test_document_status_methods(self, test_session, sample_document_data):
-        """Test des méthodes de vérification de statut"""
         doc = Document(**sample_document_data)
         test_session.add(doc)
         test_session.commit()
 
-        # État initial
+        # Initial state
         assert doc.is_processing() is True
         assert doc.is_indexed() is False
         assert doc.has_error() is False
@@ -74,13 +71,12 @@ class TestDocumentModel:
         assert doc.has_error() is True
 
     def test_unique_hash_constraint(self, test_session, sample_document_data):
-        """Test de contrainte d'unicité sur le hash"""
         # Premier document
         doc1 = Document(**sample_document_data)
         test_session.add(doc1)
         test_session.commit()
 
-        # Tentative d'ajout d'un document avec le même hash
+        # Try to add a document with the same hash
         doc2_data = sample_document_data.copy()
         doc2_data["filename"] = "different_name.pdf"
         doc2 = Document(**doc2_data)
@@ -90,7 +86,6 @@ class TestDocumentModel:
             test_session.commit()
 
     def test_document_repr(self, test_session, sample_document_data):
-        """Test de représentation string"""
         doc = Document(**sample_document_data)
         test_session.add(doc)
         test_session.commit()
@@ -103,10 +98,9 @@ class TestDocumentModel:
 
 
 class TestConfigurationModel:
-    """Tests du modèle Configuration"""
+    """Configuration model tests"""
 
     def test_create_configuration(self, test_session, sample_config_data):
-        """Test de création d'une configuration"""
         config = Configuration(**sample_config_data)
         test_session.add(config)
         test_session.commit()
@@ -116,7 +110,6 @@ class TestConfigurationModel:
         assert config.updated_at is not None
 
     def test_configuration_to_dict(self, test_session, sample_config_data):
-        """Test de sérialisation en dictionnaire"""
         config = Configuration(**sample_config_data)
         test_session.add(config)
         test_session.commit()
@@ -129,7 +122,7 @@ class TestConfigurationModel:
 
     def test_get_typed_value_method(self):
         """Test de conversion de types"""
-        # String (défaut)
+        # String (default)
         assert Configuration.get_typed_value("test", "string") == "test"
 
         # Boolean
@@ -146,10 +139,9 @@ class TestConfigurationModel:
 
 
 class TestAuditLogModel:
-    """Tests du modèle AuditLog"""
+    """AuditLog model tests"""
 
     def test_create_audit_log(self, test_session, sample_audit_data):
-        """Test de création d'un log d'audit"""
         log = AuditLog(**sample_audit_data)
         test_session.add(log)
         test_session.commit()
@@ -163,7 +155,6 @@ class TestAuditLogModel:
         assert log.created_at is not None
 
     def test_audit_log_to_dict(self, test_session, sample_audit_data):
-        """Test de sérialisation en dictionnaire"""
         log = AuditLog(**sample_audit_data)
         test_session.add(log)
         test_session.commit()
@@ -177,7 +168,6 @@ class TestAuditLogModel:
         assert "created_at" in log_dict
 
     def test_audit_log_factory_methods(self, test_session):
-        """Test des méthodes factory"""
         # Admin action
         admin_log = AuditLog.create_admin_action(
             action="login", details="Admin login attempt", ip_address="192.168.1.1"
@@ -208,7 +198,6 @@ class TestAuditLogModel:
         assert system_log.action == "startup"
 
     def test_audit_log_repr(self, test_session, sample_audit_data):
-        """Test de représentation string"""
         log = AuditLog(**sample_audit_data)
         test_session.add(log)
         test_session.commit()

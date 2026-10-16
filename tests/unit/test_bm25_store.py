@@ -9,19 +9,18 @@ Covers:
   from a subset (simulating a document delete) that drops the removed chunks.
 
 Fixture style mirrors tests/unit/test_faiss_vector_store.py (tempdir persistence,
-absolute backend.src.* imports, pytest.raises for error paths).
+absolute mimir.* imports, pytest.raises for error paths).
 """
 
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 
 import pytest
 
-from backend.src.rag_core.tokenizer_fr import light_french_tokenizer
-from backend.src.rag_core.implementations.bm25_store import Bm25LexicalStore
-from backend.src.rag_core.interfaces import VectorStoreOperationError
-
+from mimir.rag_core.implementations.bm25_store import Bm25LexicalStore
+from mimir.rag_core.interfaces import VectorStoreOperationError
+from mimir.rag_core.tokenizer_fr import light_french_tokenizer
 
 # --------------------------------------------------------------------------- #
 # Light French tokenizer                                                      #
@@ -32,7 +31,6 @@ class TestLightFrenchTokenizer:
     """Tokenizer: accent fold + exact-term preservation, no stemming/stopwords."""
 
     def test_accent_fold_produces_matching_tokens(self):
-        """Café == cafe == CAFÉ collapse to the same token."""
         assert light_french_tokenizer(["Café", "cafe", "CAFÉ"]) == [["cafe"], ["cafe"], ["cafe"]]
 
     def test_exact_identifier_preserved_no_stemming(self):
@@ -49,7 +47,6 @@ class TestLightFrenchTokenizer:
             assert word in tokens
 
     def test_various_accents_folded(self):
-        """à ç è ê ï ô ù all fold to their base letters."""
         tokens = light_french_tokenizer(["àçèêïôù"])[0]
         assert tokens == ["aceeiou"]
 

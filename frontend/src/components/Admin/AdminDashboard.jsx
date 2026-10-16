@@ -12,6 +12,9 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('AdminDashboard');
 
 const SECTIONS = [
   {
@@ -101,7 +104,7 @@ const AdminDashboard = () => {
 
       setError(null);
     } catch (error) {
-      console.error('Erreur lors du chargement des statistiques:', error);
+      logger.error('Failed to load the statistics', error);
       setError(getErrorMessage(error));
     } finally {
       setLoading(false);

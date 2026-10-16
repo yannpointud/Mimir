@@ -1,6 +1,7 @@
 # Mimir - Chatbot Documentaire d'Entreprise
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+[![CI](https://github.com/yannpointud/Mimir/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yannpointud/Mimir/actions/workflows/ci.yml?query=branch%3Amain)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.133-teal.svg)
 ![React](https://img.shields.io/badge/React-18.2-blue.svg)
@@ -25,9 +26,8 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 ### Module Administration
 - Authentification sécurisée (JWT)
 - Upload manuel de documents (PDF, DOCX, TXT, MD)
-- Liste et gestion des documents indexés
+- Liste et gestion des documents indexés (recherche, filtre par statut, tri par colonne)
 - Nettoyage automatique des chunks orphelins (rebuild index)
-- Test de l'email d'escalade (SMTP configuré par variables d'environnement)
 - Changement du mot de passe admin
 - Indicateurs de santé système en temps réel
 - Tableau de bord avec métriques d'utilisation
@@ -68,7 +68,7 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 
 #### Frontend
 - **Framework** : React 18 avec hooks
-- **Build** : Vite
+- **Build** : Vite 8
 - **UI** : Tailwind CSS
 - **HTTP** : Axios avec intercepteurs, `fetch` pour le streaming SSE
 - **Routing** : React Router v6
@@ -81,9 +81,9 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 
 ```
 backend/
-├── main.py                    # Point d'entrée FastAPI
-├── scripts/init_db.py         # Initialisation de la base
-└── src/
+├── alembic.ini                # Migrations Alembic
+└── mimir/
+    ├── main.py                # Point d'entrée FastAPI
     ├── api/
     │   ├── endpoints/         # Routes REST (chat, documents, admin, auth, health, logs)
     │   ├── middleware/        # CORS, rate limiting
@@ -99,7 +99,6 @@ backend/
     │   ├── connection.py      # Gestion connexions DB
     │   └── migrations/        # Migrations Alembic
     ├── email_service/         # Service SMTP pour escalades
-    ├── file_watcher/          # Observateur de dossier, non branché dans l'application (WATCH_ENABLED sans effet)
     ├── ingestion/
     │   ├── processor.py       # Pipeline d'ingestion
     │   ├── extractors.py      # Extraction multi-format
@@ -117,7 +116,7 @@ backend/
     ├── services/              # Logique des routes : pipeline RAG, flux SSE, upload, suppression, maintenance des index
     ├── monitoring/            # Logging centralisé JSON, alertes SMTP
     ├── shared/                # Modèles Pydantic, constantes, exceptions métier (errors.py)
-    └── utils/                 # Utilitaires (logs reader, parser)
+    └── utils/                 # Lecture des fichiers de logs
 
 frontend/
 ├── src/
@@ -127,7 +126,7 @@ frontend/
 │   │   └── Common/            # Composants réutilisables
 │   ├── services/
 │   │   └── api.js             # Client API centralisé
-│   ├── hooks/                 # Hooks personnalisés (useAuth)
+│   ├── hooks/                 # Hooks personnalisés (useAuth, useDocumentsList)
 │   ├── utils/                 # Utilitaires (storage, logger, auth)
 │   └── test/                  # Tests vitest
 └── package.json
@@ -157,16 +156,16 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 
 | Périmètre | Fichiers | Lignes de code |
 | --- | ---: | ---: |
-| Backend : `backend/src`, `backend/main.py`, `backend/scripts` (Python) | 77 | 9 484 |
-| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 39 | 5 152 |
-| **Code applicatif** | **116** | **14 636** |
-| Tests backend : `tests/` (Python) | 87 | 14 167 |
-| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 15 | 1 381 |
-| **Tests** | **102** | **15 548** |
-| Outillage : `scripts/` (Python, Bash) | 16 | 2 013 |
+| Backend : `backend/mimir`, `scripts` (Python) | 88 | 9 033 |
+| Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 42 | 5 182 |
+| **Code applicatif** | **130** | **14 215** |
+| Tests backend : `tests/` (Python) | 86 | 12 218 |
+| Tests frontend : `frontend/src/test/`, `*.test.jsx` | 16 | 1 498 |
+| **Tests** | **102** | **13 716** |
+| Outillage : `scripts/` (Python, Bash) | 16 | 1 963 |
 
 ```bash
-pygount --format=summary --suffix=py backend/src backend/main.py backend/scripts
+pygount --format=summary --suffix=py backend/mimir scripts
 pygount --format=summary --merge-embedded-languages --folders-to-skip='...,test' \
   --names-to-skip='...,*.test.js,*.test.jsx' frontend/src
 pygount --format=summary --suffix=py tests
@@ -179,7 +178,7 @@ pygount --format=summary --suffix=py,sh scripts
 
 ### Prérequis
 - Python 3.13+
-- Node.js 18+
+- Node.js 22 (Vite 8 exige Node.js 20.19+ ou 22.12+)
 - Clé API Mistral
 - Minimum 4GB RAM
 
@@ -195,17 +194,19 @@ python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # ou venv\Scripts\activate  # Windows
 
-# Installer les dépendances (requirements.txt est à la racine du projet)
-pip install -r ../requirements.txt
+# Installer les dépendances (runtime, tests et outils ; fichiers à la racine du projet)
+pip install -r ../requirements-dev.txt
 # ou, versions et hachages figés :
-# pip install --require-hashes -r ../requirements.lock
+# pip install --require-hashes -r ../requirements-dev.lock
+# Installer le package mimir en mode éditable
+pip install --no-deps -e ..
 
 # Créer le fichier .env
 cp .env.example .env
 # Éditer .env : MISTRAL_API_KEY, JWT_SECRET_KEY et le mot de passe admin (voir Configuration)
 
 # Lancer le serveur
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn mimir.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 #### 2. Frontend
@@ -232,7 +233,7 @@ L'application sera accessible sur :
 docker compose up -d --build
 ```
 
-Le fichier `.env` est lu à la racine du dépôt ou dans `backend/`. Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin (`ADMIN_PASSWORD`) avant le premier démarrage, avec `ENVIRONMENT=production` : le backend refuse alors de démarrer si `JWT_SECRET_KEY` ou le mot de passe admin n'ont pas été changés.
+Le backend lit le fichier `.env` de son répertoire de travail (`backend/` avec `start-servers.sh`) ; toute clé inconnue bloque le démarrage. Modèle complet : `backend/.env.example`. Renseigner `JWT_SECRET_KEY`, `MISTRAL_API_KEY` et le mot de passe admin (`ADMIN_PASSWORD`) avant le premier démarrage, avec `ENVIRONMENT=production` : le backend refuse alors de démarrer si `JWT_SECRET_KEY` ou le mot de passe admin n'ont pas été changés.
 
 ## ⚙️ Configuration
 
@@ -248,29 +249,22 @@ API_PORT=8000
 DATABASE_URL=sqlite:///./data/sqlite/mimir.db
 SQLITE_WAL_MODE=true
 
-# LLM Configuration (LLM_PROVIDER est seulement affiché : Mistral est la seule implémentation)
-LLM_PROVIDER=mistral
+# LLM (Mistral)
 MISTRAL_API_KEY=your_mistral_api_key_here
 MISTRAL_MODEL=mistral-small-latest
 MISTRAL_EMBEDDING_MODEL=mistral-embed
 
-# Vector Store (VECTOR_STORE_TYPE est seulement affiché : FAISS est la seule implémentation)
-VECTOR_STORE_TYPE=faiss
+# Vector Store (FAISS)
 FAISS_INDEX_PATH=./data/faiss/index.bin
 FAISS_METADATA_PATH=./data/faiss/metadata.json
 EMBEDDING_DIMENSION=1024
 SIMILARITY_THRESHOLD=0.5
-MAX_SOURCES=8
+MAX_SOURCES=5
 
 # Ingestion
 MAX_CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 MAX_FILE_SIZE_MB=100
-
-# Cache (déclarées mais non lues : les caches en mémoire ont une taille fixe)
-CACHE_ENABLED=true
-CACHE_MAX_SIZE=100
-CACHE_TTL=3600
 
 # Email (pour escalades)
 SMTP_HOST=smtp.example.com
@@ -312,7 +306,7 @@ Sans `ADMIN_PASSWORD` ni `ADMIN_PASSWORD_HASH`, le backend utilise un hash inté
 
 ```bash
 cd backend
-python -c "from src.auth.jwt_handler import JWTHandler; print(JWTHandler().hash_password('votre_password'))"
+python -c "from mimir.auth.jwt_handler import JWTHandler; print(JWTHandler().hash_password('votre_password'))"
 ```
 
 ## 📚 Utilisation
@@ -324,9 +318,9 @@ Accédez à l'interface admin via http://localhost:3000/admin et connectez-vous 
 ### 2. Upload de Documents
 
 **Upload manuel :**
-- Naviguez vers "Documents" dans l'admin
-- Cliquez sur "Upload Document"
-- Sélectionnez vos fichiers (PDF, DOCX, TXT, MD)
+- Ouvrez l'onglet « Importer » de l'administration
+- Déposez ou sélectionnez vos fichiers (PDF, DOCX, TXT, MD)
+- Suivez leur indexation dans l'onglet « Documents »
 
 
 ### 3. Chat avec le Bot
@@ -364,34 +358,34 @@ python -m pytest tests/performance/ -v
 cd frontend && npx vitest run
 ```
 
-La couverture de `backend/src` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
+La couverture de `backend/mimir` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
 
-La suite compte 1036 tests pytest (838 unitaires, 154 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/src` : 88,22 %) et 141 tests vitest (14 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Les tests de `tests/oracle` et `tests/integration` sont gelés : leurs sommes SHA-256 sont listées dans `docs/cleanup/ORACLE.sha256`.
+La suite compte 921 tests pytest (727 unitaires, 150 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 92,18 %, seuil bloquant à 85 % dans `pytest.ini`) et 150 tests vitest (15 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Toute la suite tourne sur des chemins de données temporaires, jamais sur `backend/data/`.
 
-Les instantanés FAISS de `tests/oracle/test_retrieval_ranking.py` et `tests/oracle/test_chat_stream_events.py` dépendent du jeu d'instructions SIMD du processeur. Ils ont été générés sur une machine AVX-512 ; sur un autre processeur (AVX2, Apple Silicon...), 7 à 11 de ces tests peuvent échouer sans régression, car le code d'origine échoue de la même façon (voir `docs/cleanup/DECISIONS.md`, DF.12). La CI GitHub les ignore.
+Les tests de caractérisation (`tests/oracle/`) figent le comportement observable dans des instantanés JSON : contrat OpenAPI, réponses JSON, événements SSE, classement de la recherche et découpage en chunks. Ils se régénèrent avec `ORACLE_UPDATE=1 pytest tests/oracle`, uniquement pour un changement de comportement voulu, en relisant le diff.
 
 ## 🔍 Qualité et CI
 
-- **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90 ; complexité cyclomatique maximale 15).
-- **Typage** : mypy en mode normal sur `backend/src` (`mypy backend/src`), sans erreur.
-- **Tests** : pytest 9 (pytest-asyncio, pytest-cov), vitest côté frontend.
-- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.txt`, avec une seule exclusion : PYSEC-2026-107 (orjson 3.10.18, maintenu sous 3.11 par mistralai 0.4.2).
+- **Lint et format** : ruff (`ruff check .`, `ruff format --check .`), configuré dans `pyproject.toml` (règles F, E9, B, SIM, UP, BLE, C90, TID, I, RUF ; imports absolus uniquement ; complexité cyclomatique maximale 15). ESLint côté frontend.
+- **Typage** : mypy sur `backend/mimir` avec `disallow_untyped_defs` et `check_untyped_defs` (`mypy backend/mimir`), sans erreur.
+- **Tests** : pytest 9 (pytest-asyncio, pytest-cov ; une DeprecationWarning levée depuis `mimir` ou `tests` fait échouer la suite), vitest 5 côté frontend.
+- **Vulnérabilités** : pip-audit sur `requirements-dev.lock` et `requirements.lock`, sans exclusion ; `npm audit` sur les dépendances de production du frontend (niveau haut).
 - **Mesures ponctuelles** : radon (complexité), pygount (lignes de code), mutmut (tests de mutation de `rag_core/fusion.py`, `ingestion/chunking.py` et `rag_core/tokenizer_fr.py`, configuré dans `pyproject.toml`).
 
 `bash scripts/local_ci.sh` enchaîne ruff, mypy, pytest et pip-audit (outils installés depuis `requirements-dev.txt`).
 
-La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request : quatre jobs ruff, mypy, pytest (sans les deux modules d'oracle dépendants du processeur) et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt`. Les tests vitest et le build du frontend ne sont pas exécutés par la CI.
+La CI GitHub Actions (`.github/workflows/ci.yml`) tourne sur chaque pull request et après chaque fusion dans `main` (badge en tête du README) : quatre jobs Python ruff, mypy, pytest et pip-audit, installés depuis les lockfiles avec `pip install --require-hashes`, plus une vérification hors ligne que les lockfiles correspondent aux versions épinglées dans `requirements*.txt` ; un job frontend (Node 22, `npm ci`) enchaîne ESLint, vitest, le build et `npm audit --omit=dev --audit-level=high`.
 
 **Dépendances**
-- `requirements.txt` (runtime et tests) et `requirements-dev.txt` (outils de qualité) restent la source.
+- `requirements.txt` (runtime seul, installé dans l'image Docker) et `requirements-dev.txt` (runtime, tests et outils de qualité) restent la source.
 - `requirements.lock` et `requirements-dev.lock` en sont dérivés (versions et hachages figés, résolution universelle pour Python 3.13). Les régénérer depuis la racine avec les commandes inscrites dans leur en-tête :
 
 ```bash
 uv pip compile requirements.txt --universal --python-version 3.13 --generate-hashes -o requirements.lock
-uv pip compile requirements.txt requirements-dev.txt --universal --python-version 3.13 --generate-hashes -o requirements-dev.lock
+uv pip compile requirements-dev.txt --universal --python-version 3.13 --generate-hashes -o requirements-dev.lock
 ```
 
-- Dependabot (`.github/dependabot.yml`) propose chaque semaine des mises à jour pip, npm (`frontend/`) et GitHub Actions. Pour pip, il ne modifie que les `requirements*.txt` : régénérer les deux lockfiles sur sa branche, sinon la vérification de la CI échoue. Les versions majeures de `mistralai` sont ignorées (la 1.x est un nouveau SDK).
+- Dependabot (`.github/dependabot.yml`) propose chaque semaine des mises à jour pip, npm (`frontend/`) et GitHub Actions. Pour pip, il ne modifie que les `requirements*.txt` : régénérer les deux lockfiles sur sa branche, sinon la vérification de la CI échoue.
 
 ## 🛠️ API Documentation
 
@@ -517,7 +511,7 @@ Les chunks orphelins sont des chunks vectoriels qui existent dans FAISS mais don
 
 **Solution :**
 ```bash
-# Via l'interface admin : bouton "Rebuild Index"
+# Via l'interface admin : onglet « Monitoring », bouton « Reconstruire l'index »
 # Ou via API :
 curl -X POST http://localhost:8000/api/v1/admin/vector-store/rebuild \
   -H "Authorization: Bearer $ADMIN_TOKEN"
@@ -537,7 +531,7 @@ Le rebuild effectue automatiquement :
 # Backend logs (dossier logs/ du répertoire de lancement d'uvicorn)
 tail -f backend/logs/app.log
 
-# Frontend logs (envoyés au backend)
+# Frontend logs (envoyés au backend si VITE_LOG_TO_FILE=true)
 tail -f backend/logs/frontend.log
 
 # Filtrer par niveau
@@ -553,7 +547,7 @@ Ce projet est libre.
 - **Python** : ruff (lint et format), mypy, type hints, docstrings des API publiques
 - **JavaScript** : ESLint
 - **Commits** : Conventional Commits
-- **Tests** : Couverture 88 % (backend) ; la CI (ruff, mypy, pytest, pip-audit) tourne sur chaque pull request
+- **Tests** : Couverture 92 % (backend, seuil 85 %) ; la CI (ruff, mypy, pytest, pip-audit, frontend) tourne sur chaque pull request
 - **Décisions** : un ADR par décision d'architecture dans `docs/adr/`
 
 ## 📝 License MIT

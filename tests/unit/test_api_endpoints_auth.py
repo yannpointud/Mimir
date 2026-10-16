@@ -2,13 +2,15 @@
 Unit tests for authentication endpoints.
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 from fastapi import HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy.exc import OperationalError
 
-from backend.src.api.endpoints.auth import LoginRequest, LoginResponse, TokenRefreshResponse
+from mimir.api.endpoints.auth import LoginRequest, LoginResponse, TokenRefreshResponse
 
 
 class TestAuthModels:
@@ -44,12 +46,12 @@ class TestAuthEndpoints:
         """Mock audit repository."""
         return AsyncMock()
 
-    @patch("backend.src.api.endpoints.auth._authenticate_admin")
-    @patch("backend.src.api.endpoints.auth.jwt_handler")
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
+    @patch("mimir.api.endpoints.auth._authenticate_admin")
+    @patch("mimir.api.endpoints.auth.jwt_handler")
+    @patch("mimir.api.endpoints.auth._log_auth_event")
     def test_login_success(self, mock_log_event, mock_jwt, mock_auth):
         """Test successful login."""
-        from backend.src.api.endpoints.auth import login
+        from mimir.api.endpoints.auth import login
 
         # Configure mocks
         mock_auth.return_value = True
@@ -78,11 +80,11 @@ class TestAuthEndpoints:
         assert result.user_type == "admin"
         mock_auth.assert_called_once_with("admin", "test123")
 
-    @patch("backend.src.api.endpoints.auth._authenticate_admin")
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
+    @patch("mimir.api.endpoints.auth._authenticate_admin")
+    @patch("mimir.api.endpoints.auth._log_auth_event")
     def test_login_failure_invalid_credentials(self, mock_log_event, mock_auth):
         """Test login with invalid credentials."""
-        from backend.src.api.endpoints.auth import login
+        from mimir.api.endpoints.auth import login
 
         # Configure mocks
         mock_auth.return_value = False
@@ -124,44 +126,15 @@ class TestAuthEndpoints:
         with pytest.raises(ValidationError):
             LoginRequest()  # No fields provided
 
-    @patch("backend.src.api.endpoints.auth._authenticate_admin")
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
-    def test_login_exception_handling(self, mock_log_event, mock_auth):
-        """Test exception handling during login."""
-        from backend.src.api.endpoints.auth import login
-
-        # Configure mocks to raise an exception
-        mock_auth.side_effect = Exception("Database error")
-
-        mock_request = Mock()
-        mock_request.client.host = "127.0.0.1"
-        mock_request.headers = {}
-
-        login_data = LoginRequest(username="admin", password="test123")
-        mock_audit_repo = AsyncMock()
-
-        # Test that exception is handled
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                login(
-                    request=mock_request,
-                    response=Mock(),  # required by slowapi header injection
-                    login_data=login_data,
-                    audit_repo=mock_audit_repo,
-                )
-            )
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
 
 class TestAuthHelperFunctions:
     """Tests for authentication utility functions."""
 
-    @patch("backend.src.api.endpoints.auth.settings")
-    @patch("backend.src.api.endpoints.auth.jwt_handler.verify_password")
+    @patch("mimir.api.endpoints.auth.settings")
+    @patch("mimir.api.endpoints.auth.jwt_handler.verify_password")
     def test_authenticate_admin_success(self, mock_verify_password, mock_settings):
         """Test successful admin authentication."""
-        from backend.src.api.endpoints.auth import _authenticate_admin
+        from mimir.api.endpoints.auth import _authenticate_admin
 
         mock_settings.admin_password_hash = "$2b$12$test_hash"
         mock_verify_password.return_value = True
@@ -169,21 +142,21 @@ class TestAuthHelperFunctions:
         result = _authenticate_admin("admin", "test123")
         assert result is True
 
-    @patch("backend.src.api.endpoints.auth.settings")
+    @patch("mimir.api.endpoints.auth.settings")
     def test_authenticate_admin_wrong_username(self, mock_settings):
         """Test authentication with wrong username."""
-        from backend.src.api.endpoints.auth import _authenticate_admin
+        from mimir.api.endpoints.auth import _authenticate_admin
 
         mock_settings.admin_password_hash = "$2b$12$test_hash"
 
         result = _authenticate_admin("wrong_user", "test123")
         assert result is False
 
-    @patch("backend.src.api.endpoints.auth.settings")
-    @patch("backend.src.api.endpoints.auth.jwt_handler.verify_password")
+    @patch("mimir.api.endpoints.auth.settings")
+    @patch("mimir.api.endpoints.auth.jwt_handler.verify_password")
     def test_authenticate_admin_wrong_password(self, mock_verify_password, mock_settings):
         """Test authentication with wrong password."""
-        from backend.src.api.endpoints.auth import _authenticate_admin
+        from mimir.api.endpoints.auth import _authenticate_admin
 
         mock_settings.admin_password_hash = "$2b$12$test_hash"
         mock_verify_password.return_value = False
@@ -191,57 +164,9 @@ class TestAuthHelperFunctions:
         result = _authenticate_admin("admin", "wrong_password")
         assert result is False
 
-    def test_get_client_ip_forwarded(self):
-        """Test IP extraction with X-Forwarded-For header."""
-        from backend.src.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {"X-Forwarded-For": "192.168.1.100, 10.0.0.1"}
-        mock_request.client.host = "127.0.0.1"
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "192.168.1.100"
-
-    def test_get_client_ip_real_ip(self):
-        """Test IP extraction with X-Real-IP header."""
-        from backend.src.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {"X-Real-IP": "192.168.1.200"}
-        mock_request.client.host = "127.0.0.1"
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "192.168.1.200"
-
-    def test_get_client_ip_direct(self):
-        """Test direct IP extraction."""
-        from backend.src.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client.host = "192.168.1.50"
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "192.168.1.50"
-
-    def test_get_client_ip_no_client(self):
-        """Test IP extraction without client."""
-        from backend.src.api.endpoints.auth import _get_client_ip
-
-        mock_request = Mock()
-        mock_request.headers = {}
-        mock_request.client = None
-
-        ip = _get_client_ip(mock_request)
-
-        assert ip == "unknown"
-
     def test_log_auth_event(self):
         """Test authentication event logging."""
-        from backend.src.api.endpoints.auth import _log_auth_event
+        from mimir.api.endpoints.auth import _log_auth_event
 
         mock_audit_repo = Mock()
 
@@ -261,13 +186,15 @@ class TestAuthHelperFunctions:
         mock_audit_repo.create_log.assert_called_once()
 
     def test_log_auth_event_exception(self):
-        """Test exception handling during logging."""
-        from backend.src.api.endpoints.auth import _log_auth_event
+        """An audit write failure is logged, not raised."""
+        from mimir.api.endpoints.auth import _log_auth_event
 
         mock_audit_repo = Mock()
-        mock_audit_repo.create_log.side_effect = Exception("Database error")
+        mock_audit_repo.create_log.side_effect = OperationalError(
+            "INSERT", {}, Exception("database is locked")
+        )
 
-        # The audit failure is swallowed: no exception reaches the caller
+        # A database failure of the audit write never locks the admin out
         asyncio.run(
             _log_auth_event(
                 audit_repo=mock_audit_repo,
@@ -284,12 +211,12 @@ class TestAuthHelperFunctions:
 class TestTokenRefresh:
     """Tests for token refresh."""
 
-    @patch("backend.src.api.endpoints.auth.jwt_handler")
-    @patch("backend.src.api.endpoints.auth.settings")
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
+    @patch("mimir.api.endpoints.auth.jwt_handler")
+    @patch("mimir.api.endpoints.auth.settings")
+    @patch("mimir.api.endpoints.auth._log_auth_event")
     def test_refresh_token_success(self, mock_log_event, mock_settings, mock_jwt):
         """Test successful token refresh."""
-        from backend.src.api.endpoints.auth import refresh_token
+        from mimir.api.endpoints.auth import refresh_token
 
         # Configure mocks
         mock_user = {"sub": "admin", "user_type": "admin"}
@@ -311,43 +238,14 @@ class TestTokenRefresh:
         assert result.access_token == "new_token"
         assert result.token_type == "bearer"
 
-    @patch("backend.src.api.endpoints.auth.jwt_handler")
-    @patch("backend.src.api.endpoints.auth.settings")
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
-    def test_refresh_token_invalid_token(self, mock_log_event, mock_settings, mock_jwt):
-        """Test refresh with invalid token."""
-        from backend.src.api.endpoints.auth import refresh_token
-
-        # Configure mock to raise an exception
-        mock_jwt.create_access_token.side_effect = Exception("Invalid token")
-        mock_settings.jwt_expiration_hours = 24
-
-        mock_user = {"sub": "admin", "user_type": "admin"}
-
-        mock_request = Mock()
-        mock_request.client.host = "127.0.0.1"
-        mock_request.headers = {}
-
-        mock_audit_repo = AsyncMock()
-
-        # Test that exception is handled
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                refresh_token(
-                    request=mock_request, current_user=mock_user, audit_repo=mock_audit_repo
-                )
-            )
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
 
 class TestLogout:
     """Tests for logout."""
 
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
+    @patch("mimir.api.endpoints.auth._log_auth_event")
     def test_logout_success(self, mock_log_event):
         """Test successful logout."""
-        from backend.src.api.endpoints.auth import logout
+        from mimir.api.endpoints.auth import logout
 
         # Configure mocks
         mock_user = {"sub": "admin", "user_type": "admin"}
@@ -370,13 +268,13 @@ class TestLogout:
 class TestAuthIntegration:
     """Integration tests for authentication."""
 
-    @patch("backend.src.api.endpoints.auth._authenticate_admin")
-    @patch("backend.src.api.endpoints.auth.jwt_handler")
-    @patch("backend.src.api.endpoints.auth.settings")
-    @patch("backend.src.api.endpoints.auth._log_auth_event")
+    @patch("mimir.api.endpoints.auth._authenticate_admin")
+    @patch("mimir.api.endpoints.auth.jwt_handler")
+    @patch("mimir.api.endpoints.auth.settings")
+    @patch("mimir.api.endpoints.auth._log_auth_event")
     def test_full_auth_workflow(self, mock_log_event, mock_settings, mock_jwt, mock_auth):
         """Test full authentication workflow."""
-        from backend.src.api.endpoints.auth import login, refresh_token, logout
+        from mimir.api.endpoints.auth import login, logout, refresh_token
 
         # Configure mocks
         mock_auth.return_value = True

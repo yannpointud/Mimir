@@ -1,5 +1,9 @@
 // Utilities for safe local storage management
 
+import { createLogger } from './logger';
+
+const logger = createLogger('Storage');
+
 // Utility function for safe sessionStorage handling
 export const safeSessionStorage = {
   getItem: (key) => {
@@ -7,7 +11,7 @@ export const safeSessionStorage = {
       const item = sessionStorage.getItem(key);
       return item && item !== 'undefined' ? item : null;
     } catch (error) {
-      console.error(`Erreur lors de la lecture de ${key} depuis sessionStorage:`, error);
+      logger.error(`Failed to read ${key} from sessionStorage`, error);
       return null;
     }
   },
@@ -17,7 +21,7 @@ export const safeSessionStorage = {
       sessionStorage.setItem(key, value);
       return true;
     } catch (error) {
-      console.error(`Erreur lors de l'écriture de ${key} dans sessionStorage:`, error);
+      logger.error(`Failed to write ${key} to sessionStorage`, error);
       return false;
     }
   },
@@ -27,7 +31,7 @@ export const safeSessionStorage = {
       sessionStorage.removeItem(key);
       return true;
     } catch (error) {
-      console.error(`Erreur lors de la suppression de ${key} depuis sessionStorage:`, error);
+      logger.error(`Failed to remove ${key} from sessionStorage`, error);
       return false;
     }
   },
@@ -41,7 +45,7 @@ export const safeSessionStorage = {
       const parsed = JSON.parse(item);
       return parsed;
     } catch (error) {
-      console.error(`Erreur lors du parsing JSON de ${key}:`, error);
+      logger.error(`Failed to parse the JSON of ${key}`, error);
       // Clean up corrupted data
       safeSessionStorage.removeItem(key);
       return fallback;
@@ -57,7 +61,7 @@ export const safeSessionStorage = {
       const serialized = JSON.stringify(value);
       return safeSessionStorage.setItem(key, serialized);
     } catch (error) {
-      console.error(`Erreur lors de la sérialisation JSON de ${key}:`, error);
+      logger.error(`Failed to serialize the JSON of ${key}`, error);
       return false;
     }
   }
@@ -75,7 +79,7 @@ export const chatHistoryStorage = {
 
     // Validate and clean messages
     if (!Array.isArray(messages)) {
-      console.warn('Historique chat corrompu, réinitialisation');
+      logger.warn('Corrupted chat history, resetting it');
       chatHistoryStorage.clearHistory(sessionId);
       return [];
     }
@@ -118,7 +122,7 @@ export const chatHistoryStorage = {
     const validMessages = lightMessages.filter(msg => {
       const size = JSON.stringify(msg).length;
       if (size > chatHistoryStorage.MAX_MESSAGE_SIZE) {
-        console.warn('Message trop volumineux ignoré:', msg.id);
+        logger.warn('Oversized message dropped from the history', { messageId: msg.id });
         return false;
       }
       return true;
@@ -156,7 +160,7 @@ export const chatHistoryStorage = {
         }
       }
     } catch (error) {
-      console.error('Erreur lors du nettoyage des sessions:', error);
+      logger.error('Failed to clean up the old chat sessions', error);
     }
   }
 };

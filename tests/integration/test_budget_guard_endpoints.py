@@ -15,67 +15,27 @@ db_manager so BudgetGuard/UsageTracker (which open their own sessions via
 the real db_manager singleton, not the test_session fixture) never touch
 the developer's real database. Zero real Mistral API calls.
 """
-import shutil
-import tempfile
-from pathlib import Path
+
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, AsyncMock
 
-from src import config as config_module
-from src.config import settings
-from src.cost.budget_guard import BudgetGuard
-from src.database.connection import db_manager
-from src.database.models import Base, LlmUsage
-from src.llm_interface.interfaces import EmbeddingResponse, GenerationResponse
-
+from mimir.config import settings
+from mimir.cost.budget_guard import BudgetGuard
+from mimir.database.connection import db_manager
+from mimir.database.models import LlmUsage
+from mimir.llm_interface.interfaces import EmbeddingResponse, GenerationResponse
 
 CHAT_STREAM_ROUTE = "/api/v1/chat/stream"
-
-
-@pytest.fixture
-def isolated_db_manager():
-    """Redirect the global db_manager singleton to a fresh temporary SQLite
-    file for this test's lifetime. BudgetGuard/UsageTracker open their own
-    sessions via the real db_manager singleton (own-session-per-operation
-    pattern), so the standard test_session fixture (single
-    rollback-only transaction) would never see their commits -- mirrors the
-    isolated_db_manager fixture in tests/unit/test_budget_guard.py /
-    test_usage_tracker.py."""
-    temp_dir = tempfile.mkdtemp(prefix="chat_budget_endpoints_test_")
-    temp_db_path = Path(temp_dir) / "chat_budget_endpoints_test.db"
-
-    original_engine = db_manager._engine
-    original_session_factory = db_manager._session_factory
-    original_async_engine = db_manager._async_engine
-    original_async_session_factory = db_manager._async_session_factory
-    original_database_url = config_module.settings.database_url
-
-    config_module.settings.database_url = f"sqlite:///{temp_db_path}"
-    db_manager._engine = None
-    db_manager._session_factory = None
-    db_manager._async_engine = None
-    db_manager._async_session_factory = None
-    db_manager._initialize_database()
-    Base.metadata.create_all(bind=db_manager.engine)
-
-    yield db_manager
-
-    db_manager.engine.dispose()
-    config_module.settings.database_url = original_database_url
-    db_manager._engine = original_engine
-    db_manager._session_factory = original_session_factory
-    db_manager._async_engine = original_async_engine
-    db_manager._async_session_factory = original_async_session_factory
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture
 def client(isolated_db_manager):
     """TestClient running the real app lifespan (database init) against the
     isolated temporary SQLite file."""
-    from main import app
+    from mimir.main import app
+
     with TestClient(app) as test_client:
         yield test_client
 
@@ -139,12 +99,15 @@ def apply_mocked_llm():
     target get_rag_service. The real budget_guard / usage_tracker /
     rag_debug singletons are kept so the reservation is still settled and the
     llm_usage rows are still written to the isolated temporary database."""
-    from main import app
-    from src.api.dependencies import (
-        get_rag_service, get_rag_debug_service, get_budget_guard,
-        get_usage_tracker, get_chat_cache_service,
+    from mimir.api.dependencies import (
+        get_budget_guard,
+        get_chat_cache_service,
+        get_rag_debug_service,
+        get_rag_service,
+        get_usage_tracker,
     )
-    from src.services.rag_service import RagService
+    from mimir.main import app
+    from mimir.services.rag_service import RagService
 
     mock_store = Mock()
     mock_store.query = Mock(return_value=[])
@@ -204,9 +167,7 @@ def _mock_llm_counting():
     async def fake_generate_stream(*args, usage_out=None, **kwargs):
         counters["generate_stream"] += 1
         if usage_out is not None:
-            usage_out.update(
-                {"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
-            )
+            usage_out.update({"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23})
         yield "mocked "
         yield "answer"
 
@@ -259,12 +220,15 @@ def apply_stream_rag(isolated_db_manager):
     The spy budget guard is used both by the route (reserve/release) and by
     the RagService (finalize), so a hit that releases (never finalizes) can be
     distinguished from a miss that finalizes."""
-    from main import app
-    from src.api.dependencies import (
-        get_rag_service, get_budget_guard, get_rag_debug_service,
-        get_usage_tracker, get_chat_cache_service,
+    from mimir.api.dependencies import (
+        get_budget_guard,
+        get_chat_cache_service,
+        get_rag_debug_service,
+        get_rag_service,
+        get_usage_tracker,
     )
-    from src.services.rag_service import RagService
+    from mimir.main import app
+    from mimir.services.rag_service import RagService
 
     cache = get_chat_cache_service()
     cache.invalidate_all()
@@ -362,8 +326,8 @@ class TestBudgetExceededGate:
     def _reject_every_reservation(self, isolated_db_manager):
         """Override get_budget_guard with a stub whose reserve() always
         returns None (budget exhausted), regardless of the real ledger."""
-        from main import app
-        from src.api.dependencies import get_budget_guard
+        from mimir.api.dependencies import get_budget_guard
+        from mimir.main import app
 
         rejecting_guard = Mock(spec=BudgetGuard)
         rejecting_guard.reserve = Mock(return_value=None)
@@ -402,15 +366,15 @@ class TestNormalStreamUsageRecording:
     estimated=False, and finalizes the reservation instead of leaking it
     (exactly-one-chat-row happy path)."""
 
-    def test_normal_stream_call_records_embedding_and_chat_rows(
-        self, client, apply_mocked_llm
-    ):
+    def test_normal_stream_call_records_embedding_and_chat_rows(self, client, apply_mocked_llm):
         # stream_usage set so the final SSE chunk carries real usage: the chat
         # row is priced from real tokens (estimated=False), not the finally
         # fallback estimate.
-        apply_mocked_llm(_mock_llm(
-            stream_usage={"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
-        ))
+        apply_mocked_llm(
+            _mock_llm(
+                stream_usage={"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
+            )
+        )
 
         with client.stream(
             "POST",
@@ -473,9 +437,11 @@ class TestStreamingUsageRecording:
         """Counterpart happy path: when the final SSE chunk DOES carry real
         usage, the chat row is estimated=False (proves the two branches of
         the finally block are mutually exclusive, exactly one row each)."""
-        apply_mocked_llm(_mock_llm(
-            stream_usage={"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
-        ))
+        apply_mocked_llm(
+            _mock_llm(
+                stream_usage={"prompt_tokens": 15, "completion_tokens": 8, "total_tokens": 23}
+            )
+        )
 
         with client.stream(
             "POST",

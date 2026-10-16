@@ -1,19 +1,22 @@
 name: CI
 
+# Pull requests are checked before merge; main is checked again after each
+# merge, which gives the status shown by the README badge.
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Every job installs from the hash-pinned lockfiles: requirements.lock (from
-# requirements.txt) and requirements-dev.lock (from requirements.txt and
-# requirements-dev.txt). requirements*.txt stay the source of truth; the lock
-# header gives the uv command that regenerates them.
+# Every job installs from the hash-pinned requirements-dev.lock (runtime, test
+# and quality tools). requirements*.txt stay the source of truth; the lock
+# header gives the uv command that regenerates it.
 
 jobs:
   ruff:
@@ -56,13 +59,16 @@ jobs:
       - name: Install locked dependencies
         run: pip install --require-hashes -r requirements-dev.lock
 
+      - name: Install the mimir package
+        run: pip install --no-deps -e .
+
       # Offline: fails when a pin of requirements*.txt is not the installed
       # (locked) version, e.g. after a Dependabot bump without a regenerated lock.
       - name: Check the lockfile matches requirements
-        run: pip install -q --no-deps --no-index -r requirements.txt -r requirements-dev.txt
+        run: pip install -q --no-deps --no-index -r requirements-dev.txt
 
       - name: Type check
-        run: mypy backend/src
+        run: mypy backend/mimir
 
   pytest:
     name: pytest
@@ -75,26 +81,16 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: requirements.lock
+          cache-dependency-path: requirements-dev.lock
 
-      # The test suite only needs requirements.txt (runtime and test packages).
       - name: Install locked dependencies
-        run: pip install --require-hashes -r requirements.lock
+        run: pip install --require-hashes -r requirements-dev.lock
 
-      # Offline: fails when a pin of requirements.txt is not the installed
-      # (locked) version, e.g. after a Dependabot bump without a regenerated lock.
-      - name: Check the lockfile matches requirements
-        run: pip install -q --no-deps --no-index -r requirements.txt
+      - name: Install the mimir package
+        run: pip install --no-deps -e .
 
-      # The dense-retrieval and SSE snapshots of tests/oracle depend on FAISS
-      # float rounding, which varies with the CPU's SIMD level (they were
-      # generated on an AVX-512 machine and also fail on the original code
-      # elsewhere). They run in docs/cleanup/quality_gate.sh, not on runners.
       - name: Run tests
-        run: >-
-          pytest
-          --ignore=tests/oracle/test_retrieval_ranking.py
-          --ignore=tests/oracle/test_chat_stream_events.py
+        run: pytest
 
   pip-audit:
     name: pip-audit
@@ -112,17 +108,42 @@ jobs:
       - name: Install locked dependencies
         run: pip install --require-hashes -r requirements-dev.lock
 
-      # Same ignore list as scripts/local_ci.sh; any other advisory fails the job.
-      # - PYSEC-2026-107 (orjson 3.10.18, fix 3.11.5): pinned below 3.11 by
-      #   mistralai 0.4.2; the fix requires migrating the Mistral SDK.
-      # The lock audit covers exactly what CI installs (runtime, test and dev
-      # tools); the requirements.txt audit covers what a fresh install resolves.
+      # Any known advisory fails the job. requirements.lock is what the
+      # production image installs.
       - name: Audit locked dependencies
-        run: >-
+        run: |
           pip-audit -r requirements-dev.lock --require-hashes --disable-pip
-          --ignore-vuln PYSEC-2026-107
+          pip-audit -r requirements.lock --require-hashes --disable-pip
 
-      - name: Audit runtime and test dependencies
-        run: >-
-          pip-audit -r requirements.txt
-          --ignore-vuln PYSEC-2026-107
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
+      # Production dependencies only: the dev toolchain never reaches the
+      # image. Moderate advisories that need a major upgrade are tolerated.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

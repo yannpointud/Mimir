@@ -12,14 +12,14 @@ Also pinned: the LLM calls made, the budget settlement sequence, the cache
 replay of a repeated question and the error events of a failing pipeline.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
 from tests.oracle.harness import QUESTIONS, assert_snapshot, normalize
 
 
-def _run(env, question: str, clear_cache: bool = True) -> Dict[str, Any]:
+def _run(env, question: str, clear_cache: bool = True) -> dict[str, Any]:
     if clear_cache:
         env.chat_cache.invalidate_all()
     env.budget_guard.calls.clear()
@@ -59,7 +59,7 @@ def test_stream_replays_cached_answer(oracle_corpus_env):
 
 def test_stream_error_events(oracle_corpus_env):
     env = oracle_corpus_env
-    results: Dict[str, List[Any]] = {}
+    results: dict[str, list[Any]] = {}
     env.llm.fail_embed = True
     try:
         results["embedding failure"] = _run(env, QUESTIONS[1])

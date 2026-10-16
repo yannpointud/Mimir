@@ -1,43 +1,42 @@
 """
-Tests unitaires pour FAISS Vector Store - Version corrigée selon le code réel
+Unit tests of the FAISS vector store
 """
 
-import pytest
-import numpy as np
-import tempfile
-import shutil
 import json
 import os
-import faiss
+import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import faiss
+import numpy as np
+import pytest
 from pydantic import ValidationError
 
-from backend.src.rag_core.interfaces import (
+from mimir.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
+from mimir.rag_core.interfaces import (
     AbstractVectorStore,
     Chunk,
     SearchResult,
-    VectorStoreException,
     VectorStoreConnectionError,
+    VectorStoreException,
     VectorStoreOperationError,
 )
-from backend.src.rag_core.implementations.faiss_store import FaissVectorStore, MetadataPayload
 
 
 class TestAbstractVectorStore:
-    """Tests pour l'interface abstraite VectorStore"""
+    """Tests of the abstract VectorStore interface"""
 
     def test_abstract_class_cannot_be_instantiated(self):
-        """L'interface abstraite ne peut pas être instanciée"""
         with pytest.raises(TypeError):
             AbstractVectorStore()
 
 
 class TestChunk:
-    """Tests pour la classe Chunk"""
+    """Chunk tests"""
 
     def test_chunk_creation(self):
-        """Test de création d'un chunk"""
         embedding = np.array([0.1, 0.2, 0.3], dtype=np.float32)
         chunk = Chunk(
             text="Hello world",
@@ -59,7 +58,6 @@ class TestChunk:
         assert chunk.preserve is False
 
     def test_chunk_preserve_flag(self):
-        """Test du flag preserve"""
         chunk = Chunk(
             text="Important text",
             embedding=np.array([0.1, 0.2, 0.3], dtype=np.float32),
@@ -75,10 +73,9 @@ class TestChunk:
 
 
 class TestSearchResult:
-    """Tests pour la classe SearchResult"""
+    """SearchResult tests"""
 
     def test_search_result_creation(self):
-        """Test de création d'un résultat de recherche"""
         result = SearchResult(
             chunk_id=1,
             document_id="doc1",
@@ -101,15 +98,13 @@ class TestSearchResult:
 
 
 class TestVectorStoreExceptions:
-    """Tests pour les exceptions VectorStore"""
+    """VectorStore exception tests"""
 
     def test_exception_hierarchy(self):
-        """Test de la hiérarchie des exceptions"""
         assert issubclass(VectorStoreConnectionError, VectorStoreException)
         assert issubclass(VectorStoreOperationError, VectorStoreException)
 
     def test_exception_messages(self):
-        """Test des messages d'exception"""
         exc = VectorStoreConnectionError("Connection failed")
         assert str(exc) == "Connection failed"
 
@@ -118,18 +113,18 @@ class TestVectorStoreExceptions:
 
 
 class TestFaissVectorStore:
-    """Tests pour l'implémentation FAISS Vector Store réelle"""
+    """Tests of the FAISS vector store"""
 
     @pytest.fixture
     def temp_dir(self):
-        """Répertoire temporaire pour les tests"""
+        """Temporary directory"""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
         shutil.rmtree(temp_dir)
 
     @pytest.fixture
     def sample_chunks(self):
-        """Chunks d'exemple pour les tests"""
+        """Sample chunks for the tests"""
         chunks = []
         for i in range(3):
             embedding = np.random.rand(128).astype(np.float32)  # Dimension plus commune
@@ -146,9 +141,8 @@ class TestFaissVectorStore:
         return chunks
 
     def test_faiss_store_initialization(self, temp_dir):
-        """Test d'initialisation du store FAISS"""
         index_path = temp_dir / "test.index"
-        metadata_path = temp_dir / "test.pkl"
+        metadata_path = temp_dir / "test.json"
 
         store = FaissVectorStore(
             dimension=128,
@@ -160,18 +154,14 @@ class TestFaissVectorStore:
 
         assert store.dimension == 128
         assert store.index_path == index_path
-        # metadata_path is normalized to .json regardless of the extension
-        # passed in (write target); legacy_metadata_path keeps the .pkl form
-        # for transparent migration fallback (see faiss_store.py __init__).
-        assert store.metadata_path == metadata_path.with_suffix(".json")
-        assert store.legacy_metadata_path == metadata_path.with_suffix(".pkl")
+        assert store.metadata_path == metadata_path
         assert store.similarity_threshold == 0.7
         assert store.index_type == "FlatL2"
 
     def test_faiss_store_upsert(self, temp_dir, sample_chunks):
         """Test d'ajout de chunks"""
         index_path = temp_dir / "test.index"
-        metadata_path = temp_dir / "test.pkl"
+        metadata_path = temp_dir / "test.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -189,7 +179,7 @@ class TestFaissVectorStore:
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "opt.index"),
-            metadata_path=str(temp_dir / "opt.pkl"),
+            metadata_path=str(temp_dir / "opt.json"),
         )
 
         # 3 documents x 2 chunks -> chunk ids 0..5
@@ -234,7 +224,7 @@ class TestFaissVectorStore:
         store = FaissVectorStore(
             dimension=128,
             index_path=str(temp_dir / "snap.index"),
-            metadata_path=str(temp_dir / "snap.pkl"),
+            metadata_path=str(temp_dir / "snap.json"),
         )
         store.metadata = [
             {"chunk_id": 0, "text": "active one", "deleted": False},
@@ -248,9 +238,8 @@ class TestFaissVectorStore:
         assert store.metadata[0]["text"] == "active one"
 
     def test_faiss_store_query_empty(self, temp_dir):
-        """Test de requête sur store vide"""
         index_path = temp_dir / "empty.index"
-        metadata_path = temp_dir / "empty.pkl"
+        metadata_path = temp_dir / "empty.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -264,20 +253,19 @@ class TestFaissVectorStore:
     def test_faiss_store_health_check(self, temp_dir):
         """Test de health check"""
         index_path = temp_dir / "health.index"
-        metadata_path = temp_dir / "health.pkl"
+        metadata_path = temp_dir / "health.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
-        # Le health check doit réussir après initialisation
+        # The health check must pass after initialization
         is_healthy = store.health_check()
         assert isinstance(is_healthy, bool)
 
     def test_faiss_store_stats(self, temp_dir):
-        """Test des statistiques"""
         index_path = temp_dir / "stats.index"
-        metadata_path = temp_dir / "stats.pkl"
+        metadata_path = temp_dir / "stats.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -286,12 +274,12 @@ class TestFaissVectorStore:
         stats = store.get_stats()
 
         assert isinstance(stats, dict)
-        # Les clés exactes dépendent de l'implémentation
+        # The exact keys depend on the implementation
 
     def test_faiss_store_persist_load(self, temp_dir):
         """Test de persistance et chargement"""
         index_path = temp_dir / "persist.index"
-        metadata_path = temp_dir / "persist.pkl"
+        metadata_path = temp_dir / "persist.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -364,7 +352,7 @@ class TestFaissVectorStore:
 
         with (
             patch(
-                "backend.src.rag_core.implementations.faiss_store.os.replace",
+                "mimir.rag_core.implementations.faiss_store.os.replace",
                 side_effect=flaky_replace,
             ),
             pytest.raises(VectorStoreConnectionError),
@@ -397,13 +385,13 @@ class TestFaissVectorStore:
     def test_faiss_store_delete(self, temp_dir, sample_chunks):
         """Test de suppression de documents"""
         index_path = temp_dir / "delete.index"
-        metadata_path = temp_dir / "delete.pkl"
+        metadata_path = temp_dir / "delete.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
-        # Ajouter des chunks d'abord
+        # Add chunks first
         store.upsert(sample_chunks)
 
         # Tenter de supprimer un document
@@ -412,28 +400,26 @@ class TestFaissVectorStore:
 
     @patch("faiss.IndexFlatL2")
     def test_faiss_store_with_mock_index(self, mock_index_class, temp_dir):
-        """Test avec index FAISS mocké"""
         mock_index = Mock()
         mock_index.ntotal = 0
         mock_index_class.return_value = mock_index
 
         index_path = temp_dir / "mock.index"
-        metadata_path = temp_dir / "mock.pkl"
+        metadata_path = temp_dir / "mock.json"
 
         FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
 
-        # Vérifier que l'index a été créé
+        # Check that the index was created
         mock_index_class.assert_called_with(128)
 
     def test_faiss_store_invalid_dimension(self, temp_dir):
-        """Test avec dimension invalide"""
         index_path = temp_dir / "invalid.index"
-        metadata_path = temp_dir / "invalid.pkl"
+        metadata_path = temp_dir / "invalid.json"
 
-        # Test avec dimension négative - le code actuel n'empêche pas cela
-        # donc on teste que l'initialisation se fait sans erreur
+        # Negative dimension: the current code does not prevent it
+        # so only check that initialization raises no error
         store = FaissVectorStore(
             dimension=-1, index_path=str(index_path), metadata_path=str(metadata_path)
         )
@@ -441,11 +427,11 @@ class TestFaissVectorStore:
 
 
 class TestFaissIntegration:
-    """Tests d'intégration pour FAISS"""
+    """Integration tests of FAISS"""
 
     @pytest.fixture
     def temp_dir(self):
-        """Répertoire temporaire pour les tests"""
+        """Temporary directory"""
         temp_dir = tempfile.mkdtemp()
         yield Path(temp_dir)
         shutil.rmtree(temp_dir)
@@ -453,9 +439,9 @@ class TestFaissIntegration:
     def test_basic_workflow(self, temp_dir):
         """Test de workflow basique"""
         index_path = temp_dir / "workflow.index"
-        metadata_path = temp_dir / "workflow.pkl"
+        metadata_path = temp_dir / "workflow.json"
 
-        # Créer le store
+        # Create the store
         store = FaissVectorStore(
             dimension=128,
             index_path=str(index_path),
@@ -463,7 +449,7 @@ class TestFaissIntegration:
             similarity_threshold=0.5,
         )
 
-        # Créer quelques chunks
+        # Create a few chunks
         chunks = []
         for i in range(3):
             chunk = Chunk(
@@ -477,8 +463,8 @@ class TestFaissIntegration:
             )
             chunks.append(chunk)
 
-        # Test du workflow complet
-        # 1. Ajouter des chunks
+        # Full workflow
+        # 1. Add chunks
         success = store.upsert(chunks)
         assert success is True
 
@@ -486,7 +472,7 @@ class TestFaissIntegration:
         is_healthy = store.health_check()
         assert isinstance(is_healthy, bool)
 
-        # 3. Obtenir des statistiques
+        # 3. Get the statistics
         stats = store.get_stats()
         assert isinstance(stats, dict)
 
@@ -494,7 +480,7 @@ class TestFaissIntegration:
         success = store.persist()
         assert isinstance(success, bool)
 
-        # 5. Créer un nouveau store et charger
+        # 5. Create a new store and load
         new_store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
         )
@@ -507,7 +493,7 @@ class TestFaissIntegration:
         import threading
 
         index_path = temp_dir / "thread.index"
-        metadata_path = temp_dir / "thread.pkl"
+        metadata_path = temp_dir / "thread.json"
 
         store = FaissVectorStore(
             dimension=128, index_path=str(index_path), metadata_path=str(metadata_path)
@@ -516,9 +502,9 @@ class TestFaissIntegration:
         results = []
 
         def worker():
-            """Worker qui fait des opérations sur le store"""
+            """Worker running operations on the store"""
             try:
-                # Test d'opérations basiques
+                # Basic operations
                 stats = store.get_stats()
                 health = store.health_check()
                 results.append((stats, health))
@@ -532,11 +518,11 @@ class TestFaissIntegration:
             threads.append(thread)
             thread.start()
 
-        # Attendre la fin
+        # Wait for completion
         for thread in threads:
             thread.join()
 
-        # Vérifier que tout s'est bien passé
+        # Check that everything went well
         assert len(results) == 3
         for result in results:
             assert not isinstance(result, Exception)

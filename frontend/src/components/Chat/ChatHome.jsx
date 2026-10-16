@@ -5,6 +5,9 @@ import BrandMark from '../Common/BrandMark';
 import { healthAPI } from '../../services/api';
 import { COMPANY_NAME } from '../../config/brand';
 import { cn } from '../../utils/helpers';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ChatHome');
 
 const FEATURES = [
   {
@@ -38,7 +41,7 @@ const ServiceStatus = () => {
       try {
         setHealth(await healthAPI.getHealthStatus());
       } catch (error) {
-        console.error('Health check failed:', error);
+        logger.error('Health check failed', error);
         setUnreachable(true);
       }
     };

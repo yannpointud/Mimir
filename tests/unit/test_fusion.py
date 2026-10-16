@@ -5,7 +5,7 @@ and the SIGIR 2009 formulation (Cormack, Clarke & Buttcher): consensus ranking,
 a doc absent from one retriever, and an empty list from one retriever.
 """
 
-from src.rag_core.fusion import RankedResult, reciprocal_rank_fusion
+from mimir.rag_core.fusion import RankedResult, reciprocal_rank_fusion
 
 
 def test_rrf_k60_consensus_top_doc_wins():

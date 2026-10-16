@@ -9,14 +9,14 @@ descriptions (derived from function names and docstrings), and schema titles
 (derived from Python identifiers).
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from tests.oracle.harness import assert_snapshot
 
 _DROPPED_SCHEMA_KEYS = {"title", "description"}
 
 
-def _resolve(schema: Any, components: Dict[str, Any], depth: int = 0) -> Any:
+def _resolve(schema: Any, components: dict[str, Any], depth: int = 0) -> Any:
     """Inline every $ref and drop naming-only keys."""
     if depth > 20:
         return "<recursion>"
@@ -34,7 +34,7 @@ def _resolve(schema: Any, components: Dict[str, Any], depth: int = 0) -> Any:
     return schema
 
 
-def _contract(openapi: Dict[str, Any]) -> Dict[str, Any]:
+def _contract(openapi: dict[str, Any]) -> dict[str, Any]:
     components = openapi.get("components", {}).get("schemas", {})
     contract = {}
     for path, operations in sorted(openapi["paths"].items()):

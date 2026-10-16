@@ -49,7 +49,7 @@ stop_process "logs/frontend.pid" "frontend"
 echo "🧹 Nettoyage des processus orphelins..."
 
 # Rechercher et arrêter les processus uvicorn
-UVICORN_PIDS=$(pgrep -f "uvicorn main:app")
+UVICORN_PIDS=$(pgrep -f "uvicorn mimir.main:app")
 if [ ! -z "$UVICORN_PIDS" ]; then
     echo "🔄 Arrêt des processus uvicorn orphelins..."
     echo $UVICORN_PIDS | xargs kill 2>/dev/null || true

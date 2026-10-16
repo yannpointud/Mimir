@@ -13,7 +13,7 @@ Acceptée
 ## Décision
 
 **SQLite** (`sqlite:///./data/sqlite/mimir.db`)
-- Les tables sont créées au démarrage par `Base.metadata.create_all` ; les migrations Alembic sont versionnées à côté (`backend/alembic.ini`, `backend/src/database/migrations/`).
+- Les tables sont créées au démarrage par `Base.metadata.create_all` ; les migrations Alembic sont versionnées à côté (`backend/alembic.ini`, `backend/mimir/database/migrations/`).
 - Un listener `connect` sur le moteur synchrone applique les pragmas suivants (`configure_sqlite_performance`) :
   - `journal_mode=WAL` (piloté par `sqlite_wal_mode = True`) ;
   - `synchronous=NORMAL`, `cache_size=10000`, `temp_store=MEMORY`, `mmap_size=268435456` (256 Mo) ;
@@ -43,14 +43,13 @@ Négatives
 - SQLite et FAISS ne partagent pas de transaction. Leur cohérence repose sur les routes de validation et de reconstruction.
 - Une suppression n'est écrite sur disque qu'au prochain `persist()` : prochaine ingestion, reconstruction admin, nettoyage d'orphelins qui en trouve, validation avec corrections, ou `optimize()` automatique au-delà de 25 % de chunks supprimés. Un redémarrage entre-temps recharge les chunks du document supprimé comme actifs : ils redeviennent des résultats denses orphelins (la ligne SQLite a disparu, et l'index BM25, reconstruit et persisté après la suppression, ne les contient plus) jusqu'au prochain nettoyage.
 - La sauvegarde planifiée ne couvre que SQLite. Les copies FAISS ne sont faites qu'avant le nettoyage d'orphelins de la reconstruction admin.
-- Les pragmas ne sont attachés qu'au moteur synchrone. Le moteur asynchrone (aiosqlite) déclaré dans `connection.py` n'est utilisé nulle part ailleurs.
 
 ## Où dans le code
 
-- `backend/src/database/connection.py` : `configure_sqlite_performance`, `DatabaseManager`, `get_session_context`, `init_database`
-- `backend/src/config.py` : `database_url`, `sqlite_wal_mode`, `faiss_index_path`, `faiss_metadata_path`, `faiss_max_backups`, `embedding_dimension`, `sqlite_backup_dir`, `sqlite_backup_max_count`
-- `backend/src/rag_core/implementations/faiss_store.py` : `FaissVectorStore` (`query`, `delete`, `persist`, `_atomic_write`, `load`, `optimize`, `clean_orphans`, `_create_backup`, `_rotate_backups`, `rebuild_vector_store`), `MetadataPayload`
-- `backend/src/rag_core/implementations/validation_utils.py` : `VectorStoreValidator`
-- `backend/src/services/index_maintenance.py` : `rebuild_indexes`, `validate_index_consistency`, `remove_document_from_indexes`, `_clean_orphans_if_fragmented`
-- `backend/src/api/endpoints/admin.py` : `rebuild_vector_store` ; `backend/src/api/endpoints/documents.py` : `validate_vector_store_consistency`
+- `backend/mimir/database/connection.py` : `configure_sqlite_performance`, `DatabaseManager`, `get_session_context`, `init_database`
+- `backend/mimir/config.py` : `database_url`, `sqlite_wal_mode`, `faiss_index_path`, `faiss_metadata_path`, `faiss_max_backups`, `embedding_dimension`, `sqlite_backup_dir`, `sqlite_backup_max_count`
+- `backend/mimir/rag_core/implementations/faiss_store.py` : `FaissVectorStore` (`query`, `delete`, `persist`, `_atomic_write`, `load`, `optimize`, `clean_orphans`, `_create_backup`, `_rotate_backups`, `rebuild_vector_store`), `MetadataPayload`
+- `backend/mimir/rag_core/implementations/validation_utils.py` : `VectorStoreValidator`
+- `backend/mimir/services/index_maintenance.py` : `rebuild_indexes`, `validate_index_consistency`, `remove_document_from_indexes`, `_clean_orphans_if_fragmented`
+- `backend/mimir/api/endpoints/admin.py` : `rebuild_vector_store` ; `backend/mimir/api/endpoints/documents.py` : `validate_vector_store_consistency`
 - `scripts/backup_sqlite.py`, `scripts/restore_sqlite.py`, `scripts/faiss_kill9_persist.py`, `crontab.mimir.example`, `docker-compose.yml`
