@@ -20,6 +20,6 @@ radon==6.0.1
 pygount==3.2.0
 
 # Type stubs matching the runtime pins of requirements.txt
-types-cachetools==5.3.0.7
+types-cachetools==7.0.0.20260713
 types-Markdown==3.8.0.20250809
 types-psutil==7.0.0.20251116
