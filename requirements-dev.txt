@@ -13,7 +13,7 @@ freezegun==1.5.5
 mutmut==3.8.0
 
 # Quality
-ruff==0.15.21
+ruff==0.17.1
 mypy==2.4.0
 pip-audit==2.10.1
 radon==6.0.1
