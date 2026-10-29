@@ -6,7 +6,7 @@ RAG chatbot for enterprise documentation. Python/FastAPI backend, React frontend
 **critical**
 Ne jamais pousser sur main. Push autorisé uniquement sur une branche dédiée, livrée par pull request.
 INTERDICTION DE MODIFIER AILLEURS QUE DANS LE DOSSIER PROJET
-Le dossier scripts/ contient les scripts de tests de developpements temporaire
+Le dossier scripts/ contient l'outillage du projet (CI locale, sauvegarde et restauration SQLite, évaluation RAGAS) et les scripts de tests de développement temporaires
 Tous les commentaires dans le code doivent etres en anglais
 Pour lancer serveur et arreter : 
 start-servers.sh
@@ -79,9 +79,9 @@ frontend/
 │   └── test/                        # vitest tests (150 tests)
 └── package.json
 
-tests/                               # pytest test suite (921 tests, run from the repo root)
+tests/                               # pytest test suite (922 tests, run from the repo root)
 ├── conftest.py                      # Shared fixtures (temporary data paths for the whole run)
-├── unit/                            # Unit tests (727)
+├── unit/                            # Unit tests (728)
 ├── integration/                     # API + workflow tests (150)
 ├── oracle/                          # Characterization snapshots (32)
 └── performance/                     # Cleanup, budget and FAISS concurrency tests (12)

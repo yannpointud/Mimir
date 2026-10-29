@@ -16,7 +16,7 @@ Interface utilisateur React pour l'assistant documentaire intelligent Mimir.
 - **Authentification JWT** : Connexion sécurisée pour les administrateurs
 - **Gestion des documents** : Upload, suppression, protection des documents
 - **Monitoring système** : Surveillance en temps réel de la santé du système
-- **Configuration** : Visualisation en lecture seule des paramètres système
+- **Configuration** : Paramètres système en lecture seule et changement du mot de passe admin
 - **Upload par glisser-déposer** : Interface moderne pour l'ajout de documents
 - **Statistiques** : Tableaux de bord avec métriques en temps réel
 
@@ -67,11 +67,17 @@ Copiez `.env.example` vers `.env` et ajustez les valeurs :
 # API Configuration
 VITE_API_BASE_URL=/api/v1
 
-# Application
-VITE_APP_NAME=Mimir
-VITE_APP_VERSION=1.0.0
-VITE_APP_DESCRIPTION="Assistant documentaire intelligent"
+# Logs : warnings et erreurs vont toujours dans la console ; ces drapeaux
+# ajoutent les logs info, debug et l'envoi au backend (backend/logs/frontend.log)
+VITE_DEBUG_MODE=false
+VITE_ENABLE_LOGS=false
+VITE_LOG_TO_FILE=false
+
+# Nom de l'entreprise affiché à côté du logo Mimir (défaut : Arch-IT)
+VITE_COMPANY_NAME=Arch-IT
 ```
+
+Ces variables sont lues au build : les fichiers `.env` étant exclus du contexte Docker, l'image utilise les valeurs par défaut.
 
 ### Proxy de développement
 
@@ -86,6 +92,7 @@ frontend/
 │   │   ├── Chat/            # Interface de chat
 │   │   ├── Admin/           # Interface d'administration
 │   │   └── Common/          # Composants partagés
+│   ├── config/              # Branding (brand.js)
 │   ├── hooks/               # Hooks React personnalisés
 │   ├── services/            # Services API
 │   ├── utils/               # Fonctions utilitaires
@@ -98,24 +105,23 @@ frontend/
 ## 🎨 Design System
 
 ### Couleurs
-- **Primary** : Bleu (variants 50-900)
-- **Gray** : Gris neutre (variants 50-900)
-- **Success** : Vert pour les états positifs
-- **Warning** : Jaune pour les avertissements
-- **Error** : Rouge pour les erreurs
+Chaque couleur est une variable CSS déclarée dans le bloc `:root` de `src/index.css` et exposée à Tailwind par `tailwind.config.js`. Changer la palette d'un client revient à modifier ce seul bloc.
+- **Surfaces** : `canvas`, `surface`, `sunken`
+- **Texte et bordures** : `ink`, `line`
+- **Marque et navigation** : `accent`, `nav`, `hl`
+- **États** : `success`, `warning`, `danger`
 
 ### Composants CSS
-- **Boutons** : `.btn-primary`, `.btn-secondary`, `.btn-danger`
-- **Inputs** : `.input-field`
-- **Cards** : `.card`
-- **Messages** : `.message-user`, `.message-assistant`
+- **Boutons** : `.btn` avec `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-ghost`, `.btn-sm`, `.btn-lg`, `.btn-icon`
+- **Champs** : `.input`, `.input-field`, `.select`, `.field-label`, `.field-hint`
+- **Cartes** : `.card`, `.card-header`, `.card-title`, `.card-body`
+- **Retours** : `.alert-*`, `.badge-*`
 
 ## 🔒 Sécurité
 
 ### Authentification
 - **JWT** stocké dans localStorage
-- **Auto-refresh** des tokens expirés
-- **Déconnexion automatique** en cas d'erreur 401
+- **Déconnexion automatique** en cas d'erreur 401 (pas de rafraîchissement automatique du token)
 - **Validation côté client** des données utilisateur
 
 ### Protection des routes
@@ -136,9 +142,12 @@ L'interface est optimisée pour :
 ```
 src/test/
 ├── components/              # Tests des composants
+├── hooks/                   # Tests des hooks
 ├── utils/                   # Tests des utilitaires
 └── setup.js                 # Configuration des tests
 ```
+
+Un test est placé à côté de son composant : `src/components/Admin/AnalyticsPanel.budget.test.jsx`.
 
 ### Types de tests
 - **Tests unitaires** : Composants individuels
@@ -166,10 +175,8 @@ Le dossier `dist/` contient les assets optimisés :
 - **Source maps** : Désactivées en production
 
 ### Optimisations
-- **Lazy loading** : Chargement différé des routes
 - **Code splitting** : Séparation vendor/app
 - **Tree shaking** : Élimination du code mort
-- **Compression gzip** : Assets compressés
 
 ## 🔧 Scripts npm
 

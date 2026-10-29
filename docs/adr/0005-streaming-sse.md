@@ -37,7 +37,7 @@ Positives
 Négatives
 - Après le premier octet, une erreur ne peut plus être signalée que dans le flux, par la trame `error`. Le statut HTTP reste 200.
 - L'analyseur client est fait maison et minimal : pas de champ `event:`, pas de reprise (`Last-Event-ID`), ni de trames multi-lignes.
-- Le cache de réponses est en mémoire et local au processus (`ChatCacheService()`, 50 entrées, TTL 1800 s ; les variables `CACHE_*` ne sont pas lues). Il est perdu au redémarrage, ce qui renforce la contrainte d'un seul worker.
+- Le cache de réponses est en mémoire et local au processus (`ChatCacheService()`, 50 entrées, TTL 1800 s, codés en dur : aucun réglage de `config.py` ne les modifie). Il est perdu au redémarrage, ce qui renforce la contrainte d'un seul worker.
 - La normalisation de la clé de cache se limite à la casse et aux espaces de début et de fin.
 - Un proxy intermédiaire non configuré comme nginx peut mettre le flux en mémoire tampon et le livrer d'un bloc.
 

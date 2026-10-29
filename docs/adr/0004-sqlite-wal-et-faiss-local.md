@@ -21,14 +21,14 @@ Acceptée
 - Le moteur utilise `check_same_thread=False` et `timeout=20`. Les écritures du registre budgétaire et de l'usage sont déportées hors de la boucle d'événements par `asyncio.to_thread` ; les autres accès SQLite des routes restent synchrones.
 - La sauvegarde à chaud passe par l'Online Backup API (`sqlite3.Connection.backup()`, compatible WAL), avec des permissions `0o600`. Une rotation conserve `sqlite_backup_max_count = 14` fichiers dans `./data/backups`. Elle est planifiée par cron sur l'hôte (`crontab.mimir.example`). La restauration est vérifiée par `PRAGMA integrity_check` et par une comparaison des nombres de lignes.
 
-**FAISS** (singleton en mémoire, `faiss-cpu==1.12.0`)
+**FAISS** (singleton en mémoire, `faiss-cpu==1.15.1`)
 - L'index est un `IndexFlatL2` (recherche exhaustive exacte) de dimension `embedding_dimension = 1024`. `IndexFlatL2` renvoie la distance L2 au carré `d`, convertie en similarité par `max(0, 1 - d/2)`. Pour des vecteurs de norme 1, `1 - d/2` est exactement le cosinus. Le code ne normalise pas les vecteurs : la formule repose sur le fait que les embeddings `mistral-embed` sont fournis normalisés, ce que le code ne vérifie pas. Avec des vecteurs non normalisés, le score ne serait plus un cosinus.
-- La persistance repose sur deux fichiers : `./data/faiss/index.bin` (`faiss.write_index`) et `./data/faiss/metadata.json`. Ce dernier suit un schéma `MetadataPayload` versionné (`schema_version=1`), validé par pydantic, qui remplace l'ancien format pickle (migré puis renommé en `.pkl.migrated`).
+- La persistance repose sur deux fichiers : `./data/faiss/index.bin` (`faiss.write_index`) et `./data/faiss/metadata.json`. Ce dernier suit un schéma `MetadataPayload` versionné (`schema_version=1`), validé par pydantic.
 - L'écriture est atomique : fichier temporaire dans le même répertoire, `fsync`, `os.replace`, puis `fsync` du répertoire. L'index est écrit avant les métadonnées : un crash entre les deux ne laisse que des vecteurs orphelins. Le script `scripts/faiss_kill9_persist.py` rejoue ce scénario.
-- `chunk_id` correspond à la position du vecteur dans l'index. `delete()` ne fait que poser le drapeau `deleted` en mémoire. `optimize()` reconstruit l'index lorsque plus de 25 % des chunks sont supprimés. Après une suppression de document, un nettoyage des orphelins est aussi déclenché au-delà de 20 % de vecteurs supprimés, sans sauvegarde préalable (`create_backup=False`).
+- `chunk_id` correspond à la position du vecteur dans l'index. `delete()` ne fait que poser le drapeau `deleted` en mémoire. `delete()` appelle `optimize()`, qui reconstruit et persiste l'index, lorsque plus de 25 % des chunks sont supprimés.
 - Deux routes de maintenance :
   - `POST /api/v1/admin/vector-store/rebuild` (`require_admin`) : sauvegarde horodatée de l'index et des métadonnées (rotation `faiss_max_backups = 4`), nettoyage des orphelins, reconstruction, resynchronisation de BM25, vidage des caches et entrée d'audit ;
-  - `POST /api/v1/documents/maintenance/validate-consistency?fix_issues=&save_report=` (utilisateur authentifié) : comparaison SQLite/FAISS (`VectorStoreValidator`), corrections optionnelles, rapport JSON.
+  - `POST /api/v1/documents/maintenance/validate-consistency?fix_issues=&save_report=` (`require_admin`, imposé à tout le router `documents`) : comparaison SQLite/FAISS (`VectorStoreValidator`), corrections optionnelles, rapport JSON.
 
 ## Conséquences
 
@@ -42,7 +42,7 @@ Négatives
 - `IndexFlatL2` coûte O(N) par requête et garde tout l'index en RAM (environ N × 1024 × 4 octets). La reconstruction après suppression est complète.
 - SQLite et FAISS ne partagent pas de transaction. Leur cohérence repose sur les routes de validation et de reconstruction.
 - Une suppression n'est écrite sur disque qu'au prochain `persist()` : prochaine ingestion, reconstruction admin, nettoyage d'orphelins qui en trouve, validation avec corrections, ou `optimize()` automatique au-delà de 25 % de chunks supprimés. Un redémarrage entre-temps recharge les chunks du document supprimé comme actifs : ils redeviennent des résultats denses orphelins (la ligne SQLite a disparu, et l'index BM25, reconstruit et persisté après la suppression, ne les contient plus) jusqu'au prochain nettoyage.
-- La sauvegarde planifiée ne couvre que SQLite. Les copies FAISS ne sont faites qu'avant le nettoyage d'orphelins de la reconstruction admin.
+- La sauvegarde planifiée ne couvre que SQLite. Les copies FAISS ne sont faites qu'avant un nettoyage d'orphelins : reconstruction admin, ou validation avec corrections qui détecte des orphelins.
 
 ## Où dans le code
 
@@ -50,6 +50,6 @@ Négatives
 - `backend/mimir/config.py` : `database_url`, `sqlite_wal_mode`, `faiss_index_path`, `faiss_metadata_path`, `faiss_max_backups`, `embedding_dimension`, `sqlite_backup_dir`, `sqlite_backup_max_count`
 - `backend/mimir/rag_core/implementations/faiss_store.py` : `FaissVectorStore` (`query`, `delete`, `persist`, `_atomic_write`, `load`, `optimize`, `clean_orphans`, `_create_backup`, `_rotate_backups`, `rebuild_vector_store`), `MetadataPayload`
 - `backend/mimir/rag_core/implementations/validation_utils.py` : `VectorStoreValidator`
-- `backend/mimir/services/index_maintenance.py` : `rebuild_indexes`, `validate_index_consistency`, `remove_document_from_indexes`, `_clean_orphans_if_fragmented`
+- `backend/mimir/services/index_maintenance.py` : `rebuild_indexes`, `validate_index_consistency`, `remove_document_from_indexes`
 - `backend/mimir/api/endpoints/admin.py` : `rebuild_vector_store` ; `backend/mimir/api/endpoints/documents.py` : `validate_vector_store_consistency`
 - `scripts/backup_sqlite.py`, `scripts/restore_sqlite.py`, `scripts/faiss_kill9_persist.py`, `crontab.mimir.example`, `docker-compose.yml`
