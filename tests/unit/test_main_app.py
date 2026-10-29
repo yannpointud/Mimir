@@ -1,6 +1,10 @@
 """Unit tests of the main FastAPI application."""
 
 import asyncio
+import json
+import os
+import subprocess
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -113,6 +117,37 @@ class TestMainApp:
         assert "openapi" in schema
         assert "info" in schema
         assert schema["info"]["title"] == "Mimir"
+
+
+# Prints the status of each documentation route as the last stdout line
+_DOCS_ROUTES_PROBE = """
+import json
+from fastapi.testclient import TestClient
+from mimir.main import app
+
+client = TestClient(app)
+paths = ("/api/v1/openapi.json", "/docs", "/redoc")
+print(json.dumps({path: client.get(path).status_code for path in paths}))
+"""
+
+
+class TestApiDocsExposure:
+    """The OpenAPI schema and the interactive docs are closed in production."""
+
+    def test_production_serves_neither_schema_nor_docs(self, tmp_path):
+        # The routes are fixed when the app is built at import time: probe a
+        # fresh interpreter started in production, away from the repo .env
+        result = subprocess.run(
+            [sys.executable, "-c", _DOCS_ROUTES_PROBE],
+            cwd=tmp_path,
+            env={**os.environ, "ENVIRONMENT": "production"},
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        statuses = json.loads(result.stdout.strip().splitlines()[-1])
+        assert statuses == {"/api/v1/openapi.json": 404, "/docs": 404, "/redoc": 404}
 
 
 class TestErrorHandling:
