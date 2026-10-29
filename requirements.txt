@@ -14,7 +14,7 @@ python-multipart==0.0.31
 slowapi==0.1.9
 
 # Database
-sqlalchemy==2.0.43
+sqlalchemy==2.1.5
 alembic==1.16.5
 
 # LLM & RAG
