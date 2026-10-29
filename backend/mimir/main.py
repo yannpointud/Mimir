@@ -193,7 +193,7 @@ app = MimirAPI(
     version=settings.api_version,
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
-    openapi_url=f"/api/{settings.api_version}/openapi.json",
+    openapi_url=f"/api/{settings.api_version}/openapi.json" if not settings.is_production else None,
     lifespan=lifespan,
 )
 

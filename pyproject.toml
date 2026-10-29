@@ -90,7 +90,7 @@ only_mutate = [
     "backend/mimir/rag_core/tokenizer_fr.py",
 ]
 also_copy = ["pytest.ini"]
-# tests/mutmut_aliases.py makes the src.* imports of the tests see the mutants.
+# tests/mutmut_aliases.py makes the mimir.* imports of the tests see the mutants.
 pytest_add_cli_args = ["--no-cov", "-p", "no:cacheprovider", "-p", "tests.mutmut_aliases"]
 pytest_add_cli_args_test_selection = [
     "tests/unit/test_fusion.py",

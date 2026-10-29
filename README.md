@@ -3,15 +3,15 @@
 ![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 [![CI](https://github.com/yannpointud/Mimir/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yannpointud/Mimir/actions/workflows/ci.yml?query=branch%3Amain)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.133-teal.svg)
-![React](https://img.shields.io/badge/React-18.2-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.143-teal.svg)
+![React](https://img.shields.io/badge/React-18.3-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 Mimir est une solution de chatbot intelligent RAG (Retrieval Augmented Generation) destinée aux entreprises, permettant aux employés d'obtenir des réponses instantanées et fiables basées exclusivement sur la documentation interne. 
 
 ## 🎬 Démonstration
 
-https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
+https://github.com/user-attachments/assets/9b20606e-faee-4085-8cc4-1241e9a96eb9
 
 ## ✨ Fonctionnalités
 
@@ -71,7 +71,7 @@ https://github.com/user-attachments/assets/7efeac4d-fe0b-488f-823c-e28b7014a8f2
 - **Build** : Vite 8
 - **UI** : Tailwind CSS
 - **HTTP** : Axios avec intercepteurs, `fetch` pour le streaming SSE
-- **Routing** : React Router v6
+- **Routing** : React Router v7
 
 #### Infrastructure
 - **Logs** : Système centralisé JSON structuré
@@ -156,12 +156,12 @@ Lignes de code mesurées avec pygount 3.2.0 (hors commentaires et lignes vides) 
 
 | Périmètre | Fichiers | Lignes de code |
 | --- | ---: | ---: |
-| Backend : `backend/mimir`, `scripts` (Python) | 88 | 9 033 |
+| Backend : `backend/mimir`, `scripts` (Python) | 88 | 9 032 |
 | Frontend : `frontend/src` hors tests (JSX, JS, CSS) | 42 | 5 182 |
-| **Code applicatif** | **130** | **14 215** |
-| Tests backend : `tests/` (Python) | 86 | 12 218 |
+| **Code applicatif** | **130** | **14 214** |
+| Tests backend : `tests/` (Python) | 86 | 12 234 |
 | Tests frontend : `frontend/src/test/`, `*.test.jsx` | 16 | 1 498 |
-| **Tests** | **102** | **13 716** |
+| **Tests** | **102** | **13 732** |
 | Outillage : `scripts/` (Python, Bash) | 16 | 1 963 |
 
 ```bash
@@ -241,6 +241,8 @@ Le backend lit le fichier `.env` de son répertoire de travail (`backend/` avec 
 
 ```bash
 # API Configuration
+# API_VERSION fixe la version affichée et l'URL du schéma OpenAPI ;
+# le préfixe des routes reste /api/v1 (codé en dur dans main.py et le frontend)
 API_VERSION=v1
 API_HOST=0.0.0.0
 API_PORT=8000
@@ -360,7 +362,7 @@ cd frontend && npx vitest run
 
 La couverture de `backend/mimir` est calculée à chaque exécution de pytest (rapport HTML dans `coverage_report/`).
 
-La suite compte 921 tests pytest (727 unitaires, 150 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 92,18 %, seuil bloquant à 85 % dans `pytest.ini`) et 150 tests vitest (15 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Toute la suite tourne sur des chemins de données temporaires, jamais sur `backend/data/`.
+La suite compte 922 tests pytest (728 unitaires, 150 d'intégration, 32 de caractérisation, 12 de performance ; couverture de `backend/mimir` : 92,18 %, seuil bloquant à 85 % dans `pytest.ini`) et 150 tests vitest (15 fichiers). Elle couvre : auth, cache, database, API endpoints, ingestion, RAG core, coûts IA et performance. Toute la suite tourne sur des chemins de données temporaires, jamais sur `backend/data/`.
 
 Les tests de caractérisation (`tests/oracle/`) figent le comportement observable dans des instantanés JSON : contrat OpenAPI, réponses JSON, événements SSE, classement de la recherche et découpage en chunks. Ils se régénèrent avec `ORACLE_UPDATE=1 pytest tests/oracle`, uniquement pour un changement de comportement voulu, en relisant le diff.
 
@@ -389,7 +391,7 @@ uv pip compile requirements-dev.txt --universal --python-version 3.13 --generate
 
 ## 🛠️ API Documentation
 
-L'API REST complète est documentée via OpenAPI/Swagger (désactivé quand `ENVIRONMENT=production`) :
+L'API REST complète est documentée via OpenAPI/Swagger. Quand `ENVIRONMENT=production`, Swagger UI, ReDoc et le schéma `/api/v1/openapi.json` sont tous désactivés (404) :
 
 **Accès à la documentation :**
 - Swagger UI : http://localhost:8000/docs
@@ -455,8 +457,8 @@ L'API REST complète est documentée via OpenAPI/Swagger (désactivé quand `ENV
 - **Isolation** : Déploiement sur infrastructure dédiée, backend non-root, seul nginx expose un port
 
 ### Conformité
-- RGPD : Données en local uniquement
-- Confidentialité : Données stockées en local (les requêtes LLM transitent par l'API Mistral)
+- Stockage : documents, base SQLite et index stockés en local uniquement
+- Données envoyées à l'API Mistral : le texte des documents à l'ingestion (embeddings), puis chaque question et les extraits retenus comme contexte de la réponse
 - Audit trail : Logs d'actions admin complets
 
 ## 🐛 Troubleshooting

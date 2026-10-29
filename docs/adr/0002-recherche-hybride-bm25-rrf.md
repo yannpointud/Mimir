@@ -12,7 +12,7 @@ Acceptée
 
 ## Décision
 
-- **Second index lexical** `Bm25LexicalStore`, fondé sur `bm25s==0.3.9` (paquet de base, sans PyStemmer) avec les paramètres par défaut de `bm25s.BM25()`. Il est persisté dans `./data/bm25/index` (`bm25_index_path`) via l'API native de bm25s (`allow_pickle=False`). L'écriture passe par un répertoire temporaire, mis en place par `os.replace` (l'ancien index est d'abord écarté, puis restauré en cas d'échec).
+- **Second index lexical** `Bm25LexicalStore`, fondé sur `bm25s==0.3.13` (paquet de base, sans PyStemmer) avec les paramètres par défaut de `bm25s.BM25()`. Il est persisté dans `./data/bm25/index` (`bm25_index_path`) via l'API native de bm25s (`allow_pickle=False`). L'écriture passe par un répertoire temporaire, mis en place par `os.replace` (l'ancien index est d'abord écarté, puis restauré en cas d'échec).
 - **Tokenizer français léger** `light_french_tokenizer`, appliqué de la même façon à l'indexation et à la requête. Il replie les accents (NFKD), passe en minuscules et découpe sur `[a-z0-9]+`, sans racinisation ni mots vides, pour préserver les identifiants.
 - **Index dérivé.** BM25 est entièrement reconstruit à partir des chunks actifs de FAISS (`snapshot_active_chunks()`), qui reste la seule source de vérité. La reconstruction a lieu dans quatre cas :
   - à la fin de la file d'ingestion (une seule fois par lot, via le drapeau `_bm25_dirty`) ;
