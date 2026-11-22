@@ -15,7 +15,7 @@ slowapi==0.1.9
 
 # Database
 sqlalchemy==2.1.9
-alembic==1.16.5
+alembic==1.20.1
 
 # LLM & RAG
 # HTTP client of the Mistral API service (chat and embeddings)
