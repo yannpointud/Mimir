@@ -5,7 +5,7 @@
         "path": "/api/v1/admin/audit-log"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_logs_paginated\n[SQL: get_logs_paginated]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_logs_paginated\n[SQL: get_logs_paginated]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -17,7 +17,7 @@
         "path": "/api/v1/admin/cache/clear"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in create_log\n[SQL: create_log]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in create_log\n[SQL: create_log]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -29,7 +29,7 @@
         "path": "/api/v1/admin/config"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -41,7 +41,7 @@
         "path": "/api/v1/admin/config"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in set\n[SQL: set]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in set\n[SQL: set]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -134,7 +134,7 @@
         "path": "/api/v1/documents/"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_all_paginated\n[SQL: get_all_paginated]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_all_paginated\n[SQL: get_all_paginated]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -146,7 +146,7 @@
         "path": "/api/v1/documents/stats/overview"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_statistics\n[SQL: get_statistics]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_statistics\n[SQL: get_statistics]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -179,7 +179,7 @@
         "path": "/api/v1/admin/vector-store/rebuild"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -309,7 +309,7 @@
         "path": "/api/v1/admin/usage"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_today_by_model\n[SQL: get_today_by_model]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_today_by_model\n[SQL: get_today_by_model]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -321,7 +321,7 @@
         "path": "/api/v1/admin/usage"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get\n[SQL: get]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get\n[SQL: get]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
@@ -333,7 +333,7 @@
         "path": "/api/v1/documents/maintenance/validate-consistency"
       },
       "error_code": "INTERNAL_ERROR",
-      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)",
+      "error_message": "(builtins.Exception) oracle failure in get_all\n[SQL: get_all]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)",
       "success": false,
       "timestamp": "<timestamp>"
     },
