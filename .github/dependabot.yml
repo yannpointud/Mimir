@@ -2,6 +2,9 @@
 # requirements-dev.txt only: regenerate requirements.lock and
 # requirements-dev.lock on its branch with the uv command written in their
 # header, otherwise the CI lockfile check fails.
+#
+# Major versions are ignored: each one is a migration, planned by hand.
+# update-types ignore rules do not apply to security updates.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -9,12 +12,21 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Type stubs follow the runtime pin of their package (requirements-dev.txt)
+      # and are bumped together with it.
+      - dependency-name: "types-*"
 
   - package-ecosystem: npm
     directory: "/frontend"
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"
