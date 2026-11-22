@@ -252,8 +252,10 @@ class IngestionProcessor:
         """Extract, chunk, embed and index one document; False when it yields nothing."""
         start_time = time.time()
         try:
-            extracted_text = self._extract_text(task.file_path)
-            chunks_data = self._chunk(extracted_text, task.file_path)
+            # CPU-bound steps (a large or crafted PDF can take seconds to parse):
+            # offloaded so the event loop keeps serving the other requests.
+            extracted_text = await asyncio.to_thread(self._extract_text, task.file_path)
+            chunks_data = await asyncio.to_thread(self._chunk, extracted_text, task.file_path)
             if not chunks_data:
                 return False
 

@@ -5,6 +5,7 @@ Unit tests of the ingestion processor
 import asyncio
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -291,6 +292,38 @@ class TestIngestionProcessor:
             processor.llm_service.embed.assert_called_once()
             processor.vector_store.upsert.assert_called_once()
             processor.vector_store.persist.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_pipeline_extraction_does_not_block_event_loop(self, processor):
+        """Extraction runs off the event loop: while it is in progress, other
+        coroutines keep running. The fake extraction waits for an event that
+        only a coroutine can set, so an extraction run on the event loop
+        would wait out its timeout and record False."""
+        task = IngestionTask(file_path="dummy_path", document_id="123", metadata={})
+        extraction_started = threading.Event()
+        released_by_event_loop = threading.Event()
+        released_in_time = []
+
+        def slow_extract(file_path):
+            extraction_started.set()
+            released_in_time.append(released_by_event_loop.wait(timeout=5))
+            return "Sample text"
+
+        async def release_from_event_loop():
+            while not extraction_started.is_set():
+                await asyncio.sleep(0.01)
+            released_by_event_loop.set()
+
+        with (
+            patch.object(processor, "_extract_text", side_effect=slow_extract),
+            patch.object(processor, "_chunk", return_value=[]),
+        ):
+            releaser = asyncio.create_task(release_from_event_loop())
+            success = await processor._process_document_pipeline(task)
+            await releaser
+
+        assert released_in_time == [True]
+        assert success is False  # no chunks: the pipeline stops after chunking
 
     @pytest.mark.asyncio
     async def test_pipeline_rebuilds_bm25_from_active_chunks(self, processor):
