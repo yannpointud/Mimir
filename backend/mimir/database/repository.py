@@ -5,10 +5,11 @@ Implements CRUD operations with robust error handling
 
 import logging
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import asc, desc, func, update
+from sqlalchemy import func, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -136,9 +137,9 @@ class DocumentRepository(BaseRepository):
             # Sorting
             order_field = getattr(Document, order_by, Document.created_at)
             if desc_order:
-                query = query.order_by(desc(order_field))
+                query = query.order_by(order_field.desc())
             else:
-                query = query.order_by(asc(order_field))
+                query = query.order_by(order_field.asc())
 
             # Pagination
             if offset > 0:
@@ -183,10 +184,11 @@ class DocumentRepository(BaseRepository):
             total_count = query.count()
 
             # Apply sorting and pagination
-            direction = desc if descending else asc
-            query = query.order_by(
-                direction(DOCUMENT_SORT_COLUMNS[sort_by]), direction(Document.id)
-            )
+            sort_column = DOCUMENT_SORT_COLUMNS[sort_by]
+            if descending:
+                query = query.order_by(sort_column.desc(), Document.id.desc())
+            else:
+                query = query.order_by(sort_column.asc(), Document.id.asc())
             if offset > 0:
                 query = query.offset(offset)
             if limit:
@@ -415,7 +417,7 @@ class AuditLogRepository(BaseRepository):
             if action:
                 query = query.filter(AuditLog.action.like(f"%{action}%"))
 
-            query = query.order_by(desc(AuditLog.created_at))
+            query = query.order_by(AuditLog.created_at.desc())
 
             if offset > 0:
                 query = query.offset(offset)
@@ -457,7 +459,7 @@ class AuditLogRepository(BaseRepository):
             # Count the filtered set before pagination
             total_count = query.count()
 
-            query = query.order_by(desc(AuditLog.created_at))
+            query = query.order_by(AuditLog.created_at.desc())
             if offset > 0:
                 query = query.offset(offset)
 
@@ -692,7 +694,8 @@ class UsageRepository(BaseRepository):
             )
             self.session.commit()
 
-            return result.rowcount == 1
+            # An UPDATE yields a CursorResult at runtime; Session.execute is typed as Result
+            return cast(CursorResult[Any], result).rowcount == 1
 
         except SQLAlchemyError as e:
             self._handle_db_error(e, "reserve budget")
