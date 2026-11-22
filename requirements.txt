@@ -8,7 +8,7 @@ fastapi==0.143.0
 starlette==1.9.0
 uvicorn[standard]==0.35.0
 pydantic==2.11.8
-pydantic-settings==2.15.0
+pydantic-settings==2.16.3
 python-dotenv==1.2.2
 python-multipart==0.0.31
 slowapi==0.1.9
