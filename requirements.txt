@@ -19,7 +19,7 @@ alembic==1.16.5
 
 # LLM & RAG
 # HTTP client of the Mistral API service (chat and embeddings)
-aiohttp==3.14.4
+aiohttp==3.14.5
 faiss-cpu==1.15.1
 numpy==2.3.3
 rapidfuzz==3.14.6
